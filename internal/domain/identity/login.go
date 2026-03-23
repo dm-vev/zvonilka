@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 )
 
 // BeginLogin starts a code-based login challenge for a human account.
@@ -159,7 +160,7 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 
 		restoredChallenge := challenge
 		restoredChallenge.Used = false
-		restoredChallenge.UsedAt = challenge.UsedAt
+		restoredChallenge.UsedAt = time.Time{}
 		if _, restoreErr := s.store.SaveLoginChallenge(ctx, restoredChallenge); restoreErr != nil {
 			err = errors.Join(
 				err,

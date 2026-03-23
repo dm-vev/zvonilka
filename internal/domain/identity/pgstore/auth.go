@@ -15,6 +15,9 @@ func (s *Store) SaveLoginChallenge(ctx context.Context, challenge identity.Login
 	if err := s.requireStore(); err != nil {
 		return identity.LoginChallenge{}, err
 	}
+	if err := s.requireContext(ctx); err != nil {
+		return identity.LoginChallenge{}, err
+	}
 	if challenge.ID == "" {
 		return identity.LoginChallenge{}, identity.ErrInvalidInput
 	}
@@ -72,6 +75,9 @@ func (s *Store) LoginChallengeByID(ctx context.Context, challengeID string) (ide
 	if err := s.requireStore(); err != nil {
 		return identity.LoginChallenge{}, err
 	}
+	if err := s.requireContext(ctx); err != nil {
+		return identity.LoginChallenge{}, err
+	}
 	if strings.TrimSpace(challengeID) == "" {
 		return identity.LoginChallenge{}, identity.ErrNotFound
 	}
@@ -91,6 +97,9 @@ func (s *Store) LoginChallengeByID(ctx context.Context, challengeID string) (ide
 // DeleteLoginChallenge removes a login challenge from the store.
 func (s *Store) DeleteLoginChallenge(ctx context.Context, challengeID string) error {
 	if err := s.requireStore(); err != nil {
+		return err
+	}
+	if err := s.requireContext(ctx); err != nil {
 		return err
 	}
 	if challengeID == "" {

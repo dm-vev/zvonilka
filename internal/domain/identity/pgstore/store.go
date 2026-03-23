@@ -46,10 +46,7 @@ func (s *Store) WithinTx(ctx context.Context, fn func(identity.Store) error) err
 	if err := s.requireStore(); err != nil {
 		return err
 	}
-	if ctx == nil {
-		return identity.ErrInvalidInput
-	}
-	if err := ctx.Err(); err != nil {
+	if err := s.requireContext(ctx); err != nil {
 		return err
 	}
 	if fn == nil {
@@ -61,6 +58,9 @@ func (s *Store) WithinTx(ctx context.Context, fn func(identity.Store) error) err
 
 func (s *Store) withTransaction(ctx context.Context, fn func(identity.Store) error) error {
 	if err := s.requireStore(); err != nil {
+		return err
+	}
+	if err := s.requireContext(ctx); err != nil {
 		return err
 	}
 	if s.tx != nil {
@@ -119,6 +119,28 @@ func (s *Store) conn() sqlConn {
 func (s *Store) requireStore() error {
 	if s == nil || s.db == nil {
 		return identity.ErrInvalidInput
+	}
+
+	return nil
+}
+
+func (s *Store) requireContext(ctx context.Context) error {
+	if ctx == nil {
+		return identity.ErrInvalidInput
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Store) requireContext(ctx context.Context) error {
+	if ctx == nil {
+		return identity.ErrInvalidInput
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	return nil

@@ -102,6 +102,17 @@ func TestVerifyLoginCodeRollsBackOnAccountSaveFailure(t *testing.T) {
 		t.Fatalf("expected LastAuthAt to remain zero, got %s", storedAccount.LastAuthAt)
 	}
 
+	storedChallenge, err := baseStore.LoginChallengeByID(ctx, challenge.ID)
+	if err != nil {
+		t.Fatalf("load login challenge after failed verify: %v", err)
+	}
+	if storedChallenge.Used {
+		t.Fatalf("expected login challenge to remain unused after rollback")
+	}
+	if !storedChallenge.UsedAt.IsZero() {
+		t.Fatalf("expected login challenge UsedAt to be cleared, got %s", storedChallenge.UsedAt)
+	}
+
 	retryResult, err := svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
 		ChallengeID:    challenge.ID,
 		Code:           code,
