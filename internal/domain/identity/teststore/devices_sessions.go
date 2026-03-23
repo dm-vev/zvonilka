@@ -1,0 +1,122 @@
+package teststore
+
+import (
+	"context"
+
+	"github.com/dm-vev/zvonilka/internal/domain/identity"
+)
+
+func (s *memoryStore) SaveDevice(_ context.Context, device identity.Device) (identity.Device, error) {
+	if device.ID == "" {
+		return identity.Device{}, identity.ErrInvalidInput
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.devicesByID[device.ID] = device
+	s.deviceIDsForAccountLocked(device.AccountID)[device.ID] = struct{}{}
+
+	return device, nil
+}
+
+func (s *memoryStore) DeviceByID(_ context.Context, deviceID string) (identity.Device, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	device, ok := s.devicesByID[deviceID]
+	if !ok {
+		return identity.Device{}, identity.ErrNotFound
+	}
+
+	return device, nil
+}
+
+func (s *memoryStore) DevicesByAccountID(_ context.Context, accountID string) ([]identity.Device, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	deviceIDs, ok := s.deviceIDsByAccount[accountID]
+	if !ok {
+		return []identity.Device{}, nil
+	}
+
+	devices := make([]identity.Device, 0, len(deviceIDs))
+	for deviceID := range deviceIDs {
+		device, ok := s.devicesByID[deviceID]
+		if !ok {
+			continue
+		}
+		devices = append(devices, device)
+	}
+
+	return devices, nil
+}
+
+func (s *memoryStore) SaveSession(_ context.Context, session identity.Session) (identity.Session, error) {
+	if session.ID == "" {
+		return identity.Session{}, identity.ErrInvalidInput
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.sessionsByID[session.ID] = session
+	s.sessionIDsForAccountLocked(session.AccountID)[session.ID] = struct{}{}
+
+	return session, nil
+}
+
+func (s *memoryStore) SessionByID(_ context.Context, sessionID string) (identity.Session, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	session, ok := s.sessionsByID[sessionID]
+	if !ok {
+		return identity.Session{}, identity.ErrNotFound
+	}
+
+	return session, nil
+}
+
+func (s *memoryStore) SessionsByAccountID(_ context.Context, accountID string) ([]identity.Session, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	sessionIDs, ok := s.sessionIDsByAccount[accountID]
+	if !ok {
+		return []identity.Session{}, nil
+	}
+
+	sessions := make([]identity.Session, 0, len(sessionIDs))
+	for sessionID := range sessionIDs {
+		session, ok := s.sessionsByID[sessionID]
+		if !ok {
+			continue
+		}
+		sessions = append(sessions, session)
+	}
+
+	return sessions, nil
+}
+
+func (s *memoryStore) UpdateSession(_ context.Context, session identity.Session) (identity.Session, error) {
+	if session.ID == "" {
+		return identity.Session{}, identity.ErrInvalidInput
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.sessionsByID[session.ID]; !ok {
+		return identity.Session{}, identity.ErrNotFound
+	}
+
+	s.sessionsByID[session.ID] = session
+	if _, ok := s.sessionIDsByAccount[session.AccountID]; !ok {
+		return identity.Session{}, identity.ErrNotFound
+	}
+	s.sessionIDsByAccount[session.AccountID][session.ID] = struct{}{}
+
+	return session, nil
+}

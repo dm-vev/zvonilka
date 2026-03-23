@@ -26,7 +26,7 @@ type Service struct {
 }
 
 // NewService constructs a service backed by the provided store and sender.
-func NewService(store Store, sender CodeSender) (*Service, error) {
+func NewService(store Store, sender CodeSender, opts ...Option) (*Service, error) {
 	if store == nil {
 		return nil, ErrInvalidInput
 	}
@@ -34,7 +34,7 @@ func NewService(store Store, sender CodeSender) (*Service, error) {
 		sender = NoopCodeSender{}
 	}
 
-	return &Service{
+	service := &Service{
 		store:           store,
 		sender:          sender,
 		now:             func() time.Time { return time.Now().UTC() },
@@ -42,7 +42,15 @@ func NewService(store Store, sender CodeSender) (*Service, error) {
 		challengeTTL:    defaultChallengeTTL,
 		accessTokenTTL:  defaultAccessTTL,
 		refreshTokenTTL: defaultRefreshTTL,
-	}, nil
+	}
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt(service)
+		}
+	}
+
+	return service, nil
 }
 
 func (s *Service) currentTime() time.Time {

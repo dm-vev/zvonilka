@@ -1,10 +1,13 @@
-package identity
+package identity_test
 
 import (
 	"context"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/dm-vev/zvonilka/internal/domain/identity"
+	teststore "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
 )
 
 type recordingCodeSender struct {
@@ -12,7 +15,7 @@ type recordingCodeSender struct {
 	codes map[string]string
 }
 
-func (s *recordingCodeSender) SendLoginCode(_ context.Context, target LoginTarget, code string) error {
+func (s *recordingCodeSender) SendLoginCode(_ context.Context, target identity.LoginTarget, code string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -35,18 +38,16 @@ func TestUserAccountLifecycle(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	store := NewMemoryStore()
+	store := teststore.NewMemoryStore()
 	sender := &recordingCodeSender{}
+	fixedNow := time.Date(2026, time.March, 23, 18, 30, 0, 0, time.UTC)
 
-	svc, err := NewService(store, sender)
+	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time { return fixedNow }))
 	if err != nil {
 		t.Fatalf("new service: %v", err)
 	}
 
-	fixedNow := time.Date(2026, time.March, 23, 18, 30, 0, 0, time.UTC)
-	svc.now = func() time.Time { return fixedNow }
-
-	joinRequest, err := svc.SubmitJoinRequest(ctx, SubmitJoinRequestParams{
+	joinRequest, err := svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
 		Username:    "alice",
 		DisplayName: "Alice",
 		Email:       "alice@example.com",
@@ -57,27 +58,27 @@ func TestUserAccountLifecycle(t *testing.T) {
 		t.Fatalf("submit join request: %v", err)
 	}
 
-	approvedJoinRequest, account, err := svc.ApproveJoinRequest(ctx, ApproveJoinRequestParams{
+	approvedJoinRequest, account, err := svc.ApproveJoinRequest(ctx, identity.ApproveJoinRequestParams{
 		JoinRequestID: joinRequest.ID,
 		ReviewedBy:    "admin-1",
-		Roles:         []Role{RoleAdmin},
+		Roles:         []identity.Role{identity.RoleAdmin},
 		Note:          "approved",
 	})
 	if err != nil {
 		t.Fatalf("approve join request: %v", err)
 	}
-	if approvedJoinRequest.Status != JoinRequestStatusApproved {
+	if approvedJoinRequest.Status != identity.JoinRequestStatusApproved {
 		t.Fatalf("expected approved join request, got %s", approvedJoinRequest.Status)
 	}
-	if account.Kind != AccountKindUser {
+	if account.Kind != identity.AccountKindUser {
 		t.Fatalf("expected user account, got %s", account.Kind)
 	}
 
-	challenge, targets, err := svc.BeginLogin(ctx, BeginLoginParams{
+	challenge, targets, err := svc.BeginLogin(ctx, identity.BeginLoginParams{
 		Username:      "alice",
-		Delivery:      LoginDeliveryChannelEmail,
+		Delivery:      identity.LoginDeliveryChannelEmail,
 		DeviceName:    "Alice iPhone",
-		Platform:      DevicePlatformIOS,
+		Platform:      identity.DevicePlatformIOS,
 		ClientVersion: "1.0.0",
 		Locale:        "en",
 	})
@@ -93,31 +94,31 @@ func TestUserAccountLifecycle(t *testing.T) {
 		t.Fatalf("expected recorded login code")
 	}
 
-	loginResult, err := svc.VerifyLoginCode(ctx, VerifyLoginCodeParams{
+	loginResult, err := svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
 		ChallengeID: challenge.ID,
 		Code:        code,
 		DeviceName:  "Alice iPhone",
-		Platform:    DevicePlatformIOS,
+		Platform:    identity.DevicePlatformIOS,
 		PublicKey:   "alice-device-key",
 		PushToken:   "push-token-1",
 	})
 	if err != nil {
 		t.Fatalf("verify login code: %v", err)
 	}
-	if loginResult.Session.Status != SessionStatusActive {
+	if loginResult.Session.Status != identity.SessionStatusActive {
 		t.Fatalf("expected active session, got %s", loginResult.Session.Status)
 	}
-	if loginResult.Device.Status != DeviceStatusActive {
+	if loginResult.Device.Status != identity.DeviceStatusActive {
 		t.Fatalf("expected active device, got %s", loginResult.Device.Status)
 	}
 	if loginResult.Tokens.AccessToken == "" || loginResult.Tokens.RefreshToken == "" {
 		t.Fatalf("expected issued tokens")
 	}
 
-	extraDevice, updatedSession, err := svc.RegisterDevice(ctx, RegisterDeviceParams{
+	extraDevice, updatedSession, err := svc.RegisterDevice(ctx, identity.RegisterDeviceParams{
 		SessionID:  loginResult.Session.ID,
 		DeviceName: "Alice Mac",
-		Platform:   DevicePlatformDesktop,
+		Platform:   identity.DevicePlatformDesktop,
 		PublicKey:  "alice-mac-key",
 		PushToken:  "push-token-2",
 	})
@@ -147,14 +148,14 @@ func TestUserAccountLifecycle(t *testing.T) {
 		t.Fatalf("expected 1 session, got %d", len(sessions))
 	}
 
-	revokedSession, err := svc.RevokeSession(ctx, RevokeSessionParams{
+	revokedSession, err := svc.RevokeSession(ctx, identity.RevokeSessionParams{
 		SessionID: loginResult.Session.ID,
 		Reason:    "logout",
 	})
 	if err != nil {
 		t.Fatalf("revoke session: %v", err)
 	}
-	if revokedSession.Status != SessionStatusRevoked {
+	if revokedSession.Status != identity.SessionStatusRevoked {
 		t.Fatalf("expected revoked session, got %s", revokedSession.Status)
 	}
 }
@@ -163,37 +164,34 @@ func TestBotAccountAuthentication(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	store := NewMemoryStore()
-	svc, err := NewService(store, NoopCodeSender{})
+	store := teststore.NewMemoryStore()
+	fixedNow := time.Date(2026, time.March, 23, 18, 45, 0, 0, time.UTC)
+	svc, err := identity.NewService(store, identity.NoopCodeSender{}, identity.WithNow(func() time.Time { return fixedNow }))
 	if err != nil {
 		t.Fatalf("new service: %v", err)
 	}
 
-	svc.now = func() time.Time {
-		return time.Date(2026, time.March, 23, 18, 45, 0, 0, time.UTC)
-	}
-
-	account, botToken, err := svc.CreateAccount(ctx, CreateAccountParams{
+	account, botToken, err := svc.CreateAccount(ctx, identity.CreateAccountParams{
 		Username:    "notifier-bot",
 		DisplayName: "Notifier",
-		AccountKind: AccountKindBot,
+		AccountKind: identity.AccountKindBot,
 		CreatedBy:   "admin-1",
-		Roles:       []Role{RoleSupport},
+		Roles:       []identity.Role{identity.RoleSupport},
 	})
 	if err != nil {
 		t.Fatalf("create bot account: %v", err)
 	}
-	if account.Kind != AccountKindBot {
+	if account.Kind != identity.AccountKindBot {
 		t.Fatalf("expected bot account, got %s", account.Kind)
 	}
 	if botToken == "" {
 		t.Fatalf("expected bot token")
 	}
 
-	loginResult, err := svc.AuthenticateBot(ctx, AuthenticateBotParams{
+	loginResult, err := svc.AuthenticateBot(ctx, identity.AuthenticateBotParams{
 		BotToken:      botToken,
 		DeviceName:    "bot-worker-1",
-		Platform:      DevicePlatformServer,
+		Platform:      identity.DevicePlatformServer,
 		PublicKey:     "bot-public-key",
 		ClientVersion: "1.0.0",
 		Locale:        "en",
@@ -201,7 +199,7 @@ func TestBotAccountAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatalf("authenticate bot: %v", err)
 	}
-	if loginResult.Session.Status != SessionStatusActive {
+	if loginResult.Session.Status != identity.SessionStatusActive {
 		t.Fatalf("expected active session, got %s", loginResult.Session.Status)
 	}
 	if loginResult.Device.AccountID != account.ID {
