@@ -61,6 +61,50 @@ func TestApproveJoinRequestMarksExpiredAndSkipsAccountCreation(t *testing.T) {
 	}
 }
 
+func TestRejectJoinRequestMarksExpiredAndSkipsRejection(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 23, 12, 30, 0, 0, time.UTC)
+
+	svc, err := identity.NewService(store, identity.NoopCodeSender{}, identity.WithNow(func() time.Time {
+		return now
+	}))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	joinRequest, err := svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
+		Username: "rejected-expired-user",
+		Email:    "rejected-expired@example.com",
+	})
+	if err != nil {
+		t.Fatalf("submit join request: %v", err)
+	}
+
+	now = now.Add(73 * time.Hour)
+	savedJoinRequest, err := svc.RejectJoinRequest(ctx, identity.RejectJoinRequestParams{
+		JoinRequestID: joinRequest.ID,
+		ReviewedBy:    "admin-1",
+		Reason:        "late review",
+	})
+	if !errors.Is(err, identity.ErrExpiredJoinRequest) {
+		t.Fatalf("expected ErrExpiredJoinRequest, got %v", err)
+	}
+	if savedJoinRequest.Status != identity.JoinRequestStatusExpired {
+		t.Fatalf("expected expired status, got %s", savedJoinRequest.Status)
+	}
+
+	storedJoinRequest, err := store.JoinRequestByID(ctx, joinRequest.ID)
+	if err != nil {
+		t.Fatalf("load join request: %v", err)
+	}
+	if storedJoinRequest.Status != identity.JoinRequestStatusExpired {
+		t.Fatalf("stored join request should be expired, got %s", storedJoinRequest.Status)
+	}
+}
+
 func TestApproveJoinRequestRollsBackAccountWhenJoinRequestSaveFails(t *testing.T) {
 	t.Parallel()
 
@@ -103,6 +147,46 @@ func TestApproveJoinRequestRollsBackAccountWhenJoinRequestSaveFails(t *testing.T
 	_, err = baseStore.AccountByUsername(ctx, "rollback-user")
 	if !errors.Is(err, identity.ErrNotFound) {
 		t.Fatalf("expected account rollback after failed approval, got %v", err)
+	}
+}
+
+func TestListJoinRequestsByStatusExpiresPendingRequestsBeforeReturning(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 23, 13, 30, 0, 0, time.UTC)
+
+	svc, err := identity.NewService(store, identity.NoopCodeSender{}, identity.WithNow(func() time.Time {
+		return now
+	}))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	joinRequest, err := svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
+		Username: "list-expired-user",
+		Email:    "list-expired@example.com",
+	})
+	if err != nil {
+		t.Fatalf("submit join request: %v", err)
+	}
+
+	now = now.Add(73 * time.Hour)
+	pendingJoinRequests, err := svc.ListJoinRequestsByStatus(ctx, identity.JoinRequestStatusPending)
+	if err != nil {
+		t.Fatalf("list pending join requests: %v", err)
+	}
+	if len(pendingJoinRequests) != 0 {
+		t.Fatalf("expected no pending join requests after cleanup, got %d", len(pendingJoinRequests))
+	}
+
+	storedJoinRequest, err := store.JoinRequestByID(ctx, joinRequest.ID)
+	if err != nil {
+		t.Fatalf("load join request: %v", err)
+	}
+	if storedJoinRequest.Status != identity.JoinRequestStatusExpired {
+		t.Fatalf("stored join request should be expired, got %s", storedJoinRequest.Status)
 	}
 }
 

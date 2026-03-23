@@ -81,27 +81,16 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 		return JoinRequest{}, Account{}, ErrInvalidInput
 	}
 
-	joinRequest, err := s.store.JoinRequestByID(ctx, params.JoinRequestID)
+	joinRequest, err := s.loadPendingJoinRequest(ctx, params.JoinRequestID, params.ReviewedBy)
 	if err != nil {
-		return JoinRequest{}, Account{}, fmt.Errorf("load join request %s: %w", params.JoinRequestID, err)
-	}
-	if joinRequest.Status != JoinRequestStatusPending {
-		return JoinRequest{}, Account{}, ErrConflict
-	}
-	now := s.currentTime()
-	if !joinRequest.ExpiresAt.IsZero() && !now.Before(joinRequest.ExpiresAt) {
-		joinRequest.Status = JoinRequestStatusExpired
-		joinRequest.ReviewedAt = now
-		joinRequest.ReviewedBy = trimmed(params.ReviewedBy)
-		joinRequest.DecisionReason = "join request expired"
-
-		savedJoinRequest, saveErr := s.store.SaveJoinRequest(ctx, joinRequest)
-		if saveErr != nil {
-			return JoinRequest{}, Account{}, fmt.Errorf("mark join request %s as expired: %w", joinRequest.ID, saveErr)
+		if errors.Is(err, ErrExpiredJoinRequest) {
+			return joinRequest, Account{}, err
 		}
 
-		return savedJoinRequest, Account{}, ErrExpiredJoinRequest
+		return JoinRequest{}, Account{}, err
 	}
+
+	now := s.currentTime()
 
 	account, botToken, err := s.createAccount(
 		ctx,
@@ -159,12 +148,13 @@ func (s *Service) RejectJoinRequest(ctx context.Context, params RejectJoinReques
 		return JoinRequest{}, ErrInvalidInput
 	}
 
-	joinRequest, err := s.store.JoinRequestByID(ctx, params.JoinRequestID)
+	joinRequest, err := s.loadPendingJoinRequest(ctx, params.JoinRequestID, params.ReviewedBy)
 	if err != nil {
-		return JoinRequest{}, fmt.Errorf("load join request %s: %w", params.JoinRequestID, err)
-	}
-	if joinRequest.Status != JoinRequestStatusPending {
-		return JoinRequest{}, ErrConflict
+		if errors.Is(err, ErrExpiredJoinRequest) {
+			return joinRequest, err
+		}
+
+		return JoinRequest{}, err
 	}
 
 	now := s.currentTime()
