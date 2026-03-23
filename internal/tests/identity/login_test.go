@@ -45,8 +45,9 @@ func (s *failingCodeSender) totalAttempts() int {
 // failingUpdateSessionStore fails the first UpdateSession call to exercise rollback.
 type failingUpdateSessionStore struct {
 	identity.Store
-	failErr error
-	failed  bool
+	failErr    error
+	failOnCall int
+	calls      int
 }
 
 // WithinTx preserves the injected failure semantics inside transactional callbacks.
@@ -64,8 +65,12 @@ func (s *failingUpdateSessionStore) UpdateSession(ctx context.Context, session i
 	if s.failErr == nil {
 		s.failErr = errors.New("forced update session failure")
 	}
-	if !s.failed {
-		s.failed = true
+	s.calls++
+	failOnCall := s.failOnCall
+	if failOnCall == 0 {
+		failOnCall = 1
+	}
+	if s.calls == failOnCall {
 		return identity.Session{}, s.failErr
 	}
 
@@ -82,8 +87,12 @@ func (s *failingUpdateSessionTxStore) UpdateSession(ctx context.Context, session
 	if s.parent.failErr == nil {
 		s.parent.failErr = errors.New("forced update session failure")
 	}
-	if !s.parent.failed {
-		s.parent.failed = true
+	s.parent.calls++
+	failOnCall := s.parent.failOnCall
+	if failOnCall == 0 {
+		failOnCall = 1
+	}
+	if s.parent.calls == failOnCall {
 		return identity.Session{}, s.parent.failErr
 	}
 

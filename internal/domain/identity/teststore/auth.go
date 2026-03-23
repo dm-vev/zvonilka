@@ -15,8 +15,9 @@ func (s *memoryStore) SaveLoginChallenge(_ context.Context, challenge identity.L
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.challengesByID[challenge.ID] = challenge
-	return challenge, nil
+	storedChallenge := cloneChallenge(challenge)
+	s.challengesByID[storedChallenge.ID] = storedChallenge
+	return cloneChallenge(storedChallenge), nil
 }
 
 // LoginChallengeByID resolves a login challenge by primary key.
@@ -29,7 +30,7 @@ func (s *memoryStore) LoginChallengeByID(_ context.Context, challengeID string) 
 		return identity.LoginChallenge{}, identity.ErrNotFound
 	}
 
-	return challenge, nil
+	return cloneChallenge(challenge), nil
 }
 
 // DeleteLoginChallenge removes a login challenge from the store.

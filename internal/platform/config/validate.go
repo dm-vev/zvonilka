@@ -128,6 +128,9 @@ func (c Configuration) Validate() error {
 	if c.Storage.SearchProvider == "" {
 		errs = append(errs, errors.New("storage search provider is required"))
 	}
+	if err := validateDistinctStorageProviders(c.Storage); err != nil {
+		errs = append(errs, err)
+	}
 
 	if len(errs) == 0 {
 		return nil
@@ -152,4 +155,49 @@ func validateLogFormat(format string) error {
 	default:
 		return fmt.Errorf("invalid logging format %q", format)
 	}
+}
+
+func validateDistinctStorageProviders(storage StorageConfig) error {
+	type binding struct {
+		name  string
+		value string
+	}
+
+	bindings := []binding{
+		{name: "primary", value: storage.PrimaryProvider},
+		{name: "cache", value: storage.CacheProvider},
+		{name: "object", value: storage.ObjectProvider},
+		{name: "audit", value: storage.AuditProvider},
+		{name: "search", value: storage.SearchProvider},
+	}
+
+	seen := make(map[string]string, len(bindings))
+	var errs []error
+
+	for _, binding := range bindings {
+		if binding.value == "" {
+			continue
+		}
+
+		if previous, ok := seen[binding.value]; ok {
+			errs = append(
+				errs,
+				fmt.Errorf(
+					"storage provider bindings must be distinct: %s and %s both use %q",
+					previous,
+					binding.name,
+					binding.value,
+				),
+			)
+			continue
+		}
+
+		seen[binding.value] = binding.name
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return errors.Join(errs...)
 }

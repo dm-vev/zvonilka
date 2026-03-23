@@ -157,3 +157,69 @@ func TestRevokeAllSessionsIdempotencyKeyDeduplicatesSuccessfulBulkRevoke(t *test
 		t.Fatalf("expected distinct sessions")
 	}
 }
+
+func TestRevokeAllSessionsReturnsZeroCountOnRollback(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseStore := teststore.NewMemoryStore()
+	store := &failingUpdateSessionStore{Store: baseStore, failOnCall: 2}
+	sender := &recordingCodeSender{}
+	clock := &steppedClock{
+		now:  time.Date(2026, time.March, 23, 22, 0, 0, 0, time.UTC),
+		step: time.Minute,
+	}
+
+	svc, err := identity.NewService(store, sender, identity.WithNow(clock.Now))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	account, _, err := svc.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "revoke-rollback-user",
+		DisplayName: "Revoke Rollback User",
+		Email:       "revoke-rollback@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	firstSession := newLoggedInAccount(t, svc, sender, account.Username, "revoke-rollback-phone-1", "revoke-rollback-key-1")
+	secondSession := newLoggedInAccount(t, svc, sender, account.Username, "revoke-rollback-phone-2", "revoke-rollback-key-2")
+
+	revoked, err := svc.RevokeAllSessions(ctx, account.ID, identity.RevokeAllSessionsParams{
+		Reason:         "logout all",
+		IdempotencyKey: "revoke-rollback-key",
+	})
+	if err == nil {
+		t.Fatalf("expected revoke all sessions to fail")
+	}
+	if revoked != 0 {
+		t.Fatalf("expected zero revoked count on rollback, got %d", revoked)
+	}
+
+	sessions, err := svc.ListSessions(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("list sessions after rollback: %v", err)
+	}
+	if len(sessions) != 2 {
+		t.Fatalf("expected 2 sessions after rollback, got %d", len(sessions))
+	}
+
+	currentCount := 0
+	for _, session := range sessions {
+		if session.Status != identity.SessionStatusActive {
+			t.Fatalf("expected active session after rollback, got %s", session.Status)
+		}
+		if session.Current {
+			currentCount++
+		}
+	}
+	if currentCount != 1 {
+		t.Fatalf("expected one current session after rollback, got %d", currentCount)
+	}
+	if firstSession.ID == secondSession.ID {
+		t.Fatalf("expected distinct sessions")
+	}
+}

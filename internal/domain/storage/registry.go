@@ -37,13 +37,15 @@ func (c *Catalog) Register(provider Provider) error {
 	}
 
 	name := normalizeName(provider.Name())
+	kind := normalizeKind(provider.Kind())
+	purpose := normalizePurpose(provider.Purpose())
 	if name == "" {
 		return ErrInvalidInput
 	}
-	if provider.Kind() == KindUnspecified {
+	if kind == KindUnspecified {
 		return ErrInvalidInput
 	}
-	if provider.Purpose() == PurposeUnspecified {
+	if purpose == PurposeUnspecified {
 		return ErrInvalidInput
 	}
 
@@ -58,8 +60,8 @@ func (c *Catalog) Register(provider Provider) error {
 
 	c.providers[name] = provider
 	c.order = append(c.order, name)
-	c.byKind[provider.Kind()] = append(c.byKind[provider.Kind()], name)
-	c.byPurpose[provider.Purpose()] = append(c.byPurpose[provider.Purpose()], name)
+	c.byKind[kind] = append(c.byKind[kind], name)
+	c.byPurpose[purpose] = append(c.byPurpose[purpose], name)
 
 	return nil
 }
@@ -84,6 +86,7 @@ func (c *Catalog) Provider(name string) (Provider, error) {
 
 // Select resolves the first provider that matches the requested purpose and capabilities.
 func (c *Catalog) Select(purpose Purpose, required Capability) (Provider, error) {
+	purpose = normalizePurpose(purpose)
 	if purpose == PurposeUnspecified {
 		return nil, ErrInvalidInput
 	}
@@ -107,6 +110,8 @@ func (c *Catalog) Select(purpose Purpose, required Capability) (Provider, error)
 
 // ProvidersByPurpose returns all providers registered for a purpose.
 func (c *Catalog) ProvidersByPurpose(purpose Purpose) []Provider {
+	purpose = normalizePurpose(purpose)
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -123,6 +128,8 @@ func (c *Catalog) ProvidersByPurpose(purpose Purpose) []Provider {
 
 // ProvidersByKind returns all providers registered for a kind.
 func (c *Catalog) ProvidersByKind(kind Kind) []Provider {
+	kind = normalizeKind(kind)
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -175,4 +182,24 @@ func (c *Catalog) ensureMapsLocked() {
 
 func normalizeName(name string) string {
 	return strings.ToLower(trimSpaces(name))
+}
+
+func normalizeKind(kind Kind) Kind {
+	kind = Kind(strings.ToLower(trimSpaces(string(kind))))
+	switch kind {
+	case KindRelational, KindCache, KindObject, KindIndex, KindCustom:
+		return kind
+	default:
+		return KindUnspecified
+	}
+}
+
+func normalizePurpose(purpose Purpose) Purpose {
+	purpose = Purpose(strings.ToLower(trimSpaces(string(purpose))))
+	switch purpose {
+	case PurposePrimary, PurposeCache, PurposeObject, PurposeAudit, PurposeSearch, PurposeCustom:
+		return purpose
+	default:
+		return PurposeUnspecified
+	}
 }
