@@ -36,13 +36,18 @@ func (s *Service) ListSessions(ctx context.Context, accountID string) ([]Session
 		return nil, fmt.Errorf("list sessions for account %s: %w", accountID, err)
 	}
 
-	return sessions, nil
+	return normalizeCurrentSessions(sessions), nil
 }
 
 // RevokeSession marks a single session as revoked.
 func (s *Service) RevokeSession(ctx context.Context, params RevokeSessionParams) (Session, error) {
 	if err := s.validateContext(ctx, "revoke session"); err != nil {
 		return Session{}, err
+	}
+	if params.IdempotencyKey != "" {
+		if session, ok := s.idempotency.revokeSessionResult(params.IdempotencyKey); ok {
+			return session, nil
+		}
 	}
 	if params.SessionID == "" {
 		return Session{}, ErrInvalidInput
@@ -70,6 +75,10 @@ func (s *Service) RevokeSession(ctx context.Context, params RevokeSessionParams)
 		return Session{}, fmt.Errorf("revoke session %s: %w", session.ID, err)
 	}
 
+	if params.IdempotencyKey != "" {
+		s.idempotency.storeRevokeSessionResult(params.IdempotencyKey, updatedSession)
+	}
+
 	return updatedSession, nil
 }
 
@@ -77,6 +86,11 @@ func (s *Service) RevokeSession(ctx context.Context, params RevokeSessionParams)
 func (s *Service) RevokeAllSessions(ctx context.Context, accountID string, params RevokeAllSessionsParams) (uint32, error) {
 	if err := s.validateContext(ctx, "revoke all sessions"); err != nil {
 		return 0, err
+	}
+	if params.IdempotencyKey != "" {
+		if revoked, ok := s.idempotency.revokeAllSessionsResult(params.IdempotencyKey); ok {
+			return revoked, nil
+		}
 	}
 	if accountID == "" {
 		return 0, ErrInvalidInput
@@ -107,5 +121,49 @@ func (s *Service) RevokeAllSessions(ctx context.Context, accountID string, param
 		revoked++
 	}
 
+	if params.IdempotencyKey != "" {
+		s.idempotency.storeRevokeAllSessionsResult(params.IdempotencyKey, revoked)
+	}
+
 	return revoked, nil
+}
+
+func normalizeCurrentSessions(sessions []Session) []Session {
+	if len(sessions) == 0 {
+		return sessions
+	}
+
+	currentIndex := -1
+	for i := range sessions {
+		sessions[i].Current = false
+		if sessions[i].Status != SessionStatusActive {
+			continue
+		}
+		if currentIndex == -1 || isPreferredCurrentSession(sessions[i], sessions[currentIndex]) {
+			currentIndex = i
+		}
+	}
+
+	if currentIndex >= 0 {
+		sessions[currentIndex].Current = true
+	}
+
+	return sessions
+}
+
+func isPreferredCurrentSession(candidate, current Session) bool {
+	if candidate.CreatedAt.After(current.CreatedAt) {
+		return true
+	}
+	if candidate.CreatedAt.Before(current.CreatedAt) {
+		return false
+	}
+	if candidate.LastSeenAt.After(current.LastSeenAt) {
+		return true
+	}
+	if candidate.LastSeenAt.Before(current.LastSeenAt) {
+		return false
+	}
+
+	return candidate.ID > current.ID
 }
