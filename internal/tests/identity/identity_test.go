@@ -11,12 +11,14 @@ import (
 	teststore "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
 )
 
+// recordingCodeSender captures delivered login codes for assertions in tests.
 type recordingCodeSender struct {
 	mu    sync.Mutex
 	codes map[string]string
 	count int
 }
 
+// SendLoginCode records the code by destination mask instead of sending it anywhere.
 func (s *recordingCodeSender) SendLoginCode(_ context.Context, target identity.LoginTarget, code string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -30,6 +32,7 @@ func (s *recordingCodeSender) SendLoginCode(_ context.Context, target identity.L
 	return nil
 }
 
+// codeFor returns the last code captured for a given destination mask.
 func (s *recordingCodeSender) codeFor(mask string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -37,6 +40,7 @@ func (s *recordingCodeSender) codeFor(mask string) string {
 	return s.codes[mask]
 }
 
+// totalSends returns how many login code deliveries were observed.
 func (s *recordingCodeSender) totalSends() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -44,12 +48,14 @@ func (s *recordingCodeSender) totalSends() int {
 	return s.count
 }
 
+// failingSaveDeviceStore fails the first SaveDevice call to exercise rollback behavior.
 type failingSaveDeviceStore struct {
 	identity.Store
 	failErr error
 	failed  bool
 }
 
+// SaveDevice injects a one-shot failure before delegating to the wrapped store.
 func (s *failingSaveDeviceStore) SaveDevice(ctx context.Context, device identity.Device) (identity.Device, error) {
 	if s.failErr == nil {
 		s.failErr = errors.New("forced save device failure")
@@ -62,18 +68,25 @@ func (s *failingSaveDeviceStore) SaveDevice(ctx context.Context, device identity
 	return s.Store.SaveDevice(ctx, device)
 }
 
+// failingSaveAccountStore fails a chosen SaveAccount call to exercise late rollback paths.
 type failingSaveAccountStore struct {
 	identity.Store
-	failErr error
-	calls   int
+	failErr    error
+	failOnCall int
+	calls      int
 }
 
+// SaveAccount injects a failure on the configured call number before delegating to the wrapped store.
 func (s *failingSaveAccountStore) SaveAccount(ctx context.Context, account identity.Account) (identity.Account, error) {
 	if s.failErr == nil {
 		s.failErr = errors.New("forced save account failure")
 	}
 	s.calls++
-	if s.calls == 2 {
+	failOnCall := s.failOnCall
+	if failOnCall == 0 {
+		failOnCall = 2
+	}
+	if s.calls == failOnCall {
 		return identity.Account{}, s.failErr
 	}
 

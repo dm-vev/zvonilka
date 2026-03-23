@@ -10,6 +10,7 @@ import (
 	teststore "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
 )
 
+// countingSessionStore tracks read and write operations used by the session read model.
 type countingSessionStore struct {
 	identity.Store
 
@@ -19,6 +20,7 @@ type countingSessionStore struct {
 	updateSessionCalls       int
 }
 
+// SessionByID counts and forwards single-session lookups.
 func (s *countingSessionStore) SessionByID(ctx context.Context, sessionID string) (identity.Session, error) {
 	s.mu.Lock()
 	s.sessionByIDCalls++
@@ -27,6 +29,7 @@ func (s *countingSessionStore) SessionByID(ctx context.Context, sessionID string
 	return s.Store.SessionByID(ctx, sessionID)
 }
 
+// SessionsByAccountID counts and forwards account session listings.
 func (s *countingSessionStore) SessionsByAccountID(
 	ctx context.Context,
 	accountID string,
@@ -38,6 +41,7 @@ func (s *countingSessionStore) SessionsByAccountID(
 	return s.Store.SessionsByAccountID(ctx, accountID)
 }
 
+// UpdateSession counts and forwards session updates.
 func (s *countingSessionStore) UpdateSession(ctx context.Context, session identity.Session) (identity.Session, error) {
 	s.mu.Lock()
 	s.updateSessionCalls++
@@ -46,6 +50,7 @@ func (s *countingSessionStore) UpdateSession(ctx context.Context, session identi
 	return s.Store.UpdateSession(ctx, session)
 }
 
+// counts returns the observed session-store call totals.
 func (s *countingSessionStore) counts() (sessionByID, sessionsByAccountID, updateSession int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -53,12 +58,14 @@ func (s *countingSessionStore) counts() (sessionByID, sessionsByAccountID, updat
 	return s.sessionByIDCalls, s.sessionsByAccountIDCalls, s.updateSessionCalls
 }
 
+// steppedClock returns monotonically increasing timestamps on each call.
 type steppedClock struct {
 	mu   sync.Mutex
 	now  time.Time
 	step time.Duration
 }
 
+// Now returns the next scheduled clock value.
 func (c *steppedClock) Now() time.Time {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -72,6 +79,7 @@ func (c *steppedClock) Now() time.Time {
 	return current
 }
 
+// newLoggedInAccount performs a full login and returns the resulting session.
 func newLoggedInAccount(
 	t *testing.T,
 	svc *identity.Service,
@@ -168,5 +176,74 @@ func TestListSessionsExposesOnlyOneCurrentSessionAfterMultipleLogins(t *testing.
 	}
 	if firstSession.ID == secondSession.ID {
 		t.Fatalf("expected distinct sessions")
+	}
+}
+
+func TestVerifyLoginCodeDoesNotRewriteCurrentSessions(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseStore := teststore.NewMemoryStore()
+	store := &countingSessionStore{Store: baseStore}
+	sender := &recordingCodeSender{}
+	clock := &steppedClock{
+		now:  time.Date(2026, time.March, 23, 20, 30, 0, 0, time.UTC),
+		step: time.Minute,
+	}
+
+	svc, err := identity.NewService(store, sender, identity.WithNow(clock.Now))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	account, _, err := svc.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "no-rewrite-current-session",
+		DisplayName: "No Rewrite Current Session",
+		Email:       "no-rewrite-current-session@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	firstSession := newLoggedInAccount(t, svc, sender, account.Username, "phone-1", "public-key-1")
+	secondSession := newLoggedInAccount(t, svc, sender, account.Username, "phone-2", "public-key-2")
+
+	_, _, updateSessionCalls := store.counts()
+	if updateSessionCalls != 0 {
+		t.Fatalf("expected no UpdateSession calls during login, got %d", updateSessionCalls)
+	}
+
+	sessions, err := svc.ListSessions(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("list sessions: %v", err)
+	}
+	if len(sessions) != 2 {
+		t.Fatalf("expected 2 sessions, got %d", len(sessions))
+	}
+
+	currentCount := 0
+	currentSessionID := ""
+	for _, session := range sessions {
+		if !session.Current {
+			continue
+		}
+		currentCount++
+		currentSessionID = session.ID
+	}
+	if currentCount != 1 {
+		t.Fatalf("expected exactly one current session, got %d", currentCount)
+	}
+	if currentSessionID != secondSession.ID {
+		t.Fatalf("expected newest session %s to be current, got %s", secondSession.ID, currentSessionID)
+	}
+	if firstSession.ID == secondSession.ID {
+		t.Fatalf("expected distinct sessions")
+	}
+
+	_, _, updateSessionCalls = store.counts()
+	if updateSessionCalls != 0 {
+		t.Fatalf("expected no UpdateSession calls after listing sessions, got %d", updateSessionCalls)
 	}
 }

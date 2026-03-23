@@ -12,12 +12,12 @@ import (
 
 // Run boots the controlplane skeleton.
 func Run(ctx context.Context) error {
-	cfg, err := config.FromEnv("controlplane")
+	cfg, err := config.Load("controlplane")
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logger := observability.NewLogger(cfg.Env, "controlplane")
+	logger := observability.NewLogger(cfg.Logging, cfg.Service)
 	app := newApp(cfg)
 
 	logger.InfoContext(
@@ -30,20 +30,14 @@ func Run(ctx context.Context) error {
 		"date",
 		buildinfo.Date,
 		"http_addr",
-		cfg.HTTPAddr,
+		cfg.Runtime.HTTP.Address,
 		"grpc_addr",
-		cfg.GRPCAddr,
+		cfg.Runtime.GRPC.Address,
 	)
 
 	return runtime.Run(
 		ctx,
-		runtime.Config{
-			ServiceName:     cfg.ServiceName,
-			Env:             cfg.Env,
-			HTTPAddr:        cfg.HTTPAddr,
-			GRPCAddr:        cfg.GRPCAddr,
-			ShutdownTimeout: cfg.ShutdownTimeout,
-		},
+		cfg.Runtime.ToRuntime(cfg.Service),
 		logger,
 		app.health,
 		app.handler,

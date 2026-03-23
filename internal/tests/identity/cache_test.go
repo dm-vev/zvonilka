@@ -11,6 +11,7 @@ import (
 	teststore "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
 )
 
+// countingAuthStore tracks how often auth-side persistence calls are executed.
 type countingAuthStore struct {
 	identity.Store
 
@@ -24,6 +25,7 @@ type countingAuthStore struct {
 	updateSession      int
 }
 
+// SaveLoginChallenge counts and forwards login-challenge writes.
 func (s *countingAuthStore) SaveLoginChallenge(
 	ctx context.Context,
 	challenge identity.LoginChallenge,
@@ -35,6 +37,7 @@ func (s *countingAuthStore) SaveLoginChallenge(
 	return s.Store.SaveLoginChallenge(ctx, challenge)
 }
 
+// SaveDevice counts and forwards device writes.
 func (s *countingAuthStore) SaveDevice(
 	ctx context.Context,
 	device identity.Device,
@@ -46,6 +49,7 @@ func (s *countingAuthStore) SaveDevice(
 	return s.Store.SaveDevice(ctx, device)
 }
 
+// SaveSession counts and forwards session writes.
 func (s *countingAuthStore) SaveSession(
 	ctx context.Context,
 	session identity.Session,
@@ -57,6 +61,7 @@ func (s *countingAuthStore) SaveSession(
 	return s.Store.SaveSession(ctx, session)
 }
 
+// SaveAccount counts and forwards account writes.
 func (s *countingAuthStore) SaveAccount(
 	ctx context.Context,
 	account identity.Account,
@@ -68,6 +73,7 @@ func (s *countingAuthStore) SaveAccount(
 	return s.Store.SaveAccount(ctx, account)
 }
 
+// SessionByID counts and forwards session lookups by ID.
 func (s *countingAuthStore) SessionByID(ctx context.Context, sessionID string) (identity.Session, error) {
 	s.mu.Lock()
 	s.sessionByID++
@@ -76,6 +82,7 @@ func (s *countingAuthStore) SessionByID(ctx context.Context, sessionID string) (
 	return s.Store.SessionByID(ctx, sessionID)
 }
 
+// AccountByID counts and forwards account lookups by ID.
 func (s *countingAuthStore) AccountByID(ctx context.Context, accountID string) (identity.Account, error) {
 	s.mu.Lock()
 	s.accountByID++
@@ -84,6 +91,7 @@ func (s *countingAuthStore) AccountByID(ctx context.Context, accountID string) (
 	return s.Store.AccountByID(ctx, accountID)
 }
 
+// UpdateSession counts and forwards session updates.
 func (s *countingAuthStore) UpdateSession(
 	ctx context.Context,
 	session identity.Session,
@@ -95,6 +103,7 @@ func (s *countingAuthStore) UpdateSession(
 	return s.Store.UpdateSession(ctx, session)
 }
 
+// counts returns the observed call totals for each tracked method.
 func (s *countingAuthStore) counts() (saveLoginChallenge, saveDevice, saveSession, saveAccount, sessionByID, accountByID, updateSession int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -362,14 +371,14 @@ func TestRegisterDeviceIdempotencyKeyDeduplicatesSuccessfulRegistration(t *testi
 	}
 }
 
-func TestBeginLoginIdempotencyKeyConflictsOnDifferentPayload(t *testing.T) {
+func TestBeginLoginIdempotencyKeyConflictsOnDifferentRequest(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	baseStore := teststore.NewMemoryStore()
 	store := &countingAuthStore{Store: baseStore}
 	sender := &recordingCodeSender{}
-	now := time.Date(2026, time.March, 23, 23, 0, 0, 0, time.UTC)
+	now := time.Date(2026, time.March, 24, 0, 0, 0, 0, time.UTC)
 
 	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time { return now }))
 	if err != nil {
@@ -377,10 +386,10 @@ func TestBeginLoginIdempotencyKeyConflictsOnDifferentPayload(t *testing.T) {
 	}
 
 	_, _, err = svc.CreateAccount(ctx, identity.CreateAccountParams{
-		Username:    "begin-conflict-user",
-		DisplayName: "Begin Conflict User",
-		Email:       "begin-conflict@example.com",
-		Phone:       "+1 555 0123",
+		Username:    "begin-login-conflict-user",
+		DisplayName: "Begin Login Conflict User",
+		Email:       "begin-login-conflict@example.com",
+		Phone:       "+1 555 0101",
 		AccountKind: identity.AccountKindUser,
 		CreatedBy:   "admin-1",
 	})
@@ -389,153 +398,20 @@ func TestBeginLoginIdempotencyKeyConflictsOnDifferentPayload(t *testing.T) {
 	}
 
 	_, _, err = svc.BeginLogin(ctx, identity.BeginLoginParams{
-		Username:       "begin-conflict-user",
+		Username:       "begin-login-conflict-user",
 		Delivery:       identity.LoginDeliveryChannelEmail,
-		IdempotencyKey: "begin-conflict-key",
+		IdempotencyKey: "begin-login-conflict-key",
 	})
 	if err != nil {
 		t.Fatalf("first begin login: %v", err)
 	}
 
 	_, _, err = svc.BeginLogin(ctx, identity.BeginLoginParams{
-		Username:       "begin-conflict-user",
+		Username:       "begin-login-conflict-user",
 		Delivery:       identity.LoginDeliveryChannelSMS,
-		IdempotencyKey: "begin-conflict-key",
+		IdempotencyKey: "begin-login-conflict-key",
 	})
 	if !errors.Is(err, identity.ErrConflict) {
-		t.Fatalf("expected conflict for reused key with different payload, got %v", err)
-	}
-}
-
-func TestVerifyLoginCodeIdempotencyKeyConflictsOnDifferentPayload(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	baseStore := teststore.NewMemoryStore()
-	store := &countingAuthStore{Store: baseStore}
-	sender := &recordingCodeSender{}
-	now := time.Date(2026, time.March, 23, 23, 10, 0, 0, time.UTC)
-
-	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time { return now }))
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
-
-	_, _, err = svc.CreateAccount(ctx, identity.CreateAccountParams{
-		Username:    "verify-conflict-user",
-		DisplayName: "Verify Conflict User",
-		Email:       "verify-conflict@example.com",
-		AccountKind: identity.AccountKindUser,
-		CreatedBy:   "admin-1",
-	})
-	if err != nil {
-		t.Fatalf("create account: %v", err)
-	}
-
-	challenge, targets, err := svc.BeginLogin(ctx, identity.BeginLoginParams{
-		Username: "verify-conflict-user",
-		Delivery: identity.LoginDeliveryChannelEmail,
-	})
-	if err != nil {
-		t.Fatalf("begin login: %v", err)
-	}
-	code := sender.codeFor(targets[0].DestinationMask)
-	if code == "" {
-		t.Fatalf("expected recorded login code")
-	}
-
-	_, err = svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
-		ChallengeID:    challenge.ID,
-		Code:           code,
-		DeviceName:     "verify-device",
-		Platform:       identity.DevicePlatformIOS,
-		PublicKey:      "verify-key-a",
-		IdempotencyKey: "verify-conflict-key",
-	})
-	if err != nil {
-		t.Fatalf("first verify login: %v", err)
-	}
-
-	_, err = svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
-		ChallengeID:    challenge.ID,
-		Code:           code,
-		DeviceName:     "verify-device",
-		Platform:       identity.DevicePlatformIOS,
-		PublicKey:      "verify-key-b",
-		IdempotencyKey: "verify-conflict-key",
-	})
-	if !errors.Is(err, identity.ErrConflict) {
-		t.Fatalf("expected conflict for reused key with different payload, got %v", err)
-	}
-}
-
-func TestRegisterDeviceIdempotencyKeyConflictsOnDifferentPayload(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	baseStore := teststore.NewMemoryStore()
-	store := &countingAuthStore{Store: baseStore}
-	sender := &recordingCodeSender{}
-	now := time.Date(2026, time.March, 23, 23, 20, 0, 0, time.UTC)
-
-	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time { return now }))
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
-
-	_, _, err = svc.CreateAccount(ctx, identity.CreateAccountParams{
-		Username:    "register-conflict-user",
-		DisplayName: "Register Conflict User",
-		Email:       "register-conflict@example.com",
-		AccountKind: identity.AccountKindUser,
-		CreatedBy:   "admin-1",
-	})
-	if err != nil {
-		t.Fatalf("create account: %v", err)
-	}
-
-	challenge, targets, err := svc.BeginLogin(ctx, identity.BeginLoginParams{
-		Username: "register-conflict-user",
-		Delivery: identity.LoginDeliveryChannelEmail,
-	})
-	if err != nil {
-		t.Fatalf("begin login: %v", err)
-	}
-	code := sender.codeFor(targets[0].DestinationMask)
-	if code == "" {
-		t.Fatalf("expected recorded login code")
-	}
-
-	loginResult, err := svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
-		ChallengeID: challenge.ID,
-		Code:        code,
-		DeviceName:  "register-device",
-		Platform:    identity.DevicePlatformIOS,
-		PublicKey:   "register-login-key",
-	})
-	if err != nil {
-		t.Fatalf("verify login: %v", err)
-	}
-
-	_, _, err = svc.RegisterDevice(ctx, identity.RegisterDeviceParams{
-		SessionID:      loginResult.Session.ID,
-		DeviceName:     "desktop",
-		Platform:       identity.DevicePlatformDesktop,
-		PublicKey:      "register-device-key-a",
-		IdempotencyKey: "register-conflict-key",
-	})
-	if err != nil {
-		t.Fatalf("first register device: %v", err)
-	}
-
-	_, _, err = svc.RegisterDevice(ctx, identity.RegisterDeviceParams{
-		SessionID:      loginResult.Session.ID,
-		DeviceName:     "desktop",
-		Platform:       identity.DevicePlatformDesktop,
-		PublicKey:      "register-device-key-b",
-		IdempotencyKey: "register-conflict-key",
-	})
-	if !errors.Is(err, identity.ErrConflict) {
-		t.Fatalf("expected conflict for reused key with different payload, got %v", err)
+		t.Fatalf("expected conflict on mismatched replay, got %v", err)
 	}
 }

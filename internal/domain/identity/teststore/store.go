@@ -7,6 +7,9 @@ import (
 )
 
 // NewMemoryStore builds a concurrency-safe in-memory identity store for tests.
+//
+// The implementation keeps explicit secondary indexes so the service can exercise
+// the same uniqueness and lookup paths it will use against a real database later.
 func NewMemoryStore() identity.Store {
 	return &memoryStore{
 		joinRequestsByID:     make(map[string]identity.JoinRequest),
@@ -23,6 +26,10 @@ func NewMemoryStore() identity.Store {
 	}
 }
 
+// memoryStore is a test-only identity store with explicit indexes for lookups and conflicts.
+//
+// All state lives behind a single RWMutex so the tests can probe concurrent write paths
+// without relying on a real database.
 type memoryStore struct {
 	mu sync.RWMutex
 
@@ -39,6 +46,7 @@ type memoryStore struct {
 	sessionIDsByAccount  map[string]map[string]struct{}
 }
 
+// accountByIndex resolves an account through one of the secondary indexes.
 func (s *memoryStore) accountByIndex(index map[string]string, key string) (identity.Account, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -56,6 +64,7 @@ func (s *memoryStore) accountByIndex(index map[string]string, key string) (ident
 	return account, nil
 }
 
+// indexAccountLocked updates all secondary account indexes for a freshly saved account.
 func (s *memoryStore) indexAccountLocked(account identity.Account) {
 	if account.Username != "" {
 		s.accountIDsByUsername[account.Username] = account.ID
@@ -71,6 +80,7 @@ func (s *memoryStore) indexAccountLocked(account identity.Account) {
 	}
 }
 
+// deleteAccountIndexes removes the secondary indexes that point at an account.
 func (s *memoryStore) deleteAccountIndexes(account identity.Account) {
 	delete(s.accountIDsByUsername, account.Username)
 	delete(s.accountIDsByEmail, account.Email)
@@ -78,6 +88,7 @@ func (s *memoryStore) deleteAccountIndexes(account identity.Account) {
 	delete(s.accountIDsByBotHash, account.BotTokenHash)
 }
 
+// deviceIDsForAccountLocked returns the device-ID set for an account, creating it on demand.
 func (s *memoryStore) deviceIDsForAccountLocked(accountID string) map[string]struct{} {
 	ids, ok := s.deviceIDsByAccount[accountID]
 	if !ok {
@@ -87,6 +98,7 @@ func (s *memoryStore) deviceIDsForAccountLocked(accountID string) map[string]str
 	return ids
 }
 
+// sessionIDsForAccountLocked returns the session-ID set for an account, creating it on demand.
 func (s *memoryStore) sessionIDsForAccountLocked(accountID string) map[string]struct{} {
 	ids, ok := s.sessionIDsByAccount[accountID]
 	if !ok {

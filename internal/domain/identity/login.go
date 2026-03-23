@@ -7,21 +7,23 @@ import (
 )
 
 // BeginLogin starts a code-based login challenge for a human account.
+//
+// The challenge is persisted before the code is sent so the request can be retried
+// safely if delivery fails or the client retries with the same idempotency key.
 func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (LoginChallenge, []LoginTarget, error) {
 	if err := s.validateContext(ctx, "begin login"); err != nil {
 		return LoginChallenge{}, nil, err
 	}
-
+	username, email, phone := s.normalizeAccountInput(params.Username, params.Email, params.Phone)
 	fingerprint := beginLoginFingerprint(params)
 	if params.IdempotencyKey != "" {
-		if cached, ok, err := s.idempotency.beginLoginResult(params.IdempotencyKey, fingerprint); err != nil {
+		if cached, ok, err := s.idempotency.beginLoginResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
 			return LoginChallenge{}, nil, err
 		} else if ok {
 			return cached.challenge, cached.targets, nil
 		}
 	}
 
-	username, email, phone := s.normalizeAccountInput(params.Username, params.Email, params.Phone)
 	account, err := s.lookupAccountByIdentifier(ctx, username, email, phone)
 	if err != nil {
 		return LoginChallenge{}, nil, err
@@ -41,7 +43,7 @@ func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (Logi
 		return LoginChallenge{}, nil, err
 	}
 
-	code, err := newSecret(6)
+	code, err := newSecret(s.loginCodeLength)
 	if err != nil {
 		return LoginChallenge{}, nil, fmt.Errorf("generate login code for account %s: %w", account.ID, err)
 	}
@@ -90,8 +92,9 @@ func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (Logi
 			fingerprint,
 			beginLoginCacheResult{
 				challenge: savedChallenge,
-				targets:   cloneLoginTargets(targets),
+				targets:   targets,
 			},
+			s.currentTime(),
 		)
 	}
 
@@ -99,17 +102,19 @@ func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (Logi
 }
 
 // VerifyLoginCode completes a login challenge and issues a new session.
+//
+// The challenge is consumed before session issuance so the same code cannot be replayed
+// if a later write fails. That keeps the login code single-use even across retries.
 func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodeParams) (result LoginResult, err error) {
 	if err = s.validateContext(ctx, "verify login code"); err != nil {
 		return LoginResult{}, err
 	}
-
-	fingerprint := verifyLoginFingerprint(params)
 	if params.IdempotencyKey != "" {
-		if cached, ok, lookupErr := s.idempotency.verifyLoginResult(params.IdempotencyKey, fingerprint); lookupErr != nil {
-			return LoginResult{}, lookupErr
+		fingerprint := verifyLoginFingerprint(params)
+		if result, ok, err := s.idempotency.verifyLoginResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
+			return LoginResult{}, err
 		} else if ok {
-			return cached, nil
+			return result, nil
 		}
 	}
 	if params.ChallengeID == "" || params.Code == "" {
@@ -131,7 +136,7 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 	if now.IsZero() {
 		now = s.currentTime()
 	}
-	if now.After(challenge.ExpiresAt) {
+	if !now.Before(challenge.ExpiresAt) {
 		_ = s.store.DeleteLoginChallenge(ctx, challenge.ID)
 		return LoginResult{}, ErrExpiredChallenge
 	}
@@ -139,12 +144,12 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 		return LoginResult{}, ErrInvalidCode
 	}
 
+	// Mark the challenge as consumed before any session or device writes happen.
 	challenge.Used = true
 	challenge.UsedAt = now
 	if _, err = s.store.SaveLoginChallenge(ctx, challenge); err != nil {
 		return LoginResult{}, fmt.Errorf("consume login challenge %s: %w", challenge.ID, err)
 	}
-
 	challengeSaved := true
 	defer func() {
 		if err == nil || !challengeSaved {
@@ -171,22 +176,38 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 	if err != nil {
 		return LoginResult{}, err
 	}
-
 	challengeSaved = false
+
 	if params.IdempotencyKey != "" {
-		s.idempotency.storeVerifyLoginResult(params.IdempotencyKey, fingerprint, result)
+		s.idempotency.storeVerifyLoginResult(
+			params.IdempotencyKey,
+			verifyLoginFingerprint(params),
+			result,
+			s.currentTime(),
+		)
 	}
 
 	return result, nil
 }
 
 // AuthenticateBot logs a bot account in using its issued bot token.
+//
+// Bot login reuses the same session issuance path as human login so the downstream
+// device and session invariants stay identical.
 func (s *Service) AuthenticateBot(ctx context.Context, params AuthenticateBotParams) (LoginResult, error) {
 	if err := s.validateContext(ctx, "authenticate bot"); err != nil {
 		return LoginResult{}, err
 	}
 	if params.BotToken == "" || params.PublicKey == "" {
 		return LoginResult{}, ErrInvalidInput
+	}
+	fingerprint := authenticateBotFingerprint(params)
+	if params.IdempotencyKey != "" {
+		if result, ok, err := s.idempotency.authenticateBotResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
+			return LoginResult{}, err
+		} else if ok {
+			return result, nil
+		}
 	}
 
 	tokenHash := hashSecret(params.BotToken)
@@ -198,19 +219,35 @@ func (s *Service) AuthenticateBot(ctx context.Context, params AuthenticateBotPar
 		return LoginResult{}, ErrForbidden
 	}
 
-	return s.issueSession(ctx, account, params.DeviceName, params.Platform, params.PublicKey, "")
+	result, err := s.issueSession(ctx, account, params.DeviceName, params.Platform, params.PublicKey, "")
+	if err != nil {
+		return LoginResult{}, err
+	}
+
+	if params.IdempotencyKey != "" {
+		s.idempotency.storeAuthenticateBotResult(
+			params.IdempotencyKey,
+			fingerprint,
+			result,
+			s.currentTime(),
+		)
+	}
+
+	return result, nil
 }
 
 // RegisterDevice attaches another trusted device to an active session.
+//
+// The new device inherits the owning account's display name when the client does not
+// supply one, which keeps the UI default stable across first-party and retry flows.
 func (s *Service) RegisterDevice(ctx context.Context, params RegisterDeviceParams) (Device, Session, error) {
 	if err := s.validateContext(ctx, "register device"); err != nil {
 		return Device{}, Session{}, err
 	}
-
-	fingerprint := registerDeviceFingerprint(params)
 	if params.IdempotencyKey != "" {
-		if device, session, ok, lookupErr := s.idempotency.registerDeviceResult(params.IdempotencyKey, fingerprint); lookupErr != nil {
-			return Device{}, Session{}, lookupErr
+		fingerprint := registerDeviceFingerprint(params)
+		if device, session, ok, err := s.idempotency.registerDeviceResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
+			return Device{}, Session{}, err
 		} else if ok {
 			return device, session, nil
 		}
@@ -230,6 +267,9 @@ func (s *Service) RegisterDevice(ctx context.Context, params RegisterDeviceParam
 	account, err := s.store.AccountByID(ctx, session.AccountID)
 	if err != nil {
 		return Device{}, Session{}, fmt.Errorf("load account %s for session %s: %w", session.AccountID, session.ID, err)
+	}
+	if account.Status != AccountStatusActive {
+		return Device{}, Session{}, ErrForbidden
 	}
 
 	if params.DeviceName == "" {
@@ -282,11 +322,12 @@ func (s *Service) RegisterDevice(ctx context.Context, params RegisterDeviceParam
 	if params.IdempotencyKey != "" {
 		s.idempotency.storeRegisterDeviceResult(
 			params.IdempotencyKey,
-			fingerprint,
+			registerDeviceFingerprint(params),
 			registerDeviceCacheResult{
 				device:  savedDevice,
 				session: savedSession,
 			},
+			s.currentTime(),
 		)
 	}
 

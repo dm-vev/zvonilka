@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/reflection"
 )
 
 type grpcHealthStatusSetter interface {
@@ -154,10 +155,11 @@ func startHTTPServer(
 
 	server := &http.Server{
 		Handler:           healthState.Handler(handler),
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		ReadHeaderTimeout: defaultHTTPReadHeaderTimeout(cfg.HTTP.ReadHeaderTimeout),
+		ReadTimeout:       defaultHTTPReadTimeout(cfg.HTTP.ReadTimeout),
+		WriteTimeout:      defaultHTTPWriteTimeout(cfg.HTTP.WriteTimeout),
+		IdleTimeout:       defaultHTTPIdleTimeout(cfg.HTTP.IdleTimeout),
+		MaxHeaderBytes:    defaultHTTPMaxHeaderBytes(cfg.HTTP.MaxHeaderBytes),
 	}
 
 	return server, listener, nil
@@ -181,6 +183,9 @@ func startGRPCServer(
 	grpcHealth := health.NewServer()
 	healthgrpc.RegisterHealthServer(grpcServer, grpcHealth)
 	setGRPCServingStatus(grpcHealth, healthState.serviceName)
+	if cfg.GRPC.ReflectionEnabled {
+		reflection.Register(grpcServer)
+	}
 
 	if registerGRPC != nil {
 		registerGRPC(grpcServer)
@@ -259,4 +264,44 @@ func serveGRPC(server *grpc.Server, listener net.Listener) error {
 	}
 
 	return err
+}
+
+func defaultHTTPReadHeaderTimeout(value time.Duration) time.Duration {
+	if value <= 0 {
+		return 5 * time.Second
+	}
+
+	return value
+}
+
+func defaultHTTPReadTimeout(value time.Duration) time.Duration {
+	if value <= 0 {
+		return 10 * time.Second
+	}
+
+	return value
+}
+
+func defaultHTTPWriteTimeout(value time.Duration) time.Duration {
+	if value <= 0 {
+		return 10 * time.Second
+	}
+
+	return value
+}
+
+func defaultHTTPIdleTimeout(value time.Duration) time.Duration {
+	if value <= 0 {
+		return 60 * time.Second
+	}
+
+	return value
+}
+
+func defaultHTTPMaxHeaderBytes(value int) int {
+	if value <= 0 {
+		return 1 << 20
+	}
+
+	return value
 }

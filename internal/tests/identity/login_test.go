@@ -11,12 +11,14 @@ import (
 	teststore "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
 )
 
+// failingCodeSender fails the first login-code delivery and succeeds afterwards.
 type failingCodeSender struct {
 	mu       sync.Mutex
 	attempts int
 	failErr  error
 }
 
+// SendLoginCode injects a one-shot delivery failure.
 func (s *failingCodeSender) SendLoginCode(_ context.Context, _ identity.LoginTarget, _ string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -32,6 +34,7 @@ func (s *failingCodeSender) SendLoginCode(_ context.Context, _ identity.LoginTar
 	return nil
 }
 
+// totalAttempts returns the number of observed delivery attempts.
 func (s *failingCodeSender) totalAttempts() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -39,12 +42,14 @@ func (s *failingCodeSender) totalAttempts() int {
 	return s.attempts
 }
 
+// failingUpdateSessionStore fails the first UpdateSession call to exercise rollback.
 type failingUpdateSessionStore struct {
 	identity.Store
 	failErr error
 	failed  bool
 }
 
+// UpdateSession injects a one-shot failure before delegating to the wrapped store.
 func (s *failingUpdateSessionStore) UpdateSession(ctx context.Context, session identity.Session) (identity.Session, error) {
 	if s.failErr == nil {
 		s.failErr = errors.New("forced update session failure")
@@ -57,6 +62,7 @@ func (s *failingUpdateSessionStore) UpdateSession(ctx context.Context, session i
 	return s.Store.UpdateSession(ctx, session)
 }
 
+// createAccount builds a minimal user account for reliability tests.
 func createAccount(t *testing.T, svc *identity.Service, ctx context.Context, username, email string) identity.Account {
 	t.Helper()
 
@@ -74,6 +80,7 @@ func createAccount(t *testing.T, svc *identity.Service, ctx context.Context, use
 	return account
 }
 
+// beginLogin starts a login challenge and asserts the expected target count.
 func beginLogin(
 	t *testing.T,
 	svc *identity.Service,
@@ -98,6 +105,7 @@ func beginLogin(
 	return challenge, targets
 }
 
+// verifyLogin completes a login challenge and returns the issued session bundle.
 func verifyLogin(
 	t *testing.T,
 	svc *identity.Service,
@@ -211,6 +219,53 @@ func TestBeginLoginRollsBackChallengeWhenSendFails(t *testing.T) {
 	}
 }
 
+func TestVerifyLoginCodeExpiresAtBoundary(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	sender := &recordingCodeSender{}
+	now := time.Date(2026, time.March, 23, 20, 8, 0, 0, time.UTC)
+
+	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time { return now }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	account := createAccount(t, svc, ctx, "expired-boundary-user", "expired-boundary@example.com")
+	challenge, targets := beginLogin(t, svc, ctx, account.Username, "expired-boundary-begin")
+	code := sender.codeFor(targets[0].DestinationMask)
+
+	now = now.Add(10 * time.Minute)
+
+	_, err = svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
+		ChallengeID: challenge.ID,
+		Code:        code,
+		DeviceName:  "boundary-device",
+		Platform:    identity.DevicePlatformIOS,
+		PublicKey:   "boundary-key",
+	})
+	if !errors.Is(err, identity.ErrExpiredChallenge) {
+		t.Fatalf("expected ErrExpiredChallenge at boundary, got %v", err)
+	}
+
+	storedChallenge, err := store.LoginChallengeByID(ctx, challenge.ID)
+	if !errors.Is(err, identity.ErrNotFound) {
+		t.Fatalf("expected expired challenge to be deleted, got %v", err)
+	}
+	if storedChallenge.ID != "" {
+		t.Fatalf("expected no stored challenge after expiry, got %s", storedChallenge.ID)
+	}
+
+	devices, err := store.DevicesByAccountID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("list devices after expired verify: %v", err)
+	}
+	if len(devices) != 0 {
+		t.Fatalf("expected no devices after expired verify, got %d", len(devices))
+	}
+}
+
 func TestVerifyLoginCodeDeduplicatesSuccessfulRequestsByIdempotencyKey(t *testing.T) {
 	t.Parallel()
 
@@ -298,6 +353,47 @@ func TestRegisterDeviceDeduplicatesSuccessfulRequestsByIdempotencyKey(t *testing
 	}
 }
 
+func TestRegisterDeviceConflictsOnDifferentRequest(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	sender := &recordingCodeSender{}
+	now := time.Date(2026, time.March, 23, 20, 17, 0, 0, time.UTC)
+
+	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time { return now }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	account := createAccount(t, svc, ctx, "register-conflict-user", "register-conflict@example.com")
+	challenge, targets := beginLogin(t, svc, ctx, account.Username, "")
+	code := sender.codeFor(targets[0].DestinationMask)
+	loginResult := verifyLogin(t, svc, ctx, challenge.ID, code, "", "register conflict login")
+
+	_, _, err = svc.RegisterDevice(ctx, identity.RegisterDeviceParams{
+		SessionID:      loginResult.Session.ID,
+		DeviceName:     "desktop",
+		Platform:       identity.DevicePlatformDesktop,
+		PublicKey:      "register-conflict-key-1",
+		IdempotencyKey: "register-conflict-key",
+	})
+	if err != nil {
+		t.Fatalf("first register device: %v", err)
+	}
+
+	_, _, err = svc.RegisterDevice(ctx, identity.RegisterDeviceParams{
+		SessionID:      loginResult.Session.ID,
+		DeviceName:     "tablet",
+		Platform:       identity.DevicePlatformIOS,
+		PublicKey:      "register-conflict-key-2",
+		IdempotencyKey: "register-conflict-key",
+	})
+	if !errors.Is(err, identity.ErrConflict) {
+		t.Fatalf("expected conflict on mismatched replay, got %v", err)
+	}
+}
+
 func TestRegisterDeviceRollsBackDeviceWhenSessionUpdateFails(t *testing.T) {
 	t.Parallel()
 
@@ -353,5 +449,71 @@ func TestRegisterDeviceRollsBackDeviceWhenSessionUpdateFails(t *testing.T) {
 	}
 	if len(devices) != 2 {
 		t.Fatalf("expected two devices after retry, got %d", len(devices))
+	}
+}
+
+func TestRegisterDeviceRejectsSuspendedAccount(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseStore := teststore.NewMemoryStore()
+	store := &countingAuthStore{Store: baseStore}
+	sender := &recordingCodeSender{}
+	now := time.Date(2026, time.March, 23, 20, 25, 0, 0, time.UTC)
+
+	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time { return now }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	account := createAccount(t, svc, ctx, "register-suspended-user", "register-suspended@example.com")
+	challenge, targets := beginLogin(t, svc, ctx, account.Username, "")
+	code := sender.codeFor(targets[0].DestinationMask)
+	loginResult := verifyLogin(t, svc, ctx, challenge.ID, code, "", "register suspended login")
+
+	storedAccount, err := baseStore.AccountByID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("load account before suspension: %v", err)
+	}
+	storedAccount.Status = identity.AccountStatusSuspended
+	if _, err := baseStore.SaveAccount(ctx, storedAccount); err != nil {
+		t.Fatalf("suspend account: %v", err)
+	}
+
+	saveLoginChallengeCalls, saveDeviceCalls, saveSessionCalls, saveAccountCalls, sessionByIDCalls, accountByIDCalls, updateSessionCalls := store.counts()
+
+	_, _, err = svc.RegisterDevice(ctx, identity.RegisterDeviceParams{
+		SessionID:      loginResult.Session.ID,
+		DeviceName:     "tablet",
+		Platform:       identity.DevicePlatformIOS,
+		PublicKey:      "tablet-key",
+		IdempotencyKey: "register-suspended-key",
+	})
+	if !errors.Is(err, identity.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden for suspended account, got %v", err)
+	}
+
+	afterSaveLoginChallengeCalls, afterSaveDeviceCalls, afterSaveSessionCalls, afterSaveAccountCalls, afterSessionByIDCalls, afterAccountByIDCalls, afterUpdateSessionCalls := store.counts()
+
+	if afterSaveLoginChallengeCalls != saveLoginChallengeCalls {
+		t.Fatalf("expected no login challenge writes, got %d -> %d", saveLoginChallengeCalls, afterSaveLoginChallengeCalls)
+	}
+	if afterSaveDeviceCalls != saveDeviceCalls {
+		t.Fatalf("expected no device writes, got %d -> %d", saveDeviceCalls, afterSaveDeviceCalls)
+	}
+	if afterSaveSessionCalls != saveSessionCalls {
+		t.Fatalf("expected no session writes, got %d -> %d", saveSessionCalls, afterSaveSessionCalls)
+	}
+	if afterSaveAccountCalls != saveAccountCalls {
+		t.Fatalf("expected no account writes, got %d -> %d", saveAccountCalls, afterSaveAccountCalls)
+	}
+	if afterSessionByIDCalls != sessionByIDCalls+1 {
+		t.Fatalf("expected one session lookup for register device, got %d -> %d", sessionByIDCalls, afterSessionByIDCalls)
+	}
+	if afterAccountByIDCalls != accountByIDCalls+1 {
+		t.Fatalf("expected one account lookup for register device, got %d -> %d", accountByIDCalls, afterAccountByIDCalls)
+	}
+	if afterUpdateSessionCalls != updateSessionCalls {
+		t.Fatalf("expected no session updates, got %d -> %d", updateSessionCalls, afterUpdateSessionCalls)
 	}
 }

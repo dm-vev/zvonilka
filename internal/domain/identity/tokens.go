@@ -7,6 +7,7 @@ import (
 	"math/big"
 )
 
+// newID generates a compact opaque identifier with an optional prefix.
 func newID(prefix string) (string, error) {
 	token, err := randomToken(12)
 	if err != nil {
@@ -20,6 +21,7 @@ func newID(prefix string) (string, error) {
 	return fmt.Sprintf("%s_%s", prefix, token), nil
 }
 
+// newSecret generates a numeric one-time secret with the requested length.
 func newSecret(length int) (string, error) {
 	if length <= 0 {
 		return "", ErrInvalidInput
@@ -40,6 +42,7 @@ func newSecret(length int) (string, error) {
 	return string(digits), nil
 }
 
+// randomToken returns a base64url-encoded random token of the requested size.
 func randomToken(size int) (string, error) {
 	if size <= 0 {
 		return "", ErrInvalidInput

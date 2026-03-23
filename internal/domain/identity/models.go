@@ -5,6 +5,7 @@ import "time"
 // AccountKind distinguishes human accounts from bot accounts.
 type AccountKind string
 
+// Account kinds used by the identity layer.
 const (
 	// AccountKindUnspecified is the zero value.
 	AccountKindUnspecified AccountKind = ""
@@ -17,6 +18,7 @@ const (
 // AccountStatus describes the lifecycle state of an account.
 type AccountStatus string
 
+// Account statuses used by the identity layer.
 const (
 	// AccountStatusActive indicates the account can authenticate.
 	AccountStatusActive AccountStatus = "active"
@@ -29,6 +31,7 @@ const (
 // Role identifies a coarse-grained account role.
 type Role string
 
+// Roles used by the identity layer.
 const (
 	// RoleOwner grants full ownership.
 	RoleOwner Role = "owner"
@@ -45,6 +48,7 @@ const (
 // JoinRequestStatus describes the status of a self-service join request.
 type JoinRequestStatus string
 
+// Join request states used by the identity layer.
 const (
 	// JoinRequestStatusPending indicates the request awaits review.
 	JoinRequestStatusPending JoinRequestStatus = "pending"
@@ -61,6 +65,7 @@ const (
 // DevicePlatform identifies the client platform.
 type DevicePlatform string
 
+// Device platforms used by the identity layer.
 const (
 	// DevicePlatformUnspecified is the zero value.
 	DevicePlatformUnspecified DevicePlatform = ""
@@ -79,6 +84,7 @@ const (
 // DeviceStatus describes the lifecycle state of a device.
 type DeviceStatus string
 
+// Device statuses used by the identity layer.
 const (
 	// DeviceStatusActive indicates the device may authenticate.
 	DeviceStatusActive DeviceStatus = "active"
@@ -93,6 +99,7 @@ const (
 // SessionStatus describes the lifecycle state of a session.
 type SessionStatus string
 
+// Session statuses used by the identity layer.
 const (
 	// SessionStatusActive indicates the session is usable.
 	SessionStatusActive SessionStatus = "active"
@@ -103,6 +110,7 @@ const (
 // LoginDeliveryChannel identifies where the login code was sent.
 type LoginDeliveryChannel string
 
+// Login delivery channels used by the identity layer.
 const (
 	// LoginDeliveryChannelUnspecified is the zero value.
 	LoginDeliveryChannelUnspecified LoginDeliveryChannel = ""
