@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 )
@@ -203,57 +202,21 @@ func (s *Store) expireStaleJoinRequests(ctx context.Context, joinRequest identit
 	}
 
 	query := fmt.Sprintf(
-		`SELECT %s FROM %s WHERE status = $1 AND (%s)`,
-		joinRequestColumnList,
+		`
+UPDATE %s
+SET status = $1,
+    reviewed_at = CURRENT_TIMESTAMP,
+    reviewed_by = '',
+    decision_reason = 'join request expired'
+WHERE status = $1
+  AND expires_at <= CURRENT_TIMESTAMP
+  AND (%s)
+`,
 		s.table("identity_join_requests"),
 		strings.Join(clauses, " OR "),
 	)
-	rows, err := s.conn().QueryContext(ctx, query, args...)
-	if err != nil {
-		return fmt.Errorf("load stale join requests for %s: %w", joinRequest.ID, err)
-	}
-	defer rows.Close()
-
-	staleRequests := make(map[string]identity.JoinRequest)
-	for rows.Next() {
-		stale, scanErr := scanJoinRequest(rows)
-		if scanErr != nil {
-			return fmt.Errorf("scan stale join request for %s: %w", joinRequest.ID, scanErr)
-		}
-		staleRequests[stale.ID] = stale
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("iterate stale join requests for %s: %w", joinRequest.ID, err)
-	}
-
-	now := time.Now().UTC()
-	for _, stale := range staleRequests {
-		if now.Before(stale.ExpiresAt) {
-			continue
-		}
-
-		stale.Status = identity.JoinRequestStatusExpired
-		stale.ReviewedAt = now
-		stale.ReviewedBy = ""
-		stale.DecisionReason = "join request expired"
-
-		updateQuery := fmt.Sprintf(`
-UPDATE %s
-SET status = $2, reviewed_at = $3, reviewed_by = $4, decision_reason = $5
-WHERE id = $1
-`, s.table("identity_join_requests"))
-
-		if _, err := s.conn().ExecContext(
-			ctx,
-			updateQuery,
-			stale.ID,
-			stale.Status,
-			nullTime(stale.ReviewedAt),
-			stale.ReviewedBy,
-			stale.DecisionReason,
-		); err != nil {
-			return fmt.Errorf("expire stale join request %s: %w", stale.ID, err)
-		}
+	if _, err := s.conn().ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("expire stale join requests for %s: %w", joinRequest.ID, err)
 	}
 
 	return nil

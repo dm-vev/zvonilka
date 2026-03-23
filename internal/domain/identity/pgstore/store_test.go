@@ -197,9 +197,8 @@ func TestSaveJoinRequestExpiresStalePendingRequest(t *testing.T) {
 	t.Parallel()
 
 	store, mock, _ := newMockStore(t)
-	now := time.Now().UTC()
-	requestedAt := now.Add(-2 * time.Hour)
-	staleExpires := time.Unix(0, 0).UTC()
+	now := time.Date(2026, time.March, 23, 23, 0, 0, 0, time.UTC)
+	requestedAt := now.Add(-4 * time.Hour)
 
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta("SELECT pg_advisory_xact_lock($1)")).WithArgs(sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 0))
@@ -215,42 +214,21 @@ func TestSaveJoinRequestExpiresStalePendingRequest(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(`SELECT id FROM %s WHERE phone = $1 LIMIT 1`, qualifiedName("tenant", "identity_accounts")))).
 		WithArgs("12345").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
-	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(`
-SELECT %s FROM %s WHERE status = $1 AND (username = $2 OR email = $3 OR phone = $4)`,
-		joinRequestColumnList,
-		qualifiedName("tenant", "identity_join_requests"),
-	))).
-		WithArgs(
-			identity.JoinRequestStatusPending,
-			"alice",
-			"alice@example.com",
-			"12345",
-		).
-		WillReturnRows(sqlmock.NewRows(strings.Split(joinRequestColumnList, ", ")).AddRow(
-			"join-1",
-			"alice",
-			"Alice",
-			"alice@example.com",
-			"12345",
-			"old note",
-			identity.JoinRequestStatusPending,
-			now.Add(-time.Hour),
-			nil,
-			"",
-			"",
-			staleExpires,
-		))
 	mock.ExpectExec(regexp.QuoteMeta(fmt.Sprintf(`
 UPDATE %s
-SET status = $2, reviewed_at = $3, reviewed_by = $4, decision_reason = $5
-WHERE id = $1
+SET status = $1,
+    reviewed_at = CURRENT_TIMESTAMP,
+    reviewed_by = '',
+    decision_reason = 'join request expired'
+WHERE status = $1
+  AND expires_at <= CURRENT_TIMESTAMP
+  AND (username = $2 OR email = $3 OR phone = $4)
 `, qualifiedName("tenant", "identity_join_requests")))).
 		WithArgs(
-			"join-1",
-			identity.JoinRequestStatusExpired,
-			sqlmock.AnyArg(),
-			"",
-			"join request expired",
+			identity.JoinRequestStatusPending,
+			"alice",
+			"alice@example.com",
+			"12345",
 		).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(`
