@@ -47,58 +47,6 @@ func TestCloseStorageCatalogClosesProvidersInReverseOrder(t *testing.T) {
 	}
 }
 
-func TestFinalizeRunJoinsCloseError(t *testing.T) {
-	t.Parallel()
-
-	runtimeErr := errors.New("runtime failed")
-	closeErr := errors.New("close failed")
-	catalog, err := domainstorage.NewCatalog(&fakeProvider{name: "first", closeErr: closeErr})
-	if err != nil {
-		t.Fatalf("new catalog: %v", err)
-	}
-
-	got := finalizeRun(context.Background(), &app{catalog: catalog}, runtimeErr)
-	if got == nil {
-		t.Fatal("expected joined error")
-	}
-	if !errors.Is(got, runtimeErr) {
-		t.Fatalf("expected runtime error in final error: %v", got)
-	}
-	if !errors.Is(got, closeErr) {
-		t.Fatalf("expected close error in final error: %v", got)
-	}
-	if got.Error() == "" {
-		t.Fatal("expected non-empty joined error")
-	}
-	if !strings.Contains(got.Error(), runtimeErr.Error()) {
-		t.Fatalf("expected runtime error text in final error: %v", got)
-	}
-	if !strings.Contains(got.Error(), closeErr.Error()) {
-		t.Fatalf("expected close error text in final error: %v", got)
-	}
-}
-
-func TestFinalizeRunReturnsCloseErrorWhenRunSucceeds(t *testing.T) {
-	t.Parallel()
-
-	closeErr := errors.New("close failed")
-	catalog, err := domainstorage.NewCatalog(&fakeProvider{name: "first", closeErr: closeErr})
-	if err != nil {
-		t.Fatalf("new catalog: %v", err)
-	}
-
-	got := finalizeRun(context.Background(), &app{catalog: catalog}, nil)
-	if got == nil {
-		t.Fatal("expected close error")
-	}
-	if !errors.Is(got, closeErr) {
-		t.Fatalf("expected close error in final error: %v", got)
-	}
-	if !strings.Contains(got.Error(), "close controlplane app") {
-		t.Fatalf("expected wrapped close error: %v", got)
-	}
-}
-
 func TestCloseStorageCatalogReturnsProviderError(t *testing.T) {
 	t.Parallel()
 
@@ -117,6 +65,55 @@ func TestCloseStorageCatalogReturnsProviderError(t *testing.T) {
 	}
 	if !strings.Contains(got.Error(), "close storage catalog") {
 		t.Fatalf("expected wrapped catalog close error: %v", got)
+	}
+}
+
+func TestFinalizeRunJoinsRunAndCloseErrors(t *testing.T) {
+	t.Parallel()
+
+	runErr := errors.New("runtime failed")
+	closeErr := errors.New("close failed")
+	catalog, err := domainstorage.NewCatalog(&fakeProvider{name: "primary", closeErr: closeErr})
+	if err != nil {
+		t.Fatalf("new catalog: %v", err)
+	}
+
+	got := finalizeRun(context.Background(), &app{catalog: catalog}, runErr)
+	if got == nil {
+		t.Fatal("expected joined error")
+	}
+	if !errors.Is(got, runErr) {
+		t.Fatalf("expected runtime error in final error: %v", got)
+	}
+	if !errors.Is(got, closeErr) {
+		t.Fatalf("expected close error in final error: %v", got)
+	}
+	if !strings.Contains(got.Error(), runErr.Error()) {
+		t.Fatalf("expected runtime error text in final error: %v", got)
+	}
+	if !strings.Contains(got.Error(), closeErr.Error()) {
+		t.Fatalf("expected close error text in final error: %v", got)
+	}
+}
+
+func TestFinalizeRunReturnsCloseErrorWhenRunSucceeds(t *testing.T) {
+	t.Parallel()
+
+	closeErr := errors.New("close failed")
+	catalog, err := domainstorage.NewCatalog(&fakeProvider{name: "primary", closeErr: closeErr})
+	if err != nil {
+		t.Fatalf("new catalog: %v", err)
+	}
+
+	got := finalizeRun(context.Background(), &app{catalog: catalog}, nil)
+	if got == nil {
+		t.Fatal("expected close error")
+	}
+	if !errors.Is(got, closeErr) {
+		t.Fatalf("expected close error in final error: %v", got)
+	}
+	if !strings.Contains(got.Error(), "close controlplane app") {
+		t.Fatalf("expected wrapped close error: %v", got)
 	}
 }
 

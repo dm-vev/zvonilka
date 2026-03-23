@@ -182,6 +182,101 @@ func TestBootstrapOpenRetriesAfterTransientFailure(t *testing.T) {
 	}
 }
 
+func TestBootstrapOpenRetriesAfterMigrationFailure(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	script := "CREATE TABLE IF NOT EXISTS {{schema}}.alpha (id INT PRIMARY KEY);"
+	if err := os.WriteFile(filepath.Join(dir, "0001.sql"), []byte(script), 0o600); err != nil {
+		t.Fatalf("write migration: %v", err)
+	}
+
+	firstDB, firstMock, err := sqlmock.New(
+		sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp),
+		sqlmock.MonitorPingsOption(true),
+	)
+	if err != nil {
+		t.Fatalf("sqlmock first db: %v", err)
+	}
+	secondDB, secondMock, err := sqlmock.New(
+		sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp),
+		sqlmock.MonitorPingsOption(true),
+	)
+	if err != nil {
+		t.Fatalf("sqlmock second db: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = firstDB.Close()
+		_ = secondDB.Close()
+	})
+
+	originalOpen := openDatabase
+	openCalls := 0
+	openDatabase = func(string, string) (*sql.DB, error) {
+		openCalls++
+		if openCalls == 1 {
+			return firstDB, nil
+		}
+		return secondDB, nil
+	}
+	t.Cleanup(func() {
+		openDatabase = originalOpen
+	})
+
+	firstMock.ExpectPing()
+	firstMock.ExpectBegin()
+	firstMock.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"tenant\".alpha (id INT PRIMARY KEY);")).
+		WillReturnError(errors.New("migration failed"))
+	firstMock.ExpectRollback()
+	firstMock.ExpectClose()
+
+	secondMock.ExpectPing()
+	secondMock.ExpectBegin()
+	secondMock.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"tenant\".alpha (id INT PRIMARY KEY);")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	secondMock.ExpectCommit()
+	secondMock.ExpectClose()
+
+	bootstrap := NewBootstrap(config.Configuration{
+		Service: config.ServiceConfig{Name: "controlplane"},
+		Infrastructure: config.InfrastructureConfig{
+			Postgres: config.PostgresConfig{
+				Enabled:         true,
+				DSN:             "postgres://zvonilka",
+				MigrationsPath:  dir,
+				Schema:          "tenant",
+				MaxOpenConns:    1,
+				MaxIdleConns:    1,
+				ConnMaxLifetime: time.Minute,
+				ConnMaxIdleTime: time.Minute,
+			},
+		},
+	})
+
+	if _, err := bootstrap.Open(context.Background()); err == nil {
+		t.Fatal("expected migration failure")
+	}
+
+	opened, err := bootstrap.Open(context.Background())
+	if err != nil {
+		t.Fatalf("retry open bootstrap: %v", err)
+	}
+	if opened != secondDB {
+		t.Fatal("expected second database handle after retry")
+	}
+
+	if err := bootstrap.Close(context.Background()); err != nil {
+		t.Fatalf("close bootstrap after retry: %v", err)
+	}
+
+	if err := firstMock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("first db expectations: %v", err)
+	}
+	if err := secondMock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("second db expectations: %v", err)
+	}
+}
+
 func TestBootstrapOpenReportsCleanupErrorOnMigrationFailure(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(

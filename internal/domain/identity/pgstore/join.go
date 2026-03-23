@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 )
@@ -207,7 +208,7 @@ func (s *Store) expireStaleJoinRequests(ctx context.Context, joinRequest identit
 		return fmt.Errorf("iterate stale join requests for %s: %w", joinRequest.ID, err)
 	}
 
-	now := joinRequest.RequestedAt
+	now := time.Now().UTC()
 	for _, stale := range staleRequests {
 		if now.Before(stale.ExpiresAt) {
 			continue

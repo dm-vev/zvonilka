@@ -2,6 +2,7 @@ package controlplane
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -13,13 +14,36 @@ import (
 	postgresplatform "github.com/dm-vev/zvonilka/internal/platform/storage/postgres"
 )
 
+type storageBuilder interface {
+	Build(ctx context.Context) (*domainstorage.Catalog, error)
+}
+
+var newStorageBuilder = func(
+	cfg config.Configuration,
+	factories ...platformstorage.Factory,
+) (storageBuilder, error) {
+	return platformstorage.NewBuilder(cfg, factories...)
+}
+
+var newIdentityStore = func(db *sql.DB, schema string) (domainidentity.Store, error) {
+	return postgresdomain.New(db, schema)
+}
+
+var newIdentityService = func(
+	store domainidentity.Store,
+	sender domainidentity.CodeSender,
+	opts ...domainidentity.Option,
+) (*domainidentity.Service, error) {
+	return domainidentity.NewService(store, sender, opts...)
+}
+
 func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstorage.Catalog, *domainidentity.Service, error) {
 	if !cfg.Infrastructure.Postgres.Enabled {
 		return nil, nil, nil
 	}
 
 	bootstrap := postgresplatform.NewBootstrap(cfg)
-	builder, err := platformstorage.NewBuilder(
+	builder, err := newStorageBuilder(
 		cfg,
 		postgresplatform.NewFactory(
 			bootstrap,
@@ -82,7 +106,7 @@ func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstor
 		)
 	}
 
-	store, err := postgresdomain.New(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	store, err := newIdentityStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
 	if err != nil {
 		return nil, nil, joinStorageError(
 			fmt.Errorf("construct postgres identity store: %w", err),
@@ -90,7 +114,7 @@ func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstor
 		)
 	}
 
-	service, err := domainidentity.NewService(store, domainidentity.NoopCodeSender{}, domainidentity.WithSettings(cfg.Identity.ToSettings()))
+	service, err := newIdentityService(store, domainidentity.NoopCodeSender{}, domainidentity.WithSettings(cfg.Identity.ToSettings()))
 	if err != nil {
 		return nil, nil, joinStorageError(
 			fmt.Errorf("construct identity service: %w", err),
