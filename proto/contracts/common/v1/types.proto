@@ -2,27 +2,291 @@ syntax = "proto3";
 
 package zvonilka.common.v1;
 
-option go_package = "github.com/dm-vev/zvonilka/gen/proto/common/v1;commonv1";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 
-message Cursor {
-  uint64 value = 1;
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1;commonv1";
+
+enum ConversationKind {
+  CONVERSATION_KIND_UNSPECIFIED = 0;
+  CONVERSATION_KIND_DIRECT = 1;
+  CONVERSATION_KIND_GROUP = 2;
+  CONVERSATION_KIND_CHANNEL = 3;
+  CONVERSATION_KIND_SAVED_MESSAGES = 4;
 }
 
-message ActorRef {
-  string tenant_id = 1;
-  string user_id = 2;
-  string device_id = 3;
+enum MemberRole {
+  MEMBER_ROLE_UNSPECIFIED = 0;
+  MEMBER_ROLE_OWNER = 1;
+  MEMBER_ROLE_ADMIN = 2;
+  MEMBER_ROLE_MEMBER = 3;
+  MEMBER_ROLE_GUEST = 4;
+}
+
+enum Visibility {
+  VISIBILITY_UNSPECIFIED = 0;
+  VISIBILITY_EVERYONE = 1;
+  VISIBILITY_CONTACTS = 2;
+  VISIBILITY_NOBODY = 3;
+  VISIBILITY_CUSTOM = 4;
+}
+
+enum PresenceState {
+  PRESENCE_STATE_UNSPECIFIED = 0;
+  PRESENCE_STATE_OFFLINE = 1;
+  PRESENCE_STATE_ONLINE = 2;
+  PRESENCE_STATE_AWAY = 3;
+  PRESENCE_STATE_BUSY = 4;
+  PRESENCE_STATE_INVISIBLE = 5;
+}
+
+enum DevicePlatform {
+  DEVICE_PLATFORM_UNSPECIFIED = 0;
+  DEVICE_PLATFORM_IOS = 1;
+  DEVICE_PLATFORM_ANDROID = 2;
+  DEVICE_PLATFORM_WEB = 3;
+  DEVICE_PLATFORM_DESKTOP = 4;
+  DEVICE_PLATFORM_SERVER = 5;
+}
+
+enum DeviceStatus {
+  DEVICE_STATUS_UNSPECIFIED = 0;
+  DEVICE_STATUS_ACTIVE = 1;
+  DEVICE_STATUS_SUSPENDED = 2;
+  DEVICE_STATUS_REVOKED = 3;
+  DEVICE_STATUS_UNVERIFIED = 4;
+}
+
+enum MessageKind {
+  MESSAGE_KIND_UNSPECIFIED = 0;
+  MESSAGE_KIND_TEXT = 1;
+  MESSAGE_KIND_IMAGE = 2;
+  MESSAGE_KIND_VIDEO = 3;
+  MESSAGE_KIND_DOCUMENT = 4;
+  MESSAGE_KIND_VOICE = 5;
+  MESSAGE_KIND_STICKER = 6;
+  MESSAGE_KIND_GIF = 7;
+  MESSAGE_KIND_SYSTEM = 8;
+}
+
+enum MessageStatus {
+  MESSAGE_STATUS_UNSPECIFIED = 0;
+  MESSAGE_STATUS_PENDING = 1;
+  MESSAGE_STATUS_SENT = 2;
+  MESSAGE_STATUS_DELIVERED = 3;
+  MESSAGE_STATUS_READ = 4;
+  MESSAGE_STATUS_FAILED = 5;
+  MESSAGE_STATUS_DELETED = 6;
+}
+
+enum AttachmentKind {
+  ATTACHMENT_KIND_UNSPECIFIED = 0;
+  ATTACHMENT_KIND_IMAGE = 1;
+  ATTACHMENT_KIND_VIDEO = 2;
+  ATTACHMENT_KIND_DOCUMENT = 3;
+  ATTACHMENT_KIND_VOICE = 4;
+  ATTACHMENT_KIND_STICKER = 5;
+  ATTACHMENT_KIND_GIF = 6;
+  ATTACHMENT_KIND_AVATAR = 7;
+  ATTACHMENT_KIND_FILE = 8;
+}
+
+enum MediaPurpose {
+  MEDIA_PURPOSE_UNSPECIFIED = 0;
+  MEDIA_PURPOSE_MESSAGE_ATTACHMENT = 1;
+  MEDIA_PURPOSE_PROFILE_AVATAR = 2;
+  MEDIA_PURPOSE_CHAT_AVATAR = 3;
+  MEDIA_PURPOSE_BOT_AVATAR = 4;
+  MEDIA_PURPOSE_STICKER_ASSET = 5;
+  MEDIA_PURPOSE_EXPORT = 6;
+  MEDIA_PURPOSE_TEMPORARY = 7;
+}
+
+enum JoinRequestStatus {
+  JOIN_REQUEST_STATUS_UNSPECIFIED = 0;
+  JOIN_REQUEST_STATUS_PENDING = 1;
+  JOIN_REQUEST_STATUS_APPROVED = 2;
+  JOIN_REQUEST_STATUS_REJECTED = 3;
+  JOIN_REQUEST_STATUS_CANCELLED = 4;
+  JOIN_REQUEST_STATUS_EXPIRED = 5;
+}
+
+enum BotStatus {
+  BOT_STATUS_UNSPECIFIED = 0;
+  BOT_STATUS_ACTIVE = 1;
+  BOT_STATUS_DISABLED = 2;
+  BOT_STATUS_REVOKED = 3;
+}
+
+enum AuditActionType {
+  AUDIT_ACTION_TYPE_UNSPECIFIED = 0;
+  AUDIT_ACTION_TYPE_ACCOUNT_CREATED = 1;
+  AUDIT_ACTION_TYPE_ACCOUNT_SUSPENDED = 2;
+  AUDIT_ACTION_TYPE_ACCOUNT_RESTORED = 3;
+  AUDIT_ACTION_TYPE_JOIN_REQUEST_CREATED = 4;
+  AUDIT_ACTION_TYPE_JOIN_REQUEST_APPROVED = 5;
+  AUDIT_ACTION_TYPE_JOIN_REQUEST_REJECTED = 6;
+  AUDIT_ACTION_TYPE_MESSAGE_REMOVED = 7;
+  AUDIT_ACTION_TYPE_POLICY_UPDATED = 8;
+  AUDIT_ACTION_TYPE_INVITE_REVOKED = 9;
+  AUDIT_ACTION_TYPE_ROLE_UPDATED = 10;
+  AUDIT_ACTION_TYPE_BOT_CREATED = 11;
+  AUDIT_ACTION_TYPE_BOT_REVOKED = 12;
+  AUDIT_ACTION_TYPE_MEDIA_DELETED = 13;
+  AUDIT_ACTION_TYPE_FEDERATION_REPLICATED = 14;
+}
+
+enum SearchScope {
+  SEARCH_SCOPE_UNSPECIFIED = 0;
+  SEARCH_SCOPE_USERS = 1;
+  SEARCH_SCOPE_CONVERSATIONS = 2;
+  SEARCH_SCOPE_MESSAGES = 3;
+  SEARCH_SCOPE_MEDIA = 4;
+  SEARCH_SCOPE_BOTS = 5;
+}
+
+enum FederationCapability {
+  FEDERATION_CAPABILITY_UNSPECIFIED = 0;
+  FEDERATION_CAPABILITY_EVENT_REPLICATION = 1;
+  FEDERATION_CAPABILITY_DIRECTORY_SYNC = 2;
+  FEDERATION_CAPABILITY_MEDIA_PROXY = 3;
+  FEDERATION_CAPABILITY_BOT_BRIDGE = 4;
+  FEDERATION_CAPABILITY_SEARCH_MIRROR = 5;
+}
+
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  EVENT_TYPE_MESSAGE_CREATED = 1;
+  EVENT_TYPE_MESSAGE_EDITED = 2;
+  EVENT_TYPE_MESSAGE_DELETED = 3;
+  EVENT_TYPE_MESSAGE_REACTION_ADDED = 4;
+  EVENT_TYPE_MESSAGE_REACTION_REMOVED = 5;
+  EVENT_TYPE_CONVERSATION_CREATED = 6;
+  EVENT_TYPE_CONVERSATION_UPDATED = 7;
+  EVENT_TYPE_CONVERSATION_MEMBERS_CHANGED = 8;
+  EVENT_TYPE_JOIN_REQUEST_CREATED = 9;
+  EVENT_TYPE_JOIN_REQUEST_APPROVED = 10;
+  EVENT_TYPE_JOIN_REQUEST_REJECTED = 11;
+  EVENT_TYPE_USER_UPDATED = 12;
+  EVENT_TYPE_DEVICE_REGISTERED = 13;
+  EVENT_TYPE_DEVICE_REVOKED = 14;
+  EVENT_TYPE_SESSION_REVOKED = 15;
+  EVENT_TYPE_MEDIA_CREATED = 16;
+  EVENT_TYPE_MEDIA_DELETED = 17;
+  EVENT_TYPE_ADMIN_ACTION_RECORDED = 18;
+  EVENT_TYPE_BOT_UPDATED = 19;
+  EVENT_TYPE_FEDERATION_REPLICATED = 20;
+}
+
+message PageRequest {
+  uint32 page_size = 1;
+  string page_token = 2;
+}
+
+message PageResponse {
+  string next_page_token = 1;
+  uint64 total_size = 2;
+}
+
+message PublicKeyBundle {
+  string key_id = 1;
+  string algorithm = 2;
+  bytes public_key = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp rotated_at = 5;
+  google.protobuf.Timestamp expires_at = 6;
+}
+
+message AuthTokens {
+  string session_id = 1;
+  string access_token = 2;
+  string refresh_token = 3;
+  string token_type = 4;
+  google.protobuf.Timestamp access_expires_at = 5;
+  google.protobuf.Timestamp refresh_expires_at = 6;
+}
+
+message EncryptedPayload {
+  string key_id = 1;
+  string algorithm = 2;
+  bytes nonce = 3;
+  bytes ciphertext = 4;
+  bytes aad = 5;
+  map<string, string> metadata = 6;
+}
+
+message Avatar {
+  string media_id = 1;
+  string variant = 2;
+  bool is_primary = 3;
+  uint32 width = 4;
+  uint32 height = 5;
+  string mime_type = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message PrivacySettings {
+  Visibility phone_visibility = 1;
+  Visibility last_seen_visibility = 2;
+  Visibility message_privacy = 3;
+  Visibility birthday_visibility = 4;
+  bool allow_contact_sync = 5;
+  bool allow_unknown_senders = 6;
+}
+
+message AttachmentRef {
+  string media_id = 1;
+  AttachmentKind kind = 2;
+  string file_name = 3;
+  string mime_type = 4;
+  uint64 size_bytes = 5;
+  string sha256_hex = 6;
+  uint32 width = 7;
+  uint32 height = 8;
+  google.protobuf.Duration duration = 9;
+  string caption = 10;
+}
+
+message MessageReference {
+  string conversation_id = 1;
+  string message_id = 2;
+  string sender_user_id = 3;
+  MessageKind message_kind = 4;
+  string snippet = 5;
+}
+
+message MessageDraft {
+  string client_message_id = 1;
+  MessageKind kind = 2;
+  EncryptedPayload payload = 3;
+  repeated AttachmentRef attachments = 4;
+  MessageReference reply_to = 5;
+  string thread_id = 6;
+  google.protobuf.Timestamp deliver_at = 7;
+  bool silent = 8;
+  bool disable_link_previews = 9;
+  map<string, string> metadata = 10;
 }
 
 message EventEnvelope {
   string event_id = 1;
-  string tenant_id = 2;
-  string conversation_id = 3;
-  string actor_id = 4;
-  string device_id = 5;
-  uint64 sequence = 6;
-  string created_at = 7;
-  string payload_type = 8;
-  bytes encrypted_payload = 9;
-  map<string, string> metadata = 10;
+  EventType event_type = 2;
+  string tenant_id = 3;
+  string conversation_id = 4;
+  string actor_user_id = 5;
+  string actor_device_id = 6;
+  string causation_id = 7;
+  string correlation_id = 8;
+  uint64 sequence = 9;
+  string payload_type = 10;
+  EncryptedPayload payload = 11;
+  map<string, string> metadata = 12;
+  google.protobuf.Timestamp created_at = 13;
+}
+
+message SyncState {
+  uint64 last_applied_sequence = 1;
+  uint64 last_acked_sequence = 2;
+  google.protobuf.Timestamp server_time = 3;
+  map<string, uint64> conversation_watermarks = 4;
 }

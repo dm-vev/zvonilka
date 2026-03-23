@@ -2,29 +2,58 @@ syntax = "proto3";
 
 package zvonilka.sync.v1;
 
-import "proto/contracts/common/v1/types.proto";
+import "contracts/common/v1/types.proto";
 
-option go_package = "github.com/dm-vev/zvonilka/gen/proto/sync/v1;syncv1";
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/sync/v1;syncv1";
 
 service SyncService {
-  rpc Pull(PullRequest) returns (PullResponse);
+  rpc GetSyncState(GetSyncStateRequest) returns (GetSyncStateResponse);
+  rpc PullEvents(PullEventsRequest) returns (PullEventsResponse);
+  rpc AcknowledgeEvents(AcknowledgeEventsRequest) returns (AcknowledgeEventsResponse);
+  rpc SubscribeEvents(SubscribeEventsRequest) returns (stream SubscribeEventsResponse);
 }
 
-service EventStreamService {
-  rpc Stream(StreamRequest) returns (stream zvonilka.common.v1.EventEnvelope);
+message GetSyncStateRequest {
+  string device_id = 1;
 }
 
-message PullRequest {
+message GetSyncStateResponse {
+  zvonilka.common.v1.SyncState state = 1;
+  repeated string pending_conversation_ids = 2;
+}
+
+message PullEventsRequest {
   string device_id = 1;
   uint64 from_sequence = 2;
-  uint32 limit = 3;
+  zvonilka.common.v1.PageRequest page = 3;
+  repeated string conversation_ids = 4;
+  bool include_presence = 5;
+  bool include_moderation = 6;
 }
 
-message PullResponse {
+message PullEventsResponse {
   repeated zvonilka.common.v1.EventEnvelope events = 1;
   uint64 next_sequence = 2;
+  bool has_more = 3;
+  zvonilka.common.v1.SyncState state = 4;
 }
 
-message StreamRequest {
+message AcknowledgeEventsRequest {
   string device_id = 1;
+  uint64 acked_sequence = 2;
+  repeated string event_ids = 3;
+}
+
+message AcknowledgeEventsResponse {
+  zvonilka.common.v1.SyncState state = 1;
+}
+
+message SubscribeEventsRequest {
+  string device_id = 1;
+  uint64 from_sequence = 2;
+  repeated string conversation_ids = 3;
+}
+
+message SubscribeEventsResponse {
+  zvonilka.common.v1.EventEnvelope event = 1;
 }

@@ -2,19 +2,133 @@ syntax = "proto3";
 
 package zvonilka.media.v1;
 
-option go_package = "github.com/dm-vev/zvonilka/gen/proto/media/v1;mediav1";
+import "google/protobuf/timestamp.proto";
+import "contracts/common/v1/types.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/media/v1;mediav1";
 
 service MediaService {
-  rpc CreateUpload(CreateUploadRequest) returns (CreateUploadResponse);
+  rpc InitiateUpload(InitiateUploadRequest) returns (InitiateUploadResponse);
+  rpc CompleteUpload(CompleteUploadRequest) returns (CompleteUploadResponse);
+  rpc AbortUpload(AbortUploadRequest) returns (AbortUploadResponse);
+  rpc GetMedia(GetMediaRequest) returns (GetMediaResponse);
+  rpc GetDownloadUrl(GetDownloadUrlRequest) returns (GetDownloadUrlResponse);
+  rpc ListMedia(ListMediaRequest) returns (ListMediaResponse);
+  rpc DeleteMedia(DeleteMediaRequest) returns (DeleteMediaResponse);
 }
 
-message CreateUploadRequest {
-  string owner_id = 1;
-  string content_type = 2;
-  uint64 size_bytes = 3;
+message MediaVariant {
+  string name = 1;
+  string url = 2;
+  uint32 width = 3;
+  uint32 height = 4;
+  string mime_type = 5;
+  uint64 size_bytes = 6;
 }
 
-message CreateUploadResponse {
-  string object_id = 1;
-  string upload_url = 2;
+message MediaObject {
+  string media_id = 1;
+  string owner_user_id = 2;
+  zvonilka.common.v1.MediaPurpose purpose = 3;
+  string file_name = 4;
+  string mime_type = 5;
+  uint64 size_bytes = 6;
+  string sha256_hex = 7;
+  string storage_key = 8;
+  string public_url = 9;
+  bool public_access = 10;
+  repeated MediaVariant variants = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp completed_at = 13;
+  google.protobuf.Timestamp deleted_at = 14;
+}
+
+message UploadSession {
+  string upload_id = 1;
+  string media_id = 2;
+  string upload_url = 3;
+  map<string, string> headers = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  bool multipart = 6;
+  uint32 part_size_bytes = 7;
+  uint32 part_count = 8;
+  string checksum_sha256 = 9;
+}
+
+message InitiateUploadRequest {
+  string owner_user_id = 1;
+  zvonilka.common.v1.MediaPurpose purpose = 2;
+  string file_name = 3;
+  string mime_type = 4;
+  uint64 size_bytes = 5;
+  string sha256_hex = 6;
+  string conversation_id = 7;
+  string idempotency_key = 8;
+}
+
+message InitiateUploadResponse {
+  MediaObject media = 1;
+  UploadSession upload = 2;
+}
+
+message CompleteUploadRequest {
+  string upload_id = 1;
+  string media_id = 2;
+  string idempotency_key = 3;
+}
+
+message CompleteUploadResponse {
+  MediaObject media = 1;
+}
+
+message AbortUploadRequest {
+  string upload_id = 1;
+  string reason = 2;
+  string idempotency_key = 3;
+}
+
+message AbortUploadResponse {
+  bool aborted = 1;
+}
+
+message GetMediaRequest {
+  string media_id = 1;
+}
+
+message GetMediaResponse {
+  MediaObject media = 1;
+}
+
+message GetDownloadUrlRequest {
+  string media_id = 1;
+  string variant = 2;
+}
+
+message GetDownloadUrlResponse {
+  string url = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  map<string, string> headers = 3;
+}
+
+message ListMediaRequest {
+  string owner_user_id = 1;
+  zvonilka.common.v1.PageRequest page = 2;
+  repeated zvonilka.common.v1.MediaPurpose purposes = 3;
+  string conversation_id = 4;
+}
+
+message ListMediaResponse {
+  repeated MediaObject media = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message DeleteMediaRequest {
+  string media_id = 1;
+  bool hard_delete = 2;
+  string reason = 3;
+  string idempotency_key = 4;
+}
+
+message DeleteMediaResponse {
+  MediaObject media = 1;
 }
