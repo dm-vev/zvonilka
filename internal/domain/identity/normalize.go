@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"strings"
+	"unicode"
 )
 
 func normalizeUsername(value string) string {
@@ -15,7 +16,19 @@ func normalizeEmail(value string) string {
 }
 
 func normalizePhone(value string) string {
-	return strings.TrimSpace(value)
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+
+	digits := make([]rune, 0, len(value))
+	for _, symbol := range value {
+		if unicode.IsDigit(symbol) {
+			digits = append(digits, symbol)
+		}
+	}
+
+	return string(digits)
 }
 
 func maskEmail(value string) string {
