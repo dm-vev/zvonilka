@@ -132,6 +132,24 @@ func (s *Service) lookupAccountByIdentifier(ctx context.Context, username, email
 	}
 }
 
+// touchAccount serializes the current transaction on the account row without changing
+// any logical fields the caller has not already decided to persist.
+//
+// The helper is intentionally a benign write so account-wide revoke can contend with
+// login and device-registration flows on the same row boundary before any session or
+// device rows are created.
+func (s *Service) touchAccount(ctx context.Context, store Store, account Account) error {
+	if account.ID == "" {
+		return ErrInvalidInput
+	}
+
+	if _, err := store.SaveAccount(ctx, account); err != nil {
+		return fmt.Errorf("touch account %s: %w", account.ID, err)
+	}
+
+	return nil
+}
+
 // issueSession creates a device/session pair and returns bearer tokens for the account.
 //
 // The caller is expected to run the helper inside a store transaction when the
@@ -160,6 +178,15 @@ func (s *Service) issueSession(
 		if deviceName == "" {
 			deviceName = account.Username
 		}
+	}
+
+	// Touch the account row first so account-wide revocation serializes before we
+	// create any new device or session rows.
+	account.LastAuthAt = now
+	account.UpdatedAt = now
+	if err = s.touchAccount(ctx, store, account); err != nil {
+		err = fmt.Errorf("update account %s before session issuance: %w", account.ID, err)
+		return
 	}
 
 	deviceID, err := newID("dev")
@@ -220,13 +247,6 @@ func (s *Service) issueSession(
 	refreshToken, err := randomToken(32)
 	if err != nil {
 		err = fmt.Errorf("generate refresh token for account %s: %w", account.ID, err)
-		return
-	}
-
-	account.LastAuthAt = now
-	account.UpdatedAt = now
-	if _, saveErr := store.SaveAccount(ctx, account); saveErr != nil {
-		err = fmt.Errorf("update account %s after authentication: %w", account.ID, saveErr)
 		return
 	}
 
