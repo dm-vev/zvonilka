@@ -11,6 +11,7 @@ import (
 	teststore "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
 )
 
+// failingFirstSaveAccountStore fails the first account write and succeeds afterwards.
 type failingFirstSaveAccountStore struct {
 	identity.Store
 
@@ -19,6 +20,7 @@ type failingFirstSaveAccountStore struct {
 	failErr error
 }
 
+// SaveAccount injects a one-shot failure before delegating to the wrapped store.
 func (s *failingFirstSaveAccountStore) SaveAccount(
 	ctx context.Context,
 	account identity.Account,

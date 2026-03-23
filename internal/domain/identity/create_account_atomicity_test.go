@@ -11,6 +11,7 @@ import (
 	teststore "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
 )
 
+// barrierSaveAccountStore blocks both concurrent saves until they have all arrived.
 type barrierSaveAccountStore struct {
 	identity.Store
 
@@ -19,6 +20,7 @@ type barrierSaveAccountStore struct {
 	release chan struct{}
 }
 
+// newBarrierSaveAccountStore constructs the synchronization wrapper used by the atomicity test.
 func newBarrierSaveAccountStore(store identity.Store) *barrierSaveAccountStore {
 	return &barrierSaveAccountStore{
 		Store:   store,
@@ -26,6 +28,7 @@ func newBarrierSaveAccountStore(store identity.Store) *barrierSaveAccountStore {
 	}
 }
 
+// SaveAccount waits for both concurrent callers before delegating to the wrapped store.
 func (s *barrierSaveAccountStore) SaveAccount(
 	ctx context.Context,
 	account identity.Account,

@@ -13,6 +13,7 @@ import (
 
 var errApprovedJoinRequestSave = errors.New("forced approved join request save failure")
 
+// onceFailingApprovedJoinRequestStore fails the first approved join-request write.
 type onceFailingApprovedJoinRequestStore struct {
 	identity.Store
 
@@ -20,6 +21,7 @@ type onceFailingApprovedJoinRequestStore struct {
 	failed bool
 }
 
+// SaveJoinRequest injects a one-shot failure for approved join requests.
 func (s *onceFailingApprovedJoinRequestStore) SaveJoinRequest(
 	ctx context.Context,
 	joinRequest identity.JoinRequest,

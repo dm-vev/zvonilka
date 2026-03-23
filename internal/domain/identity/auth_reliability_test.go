@@ -275,6 +275,7 @@ func TestRegisterDeviceIdempotencyReturnsCachedDeviceAndSession(t *testing.T) {
 	}
 }
 
+// loginUser performs the full login flow and returns both the challenge and the resulting session bundle.
 func loginUser(
 	t *testing.T,
 	svc *identity.Service,
@@ -351,6 +352,7 @@ func TestLoginIssuesSingleCurrentSession(t *testing.T) {
 	}
 }
 
+// newReliabilityService constructs a service with a deterministic clock for reliability tests.
 func newReliabilityService(
 	t *testing.T,
 	store identity.Store,
@@ -367,6 +369,7 @@ func newReliabilityService(
 	return svc
 }
 
+// createUserAccount creates a minimal user account for reliability flows.
 func createUserAccount(
 	t *testing.T,
 	svc *identity.Service,
@@ -389,6 +392,7 @@ func createUserAccount(
 	return account
 }
 
+// startEmailLogin starts an email-based login challenge and returns the code captured by the fake sender.
 func startEmailLogin(
 	t *testing.T,
 	svc *identity.Service,
@@ -419,6 +423,7 @@ func startEmailLogin(
 	return challenge, code
 }
 
+// loginUserResult performs a complete login and returns the issued result bundle.
 func loginUserResult(
 	t *testing.T,
 	svc *identity.Service,

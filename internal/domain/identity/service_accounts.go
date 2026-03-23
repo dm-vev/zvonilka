@@ -222,12 +222,10 @@ func (s *Service) CreateAccount(ctx context.Context, params CreateAccountParams)
 	return account, botToken, err
 }
 
-/*
-	createAccount executes the shared account write path for direct creation and approval retries.
-
-The allowExisting flag is only enabled by approval flows so they can recover an active
-account that survived a partial rollback. Direct admin creation still fails on conflicts.
-*/
+// createAccount executes the shared account write path for direct creation and approval retries.
+//
+// The allowExisting flag is only enabled by approval flows so they can recover an active
+// account that survived a partial rollback. Direct admin creation still fails on conflicts.
 func (s *Service) createAccount(
 	ctx context.Context,
 	params CreateAccountParams,

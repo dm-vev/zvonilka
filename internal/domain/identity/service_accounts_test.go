@@ -229,10 +229,12 @@ func TestListJoinRequestsByStatusFiltersExpiredPendingRequestsWithoutPersisting(
 
 var errInjectedJoinRequestSave = errors.New("join request save failed")
 
+// failJoinRequestApprovalStore fails approved join-request writes to exercise rollback cleanup.
 type failJoinRequestApprovalStore struct {
 	identity.Store
 }
 
+// SaveJoinRequest injects a failure for approved join requests.
 func (s *failJoinRequestApprovalStore) SaveJoinRequest(
 	ctx context.Context,
 	joinRequest identity.JoinRequest,

@@ -10,6 +10,7 @@ import (
 	teststore "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
 )
 
+// countingSessionStore tracks read and write operations used by the session read model.
 type countingSessionStore struct {
 	identity.Store
 
@@ -19,6 +20,7 @@ type countingSessionStore struct {
 	updateSessionCalls       int
 }
 
+// SessionByID counts and forwards single-session lookups.
 func (s *countingSessionStore) SessionByID(ctx context.Context, sessionID string) (identity.Session, error) {
 	s.mu.Lock()
 	s.sessionByIDCalls++
@@ -27,6 +29,7 @@ func (s *countingSessionStore) SessionByID(ctx context.Context, sessionID string
 	return s.Store.SessionByID(ctx, sessionID)
 }
 
+// SessionsByAccountID counts and forwards account session listings.
 func (s *countingSessionStore) SessionsByAccountID(
 	ctx context.Context,
 	accountID string,
@@ -38,6 +41,7 @@ func (s *countingSessionStore) SessionsByAccountID(
 	return s.Store.SessionsByAccountID(ctx, accountID)
 }
 
+// UpdateSession counts and forwards session updates.
 func (s *countingSessionStore) UpdateSession(ctx context.Context, session identity.Session) (identity.Session, error) {
 	s.mu.Lock()
 	s.updateSessionCalls++
@@ -46,6 +50,7 @@ func (s *countingSessionStore) UpdateSession(ctx context.Context, session identi
 	return s.Store.UpdateSession(ctx, session)
 }
 
+// counts returns the observed session-store call totals.
 func (s *countingSessionStore) counts() (sessionByID, sessionsByAccountID, updateSession int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -53,12 +58,14 @@ func (s *countingSessionStore) counts() (sessionByID, sessionsByAccountID, updat
 	return s.sessionByIDCalls, s.sessionsByAccountIDCalls, s.updateSessionCalls
 }
 
+// steppedClock returns monotonically increasing timestamps on each call.
 type steppedClock struct {
 	mu   sync.Mutex
 	now  time.Time
 	step time.Duration
 }
 
+// Now returns the next scheduled clock value.
 func (c *steppedClock) Now() time.Time {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -72,6 +79,7 @@ func (c *steppedClock) Now() time.Time {
 	return current
 }
 
+// newLoggedInAccount performs a full login and returns the resulting session.
 func newLoggedInAccount(
 	t *testing.T,
 	svc *identity.Service,

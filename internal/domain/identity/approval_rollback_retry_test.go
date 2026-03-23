@@ -13,6 +13,7 @@ import (
 
 var errApprovalRollbackDeleteFailure = errors.New("forced approval rollback delete failure")
 
+// onceFailingApprovalRollbackStore fails approval once and then fails rollback delete once.
 type onceFailingApprovalRollbackStore struct {
 	identity.Store
 
@@ -21,6 +22,7 @@ type onceFailingApprovalRollbackStore struct {
 	deleteFailed bool
 }
 
+// SaveJoinRequest injects a single approved-write failure.
 func (s *onceFailingApprovalRollbackStore) SaveJoinRequest(
 	ctx context.Context,
 	joinRequest identity.JoinRequest,
@@ -36,6 +38,7 @@ func (s *onceFailingApprovalRollbackStore) SaveJoinRequest(
 	return s.Store.SaveJoinRequest(ctx, joinRequest)
 }
 
+// DeleteAccount injects a single rollback-delete failure before delegating.
 func (s *onceFailingApprovalRollbackStore) DeleteAccount(ctx context.Context, accountID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -48,6 +51,7 @@ func (s *onceFailingApprovalRollbackStore) DeleteAccount(ctx context.Context, ac
 	return s.Store.DeleteAccount(ctx, accountID)
 }
 
+// alwaysFailApprovedJoinRequestDeleteOnceStore always fails approved writes and fails delete once.
 type alwaysFailApprovedJoinRequestDeleteOnceStore struct {
 	identity.Store
 
@@ -55,6 +59,7 @@ type alwaysFailApprovedJoinRequestDeleteOnceStore struct {
 	deleteFailed bool
 }
 
+// SaveJoinRequest always fails approved join-request writes.
 func (s *alwaysFailApprovedJoinRequestDeleteOnceStore) SaveJoinRequest(
 	ctx context.Context,
 	joinRequest identity.JoinRequest,
@@ -69,6 +74,7 @@ func (s *alwaysFailApprovedJoinRequestDeleteOnceStore) SaveJoinRequest(
 	return s.Store.SaveJoinRequest(ctx, joinRequest)
 }
 
+// DeleteAccount injects a single rollback-delete failure before delegating.
 func (s *alwaysFailApprovedJoinRequestDeleteOnceStore) DeleteAccount(ctx context.Context, accountID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

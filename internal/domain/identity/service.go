@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// These defaults keep the service usable in tests and local development without extra configuration.
 const (
 	defaultJoinRequestTTL = 72 * time.Hour
 	defaultChallengeTTL   = 10 * time.Minute
@@ -136,14 +137,12 @@ func (s *Service) lookupAccountByIdentifier(ctx context.Context, username, email
 	}
 }
 
-/*
-	issueSession creates a device/session pair and returns bearer tokens for the account.
-
-The store interface is intentionally not transactional yet, so the function records the
-device first, then the session, then the auth metadata. If any later step fails, the
-defer block rolls back the partial writes so callers do not observe half-created login
-state.
-*/
+// issueSession creates a device/session pair and returns bearer tokens for the account.
+//
+// The store interface is intentionally not transactional yet, so the function records the
+// device first, then the session, then the auth metadata. If any later step fails, the
+// defer block rolls back the partial writes so callers do not observe half-created login
+// state.
 func (s *Service) issueSession(
 	ctx context.Context,
 	account Account,

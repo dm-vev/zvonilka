@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// defaultIdempotencyTTL bounds how long a cached idempotency response stays reusable.
 const defaultIdempotencyTTL = 24 * time.Hour
 
 // idempotencyEntry stores one cached response together with the request fingerprint and TTL.
@@ -18,21 +19,25 @@ type idempotencyEntry[T any] struct {
 	value       T
 }
 
+// beginLoginCacheResult keeps the cached login challenge together with the chosen targets.
 type beginLoginCacheResult struct {
 	challenge LoginChallenge
 	targets   []LoginTarget
 }
 
+// registerDeviceCacheResult keeps the paired device and session for device-registration retries.
 type registerDeviceCacheResult struct {
 	device  Device
 	session Session
 }
 
+// createAccountCacheResult keeps the created account and optional bot token.
 type createAccountCacheResult struct {
 	account  Account
 	botToken string
 }
 
+// approveJoinRequestCacheResult keeps the approved join request and the resulting account.
 type approveJoinRequestCacheResult struct {
 	joinRequest JoinRequest
 	account     Account
@@ -191,6 +196,7 @@ func newIdempotencyCache() *idempotencyCache {
 //
 // They keep the payload-specific cloning behavior local to the operation that needs it,
 // while the bucket itself stays generic and unaware of the response shape.
+// submitJoinRequestResult returns the cached join-request submission if it still matches.
 func (c *idempotencyCache) submitJoinRequestResult(
 	key string,
 	fingerprint string,
@@ -199,6 +205,7 @@ func (c *idempotencyCache) submitJoinRequestResult(
 	return c.submitJoinRequest.get(key, fingerprint, now)
 }
 
+// storeSubmitJoinRequestResult caches a successful join-request submission.
 func (c *idempotencyCache) storeSubmitJoinRequestResult(
 	key string,
 	fingerprint string,
@@ -208,6 +215,7 @@ func (c *idempotencyCache) storeSubmitJoinRequestResult(
 	c.submitJoinRequest.put(key, fingerprint, joinRequest, now)
 }
 
+// approveJoinRequestResult returns the cached approval outcome if the fingerprint still matches.
 func (c *idempotencyCache) approveJoinRequestResult(
 	key string,
 	fingerprint string,
@@ -221,6 +229,7 @@ func (c *idempotencyCache) approveJoinRequestResult(
 	return cloneApproveJoinRequestCacheResult(result), true, nil
 }
 
+// storeApproveJoinRequestResult caches a successful join-request approval.
 func (c *idempotencyCache) storeApproveJoinRequestResult(
 	key string,
 	fingerprint string,
@@ -230,6 +239,7 @@ func (c *idempotencyCache) storeApproveJoinRequestResult(
 	c.approveJoinRequest.put(key, fingerprint, cloneApproveJoinRequestCacheResult(result), now)
 }
 
+// rejectJoinRequestResult returns the cached rejection outcome if it still matches.
 func (c *idempotencyCache) rejectJoinRequestResult(
 	key string,
 	fingerprint string,
@@ -238,6 +248,7 @@ func (c *idempotencyCache) rejectJoinRequestResult(
 	return c.rejectJoinRequest.get(key, fingerprint, now)
 }
 
+// storeRejectJoinRequestResult caches a successful join-request rejection.
 func (c *idempotencyCache) storeRejectJoinRequestResult(
 	key string,
 	fingerprint string,
@@ -247,6 +258,7 @@ func (c *idempotencyCache) storeRejectJoinRequestResult(
 	c.rejectJoinRequest.put(key, fingerprint, joinRequest, now)
 }
 
+// createAccountResult returns the cached account creation outcome if the fingerprint still matches.
 func (c *idempotencyCache) createAccountResult(
 	key string,
 	fingerprint string,
@@ -260,6 +272,7 @@ func (c *idempotencyCache) createAccountResult(
 	return cloneCreateAccountCacheResult(result), true, nil
 }
 
+// storeCreateAccountResult caches a successful account creation.
 func (c *idempotencyCache) storeCreateAccountResult(
 	key string,
 	fingerprint string,
@@ -269,6 +282,7 @@ func (c *idempotencyCache) storeCreateAccountResult(
 	c.createAccount.put(key, fingerprint, cloneCreateAccountCacheResult(result), now)
 }
 
+// beginLoginResult returns the cached login-start outcome if the fingerprint still matches.
 func (c *idempotencyCache) beginLoginResult(
 	key string,
 	fingerprint string,
@@ -282,6 +296,7 @@ func (c *idempotencyCache) beginLoginResult(
 	return cloneBeginLoginCacheResult(result), true, nil
 }
 
+// storeBeginLoginResult caches a successful login-start challenge.
 func (c *idempotencyCache) storeBeginLoginResult(
 	key string,
 	fingerprint string,
@@ -291,6 +306,7 @@ func (c *idempotencyCache) storeBeginLoginResult(
 	c.beginLogin.put(key, fingerprint, cloneBeginLoginCacheResult(result), now)
 }
 
+// verifyLoginResult returns the cached login completion outcome if the fingerprint still matches.
 func (c *idempotencyCache) verifyLoginResult(
 	key string,
 	fingerprint string,
@@ -299,6 +315,7 @@ func (c *idempotencyCache) verifyLoginResult(
 	return c.verifyLogin.get(key, fingerprint, now)
 }
 
+// storeVerifyLoginResult caches a successful login completion.
 func (c *idempotencyCache) storeVerifyLoginResult(
 	key string,
 	fingerprint string,
@@ -308,6 +325,7 @@ func (c *idempotencyCache) storeVerifyLoginResult(
 	c.verifyLogin.put(key, fingerprint, result, now)
 }
 
+// authenticateBotResult returns the cached bot-auth outcome if the fingerprint still matches.
 func (c *idempotencyCache) authenticateBotResult(
 	key string,
 	fingerprint string,
@@ -316,6 +334,7 @@ func (c *idempotencyCache) authenticateBotResult(
 	return c.authenticateBot.get(key, fingerprint, now)
 }
 
+// storeAuthenticateBotResult caches a successful bot authentication.
 func (c *idempotencyCache) storeAuthenticateBotResult(
 	key string,
 	fingerprint string,
@@ -325,6 +344,7 @@ func (c *idempotencyCache) storeAuthenticateBotResult(
 	c.authenticateBot.put(key, fingerprint, result, now)
 }
 
+// registerDeviceResult returns the cached device-registration outcome if the fingerprint still matches.
 func (c *idempotencyCache) registerDeviceResult(
 	key string,
 	fingerprint string,
@@ -338,6 +358,7 @@ func (c *idempotencyCache) registerDeviceResult(
 	return result.device, result.session, true, nil
 }
 
+// storeRegisterDeviceResult caches a successful device registration.
 func (c *idempotencyCache) storeRegisterDeviceResult(
 	key string,
 	fingerprint string,
@@ -347,6 +368,7 @@ func (c *idempotencyCache) storeRegisterDeviceResult(
 	c.registerDevice.put(key, fingerprint, result, now)
 }
 
+// revokeSessionResult returns the cached single-session revocation if it still matches.
 func (c *idempotencyCache) revokeSessionResult(
 	key string,
 	fingerprint string,
@@ -355,6 +377,7 @@ func (c *idempotencyCache) revokeSessionResult(
 	return c.revokeSession.get(key, fingerprint, now)
 }
 
+// storeRevokeSessionResult caches a successful single-session revocation.
 func (c *idempotencyCache) storeRevokeSessionResult(
 	key string,
 	fingerprint string,
@@ -364,6 +387,7 @@ func (c *idempotencyCache) storeRevokeSessionResult(
 	c.revokeSession.put(key, fingerprint, session, now)
 }
 
+// revokeAllSessionsResult returns the cached bulk-revocation count if it still matches.
 func (c *idempotencyCache) revokeAllSessionsResult(
 	key string,
 	fingerprint string,
@@ -372,6 +396,7 @@ func (c *idempotencyCache) revokeAllSessionsResult(
 	return c.revokeAllSessions.get(key, fingerprint, now)
 }
 
+// storeRevokeAllSessionsResult caches a successful bulk session revocation.
 func (c *idempotencyCache) storeRevokeAllSessionsResult(
 	key string,
 	fingerprint string,

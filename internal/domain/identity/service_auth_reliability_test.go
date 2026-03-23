@@ -11,12 +11,14 @@ import (
 	teststore "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
 )
 
+// failingCodeSender fails the first login-code delivery and succeeds afterwards.
 type failingCodeSender struct {
 	mu       sync.Mutex
 	attempts int
 	failErr  error
 }
 
+// SendLoginCode injects a one-shot delivery failure.
 func (s *failingCodeSender) SendLoginCode(_ context.Context, _ identity.LoginTarget, _ string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -32,6 +34,7 @@ func (s *failingCodeSender) SendLoginCode(_ context.Context, _ identity.LoginTar
 	return nil
 }
 
+// totalAttempts returns the number of observed delivery attempts.
 func (s *failingCodeSender) totalAttempts() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -39,12 +42,14 @@ func (s *failingCodeSender) totalAttempts() int {
 	return s.attempts
 }
 
+// failingUpdateSessionStore fails the first UpdateSession call to exercise rollback.
 type failingUpdateSessionStore struct {
 	identity.Store
 	failErr error
 	failed  bool
 }
 
+// UpdateSession injects a one-shot failure before delegating to the wrapped store.
 func (s *failingUpdateSessionStore) UpdateSession(ctx context.Context, session identity.Session) (identity.Session, error) {
 	if s.failErr == nil {
 		s.failErr = errors.New("forced update session failure")
@@ -57,6 +62,7 @@ func (s *failingUpdateSessionStore) UpdateSession(ctx context.Context, session i
 	return s.Store.UpdateSession(ctx, session)
 }
 
+// createAccount builds a minimal user account for reliability tests.
 func createAccount(t *testing.T, svc *identity.Service, ctx context.Context, username, email string) identity.Account {
 	t.Helper()
 
@@ -74,6 +80,7 @@ func createAccount(t *testing.T, svc *identity.Service, ctx context.Context, use
 	return account
 }
 
+// beginLogin starts a login challenge and asserts the expected target count.
 func beginLogin(
 	t *testing.T,
 	svc *identity.Service,
@@ -98,6 +105,7 @@ func beginLogin(
 	return challenge, targets
 }
 
+// verifyLogin completes a login challenge and returns the issued session bundle.
 func verifyLogin(
 	t *testing.T,
 	svc *identity.Service,

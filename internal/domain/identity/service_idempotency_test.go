@@ -11,6 +11,7 @@ import (
 	teststore "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
 )
 
+// countingAuthStore tracks how often auth-side persistence calls are executed.
 type countingAuthStore struct {
 	identity.Store
 
@@ -24,6 +25,7 @@ type countingAuthStore struct {
 	updateSession      int
 }
 
+// SaveLoginChallenge counts and forwards login-challenge writes.
 func (s *countingAuthStore) SaveLoginChallenge(
 	ctx context.Context,
 	challenge identity.LoginChallenge,
@@ -35,6 +37,7 @@ func (s *countingAuthStore) SaveLoginChallenge(
 	return s.Store.SaveLoginChallenge(ctx, challenge)
 }
 
+// SaveDevice counts and forwards device writes.
 func (s *countingAuthStore) SaveDevice(
 	ctx context.Context,
 	device identity.Device,
@@ -46,6 +49,7 @@ func (s *countingAuthStore) SaveDevice(
 	return s.Store.SaveDevice(ctx, device)
 }
 
+// SaveSession counts and forwards session writes.
 func (s *countingAuthStore) SaveSession(
 	ctx context.Context,
 	session identity.Session,
@@ -57,6 +61,7 @@ func (s *countingAuthStore) SaveSession(
 	return s.Store.SaveSession(ctx, session)
 }
 
+// SaveAccount counts and forwards account writes.
 func (s *countingAuthStore) SaveAccount(
 	ctx context.Context,
 	account identity.Account,
@@ -68,6 +73,7 @@ func (s *countingAuthStore) SaveAccount(
 	return s.Store.SaveAccount(ctx, account)
 }
 
+// SessionByID counts and forwards session lookups by ID.
 func (s *countingAuthStore) SessionByID(ctx context.Context, sessionID string) (identity.Session, error) {
 	s.mu.Lock()
 	s.sessionByID++
@@ -76,6 +82,7 @@ func (s *countingAuthStore) SessionByID(ctx context.Context, sessionID string) (
 	return s.Store.SessionByID(ctx, sessionID)
 }
 
+// AccountByID counts and forwards account lookups by ID.
 func (s *countingAuthStore) AccountByID(ctx context.Context, accountID string) (identity.Account, error) {
 	s.mu.Lock()
 	s.accountByID++
@@ -84,6 +91,7 @@ func (s *countingAuthStore) AccountByID(ctx context.Context, accountID string) (
 	return s.Store.AccountByID(ctx, accountID)
 }
 
+// UpdateSession counts and forwards session updates.
 func (s *countingAuthStore) UpdateSession(
 	ctx context.Context,
 	session identity.Session,
@@ -95,6 +103,7 @@ func (s *countingAuthStore) UpdateSession(
 	return s.Store.UpdateSession(ctx, session)
 }
 
+// counts returns the observed call totals for each tracked method.
 func (s *countingAuthStore) counts() (saveLoginChallenge, saveDevice, saveSession, saveAccount, sessionByID, accountByID, updateSession int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
