@@ -15,6 +15,8 @@ var (
 	ErrForbidden = errors.New("forbidden")
 	// ErrExpiredChallenge indicates a login challenge has expired.
 	ErrExpiredChallenge = errors.New("expired challenge")
+	// ErrExpiredJoinRequest indicates a join request expired before review.
+	ErrExpiredJoinRequest = errors.New("expired join request")
 	// ErrInvalidCode indicates a login code does not match the challenge.
 	ErrInvalidCode = errors.New("invalid code")
 )

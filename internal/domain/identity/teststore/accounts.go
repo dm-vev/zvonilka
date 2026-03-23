@@ -24,6 +24,24 @@ func (s *memoryStore) SaveAccount(_ context.Context, account identity.Account) (
 	return account, nil
 }
 
+func (s *memoryStore) DeleteAccount(_ context.Context, accountID string) error {
+	if accountID == "" {
+		return identity.ErrInvalidInput
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	account, ok := s.accountsByID[accountID]
+	if !ok {
+		return identity.ErrNotFound
+	}
+
+	delete(s.accountsByID, accountID)
+	s.deleteAccountIndexes(account)
+	return nil
+}
+
 func (s *memoryStore) AccountByID(_ context.Context, accountID string) (identity.Account, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

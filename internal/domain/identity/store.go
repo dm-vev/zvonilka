@@ -9,6 +9,7 @@ type Store interface {
 	JoinRequestsByStatus(ctx context.Context, status JoinRequestStatus) ([]JoinRequest, error)
 
 	SaveAccount(ctx context.Context, account Account) (Account, error)
+	DeleteAccount(ctx context.Context, accountID string) error
 	AccountByID(ctx context.Context, accountID string) (Account, error)
 	AccountByUsername(ctx context.Context, username string) (Account, error)
 	AccountByEmail(ctx context.Context, email string) (Account, error)

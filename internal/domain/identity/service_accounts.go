@@ -88,6 +88,20 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 	if joinRequest.Status != JoinRequestStatusPending {
 		return JoinRequest{}, Account{}, ErrConflict
 	}
+	now := s.currentTime()
+	if !joinRequest.ExpiresAt.IsZero() && !now.Before(joinRequest.ExpiresAt) {
+		joinRequest.Status = JoinRequestStatusExpired
+		joinRequest.ReviewedAt = now
+		joinRequest.ReviewedBy = trimmed(params.ReviewedBy)
+		joinRequest.DecisionReason = "join request expired"
+
+		savedJoinRequest, saveErr := s.store.SaveJoinRequest(ctx, joinRequest)
+		if saveErr != nil {
+			return JoinRequest{}, Account{}, fmt.Errorf("mark join request %s as expired: %w", joinRequest.ID, saveErr)
+		}
+
+		return savedJoinRequest, Account{}, ErrExpiredJoinRequest
+	}
 
 	account, botToken, err := s.createAccount(
 		ctx,
@@ -102,7 +116,7 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 			AccountKind:    AccountKindUser,
 			CreatedBy:      params.ReviewedBy,
 			IdempotencyKey: params.IdempotencyKey,
-			RequestedAt:    s.currentTime(),
+			RequestedAt:    now,
 		},
 	)
 	if err != nil {
@@ -112,7 +126,6 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 		return JoinRequest{}, Account{}, fmt.Errorf("join request created unexpected bot token")
 	}
 
-	now := s.currentTime()
 	joinRequest.Status = JoinRequestStatusApproved
 	joinRequest.ReviewedAt = now
 	joinRequest.ReviewedBy = params.ReviewedBy
@@ -120,6 +133,17 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 
 	savedJoinRequest, err := s.store.SaveJoinRequest(ctx, joinRequest)
 	if err != nil {
+		rollbackErr := s.store.DeleteAccount(ctx, account.ID)
+		if rollbackErr != nil && !isNotFound(rollbackErr) {
+			return JoinRequest{}, Account{}, fmt.Errorf(
+				"update join request %s: %w: rollback account %s: %w",
+				joinRequest.ID,
+				err,
+				account.ID,
+				rollbackErr,
+			)
+		}
+
 		return JoinRequest{}, Account{}, fmt.Errorf("update join request %s: %w", joinRequest.ID, err)
 	}
 
