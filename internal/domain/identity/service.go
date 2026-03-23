@@ -135,8 +135,6 @@ func (s *Service) issueSession(
 	}
 
 	var (
-		deviceSaved     bool
-		sessionSaved    bool
 		savedDevice     Device
 		savedSession    Session
 		currentSessions []Session
@@ -151,21 +149,8 @@ func (s *Service) issueSession(
 				err = errors.Join(err, restoreErr)
 			}
 		}
-		if sessionSaved {
-			if deleteErr := s.store.DeleteSession(ctx, savedSession.ID); deleteErr != nil && !errors.Is(deleteErr, ErrNotFound) {
-				err = errors.Join(
-					err,
-					fmt.Errorf("delete session %s after authentication failure: %w", savedSession.ID, deleteErr),
-				)
-			}
-		}
-		if deviceSaved {
-			if deleteErr := s.store.DeleteDevice(ctx, savedDevice.ID); deleteErr != nil && !errors.Is(deleteErr, ErrNotFound) {
-				err = errors.Join(
-					err,
-					fmt.Errorf("delete device %s after authentication failure: %w", savedDevice.ID, deleteErr),
-				)
-			}
+		if rollbackErr := s.rollbackDeviceAndSession(ctx, savedDevice.ID, savedSession.ID); rollbackErr != nil {
+			err = errors.Join(err, rollbackErr)
 		}
 	}()
 
@@ -207,7 +192,6 @@ func (s *Service) issueSession(
 		err = fmt.Errorf("save device for account %s: %w", account.ID, saveErr)
 		return
 	}
-	deviceSaved = true
 
 	session := Session{
 		ID:             sessionID,
@@ -226,7 +210,6 @@ func (s *Service) issueSession(
 		err = fmt.Errorf("save session for account %s: %w", account.ID, saveErr)
 		return
 	}
-	sessionSaved = true
 
 	currentSessions, saveErr = s.ensureSingleCurrentSession(ctx, account.ID, savedSession.ID)
 	if saveErr != nil {

@@ -64,8 +64,9 @@ func (s *failingSaveDeviceStore) SaveDevice(ctx context.Context, device identity
 
 type failingSaveAccountStore struct {
 	identity.Store
-	failErr error
-	calls   int
+	failErr    error
+	failOnCall int
+	calls      int
 }
 
 func (s *failingSaveAccountStore) SaveAccount(ctx context.Context, account identity.Account) (identity.Account, error) {
@@ -73,7 +74,11 @@ func (s *failingSaveAccountStore) SaveAccount(ctx context.Context, account ident
 		s.failErr = errors.New("forced save account failure")
 	}
 	s.calls++
-	if s.calls == 2 {
+	failOnCall := s.failOnCall
+	if failOnCall == 0 {
+		failOnCall = 2
+	}
+	if s.calls == failOnCall {
 		return identity.Account{}, s.failErr
 	}
 

@@ -114,6 +114,62 @@ func TestVerifyLoginCodeRollsBackOnAccountSaveFailure(t *testing.T) {
 	}
 }
 
+func TestVerifyLoginCodeRestoresPreviousCurrentSessionOnLateFailure(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseStore := teststore.NewMemoryStore()
+	store := &failingSaveAccountStore{
+		Store:      baseStore,
+		failOnCall: 3,
+	}
+	sender := &recordingCodeSender{}
+	svc := newReliabilityService(t, store, sender, time.Date(2026, time.March, 23, 19, 55, 0, 0, time.UTC))
+
+	account := createUserAccount(t, svc, ctx, "restore-current-session")
+	firstLogin := loginUserResult(t, svc, sender, ctx, account.Username, "begin-restore-current-1", "verify-restore-current-1")
+
+	challenge, code := startEmailLogin(t, svc, sender, ctx, account.Username, "begin-restore-current-2")
+	_, err := svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
+		ChallengeID: challenge.ID,
+		Code:        code,
+		DeviceName:  "restore-current-session-device-2",
+		Platform:    identity.DevicePlatformIOS,
+		PublicKey:   "restore-current-session-public-key-2",
+	})
+	if err == nil {
+		t.Fatalf("expected verify login to fail")
+	}
+	if errors.Is(err, identity.ErrConflict) {
+		t.Fatalf("expected downstream failure, got conflict")
+	}
+
+	sessions, err := baseStore.SessionsByAccountID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("list sessions after failed verify: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("expected one persisted session after rollback, got %d", len(sessions))
+	}
+	if sessions[0].ID != firstLogin.Session.ID {
+		t.Fatalf("expected original session %s to remain, got %s", firstLogin.Session.ID, sessions[0].ID)
+	}
+	if !sessions[0].Current {
+		t.Fatalf("expected original session to remain current")
+	}
+
+	devices, err := baseStore.DevicesByAccountID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("list devices after failed verify: %v", err)
+	}
+	if len(devices) != 1 {
+		t.Fatalf("expected one persisted device after rollback, got %d", len(devices))
+	}
+	if devices[0].SessionID != firstLogin.Session.ID {
+		t.Fatalf("expected device to remain attached to original session %s, got %s", firstLogin.Session.ID, devices[0].SessionID)
+	}
+}
+
 func TestVerifyLoginCodeIdempotencyReturnsCachedLoginResult(t *testing.T) {
 	t.Parallel()
 
