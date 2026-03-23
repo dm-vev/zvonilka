@@ -408,14 +408,11 @@ func TestVerifyLoginCodeUpdatesLastAuthAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load account after login: %v", err)
 	}
-	if storedAccount.LastAuthAt.IsZero() {
-		t.Fatalf("expected LastAuthAt to be updated")
-	}
 	if !storedAccount.LastAuthAt.Equal(now) {
-		t.Fatalf("expected LastAuthAt %s, got %s", now, storedAccount.LastAuthAt)
+		t.Fatalf("expected LastAuthAt to be updated to %s, got %s", now, storedAccount.LastAuthAt)
 	}
 	if !storedAccount.UpdatedAt.Equal(now) {
-		t.Fatalf("expected UpdatedAt %s, got %s", now, storedAccount.UpdatedAt)
+		t.Fatalf("expected UpdatedAt to be updated to %s, got %s", now, storedAccount.UpdatedAt)
 	}
 }
 

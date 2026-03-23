@@ -92,9 +92,7 @@ func TestRevokeAllSessionsPreservesConcurrentAccountMetadataUpdate(t *testing.T)
 	go func() {
 		updateDone <- overwriteConcurrentAccountMetadata(t, ctx, store, account.ID, clock)
 	}()
-
 	<-store.entered
-
 	close(store.release)
 
 	if err := <-revokeDone; err != nil {
@@ -186,7 +184,6 @@ func TestVerifyLoginCodePreservesConcurrentAccountMetadataUpdate(t *testing.T) {
 	go func() {
 		updateDone <- overwriteConcurrentAccountMetadata(t, ctx, store, account.ID, clock)
 	}()
-
 	<-store.entered
 	close(store.release)
 
@@ -267,7 +264,6 @@ func TestRegisterDevicePreservesConcurrentAccountMetadataUpdate(t *testing.T) {
 	go func() {
 		updateDone <- overwriteConcurrentAccountMetadata(t, ctx, store, account.ID, clock)
 	}()
-
 	<-store.entered
 	close(store.release)
 

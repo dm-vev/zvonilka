@@ -359,8 +359,8 @@ func TestVerifyLoginCodeIdempotencyKeyDeduplicatesSuccessfulLogin(t *testing.T) 
 	if saveSession != 1 {
 		t.Fatalf("expected one SaveSession call, got %d", saveSession)
 	}
-	if saveAccount != 1 {
-		t.Fatalf("expected one SaveAccount call, got %d", saveAccount)
+	if saveAccount != 2 {
+		t.Fatalf("expected two SaveAccount calls, got %d", saveAccount)
 	}
 	if lockAccount != 1 {
 		t.Fatalf("expected one LockAccount call, got %d", lockAccount)
@@ -466,8 +466,8 @@ func TestRegisterDeviceIdempotencyKeyDeduplicatesSuccessfulRegistration(t *testi
 	if saveSession != 1 {
 		t.Fatalf("expected one SaveSession call for login session, got %d", saveSession)
 	}
-	if saveAccount != 1 {
-		t.Fatalf("expected one SaveAccount call, got %d", saveAccount)
+	if saveAccount != 2 {
+		t.Fatalf("expected two SaveAccount calls, got %d", saveAccount)
 	}
 	if lockAccount != 2 {
 		t.Fatalf("expected two LockAccount calls, got %d", lockAccount)

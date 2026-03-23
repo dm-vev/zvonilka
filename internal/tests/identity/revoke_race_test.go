@@ -20,7 +20,9 @@ type accountGateStore struct {
 	lock        sync.Mutex
 	blocking    bool
 	enteredOnce sync.Once
+	saveOnce    sync.Once
 	entered     chan struct{}
+	saveEntered chan struct{}
 	release     chan struct{}
 }
 
@@ -39,9 +41,19 @@ func (s *accountGateStore) WithinTx(ctx context.Context, fn func(identity.Store)
 	return fn(tx)
 }
 
-// SaveAccount forwards directly; the gate only intercepts LockAccount so a
-// concurrent profile edit can proceed while the transaction is paused.
+// SaveAccount blocks behind the shared account boundary when the gate is active.
 func (s *accountGateStore) SaveAccount(ctx context.Context, account identity.Account) (identity.Account, error) {
+	s.stateMu.Lock()
+	blocking := s.blocking
+	s.stateMu.Unlock()
+	if blocking {
+		s.saveOnce.Do(func() {
+			close(s.saveEntered)
+		})
+		s.lock.Lock()
+		defer s.lock.Unlock()
+	}
+
 	return s.Store.SaveAccount(ctx, account)
 }
 
@@ -83,9 +95,10 @@ func (s *accountGateTxStore) LockAccount(ctx context.Context, accountID string) 
 // newAccountGateStore wraps a store with a controllable account-boundary gate.
 func newAccountGateStore(store identity.Store) *accountGateStore {
 	return &accountGateStore{
-		Store:   store,
-		entered: make(chan struct{}),
-		release: make(chan struct{}),
+		Store:       store,
+		entered:     make(chan struct{}),
+		saveEntered: make(chan struct{}),
+		release:     make(chan struct{}),
 	}
 }
 
