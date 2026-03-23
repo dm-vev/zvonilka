@@ -12,6 +12,9 @@ import (
 
 // SaveDevice stores a device and indexes it by account.
 func (s *Store) SaveDevice(ctx context.Context, device identity.Device) (identity.Device, error) {
+	if err := s.requireStore(); err != nil {
+		return identity.Device{}, err
+	}
 	if device.ID == "" {
 		return identity.Device{}, identity.ErrInvalidInput
 	}
@@ -65,6 +68,9 @@ RETURNING %s
 
 // DeleteDevice removes a device by primary key.
 func (s *Store) DeleteDevice(ctx context.Context, deviceID string) error {
+	if err := s.requireStore(); err != nil {
+		return err
+	}
 	if deviceID == "" {
 		return identity.ErrInvalidInput
 	}
@@ -88,6 +94,9 @@ func (s *Store) DeleteDevice(ctx context.Context, deviceID string) error {
 
 // DeviceByID resolves a device by primary key.
 func (s *Store) DeviceByID(ctx context.Context, deviceID string) (identity.Device, error) {
+	if err := s.requireStore(); err != nil {
+		return identity.Device{}, err
+	}
 	if strings.TrimSpace(deviceID) == "" {
 		return identity.Device{}, identity.ErrNotFound
 	}
@@ -106,6 +115,9 @@ func (s *Store) DeviceByID(ctx context.Context, deviceID string) (identity.Devic
 
 // DevicesByAccountID lists devices for an account.
 func (s *Store) DevicesByAccountID(ctx context.Context, accountID string) ([]identity.Device, error) {
+	if err := s.requireStore(); err != nil {
+		return nil, err
+	}
 	query := fmt.Sprintf(
 		`SELECT %s FROM %s WHERE account_id = $1 ORDER BY created_at ASC, id ASC`,
 		deviceColumnList,

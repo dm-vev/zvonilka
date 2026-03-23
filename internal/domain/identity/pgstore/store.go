@@ -43,6 +43,9 @@ func New(db *sql.DB, schema string) (*Store, error) {
 
 // WithinTx executes the callback within a single database transaction.
 func (s *Store) WithinTx(ctx context.Context, fn func(identity.Store) error) error {
+	if err := s.requireStore(); err != nil {
+		return err
+	}
 	if ctx == nil {
 		return identity.ErrInvalidInput
 	}
@@ -57,6 +60,9 @@ func (s *Store) WithinTx(ctx context.Context, fn func(identity.Store) error) err
 }
 
 func (s *Store) withTransaction(ctx context.Context, fn func(identity.Store) error) error {
+	if err := s.requireStore(); err != nil {
+		return err
+	}
 	if s.tx != nil {
 		return fn(s)
 	}
@@ -100,11 +106,22 @@ func (s *Store) withTransaction(ctx context.Context, fn func(identity.Store) err
 }
 
 func (s *Store) conn() sqlConn {
+	if s == nil {
+		return nil
+	}
 	if s.tx != nil {
 		return s.tx
 	}
 
 	return s.db
+}
+
+func (s *Store) requireStore() error {
+	if s == nil || s.db == nil {
+		return identity.ErrInvalidInput
+	}
+
+	return nil
 }
 
 func (s *Store) table(name string) string {

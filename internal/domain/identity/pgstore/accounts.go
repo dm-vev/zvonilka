@@ -12,6 +12,9 @@ import (
 
 // SaveAccount inserts or replaces an account while preserving uniqueness semantics.
 func (s *Store) SaveAccount(ctx context.Context, account identity.Account) (identity.Account, error) {
+	if err := s.requireStore(); err != nil {
+		return identity.Account{}, err
+	}
 	if account.ID == "" {
 		return identity.Account{}, identity.ErrInvalidInput
 	}
@@ -114,6 +117,9 @@ RETURNING %s
 
 // DeleteAccount removes an account and all cascading rows.
 func (s *Store) DeleteAccount(ctx context.Context, accountID string) error {
+	if err := s.requireStore(); err != nil {
+		return err
+	}
 	if accountID == "" {
 		return identity.ErrInvalidInput
 	}
@@ -137,26 +143,41 @@ func (s *Store) DeleteAccount(ctx context.Context, accountID string) error {
 
 // AccountByID resolves an account by primary key.
 func (s *Store) AccountByID(ctx context.Context, accountID string) (identity.Account, error) {
+	if err := s.requireStore(); err != nil {
+		return identity.Account{}, err
+	}
 	return s.accountByColumn(ctx, "id", accountID)
 }
 
 // AccountByUsername resolves an account by username.
 func (s *Store) AccountByUsername(ctx context.Context, username string) (identity.Account, error) {
+	if err := s.requireStore(); err != nil {
+		return identity.Account{}, err
+	}
 	return s.accountByColumn(ctx, "username", username)
 }
 
 // AccountByEmail resolves an account by email.
 func (s *Store) AccountByEmail(ctx context.Context, email string) (identity.Account, error) {
+	if err := s.requireStore(); err != nil {
+		return identity.Account{}, err
+	}
 	return s.accountByColumn(ctx, "email", email)
 }
 
 // AccountByPhone resolves an account by phone.
 func (s *Store) AccountByPhone(ctx context.Context, phone string) (identity.Account, error) {
+	if err := s.requireStore(); err != nil {
+		return identity.Account{}, err
+	}
 	return s.accountByColumn(ctx, "phone", phone)
 }
 
 // AccountByBotTokenHash resolves a bot account by token hash.
 func (s *Store) AccountByBotTokenHash(ctx context.Context, tokenHash string) (identity.Account, error) {
+	if err := s.requireStore(); err != nil {
+		return identity.Account{}, err
+	}
 	return s.accountByColumn(ctx, "bot_token_hash", tokenHash)
 }
 

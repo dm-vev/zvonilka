@@ -13,6 +13,9 @@ import (
 
 // SaveJoinRequest inserts or replaces a join request.
 func (s *Store) SaveJoinRequest(ctx context.Context, joinRequest identity.JoinRequest) (identity.JoinRequest, error) {
+	if err := s.requireStore(); err != nil {
+		return identity.JoinRequest{}, err
+	}
 	if joinRequest.ID == "" {
 		return identity.JoinRequest{}, identity.ErrInvalidInput
 	}
@@ -105,6 +108,9 @@ RETURNING %s
 
 // JoinRequestByID resolves a join request by primary key.
 func (s *Store) JoinRequestByID(ctx context.Context, joinRequestID string) (identity.JoinRequest, error) {
+	if err := s.requireStore(); err != nil {
+		return identity.JoinRequest{}, err
+	}
 	if strings.TrimSpace(joinRequestID) == "" {
 		return identity.JoinRequest{}, identity.ErrNotFound
 	}
@@ -123,6 +129,9 @@ func (s *Store) JoinRequestByID(ctx context.Context, joinRequestID string) (iden
 
 // JoinRequestsByStatus lists join requests with the requested status.
 func (s *Store) JoinRequestsByStatus(ctx context.Context, status identity.JoinRequestStatus) ([]identity.JoinRequest, error) {
+	if err := s.requireStore(); err != nil {
+		return nil, err
+	}
 	query := fmt.Sprintf(
 		`SELECT %s FROM %s WHERE status = $1 ORDER BY requested_at ASC, id ASC`,
 		joinRequestColumnList,
