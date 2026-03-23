@@ -404,3 +404,69 @@ func TestRegisterDeviceRollsBackDeviceWhenSessionUpdateFails(t *testing.T) {
 		t.Fatalf("expected two devices after retry, got %d", len(devices))
 	}
 }
+
+func TestRegisterDeviceRejectsSuspendedAccount(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseStore := teststore.NewMemoryStore()
+	store := &countingAuthStore{Store: baseStore}
+	sender := &recordingCodeSender{}
+	now := time.Date(2026, time.March, 23, 20, 25, 0, 0, time.UTC)
+
+	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time { return now }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	account := createAccount(t, svc, ctx, "register-suspended-user", "register-suspended@example.com")
+	challenge, targets := beginLogin(t, svc, ctx, account.Username, "")
+	code := sender.codeFor(targets[0].DestinationMask)
+	loginResult := verifyLogin(t, svc, ctx, challenge.ID, code, "", "register suspended login")
+
+	storedAccount, err := baseStore.AccountByID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("load account before suspension: %v", err)
+	}
+	storedAccount.Status = identity.AccountStatusSuspended
+	if _, err := baseStore.SaveAccount(ctx, storedAccount); err != nil {
+		t.Fatalf("suspend account: %v", err)
+	}
+
+	saveLoginChallengeCalls, saveDeviceCalls, saveSessionCalls, saveAccountCalls, sessionByIDCalls, accountByIDCalls, updateSessionCalls := store.counts()
+
+	_, _, err = svc.RegisterDevice(ctx, identity.RegisterDeviceParams{
+		SessionID:      loginResult.Session.ID,
+		DeviceName:     "tablet",
+		Platform:       identity.DevicePlatformIOS,
+		PublicKey:      "tablet-key",
+		IdempotencyKey: "register-suspended-key",
+	})
+	if !errors.Is(err, identity.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden for suspended account, got %v", err)
+	}
+
+	afterSaveLoginChallengeCalls, afterSaveDeviceCalls, afterSaveSessionCalls, afterSaveAccountCalls, afterSessionByIDCalls, afterAccountByIDCalls, afterUpdateSessionCalls := store.counts()
+
+	if afterSaveLoginChallengeCalls != saveLoginChallengeCalls {
+		t.Fatalf("expected no login challenge writes, got %d -> %d", saveLoginChallengeCalls, afterSaveLoginChallengeCalls)
+	}
+	if afterSaveDeviceCalls != saveDeviceCalls {
+		t.Fatalf("expected no device writes, got %d -> %d", saveDeviceCalls, afterSaveDeviceCalls)
+	}
+	if afterSaveSessionCalls != saveSessionCalls {
+		t.Fatalf("expected no session writes, got %d -> %d", saveSessionCalls, afterSaveSessionCalls)
+	}
+	if afterSaveAccountCalls != saveAccountCalls {
+		t.Fatalf("expected no account writes, got %d -> %d", saveAccountCalls, afterSaveAccountCalls)
+	}
+	if afterSessionByIDCalls != sessionByIDCalls+1 {
+		t.Fatalf("expected one session lookup for register device, got %d -> %d", sessionByIDCalls, afterSessionByIDCalls)
+	}
+	if afterAccountByIDCalls != accountByIDCalls+1 {
+		t.Fatalf("expected one account lookup for register device, got %d -> %d", accountByIDCalls, afterAccountByIDCalls)
+	}
+	if afterUpdateSessionCalls != updateSessionCalls {
+		t.Fatalf("expected no session updates, got %d -> %d", updateSessionCalls, afterUpdateSessionCalls)
+	}
+}

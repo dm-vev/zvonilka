@@ -251,6 +251,9 @@ func (s *Service) RegisterDevice(ctx context.Context, params RegisterDeviceParam
 	if err != nil {
 		return Device{}, Session{}, fmt.Errorf("load account %s for session %s: %w", session.AccountID, session.ID, err)
 	}
+	if account.Status != AccountStatusActive {
+		return Device{}, Session{}, ErrForbidden
+	}
 
 	if params.DeviceName == "" {
 		params.DeviceName = account.DisplayName

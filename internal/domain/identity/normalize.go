@@ -46,12 +46,12 @@ func maskEmail(value string) string {
 		return value
 	}
 
-	localPart := parts[0]
-	if len(localPart) <= 2 {
+	localPartRunes := []rune(parts[0])
+	if len(localPartRunes) <= 2 {
 		return "***@" + parts[1]
 	}
 
-	return localPart[:1] + "***@" + parts[1]
+	return string(localPartRunes[:1]) + "***@" + parts[1]
 }
 
 // maskPhone returns a partially redacted phone number for UI and logs.
