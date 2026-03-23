@@ -219,6 +219,53 @@ func TestBeginLoginRollsBackChallengeWhenSendFails(t *testing.T) {
 	}
 }
 
+func TestVerifyLoginCodeExpiresAtBoundary(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	sender := &recordingCodeSender{}
+	now := time.Date(2026, time.March, 23, 20, 8, 0, 0, time.UTC)
+
+	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time { return now }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	account := createAccount(t, svc, ctx, "expired-boundary-user", "expired-boundary@example.com")
+	challenge, targets := beginLogin(t, svc, ctx, account.Username, "expired-boundary-begin")
+	code := sender.codeFor(targets[0].DestinationMask)
+
+	now = now.Add(10 * time.Minute)
+
+	_, err = svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
+		ChallengeID: challenge.ID,
+		Code:        code,
+		DeviceName:  "boundary-device",
+		Platform:    identity.DevicePlatformIOS,
+		PublicKey:   "boundary-key",
+	})
+	if !errors.Is(err, identity.ErrExpiredChallenge) {
+		t.Fatalf("expected ErrExpiredChallenge at boundary, got %v", err)
+	}
+
+	storedChallenge, err := store.LoginChallengeByID(ctx, challenge.ID)
+	if !errors.Is(err, identity.ErrNotFound) {
+		t.Fatalf("expected expired challenge to be deleted, got %v", err)
+	}
+	if storedChallenge.ID != "" {
+		t.Fatalf("expected no stored challenge after expiry, got %s", storedChallenge.ID)
+	}
+
+	devices, err := store.DevicesByAccountID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("list devices after expired verify: %v", err)
+	}
+	if len(devices) != 0 {
+		t.Fatalf("expected no devices after expired verify, got %d", len(devices))
+	}
+}
+
 func TestVerifyLoginCodeDeduplicatesSuccessfulRequestsByIdempotencyKey(t *testing.T) {
 	t.Parallel()
 

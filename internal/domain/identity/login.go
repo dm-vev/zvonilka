@@ -136,7 +136,7 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 	if now.IsZero() {
 		now = s.currentTime()
 	}
-	if now.After(challenge.ExpiresAt) {
+	if !now.Before(challenge.ExpiresAt) {
 		_ = s.store.DeleteLoginChallenge(ctx, challenge.ID)
 		return LoginResult{}, ErrExpiredChallenge
 	}
