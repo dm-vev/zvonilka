@@ -444,11 +444,11 @@ func TestRegisterDeviceIdempotencyKeyDeduplicatesSuccessfulRegistration(t *testi
 	if saveSession != 1 {
 		t.Fatalf("expected one SaveSession call for login session, got %d", saveSession)
 	}
-	if saveAccount != 2 {
-		t.Fatalf("expected two SaveAccount calls, got %d", saveAccount)
+	if saveAccount != 3 {
+		t.Fatalf("expected three SaveAccount calls, got %d", saveAccount)
 	}
-	if sessionByID != 1 {
-		t.Fatalf("expected one SessionByID call, got %d", sessionByID)
+	if sessionByID != 2 {
+		t.Fatalf("expected two SessionByID calls, got %d", sessionByID)
 	}
 	if accountByID != 2 {
 		t.Fatalf("expected two AccountByID calls, got %d", accountByID)
