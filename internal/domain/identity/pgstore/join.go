@@ -182,8 +182,8 @@ func (s *Store) accountConflictForJoin(ctx context.Context, joinRequest identity
 
 func (s *Store) expireStaleJoinRequests(ctx context.Context, joinRequest identity.JoinRequest) error {
 	clauses := make([]string, 0, 3)
-	args := make([]any, 0, 4)
-	args = append(args, identity.JoinRequestStatusPending)
+	args := make([]any, 0, 5)
+	args = append(args, identity.JoinRequestStatusPending, identity.JoinRequestStatusExpired)
 
 	if strings.TrimSpace(joinRequest.Username) != "" {
 		clauses = append(clauses, fmt.Sprintf("username = $%d", len(args)+1))
@@ -204,7 +204,7 @@ func (s *Store) expireStaleJoinRequests(ctx context.Context, joinRequest identit
 	query := fmt.Sprintf(
 		`
 UPDATE %s
-SET status = $1,
+SET status = $2,
     reviewed_at = CURRENT_TIMESTAMP,
     reviewed_by = '',
     decision_reason = 'join request expired'

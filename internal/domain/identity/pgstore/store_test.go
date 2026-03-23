@@ -193,6 +193,58 @@ RETURNING %s
 	}
 }
 
+func TestLockAccountLocksExistingRow(t *testing.T) {
+	t.Parallel()
+
+	store, mock, _ := newMockStore(t)
+
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta("SELECT pg_advisory_xact_lock($1)")).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(
+		`SELECT id FROM %s WHERE id = $1 FOR UPDATE`,
+		qualifiedName("tenant", "identity_accounts"),
+	))).
+		WithArgs("acc-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("acc-1"))
+	mock.ExpectCommit()
+
+	if err := store.LockAccount(context.Background(), "acc-1"); err != nil {
+		t.Fatalf("lock account: %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestLockAccountReturnsNotFound(t *testing.T) {
+	t.Parallel()
+
+	store, mock, _ := newMockStore(t)
+
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta("SELECT pg_advisory_xact_lock($1)")).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(
+		`SELECT id FROM %s WHERE id = $1 FOR UPDATE`,
+		qualifiedName("tenant", "identity_accounts"),
+	))).
+		WithArgs("acc-1").
+		WillReturnError(sql.ErrNoRows)
+	mock.ExpectRollback()
+
+	if err := store.LockAccount(context.Background(), "acc-1"); !errors.Is(err, identity.ErrNotFound) {
+		t.Fatalf("expected not found, got %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
 func TestSaveJoinRequestExpiresStalePendingRequest(t *testing.T) {
 	t.Parallel()
 
@@ -216,16 +268,17 @@ func TestSaveJoinRequestExpiresStalePendingRequest(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	mock.ExpectExec(regexp.QuoteMeta(fmt.Sprintf(`
 UPDATE %s
-SET status = $1,
+SET status = $2,
     reviewed_at = CURRENT_TIMESTAMP,
     reviewed_by = '',
     decision_reason = 'join request expired'
 WHERE status = $1
   AND expires_at <= CURRENT_TIMESTAMP
-  AND (username = $2 OR email = $3 OR phone = $4)
+  AND (username = $3 OR email = $4 OR phone = $5)
 `, qualifiedName("tenant", "identity_join_requests")))).
 		WithArgs(
 			identity.JoinRequestStatusPending,
+			identity.JoinRequestStatusExpired,
 			"alice",
 			"alice@example.com",
 			"12345",
