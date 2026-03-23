@@ -14,6 +14,10 @@ import (
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
 )
 
+type grpcHealthStatusSetter interface {
+	SetServingStatus(string, healthgrpc.HealthCheckResponse_ServingStatus)
+}
+
 // Run starts the HTTP and gRPC listeners for a service.
 func Run(
 	ctx context.Context,
@@ -48,7 +52,7 @@ func Run(
 		return err
 	}
 
-	grpcServer, grpcListener, err := startGRPCServer(cfg, registerGRPC, healthState)
+	grpcServer, grpcListener, grpcHealth, err := startGRPCServer(cfg, registerGRPC, healthState)
 	if err != nil {
 		_ = httpServer.Close()
 		return err
@@ -97,19 +101,7 @@ func Run(
 		}
 	}
 
-	if grpcServer != nil {
-		done := make(chan struct{})
-		go func() {
-			grpcServer.GracefulStop()
-			close(done)
-		}()
-
-		select {
-		case <-done:
-		case <-shutdownCtx.Done():
-			grpcServer.Stop()
-		}
-	}
+	shutdownGRPCServer(shutdownCtx, grpcServer, grpcHealth, healthState.serviceName)
 
 	if runErr != nil {
 		return runErr
@@ -175,27 +167,72 @@ func startGRPCServer(
 	cfg Config,
 	registerGRPC func(*grpc.Server),
 	healthState *Health,
-) (*grpc.Server, net.Listener, error) {
+) (*grpc.Server, net.Listener, grpcHealthStatusSetter, error) {
 	if cfg.GRPCAddr == "" {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	listener, err := net.Listen("tcp", cfg.GRPCAddr)
 	if err != nil {
-		return nil, nil, fmt.Errorf("listen gRPC on %s: %w", cfg.GRPCAddr, err)
+		return nil, nil, nil, fmt.Errorf("listen gRPC on %s: %w", cfg.GRPCAddr, err)
 	}
 
 	grpcServer := grpc.NewServer()
 	grpcHealth := health.NewServer()
 	healthgrpc.RegisterHealthServer(grpcServer, grpcHealth)
-	grpcHealth.SetServingStatus(healthState.serviceName, healthgrpc.HealthCheckResponse_SERVING)
-	grpcHealth.SetServingStatus("", healthgrpc.HealthCheckResponse_SERVING)
+	setGRPCServingStatus(grpcHealth, healthState.serviceName)
 
 	if registerGRPC != nil {
 		registerGRPC(grpcServer)
 	}
 
-	return grpcServer, listener, nil
+	return grpcServer, listener, grpcHealth, nil
+}
+
+func setGRPCServingStatus(healthSetter grpcHealthStatusSetter, serviceName string) {
+	setGRPCHealthStatus(healthSetter, serviceName, healthgrpc.HealthCheckResponse_SERVING)
+}
+
+func setGRPCNotServingStatus(healthSetter grpcHealthStatusSetter, serviceName string) {
+	setGRPCHealthStatus(healthSetter, serviceName, healthgrpc.HealthCheckResponse_NOT_SERVING)
+}
+
+func setGRPCHealthStatus(
+	healthSetter grpcHealthStatusSetter,
+	serviceName string,
+	status healthgrpc.HealthCheckResponse_ServingStatus,
+) {
+	if healthSetter == nil {
+		return
+	}
+
+	healthSetter.SetServingStatus(serviceName, status)
+	healthSetter.SetServingStatus("", status)
+}
+
+func shutdownGRPCServer(
+	shutdownCtx context.Context,
+	grpcServer *grpc.Server,
+	grpcHealth grpcHealthStatusSetter,
+	serviceName string,
+) {
+	if grpcServer == nil {
+		return
+	}
+
+	setGRPCNotServingStatus(grpcHealth, serviceName)
+
+	done := make(chan struct{})
+	go func() {
+		grpcServer.GracefulStop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-shutdownCtx.Done():
+		grpcServer.Stop()
+	}
 }
 
 func serveHTTP(server *http.Server, listener net.Listener) error {
