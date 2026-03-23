@@ -327,13 +327,30 @@ func TestVerifyLoginCodeKeepsChallengeConsumedAfterSessionFailure(t *testing.T) 
 	}
 
 	_, err = svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
-		ChallengeID: challenge.ID,
-		Code:        code,
-		DeviceName:  "Replay Device",
-		Platform:    identity.DevicePlatformIOS,
-		PublicKey:   "replay-key-2",
+		ChallengeID:    challenge.ID,
+		Code:           code,
+		DeviceName:     "Replay Device",
+		Platform:       identity.DevicePlatformIOS,
+		PublicKey:      "replay-key-1",
+		IdempotencyKey: "verify-replay-safe",
 	})
-	if !errors.Is(err, identity.ErrConflict) {
-		t.Fatalf("expected second verify to conflict after rollback, got %v", err)
+	if err != nil {
+		t.Fatalf("expected retry to succeed after rollback, got %v", err)
+	}
+
+	devices, err = baseStore.DevicesByAccountID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("list devices after retry: %v", err)
+	}
+	if len(devices) != 1 {
+		t.Fatalf("expected one device after retry, got %d", len(devices))
+	}
+
+	sessions, err = baseStore.SessionsByAccountID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("list sessions after retry: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("expected one session after retry, got %d", len(sessions))
 	}
 }

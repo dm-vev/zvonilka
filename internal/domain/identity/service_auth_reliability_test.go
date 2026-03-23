@@ -275,7 +275,7 @@ func TestRegisterDeviceDeduplicatesSuccessfulRequestsByIdempotencyKey(t *testing
 		SessionID:      loginResult.Session.ID,
 		DeviceName:     "desktop",
 		Platform:       identity.DevicePlatformDesktop,
-		PublicKey:      "desktop-key-2",
+		PublicKey:      "desktop-key-1",
 		IdempotencyKey: "register-idem-key",
 	})
 	if err != nil {
