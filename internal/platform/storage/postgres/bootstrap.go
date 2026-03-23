@@ -60,9 +60,10 @@ func (b *Bootstrap) Close(ctx context.Context) error {
 	}
 
 	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	db := b.db
 	b.db = nil
-	b.mu.Unlock()
 
 	if db == nil {
 		return nil
