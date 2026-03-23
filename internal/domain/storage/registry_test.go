@@ -12,6 +12,7 @@ type testProvider struct {
 	purpose      Purpose
 	capabilities Capability
 	closed       *[]string
+	closeErr     error
 }
 
 func (p testProvider) Name() string             { return p.name }
@@ -22,7 +23,7 @@ func (p testProvider) Close(context.Context) error {
 	if p.closed != nil {
 		*p.closed = append(*p.closed, p.name)
 	}
-	return nil
+	return p.closeErr
 }
 
 func TestCatalogRegistersAndSelectsProviders(t *testing.T) {
@@ -144,6 +145,70 @@ func TestCatalogRejectsUnsupportedProviderMetadata(t *testing.T) {
 	})
 	if !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("expected invalid input, got %v", err)
+	}
+}
+
+func TestNewCatalogClosesPartialProvidersOnRegistrationFailure(t *testing.T) {
+	t.Parallel()
+
+	closed := make([]string, 0, 1)
+	closeErr := errors.New("close boom")
+
+	_, err := NewCatalog(
+		testProvider{
+			name:         "primary",
+			kind:         KindRelational,
+			purpose:      PurposePrimary,
+			capabilities: CapabilityRead | CapabilityWrite | CapabilityTransactions,
+			closed:       &closed,
+			closeErr:     closeErr,
+		},
+		testProvider{
+			name:         "primary",
+			kind:         KindCache,
+			purpose:      PurposeCache,
+			capabilities: CapabilityRead | CapabilityWrite | CapabilityKeyValue,
+		},
+	)
+	if err == nil {
+		t.Fatal("expected catalog construction to fail")
+	}
+	if !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected conflict in error, got %v", err)
+	}
+	if !errors.Is(err, closeErr) {
+		t.Fatalf("expected cleanup error in error, got %v", err)
+	}
+	if len(closed) != 1 || closed[0] != "primary" {
+		t.Fatalf("expected partial provider to close, got %v", closed)
+	}
+}
+
+func TestCatalogNilReceiverIsSafe(t *testing.T) {
+	t.Parallel()
+
+	var catalog *Catalog
+
+	if err := catalog.Register(testProvider{}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input from nil register, got %v", err)
+	}
+
+	if _, err := catalog.Provider("primary"); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input from nil provider lookup, got %v", err)
+	}
+
+	if _, err := catalog.Select(PurposePrimary, CapabilityTransactions); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input from nil select, got %v", err)
+	}
+
+	if providers := catalog.ProvidersByPurpose(PurposePrimary); providers != nil {
+		t.Fatalf("expected nil providers by purpose, got %+v", providers)
+	}
+	if providers := catalog.ProvidersByKind(KindRelational); providers != nil {
+		t.Fatalf("expected nil providers by kind, got %+v", providers)
+	}
+	if err := catalog.Close(context.Background()); err != nil {
+		t.Fatalf("expected nil close receiver to be safe, got %v", err)
 	}
 }
 

@@ -84,16 +84,28 @@ func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstor
 	if err != nil {
 		return nil, nil, fmt.Errorf("configure storage builder: %w", err)
 	}
+	if builder == nil {
+		return nil, nil, fmt.Errorf("configure storage builder: %w", domainstorage.ErrInvalidInput)
+	}
 
 	catalog, err := builder.Build(ctx)
 	if err != nil {
 		return nil, nil, err
+	}
+	if catalog == nil {
+		return nil, nil, fmt.Errorf("build storage catalog: %w", domainstorage.ErrInvalidInput)
 	}
 
 	provider, err := catalog.Provider(cfg.Storage.PrimaryProvider)
 	if err != nil {
 		return nil, nil, joinStorageError(
 			fmt.Errorf("select primary storage provider %q: %w", cfg.Storage.PrimaryProvider, err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	if provider == nil {
+		return nil, nil, joinStorageError(
+			fmt.Errorf("select primary storage provider: %w", domainstorage.ErrInvalidInput),
 			closeStorageCatalog(ctx, catalog),
 		)
 	}
@@ -113,11 +125,23 @@ func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstor
 			closeStorageCatalog(ctx, catalog),
 		)
 	}
+	if store == nil {
+		return nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres identity store: %w", domainidentity.ErrInvalidInput),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
 
 	service, err := newIdentityService(store, domainidentity.NoopCodeSender{}, domainidentity.WithSettings(cfg.Identity.ToSettings()))
 	if err != nil {
 		return nil, nil, joinStorageError(
 			fmt.Errorf("construct identity service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	if service == nil {
+		return nil, nil, joinStorageError(
+			fmt.Errorf("construct identity service: %w", domainidentity.ErrInvalidInput),
 			closeStorageCatalog(ctx, catalog),
 		)
 	}
@@ -130,7 +154,7 @@ func closeStorageCatalog(ctx context.Context, catalog *domainstorage.Catalog) er
 		return nil
 	}
 
-	if err := catalog.Close(ctx); err != nil {
+	if err := catalog.Close(cleanupContext(ctx)); err != nil {
 		return fmt.Errorf("close storage catalog: %w", err)
 	}
 

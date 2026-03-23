@@ -23,6 +23,10 @@ func NewCatalog(providers ...Provider) (*Catalog, error) {
 	catalog := &Catalog{}
 	for _, provider := range providers {
 		if err := catalog.Register(provider); err != nil {
+			if closeErr := catalog.Close(context.Background()); closeErr != nil {
+				return nil, errors.Join(err, fmt.Errorf("close partial storage catalog: %w", closeErr))
+			}
+
 			return nil, err
 		}
 	}
@@ -32,6 +36,9 @@ func NewCatalog(providers ...Provider) (*Catalog, error) {
 
 // Register adds a provider to the catalog.
 func (c *Catalog) Register(provider Provider) error {
+	if c == nil {
+		return ErrInvalidInput
+	}
 	if provider == nil {
 		return ErrInvalidInput
 	}
@@ -68,6 +75,9 @@ func (c *Catalog) Register(provider Provider) error {
 
 // Provider resolves a provider by name.
 func (c *Catalog) Provider(name string) (Provider, error) {
+	if c == nil {
+		return nil, ErrInvalidInput
+	}
 	name = normalizeName(name)
 	if name == "" {
 		return nil, ErrInvalidInput
@@ -86,6 +96,9 @@ func (c *Catalog) Provider(name string) (Provider, error) {
 
 // Select resolves the first provider that matches the requested purpose and capabilities.
 func (c *Catalog) Select(purpose Purpose, required Capability) (Provider, error) {
+	if c == nil {
+		return nil, ErrInvalidInput
+	}
 	purpose = normalizePurpose(purpose)
 	if purpose == PurposeUnspecified {
 		return nil, ErrInvalidInput
@@ -110,6 +123,9 @@ func (c *Catalog) Select(purpose Purpose, required Capability) (Provider, error)
 
 // ProvidersByPurpose returns all providers registered for a purpose.
 func (c *Catalog) ProvidersByPurpose(purpose Purpose) []Provider {
+	if c == nil {
+		return nil
+	}
 	purpose = normalizePurpose(purpose)
 
 	c.mu.RLock()
@@ -128,6 +144,9 @@ func (c *Catalog) ProvidersByPurpose(purpose Purpose) []Provider {
 
 // ProvidersByKind returns all providers registered for a kind.
 func (c *Catalog) ProvidersByKind(kind Kind) []Provider {
+	if c == nil {
+		return nil
+	}
 	kind = normalizeKind(kind)
 
 	c.mu.RLock()
@@ -146,6 +165,9 @@ func (c *Catalog) ProvidersByKind(kind Kind) []Provider {
 
 // Close closes all registered providers in reverse registration order.
 func (c *Catalog) Close(ctx context.Context) error {
+	if c == nil {
+		return nil
+	}
 	c.mu.RLock()
 	names := append([]string(nil), c.order...)
 	providers := make(map[string]Provider, len(c.providers))

@@ -207,6 +207,101 @@ func TestBuildAppStorageRejectsNilIdentityService(t *testing.T) {
 	}
 }
 
+func TestBuildAppStorageRejectsMissingPrimaryProvider(t *testing.T) {
+	originalBuilder := newStorageBuilder
+	t.Cleanup(func() {
+		newStorageBuilder = originalBuilder
+	})
+
+	closeCtxErrs := make([]error, 0, 1)
+	catalog, err := domainstorage.NewCatalog(
+		&fakeRelationalProvider{
+			name:         "secondary",
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+			closeCtxErrs: &closeCtxErrs,
+		},
+	)
+	if err != nil {
+		t.Fatalf("new catalog: %v", err)
+	}
+
+	newStorageBuilder = func(config.Configuration, ...platformstorage.Factory) (storageBuilder, error) {
+		return &fakeBuilder{catalog: catalog}, nil
+	}
+
+	cfg := config.Configuration{
+		Infrastructure: config.InfrastructureConfig{
+			Postgres: config.PostgresConfig{
+				Enabled: true,
+			},
+		},
+		Storage: config.StorageConfig{
+			PrimaryProvider: "primary",
+		},
+	}
+
+	_, _, gotErr := buildAppStorage(context.Background(), cfg)
+	if gotErr == nil {
+		t.Fatal("expected provider selection error")
+	}
+	if !strings.Contains(gotErr.Error(), "select primary storage provider") {
+		t.Fatalf("expected provider selection error, got %v", gotErr)
+	}
+	if len(closeCtxErrs) != 1 {
+		t.Fatalf("expected one catalog close, got %d", len(closeCtxErrs))
+	}
+	if closeCtxErrs[0] != nil {
+		t.Fatalf("expected cleanup context to ignore cancellation, got %v", closeCtxErrs[0])
+	}
+}
+
+func TestBuildAppStorageRejectsNonRelationalPrimaryProvider(t *testing.T) {
+	originalBuilder := newStorageBuilder
+	t.Cleanup(func() {
+		newStorageBuilder = originalBuilder
+	})
+
+	closeCtxErrs := make([]error, 0, 1)
+	catalog, err := domainstorage.NewCatalog(
+		&fakeProvider{
+			name:         "primary",
+			closeCtxErrs: &closeCtxErrs,
+		},
+	)
+	if err != nil {
+		t.Fatalf("new catalog: %v", err)
+	}
+
+	newStorageBuilder = func(config.Configuration, ...platformstorage.Factory) (storageBuilder, error) {
+		return &fakeBuilder{catalog: catalog}, nil
+	}
+
+	cfg := config.Configuration{
+		Infrastructure: config.InfrastructureConfig{
+			Postgres: config.PostgresConfig{
+				Enabled: true,
+			},
+		},
+		Storage: config.StorageConfig{
+			PrimaryProvider: "primary",
+		},
+	}
+
+	_, _, gotErr := buildAppStorage(context.Background(), cfg)
+	if gotErr == nil {
+		t.Fatal("expected provider type error")
+	}
+	if !strings.Contains(gotErr.Error(), "expected relational provider") {
+		t.Fatalf("expected provider type error, got %v", gotErr)
+	}
+	if len(closeCtxErrs) != 1 {
+		t.Fatalf("expected one catalog close, got %d", len(closeCtxErrs))
+	}
+	if closeCtxErrs[0] != nil {
+		t.Fatalf("expected cleanup context to ignore cancellation, got %v", closeCtxErrs[0])
+	}
+}
+
 func TestBuildAppStorageJoinsCleanupErrorOnStartupFailure(t *testing.T) {
 	originalBuilder := newStorageBuilder
 	originalIdentityStore := newIdentityStore
