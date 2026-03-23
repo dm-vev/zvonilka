@@ -19,15 +19,24 @@ func (s *memoryStore) SaveJoinRequest(_ context.Context, joinRequest identity.Jo
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, exists := s.joinRequestsByID[joinRequest.ID]; !exists &&
-		joinRequest.Status == identity.JoinRequestStatusPending &&
-		joinRequest.ReviewedAt.IsZero() {
-		if s.hasAccountConflictLocked("", joinRequest.Username, joinRequest.Email, joinRequest.Phone, "") {
+	previous, exists := s.joinRequestsByID[joinRequest.ID]
+
+	if joinRequest.Status == identity.JoinRequestStatusPending && joinRequest.ReviewedAt.IsZero() {
+		if s.hasAccountConflictLocked("", joinRequest.Username, joinRequest.Email, joinRequest.Phone, "") ||
+			s.hasJoinRequestConflictLocked(joinRequest.ID, joinRequest.Username, joinRequest.Email, joinRequest.Phone) {
 			return identity.JoinRequest{}, identity.ErrConflict
 		}
 	}
 
+	if exists {
+		s.deleteJoinRequestIndexes(previous)
+	}
+
 	s.joinRequestsByID[joinRequest.ID] = joinRequest
+	if joinRequest.Status == identity.JoinRequestStatusPending && joinRequest.ReviewedAt.IsZero() {
+		s.indexJoinRequestLocked(joinRequest)
+	}
+
 	return joinRequest, nil
 }
 

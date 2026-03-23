@@ -17,21 +17,59 @@ func normalizeEmail(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }
 
-// normalizePhone strips all non-digit characters from a phone number.
+// normalizePhone strips all non-digit characters from a phone number and
+// canonicalizes all Unicode decimal digits to ASCII digits.
 func normalizePhone(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return ""
 	}
 
-	digits := make([]rune, 0, len(value))
+	digits := make([]byte, 0, len(value))
 	for _, symbol := range value {
-		if unicode.IsDigit(symbol) {
-			digits = append(digits, symbol)
+		if digit, ok := normalizeDigit(symbol); ok {
+			digits = append(digits, digit)
 		}
 	}
 
 	return string(digits)
+}
+
+// normalizeDigit maps a Unicode decimal digit to its ASCII representation.
+func normalizeDigit(symbol rune) (byte, bool) {
+	if symbol >= '0' && symbol <= '9' {
+		return byte(symbol), true
+	}
+
+	for _, digitRange := range unicode.Digit.R16 {
+		if digitRange.Stride != 1 {
+			continue
+		}
+		if symbol < rune(digitRange.Lo) || symbol > rune(digitRange.Hi) {
+			continue
+		}
+
+		offset := symbol - rune(digitRange.Lo)
+		if offset >= 0 && offset < 10 {
+			return byte('0' + offset), true
+		}
+	}
+
+	for _, digitRange := range unicode.Digit.R32 {
+		if digitRange.Stride != 1 {
+			continue
+		}
+		if symbol < rune(digitRange.Lo) || symbol > rune(digitRange.Hi) {
+			continue
+		}
+
+		offset := symbol - rune(digitRange.Lo)
+		if offset >= 0 && offset < 10 {
+			return byte('0' + offset), true
+		}
+	}
+
+	return 0, false
 }
 
 // maskEmail returns a partially redacted email address for UI and logs.

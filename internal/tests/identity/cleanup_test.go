@@ -69,9 +69,9 @@ func TestIdempotencyCacheCleanupIsBucketScoped(t *testing.T) {
 	now = now.Add(12*time.Hour + time.Minute)
 
 	repeatedJoinRequest, err := svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
-		Username:       "cleanup-submit",
-		DisplayName:    "Cleanup Submit",
-		Email:          "cleanup-submit@example.com",
+		Username:       "cleanup-submit-2",
+		DisplayName:    "Cleanup Submit Two",
+		Email:          "cleanup-submit-2@example.com",
 		IdempotencyKey: "submit-key",
 	})
 	if err != nil {

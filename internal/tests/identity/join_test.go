@@ -95,6 +95,41 @@ func TestSubmitJoinRequestRejectsExistingAccount(t *testing.T) {
 	}
 }
 
+func TestSubmitJoinRequestRejectsDuplicatePendingRequest(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 23, 12, 20, 0, 0, time.UTC)
+
+	svc, err := identity.NewService(store, identity.NoopCodeSender{}, identity.WithNow(func() time.Time {
+		return now
+	}))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	_, err = svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
+		Username:    "duplicate-pending-user",
+		DisplayName: "Duplicate Pending User",
+		Email:       "duplicate-pending@example.com",
+		Note:        "first request",
+	})
+	if err != nil {
+		t.Fatalf("submit first join request: %v", err)
+	}
+
+	_, err = svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
+		Username:    "duplicate-pending-user",
+		DisplayName: "Duplicate Pending User",
+		Email:       "duplicate-pending@example.com",
+		Note:        "second request",
+	})
+	if !errors.Is(err, identity.ErrConflict) {
+		t.Fatalf("expected conflict on duplicate pending join request, got %v", err)
+	}
+}
+
 func TestRejectJoinRequestMarksExpiredAndSkipsRejection(t *testing.T) {
 	t.Parallel()
 
