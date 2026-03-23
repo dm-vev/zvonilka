@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package zvonilka.admin.v1;
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/admin/v1;adminv1";
+
+service AdminService {
+  rpc ApproveJoinRequest(ApproveJoinRequestRequest) returns (ApproveJoinRequestResponse);
+  rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse);
+  rpc InviteUser(InviteUserRequest) returns (InviteUserResponse);
+}
+
+message ApproveJoinRequestRequest {
+  string request_id = 1;
+  string role = 2;
+}
+
+message ApproveJoinRequestResponse {
+  string user_id = 1;
+}
+
+message CreateAccountRequest {
+  string username = 1;
+  string email = 2;
+  string phone = 3;
+}
+
+message CreateAccountResponse {
+  string user_id = 1;
+}
+
+message InviteUserRequest {
+  string email = 1;
+  string phone = 2;
+}
+
+message InviteUserResponse {
+  string invite_id = 1;
+}

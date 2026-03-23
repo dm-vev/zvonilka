@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package zvonilka.federation.v1;
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/federation/v1;federationv1";
+
+service FederationService {
+  rpc Ping(PingRequest) returns (PingResponse);
+}
+
+message PingRequest {
+  string origin_server = 1;
+}
+
+message PingResponse {
+  string server_name = 1;
+  bool experimental = 2;
+}

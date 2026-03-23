@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package zvonilka.auth.v1;
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/auth/v1;authv1";
+
+service AuthService {
+  rpc SubmitJoinRequest(SubmitJoinRequestRequest) returns (SubmitJoinRequestResponse);
+  rpc RegisterDevice(RegisterDeviceRequest) returns (RegisterDeviceResponse);
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+}
+
+message SubmitJoinRequestRequest {
+  string username = 1;
+  string email = 2;
+  string phone = 3;
+  string note = 4;
+}
+
+message SubmitJoinRequestResponse {
+  string request_id = 1;
+  string status = 2;
+}
+
+message RegisterDeviceRequest {
+  string user_id = 1;
+  string device_name = 2;
+  string device_public_key = 3;
+}
+
+message RegisterDeviceResponse {
+  string device_id = 1;
+  bool recovery_enabled = 2;
+}
+
+message ListSessionsRequest {
+  string user_id = 1;
+}
+
+message ListSessionsResponse {
+  repeated Session sessions = 1;
+}
+
+message Session {
+  string session_id = 1;
+  string device_id = 2;
+  string device_name = 3;
+  string last_seen_at = 4;
+}

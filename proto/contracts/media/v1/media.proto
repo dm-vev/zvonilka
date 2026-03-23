@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package zvonilka.media.v1;
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/media/v1;mediav1";
+
+service MediaService {
+  rpc CreateUpload(CreateUploadRequest) returns (CreateUploadResponse);
+}
+
+message CreateUploadRequest {
+  string owner_id = 1;
+  string content_type = 2;
+  uint64 size_bytes = 3;
+}
+
+message CreateUploadResponse {
+  string object_id = 1;
+  string upload_url = 2;
+}

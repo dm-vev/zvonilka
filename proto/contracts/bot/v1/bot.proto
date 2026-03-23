@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package zvonilka.bot.v1;
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/bot/v1;botv1";
+
+service BotService {
+  rpc RegisterBot(RegisterBotRequest) returns (RegisterBotResponse);
+}
+
+message RegisterBotRequest {
+  string display_name = 1;
+  string webhook_url = 2;
+}
+
+message RegisterBotResponse {
+  string bot_id = 1;
+  string token = 2;
+}

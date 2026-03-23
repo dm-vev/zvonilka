@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package zvonilka.common.v1;
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/common/v1;commonv1";
+
+message Cursor {
+  uint64 value = 1;
+}
+
+message ActorRef {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+}
+
+message EventEnvelope {
+  string event_id = 1;
+  string tenant_id = 2;
+  string conversation_id = 3;
+  string actor_id = 4;
+  string device_id = 5;
+  uint64 sequence = 6;
+  string created_at = 7;
+  string payload_type = 8;
+  bytes encrypted_payload = 9;
+  map<string, string> metadata = 10;
+}

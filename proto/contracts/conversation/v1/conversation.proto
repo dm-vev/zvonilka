@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package zvonilka.conversation.v1;
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/conversation/v1;conversationv1";
+
+service ConversationService {
+  rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+}
+
+message CreateConversationRequest {
+  string kind = 1;
+  repeated string member_ids = 2;
+  string title = 3;
+}
+
+message CreateConversationResponse {
+  string conversation_id = 1;
+}
+
+message SendMessageRequest {
+  string conversation_id = 1;
+  string client_message_id = 2;
+  bytes encrypted_payload = 3;
+}
+
+message SendMessageResponse {
+  string message_id = 1;
+  uint64 sequence = 2;
+}

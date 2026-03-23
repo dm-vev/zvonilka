@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package zvonilka.sync.v1;
+
+import "proto/contracts/common/v1/types.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/sync/v1;syncv1";
+
+service SyncService {
+  rpc Pull(PullRequest) returns (PullResponse);
+}
+
+service EventStreamService {
+  rpc Stream(StreamRequest) returns (stream zvonilka.common.v1.EventEnvelope);
+}
+
+message PullRequest {
+  string device_id = 1;
+  uint64 from_sequence = 2;
+  uint32 limit = 3;
+}
+
+message PullResponse {
+  repeated zvonilka.common.v1.EventEnvelope events = 1;
+  uint64 next_sequence = 2;
+}
+
+message StreamRequest {
+  string device_id = 1;
+}
