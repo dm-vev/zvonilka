@@ -110,10 +110,12 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 		cfg.Identity.LoginCodeLength = value
 	}
 
+	postgresEnabledSet := false
 	if value, ok, err := boolValue(serviceName, "POSTGRES_ENABLED", cfg.Infrastructure.Postgres.Enabled); err != nil {
 		return err
 	} else if ok {
 		cfg.Infrastructure.Postgres.Enabled = value
+		postgresEnabledSet = true
 	}
 	if value, ok, err := stringValueWithPresence(serviceName, "POSTGRES_DSN", cfg.Infrastructure.Postgres.DSN); err != nil {
 		return err
@@ -151,10 +153,12 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 		cfg.Infrastructure.Postgres.Schema = value
 	}
 
+	redisEnabledSet := false
 	if value, ok, err := boolValue(serviceName, "REDIS_ENABLED", cfg.Infrastructure.Redis.Enabled); err != nil {
 		return err
 	} else if ok {
 		cfg.Infrastructure.Redis.Enabled = value
+		redisEnabledSet = true
 	}
 	if value, ok, err := stringValueWithPresence(serviceName, "REDIS_ADDR", cfg.Infrastructure.Redis.Address); err != nil {
 		return err
@@ -202,10 +206,12 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 		cfg.Infrastructure.Redis.ConnMaxIdleTime = value
 	}
 
+	objectStoreEnabledSet := false
 	if value, ok, err := boolValue(serviceName, "OBJECT_STORAGE_ENABLED", cfg.Infrastructure.ObjectStore.Enabled); err != nil {
 		return err
 	} else if ok {
 		cfg.Infrastructure.ObjectStore.Enabled = value
+		objectStoreEnabledSet = true
 	}
 	if value, ok, err := stringValueWithPresence(serviceName, "OBJECT_STORAGE_ENDPOINT", cfg.Infrastructure.ObjectStore.Endpoint); err != nil {
 		return err
@@ -243,6 +249,7 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 		cfg.Infrastructure.ObjectStore.ForcePathStyle = value
 	}
 
+	telemetryTracingSet := false
 	if value, ok, err := boolValue(serviceName, "TELEMETRY_METRICS_ENABLED", cfg.Infrastructure.Telemetry.MetricsEnabled); err != nil {
 		return err
 	} else if ok {
@@ -252,6 +259,7 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 		return err
 	} else if ok {
 		cfg.Infrastructure.Telemetry.TracingEnabled = value
+		telemetryTracingSet = true
 	}
 	if value, ok, err := stringValueWithPresence(serviceName, "TELEMETRY_OTLP_ADDRESS", cfg.Infrastructure.Telemetry.OTLPAddress); err != nil {
 		return err
@@ -316,16 +324,16 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 		cfg.Features.TranslationEnabled = value
 	}
 
-	if cfg.Infrastructure.Postgres.DSN != "" {
+	if !postgresEnabledSet && cfg.Infrastructure.Postgres.DSN != "" {
 		cfg.Infrastructure.Postgres.Enabled = true
 	}
-	if cfg.Infrastructure.Redis.Address != "" {
+	if !redisEnabledSet && cfg.Infrastructure.Redis.Address != "" {
 		cfg.Infrastructure.Redis.Enabled = true
 	}
-	if cfg.Infrastructure.ObjectStore.Endpoint != "" || cfg.Infrastructure.ObjectStore.Bucket != "" {
+	if !objectStoreEnabledSet && (cfg.Infrastructure.ObjectStore.Endpoint != "" || cfg.Infrastructure.ObjectStore.Bucket != "") {
 		cfg.Infrastructure.ObjectStore.Enabled = true
 	}
-	if cfg.Infrastructure.Telemetry.OTLPAddress != "" || cfg.Infrastructure.Telemetry.SentryDSN != "" {
+	if !telemetryTracingSet && (cfg.Infrastructure.Telemetry.OTLPAddress != "" || cfg.Infrastructure.Telemetry.SentryDSN != "") {
 		cfg.Infrastructure.Telemetry.TracingEnabled = cfg.Infrastructure.Telemetry.TracingEnabled || cfg.Infrastructure.Telemetry.OTLPAddress != ""
 	}
 
