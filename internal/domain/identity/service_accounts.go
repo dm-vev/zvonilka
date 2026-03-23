@@ -28,10 +28,6 @@ func (s *Service) SubmitJoinRequest(ctx context.Context, params SubmitJoinReques
 		return JoinRequest{}, ErrInvalidInput
 	}
 
-	if err := s.ensureAccountIdentifiersAvailable(ctx, username, email, phone); err != nil {
-		return JoinRequest{}, err
-	}
-
 	now := params.RequestedAt
 	if now.IsZero() {
 		now = s.currentTime()
@@ -96,7 +92,7 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 
 	// Approval retries must reuse a still-persisted cached account, or recreate
 	// it if rollback removed the previous one.
-	account, botToken, err := s.createAccount(
+	account, botToken, reusedExisting, err := s.createAccount(
 		ctx,
 		CreateAccountParams{
 			Username:       joinRequest.Username,
@@ -111,6 +107,7 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 			IdempotencyKey: params.IdempotencyKey,
 			RequestedAt:    now,
 		},
+		true,
 	)
 	if err != nil {
 		return JoinRequest{}, Account{}, err
@@ -126,15 +123,17 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 
 	savedJoinRequest, err := s.store.SaveJoinRequest(ctx, joinRequest)
 	if err != nil {
-		rollbackErr := s.store.DeleteAccount(ctx, account.ID)
-		if rollbackErr != nil && !isNotFound(rollbackErr) {
-			return JoinRequest{}, Account{}, fmt.Errorf(
-				"update join request %s: %w: rollback account %s: %w",
-				joinRequest.ID,
-				err,
-				account.ID,
-				rollbackErr,
-			)
+		if !reusedExisting {
+			rollbackErr := s.store.DeleteAccount(ctx, account.ID)
+			if rollbackErr != nil && !isNotFound(rollbackErr) {
+				return JoinRequest{}, Account{}, fmt.Errorf(
+					"update join request %s: %w: rollback account %s: %w",
+					joinRequest.ID,
+					err,
+					account.ID,
+					rollbackErr,
+				)
+			}
 		}
 
 		return JoinRequest{}, Account{}, fmt.Errorf("update join request %s: %w", joinRequest.ID, err)
@@ -205,36 +204,37 @@ func (s *Service) CreateAccount(ctx context.Context, params CreateAccountParams)
 		return Account{}, "", err
 	}
 
-	return s.createAccount(ctx, params)
+	account, botToken, _, err := s.createAccount(ctx, params, false)
+	return account, botToken, err
 }
 
-func (s *Service) createAccount(ctx context.Context, params CreateAccountParams) (Account, string, error) {
+func (s *Service) createAccount(
+	ctx context.Context,
+	params CreateAccountParams,
+	allowExisting bool,
+) (Account, string, bool, error) {
 	fingerprint := createAccountFingerprint(params)
 	if params.IdempotencyKey != "" {
 		if result, ok, err := s.idempotency.createAccountResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
-			return Account{}, "", err
+			return Account{}, "", false, err
 		} else if ok {
 			if _, err := s.store.AccountByID(ctx, result.account.ID); err == nil {
-				return result.account, result.botToken, nil
+				return result.account, result.botToken, false, nil
 			} else if !isNotFound(err) {
-				return Account{}, "", fmt.Errorf("verify cached account %s: %w", result.account.ID, err)
+				return Account{}, "", false, fmt.Errorf("verify cached account %s: %w", result.account.ID, err)
 			}
 		}
 	}
 
 	username, email, phone := s.normalizeAccountInput(params.Username, params.Email, params.Phone)
 	if username == "" {
-		return Account{}, "", ErrInvalidInput
+		return Account{}, "", false, ErrInvalidInput
 	}
 	if params.AccountKind == AccountKindUnspecified {
-		return Account{}, "", ErrInvalidInput
+		return Account{}, "", false, ErrInvalidInput
 	}
 	if params.AccountKind == AccountKindUser && email == "" && phone == "" {
-		return Account{}, "", ErrInvalidInput
-	}
-
-	if err := s.ensureAccountIdentifiersAvailable(ctx, username, email, phone); err != nil {
-		return Account{}, "", err
+		return Account{}, "", false, ErrInvalidInput
 	}
 
 	now := params.RequestedAt
@@ -244,7 +244,7 @@ func (s *Service) createAccount(ctx context.Context, params CreateAccountParams)
 
 	accountID, err := newID("acc")
 	if err != nil {
-		return Account{}, "", fmt.Errorf("generate account ID: %w", err)
+		return Account{}, "", false, fmt.Errorf("generate account ID: %w", err)
 	}
 
 	account := Account{
@@ -268,14 +268,41 @@ func (s *Service) createAccount(ctx context.Context, params CreateAccountParams)
 	if params.AccountKind == AccountKindBot {
 		botToken, err = randomToken(32)
 		if err != nil {
-			return Account{}, "", fmt.Errorf("generate bot token for account %s: %w", accountID, err)
+			return Account{}, "", false, fmt.Errorf("generate bot token for account %s: %w", accountID, err)
 		}
 		account.BotTokenHash = hashSecret(botToken)
 	}
 
 	savedAccount, err := s.store.SaveAccount(ctx, account)
 	if err != nil {
-		return Account{}, "", fmt.Errorf("save account %s: %w", username, err)
+		if allowExisting && params.AccountKind == AccountKindUser && errors.Is(err, ErrConflict) {
+			existingAccount, lookupErr := s.store.AccountByUsername(ctx, username)
+			if lookupErr != nil {
+				return Account{}, "", false, fmt.Errorf("load existing account %s after conflict: %w", username, lookupErr)
+			}
+			if existingAccount.Status != AccountStatusActive {
+				return Account{}, "", false, ErrConflict
+			}
+			if existingAccount.Kind != params.AccountKind || existingAccount.Email != email || existingAccount.Phone != phone {
+				return Account{}, "", false, ErrConflict
+			}
+
+			if params.IdempotencyKey != "" {
+				s.idempotency.storeCreateAccountResult(
+					params.IdempotencyKey,
+					fingerprint,
+					createAccountCacheResult{
+						account:  existingAccount,
+						botToken: "",
+					},
+					s.currentTime(),
+				)
+			}
+
+			return existingAccount, "", true, nil
+		}
+
+		return Account{}, "", false, fmt.Errorf("save account %s: %w", username, err)
 	}
 
 	if params.IdempotencyKey != "" {
@@ -290,26 +317,9 @@ func (s *Service) createAccount(ctx context.Context, params CreateAccountParams)
 		)
 	}
 
-	return savedAccount, botToken, nil
+	return savedAccount, botToken, false, nil
 }
 
 func isNotFound(err error) bool {
 	return errors.Is(err, ErrNotFound)
-}
-
-func (s *Service) ensureAccountIdentifiersAvailable(
-	ctx context.Context,
-	username string,
-	email string,
-	phone string,
-) error {
-	conflict, err := s.store.HasAccountConflict(ctx, username, email, phone)
-	if err != nil {
-		return fmt.Errorf("check account availability for username %s: %w", username, err)
-	}
-	if conflict {
-		return ErrConflict
-	}
-
-	return nil
 }

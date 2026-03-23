@@ -61,6 +61,40 @@ func TestApproveJoinRequestMarksExpiredAndSkipsAccountCreation(t *testing.T) {
 	}
 }
 
+func TestSubmitJoinRequestRejectsExistingAccount(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 23, 12, 15, 0, 0, time.UTC)
+
+	svc, err := identity.NewService(store, identity.NoopCodeSender{}, identity.WithNow(func() time.Time {
+		return now
+	}))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	_, _, err = svc.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "existing-user",
+		DisplayName: "Existing User",
+		Email:       "existing-user@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	_, err = svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
+		Username: "existing-user",
+		Email:    "existing-user@example.com",
+	})
+	if !errors.Is(err, identity.ErrConflict) {
+		t.Fatalf("expected conflict on duplicate join request, got %v", err)
+	}
+}
+
 func TestRejectJoinRequestMarksExpiredAndSkipsRejection(t *testing.T) {
 	t.Parallel()
 

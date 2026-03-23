@@ -15,7 +15,6 @@ type Store interface {
 	AccountByEmail(ctx context.Context, email string) (Account, error)
 	AccountByPhone(ctx context.Context, phone string) (Account, error)
 	AccountByBotTokenHash(ctx context.Context, tokenHash string) (Account, error)
-	HasAccountConflict(ctx context.Context, username, email, phone string) (bool, error)
 
 	SaveLoginChallenge(ctx context.Context, challenge LoginChallenge) (LoginChallenge, error)
 	LoginChallengeByID(ctx context.Context, challengeID string) (LoginChallenge, error)

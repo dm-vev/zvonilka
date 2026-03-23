@@ -14,6 +14,10 @@ func (s *memoryStore) SaveAccount(_ context.Context, account identity.Account) (
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if s.hasAccountConflictLocked(account.ID, account.Username, account.Email, account.Phone, account.BotTokenHash) {
+		return identity.Account{}, identity.ErrConflict
+	}
+
 	if previous, ok := s.accountsByID[account.ID]; ok {
 		s.deleteAccountIndexes(previous)
 	}
@@ -70,32 +74,36 @@ func (s *memoryStore) AccountByBotTokenHash(_ context.Context, tokenHash string)
 	return s.accountByIndex(s.accountIDsByBotHash, tokenHash)
 }
 
-func (s *memoryStore) HasAccountConflict(
-	_ context.Context,
+func (s *memoryStore) hasAccountConflictLocked(
+	accountID string,
 	username string,
 	email string,
 	phone string,
-) (bool, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+	botTokenHash string,
+) bool {
 	if username != "" {
-		if _, ok := s.accountIDsByUsername[username]; ok {
-			return true, nil
+		if otherID, ok := s.accountIDsByUsername[username]; ok && otherID != accountID {
+			return true
 		}
 	}
 
 	if email != "" {
-		if _, ok := s.accountIDsByEmail[email]; ok {
-			return true, nil
+		if otherID, ok := s.accountIDsByEmail[email]; ok && otherID != accountID {
+			return true
 		}
 	}
 
 	if phone != "" {
-		if _, ok := s.accountIDsByPhone[phone]; ok {
-			return true, nil
+		if otherID, ok := s.accountIDsByPhone[phone]; ok && otherID != accountID {
+			return true
 		}
 	}
 
-	return false, nil
+	if botTokenHash != "" {
+		if otherID, ok := s.accountIDsByBotHash[botTokenHash]; ok && otherID != accountID {
+			return true
+		}
+	}
+
+	return false
 }
