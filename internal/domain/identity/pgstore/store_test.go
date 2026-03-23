@@ -199,7 +199,7 @@ func TestSaveJoinRequestExpiresStalePendingRequest(t *testing.T) {
 	store, mock, _ := newMockStore(t)
 	now := time.Now().UTC()
 	requestedAt := now.Add(-2 * time.Hour)
-	staleExpires := now.Add(-time.Minute)
+	staleExpires := time.Unix(0, 0).UTC()
 
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta("SELECT pg_advisory_xact_lock($1)")).WithArgs(sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 0))

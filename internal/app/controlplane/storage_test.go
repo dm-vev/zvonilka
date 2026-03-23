@@ -71,24 +71,27 @@ func TestCloseStorageCatalogReturnsProviderError(t *testing.T) {
 func TestFinalizeRunJoinsRunAndCloseErrors(t *testing.T) {
 	t.Parallel()
 
-	runErr := errors.New("runtime failed")
+	runtimeErr := errors.New("runtime failed")
 	closeErr := errors.New("close failed")
-	catalog, err := domainstorage.NewCatalog(&fakeProvider{name: "primary", closeErr: closeErr})
+	catalog, err := domainstorage.NewCatalog(&fakeProvider{name: "first", closeErr: closeErr})
 	if err != nil {
 		t.Fatalf("new catalog: %v", err)
 	}
 
-	got := finalizeRun(context.Background(), &app{catalog: catalog}, runErr)
+	got := finalizeRun(context.Background(), &app{catalog: catalog}, runtimeErr)
 	if got == nil {
 		t.Fatal("expected joined error")
 	}
-	if !errors.Is(got, runErr) {
+	if !errors.Is(got, runtimeErr) {
 		t.Fatalf("expected runtime error in final error: %v", got)
 	}
 	if !errors.Is(got, closeErr) {
 		t.Fatalf("expected close error in final error: %v", got)
 	}
-	if !strings.Contains(got.Error(), runErr.Error()) {
+	if got.Error() == "" {
+		t.Fatal("expected non-empty joined error")
+	}
+	if !strings.Contains(got.Error(), runtimeErr.Error()) {
 		t.Fatalf("expected runtime error text in final error: %v", got)
 	}
 	if !strings.Contains(got.Error(), closeErr.Error()) {
@@ -100,7 +103,7 @@ func TestFinalizeRunReturnsCloseErrorWhenRunSucceeds(t *testing.T) {
 	t.Parallel()
 
 	closeErr := errors.New("close failed")
-	catalog, err := domainstorage.NewCatalog(&fakeProvider{name: "primary", closeErr: closeErr})
+	catalog, err := domainstorage.NewCatalog(&fakeProvider{name: "first", closeErr: closeErr})
 	if err != nil {
 		t.Fatalf("new catalog: %v", err)
 	}
