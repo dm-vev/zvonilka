@@ -90,10 +90,10 @@ func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstor
 		return nil, nil, err
 	}
 
-	provider, err := catalog.Select(domainstorage.PurposePrimary, domainstorage.CapabilityTransactions)
+	provider, err := catalog.Provider(cfg.Storage.PrimaryProvider)
 	if err != nil {
 		return nil, nil, joinStorageError(
-			fmt.Errorf("select primary storage provider: %w", err),
+			fmt.Errorf("select primary storage provider %q: %w", cfg.Storage.PrimaryProvider, err),
 			closeStorageCatalog(ctx, catalog),
 		)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -69,6 +70,13 @@ func TestBuildAppStorageJoinsCleanupErrorOnStartupFailure(t *testing.T) {
 				Enabled: true,
 			},
 		},
+		Storage: config.StorageConfig{
+			PrimaryProvider: "primary",
+			CacheProvider:   "cache",
+			ObjectProvider:  "object",
+			AuditProvider:   "audit",
+			SearchProvider:  "search",
+		},
 	}
 
 	_, _, gotErr := buildAppStorage(context.Background(), cfg)
@@ -83,6 +91,83 @@ func TestBuildAppStorageJoinsCleanupErrorOnStartupFailure(t *testing.T) {
 	}
 	if !strings.Contains(gotErr.Error(), "close storage catalog") {
 		t.Fatalf("expected cleanup wrapper in error: %v", gotErr)
+	}
+}
+
+func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
+	correctDB := new(sql.DB)
+	wrongDB := new(sql.DB)
+
+	catalog, err := domainstorage.NewCatalog(
+		&fakeRelationalProvider{
+			name:         "wrong-primary",
+			db:           wrongDB,
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+		},
+		&fakeRelationalProvider{
+			name:         "primary",
+			db:           correctDB,
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+		},
+		&fakeProvider{name: "cache"},
+		&fakeProvider{name: "object"},
+		&fakeProvider{name: "audit"},
+		&fakeProvider{name: "search"},
+	)
+	if err != nil {
+		t.Fatalf("new catalog: %v", err)
+	}
+
+	originalBuilder := newStorageBuilder
+	originalIdentityStore := newIdentityStore
+	originalIdentityService := newIdentityService
+	t.Cleanup(func() {
+		newStorageBuilder = originalBuilder
+		newIdentityStore = originalIdentityStore
+		newIdentityService = originalIdentityService
+	})
+
+	newStorageBuilder = func(config.Configuration, ...platformstorage.Factory) (storageBuilder, error) {
+		return &fakeBuilder{catalog: catalog}, nil
+	}
+	newIdentityStore = func(db *sql.DB, schema string) (domainidentity.Store, error) {
+		if db != correctDB {
+			return nil, fmt.Errorf("unexpected primary database selected for schema %q", schema)
+		}
+
+		return nil, nil
+	}
+	newIdentityService = func(domainidentity.Store, domainidentity.CodeSender, ...domainidentity.Option) (*domainidentity.Service, error) {
+		return &domainidentity.Service{}, nil
+	}
+
+	cfg := config.Configuration{
+		Infrastructure: config.InfrastructureConfig{
+			Postgres: config.PostgresConfig{
+				Enabled: true,
+			},
+		},
+		Storage: config.StorageConfig{
+			PrimaryProvider: "primary",
+			CacheProvider:   "cache",
+			ObjectProvider:  "object",
+			AuditProvider:   "audit",
+			SearchProvider:  "search",
+		},
+	}
+
+	createdCatalog, service, gotErr := buildAppStorage(context.Background(), cfg)
+	if gotErr != nil {
+		t.Fatalf("build app storage: %v", gotErr)
+	}
+	if createdCatalog != catalog {
+		t.Fatal("expected configured catalog")
+	}
+	if service == nil {
+		t.Fatal("expected identity service")
+	}
+	if err := closeStorageCatalog(context.Background(), createdCatalog); err != nil {
+		t.Fatalf("close storage catalog: %v", err)
 	}
 }
 
@@ -230,6 +315,7 @@ func (p *fakeProvider) Close(context.Context) error {
 
 type fakeRelationalProvider struct {
 	name         string
+	db           *sql.DB
 	closeErr     error
 	capabilities domainstorage.Capability
 }
@@ -255,7 +341,7 @@ func (p *fakeRelationalProvider) Close(context.Context) error {
 }
 
 func (p *fakeRelationalProvider) DB() *sql.DB {
-	return nil
+	return p.db
 }
 
 type fakeBuilder struct {
