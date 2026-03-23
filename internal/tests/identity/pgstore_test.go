@@ -60,16 +60,17 @@ func TestSaveJoinRequestExpiresStalePendingRequestByCurrentTime(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	mock.ExpectExec(regexp.QuoteMeta(fmt.Sprintf(`
 UPDATE %s
-SET status = $1,
+SET status = $2,
     reviewed_at = CURRENT_TIMESTAMP,
     reviewed_by = '',
     decision_reason = 'join request expired'
 WHERE status = $1
   AND expires_at <= CURRENT_TIMESTAMP
-  AND (username = $2 OR email = $3)
+  AND (username = $3 OR email = $4)
 `, qualifiedName("tenant", "identity_join_requests")))).
 		WithArgs(
 			identity.JoinRequestStatusPending,
+			identity.JoinRequestStatusExpired,
 			"backdated-user",
 			"backdated@example.com",
 		).

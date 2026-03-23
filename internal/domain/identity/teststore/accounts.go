@@ -33,6 +33,22 @@ func (s *memoryStore) SaveAccount(_ context.Context, account identity.Account) (
 	return cloneAccount(storedAccount), nil
 }
 
+// LockAccount verifies that the account exists without mutating any persisted fields.
+func (s *memoryStore) LockAccount(_ context.Context, accountID string) error {
+	if accountID == "" {
+		return identity.ErrInvalidInput
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if _, ok := s.accountsByID[accountID]; !ok {
+		return identity.ErrNotFound
+	}
+
+	return nil
+}
+
 // DeleteAccount removes an account and all of its secondary indexes.
 func (s *memoryStore) DeleteAccount(_ context.Context, accountID string) error {
 	if accountID == "" {

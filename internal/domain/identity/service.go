@@ -132,28 +132,32 @@ func (s *Service) lookupAccountByIdentifier(ctx context.Context, username, email
 	}
 }
 
-// touchAccount serializes the current transaction on the account row without changing
-// any logical fields the caller has not already decided to persist.
+// lockAccount acquires the account boundary and reloads the latest row snapshot.
 //
-// The helper is intentionally a benign write so account-wide revoke can contend with
-// login and device-registration flows on the same row boundary before any session or
-// device rows are created.
-func (s *Service) touchAccount(ctx context.Context, store Store, account Account) error {
-	if account.ID == "" {
-		return ErrInvalidInput
+// The account row is locked first so account-wide revoke, login, and device flows
+// serialize on the same boundary without writing any unrelated account fields.
+func (s *Service) lockAccount(ctx context.Context, store Store, accountID string) (Account, error) {
+	if accountID == "" {
+		return Account{}, ErrInvalidInput
 	}
 
-	if _, err := store.SaveAccount(ctx, account); err != nil {
-		return fmt.Errorf("touch account %s: %w", account.ID, err)
+	if err := store.LockAccount(ctx, accountID); err != nil {
+		return Account{}, fmt.Errorf("lock account %s: %w", accountID, err)
 	}
 
-	return nil
+	account, err := store.AccountByID(ctx, accountID)
+	if err != nil {
+		return Account{}, fmt.Errorf("reload account %s after lock: %w", accountID, err)
+	}
+
+	return account, nil
 }
 
 // issueSession creates a device/session pair and returns bearer tokens for the account.
 //
 // The caller is expected to run the helper inside a store transaction when the
-// provider supports it so device, session, and account updates commit atomically.
+// provider supports it so device and session writes commit atomically after the
+// account boundary has been locked and reloaded.
 func (s *Service) issueSession(
 	ctx context.Context,
 	store Store,
@@ -167,6 +171,17 @@ func (s *Service) issueSession(
 		err = ErrInvalidInput
 		return
 	}
+	if account.ID == "" {
+		err = ErrInvalidInput
+		return
+	}
+
+	accountID := account.ID
+	account, err = s.lockAccount(ctx, store, accountID)
+	if err != nil {
+		err = fmt.Errorf("load account %s before session issuance: %w", accountID, err)
+		return
+	}
 	if account.Status != AccountStatusActive {
 		err = ErrForbidden
 		return
@@ -178,15 +193,6 @@ func (s *Service) issueSession(
 		if deviceName == "" {
 			deviceName = account.Username
 		}
-	}
-
-	// Touch the account row first so account-wide revocation serializes before we
-	// create any new device or session rows.
-	account.LastAuthAt = now
-	account.UpdatedAt = now
-	if err = s.touchAccount(ctx, store, account); err != nil {
-		err = fmt.Errorf("update account %s before session issuance: %w", account.ID, err)
-		return
 	}
 
 	deviceID, err := newID("dev")
