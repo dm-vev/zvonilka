@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package zvonilka.common.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "contracts/common/v1/types.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1;commonv1";
+
+message PageRequest {
+  uint32 page_size = 1;
+  string page_token = 2;
+}
+
+message PageResponse {
+  string next_page_token = 1;
+  uint64 total_size = 2;
+}
+
+message PublicKeyBundle {
+  string key_id = 1;
+  string algorithm = 2;
+  bytes public_key = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp rotated_at = 5;
+  google.protobuf.Timestamp expires_at = 6;
+}
+
+message AuthTokens {
+  string session_id = 1;
+  string access_token = 2;
+  string refresh_token = 3;
+  string token_type = 4;
+  google.protobuf.Timestamp access_expires_at = 5;
+  google.protobuf.Timestamp refresh_expires_at = 6;
+}
+
+message EncryptedPayload {
+  string key_id = 1;
+  string algorithm = 2;
+  bytes nonce = 3;
+  bytes ciphertext = 4;
+  bytes aad = 5;
+  map<string, string> metadata = 6;
+}
+
+message Avatar {
+  string media_id = 1;
+  string variant = 2;
+  bool is_primary = 3;
+  uint32 width = 4;
+  uint32 height = 5;
+  string mime_type = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message AttachmentRef {
+  string media_id = 1;
+  AttachmentKind kind = 2;
+  string file_name = 3;
+  string mime_type = 4;
+  uint64 size_bytes = 5;
+  string sha256_hex = 6;
+  uint32 width = 7;
+  uint32 height = 8;
+  google.protobuf.Duration duration = 9;
+  string caption = 10;
+}
+
+message MessageReference {
+  string conversation_id = 1;
+  string message_id = 2;
+  string sender_user_id = 3;
+  MessageKind message_kind = 4;
+  string snippet = 5;
+}
+
+message MessageDraft {
+  string client_message_id = 1;
+  MessageKind kind = 2;
+  EncryptedPayload payload = 3;
+  repeated AttachmentRef attachments = 4;
+  MessageReference reply_to = 5;
+  string thread_id = 6;
+  google.protobuf.Timestamp deliver_at = 7;
+  bool silent = 8;
+  bool disable_link_previews = 9;
+  map<string, string> metadata = 10;
+}
+
+message EventEnvelope {
+  string event_id = 1;
+  EventType event_type = 2;
+  string tenant_id = 3;
+  string conversation_id = 4;
+  string actor_user_id = 5;
+  string actor_device_id = 6;
+  string causation_id = 7;
+  string correlation_id = 8;
+  uint64 sequence = 9;
+  string payload_type = 10;
+  EncryptedPayload payload = 11;
+  map<string, string> metadata = 12;
+  google.protobuf.Timestamp created_at = 13;
+}
+
+message SyncState {
+  uint64 last_applied_sequence = 1;
+  uint64 last_acked_sequence = 2;
+  google.protobuf.Timestamp server_time = 3;
+  map<string, uint64> conversation_watermarks = 4;
+}

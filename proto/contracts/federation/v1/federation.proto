@@ -2,9 +2,7 @@ syntax = "proto3";
 
 package zvonilka.federation.v1;
 
-import "google/protobuf/field_mask.proto";
-import "google/protobuf/timestamp.proto";
-import "contracts/common/v1/types.proto";
+import "contracts/federation/v1/requests.proto";
 
 option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/federation/v1;federationv1";
 
@@ -16,112 +14,4 @@ service FederationService {
   rpc PushEvents(PushEventsRequest) returns (PushEventsResponse);
   rpc PullEvents(PullEventsRequest) returns (PullEventsResponse);
   rpc AcknowledgeReplication(AcknowledgeReplicationRequest) returns (AcknowledgeReplicationResponse);
-}
-
-enum PeerState {
-  PEER_STATE_UNSPECIFIED = 0;
-  PEER_STATE_PENDING = 1;
-  PEER_STATE_ACTIVE = 2;
-  PEER_STATE_DEGRADED = 3;
-  PEER_STATE_REVOKED = 4;
-}
-
-message Peer {
-  string peer_id = 1;
-  string server_name = 2;
-  string base_url = 3;
-  repeated zvonilka.common.v1.FederationCapability capabilities = 4;
-  bool trusted = 5;
-  PeerState status = 6;
-  google.protobuf.Timestamp created_at = 7;
-  google.protobuf.Timestamp updated_at = 8;
-  google.protobuf.Timestamp last_seen_at = 9;
-  string verification_fingerprint = 10;
-}
-
-message ReplicationReceipt {
-  string peer_id = 1;
-  uint64 last_sequence = 2;
-  repeated string acknowledged_event_ids = 3;
-  google.protobuf.Timestamp acknowledged_at = 4;
-  bool accepted = 5;
-}
-
-message RegisterPeerRequest {
-  string server_name = 1;
-  string base_url = 2;
-  string shared_secret = 3;
-  repeated zvonilka.common.v1.FederationCapability capabilities = 4;
-  string idempotency_key = 5;
-}
-
-message RegisterPeerResponse {
-  Peer peer = 1;
-  string verification_token = 2;
-  google.protobuf.Timestamp expires_at = 3;
-}
-
-message GetPeerRequest {
-  oneof lookup {
-    string peer_id = 1;
-    string server_name = 2;
-  }
-}
-
-message GetPeerResponse {
-  Peer peer = 1;
-}
-
-message ListPeersRequest {
-  zvonilka.common.v1.PageRequest page = 1;
-  PeerState status_filter = 2;
-}
-
-message ListPeersResponse {
-  repeated Peer peers = 1;
-  zvonilka.common.v1.PageResponse page = 2;
-}
-
-message UpdatePeerRequest {
-  Peer peer = 1;
-  google.protobuf.FieldMask update_mask = 2;
-  string idempotency_key = 3;
-}
-
-message UpdatePeerResponse {
-  Peer peer = 1;
-}
-
-message PushEventsRequest {
-  string peer_id = 1;
-  repeated zvonilka.common.v1.EventEnvelope events = 2;
-  uint64 from_sequence = 3;
-  uint64 to_sequence = 4;
-  string idempotency_key = 5;
-}
-
-message PushEventsResponse {
-  ReplicationReceipt receipt = 1;
-}
-
-message PullEventsRequest {
-  string peer_id = 1;
-  uint64 from_sequence = 2;
-  zvonilka.common.v1.PageRequest page = 3;
-}
-
-message PullEventsResponse {
-  repeated zvonilka.common.v1.EventEnvelope events = 1;
-  uint64 next_sequence = 2;
-  bool has_more = 3;
-}
-
-message AcknowledgeReplicationRequest {
-  string peer_id = 1;
-  uint64 last_sequence = 2;
-  repeated string event_ids = 3;
-}
-
-message AcknowledgeReplicationResponse {
-  ReplicationReceipt receipt = 1;
 }

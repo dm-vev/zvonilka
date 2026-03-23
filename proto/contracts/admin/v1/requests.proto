@@ -1,0 +1,172 @@
+syntax = "proto3";
+
+package zvonilka.admin.v1;
+
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "contracts/admin/v1/models.proto";
+import "contracts/common/v1/messages.proto";
+import "contracts/common/v1/types.proto";
+import "contracts/users/v1/models.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/admin/v1;adminv1";
+
+message ListJoinRequestsRequest {
+  zvonilka.common.v1.PageRequest page = 1;
+  zvonilka.common.v1.JoinRequestStatus status_filter = 2;
+}
+
+message ListJoinRequestsResponse {
+  repeated JoinRequest join_requests = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message ApproveJoinRequestRequest {
+  string join_request_id = 1;
+  repeated AccountRole roles = 2;
+  string note = 3;
+  string idempotency_key = 4;
+}
+
+message ApproveJoinRequestResponse {
+  JoinRequest join_request = 1;
+  zvonilka.users.v1.UserProfile profile = 2;
+}
+
+message RejectJoinRequestRequest {
+  string join_request_id = 1;
+  string reason = 2;
+  string idempotency_key = 3;
+}
+
+message RejectJoinRequestResponse {
+  JoinRequest join_request = 1;
+}
+
+message CreateAccountRequest {
+  string username = 1;
+  string display_name = 2;
+  string email = 3;
+  string phone = 4;
+  repeated AccountRole roles = 5;
+  string note = 6;
+  string invite_code = 7;
+  string idempotency_key = 8;
+}
+
+message CreateAccountResponse {
+  zvonilka.users.v1.UserProfile profile = 1;
+  string invite_code = 2;
+  google.protobuf.Timestamp invite_expires_at = 3;
+}
+
+message SuspendAccountRequest {
+  string user_id = 1;
+  string reason = 2;
+  google.protobuf.Timestamp until = 3;
+  string idempotency_key = 4;
+}
+
+message SuspendAccountResponse {
+  zvonilka.users.v1.UserProfile profile = 1;
+}
+
+message RestoreAccountRequest {
+  string user_id = 1;
+  string reason = 2;
+  string idempotency_key = 3;
+}
+
+message RestoreAccountResponse {
+  zvonilka.users.v1.UserProfile profile = 1;
+}
+
+message UpdateAccountRolesRequest {
+  string user_id = 1;
+  repeated AccountRole roles = 2;
+  string reason = 3;
+  string idempotency_key = 4;
+}
+
+message UpdateAccountRolesResponse {
+  zvonilka.users.v1.UserProfile profile = 1;
+}
+
+message CreateInviteRequest {
+  repeated AccountRole roles = 1;
+  string email = 2;
+  string phone = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  uint32 max_uses = 5;
+  string note = 6;
+  string idempotency_key = 7;
+}
+
+message CreateInviteResponse {
+  string invite_code = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  uint32 max_uses = 3;
+}
+
+message RevokeInviteRequest {
+  string invite_code = 1;
+  string reason = 2;
+  string idempotency_key = 3;
+}
+
+message RevokeInviteResponse {
+  bool revoked = 1;
+}
+
+message GetPolicySetRequest {}
+
+message GetPolicySetResponse {
+  PolicySet policy = 1;
+}
+
+message UpdatePolicySetRequest {
+  PolicySet policy = 1;
+  google.protobuf.FieldMask update_mask = 2;
+  string idempotency_key = 3;
+}
+
+message UpdatePolicySetResponse {
+  PolicySet policy = 1;
+}
+
+message ListAuditLogsRequest {
+  zvonilka.common.v1.PageRequest page = 1;
+  string actor_user_id = 2;
+  string target_user_id = 3;
+  repeated zvonilka.common.v1.AuditActionType action_types = 4;
+  google.protobuf.Timestamp since = 5;
+  google.protobuf.Timestamp until = 6;
+}
+
+message ListAuditLogsResponse {
+  repeated AuditEvent events = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message ListModerationCasesRequest {
+  zvonilka.common.v1.PageRequest page = 1;
+  ModerationCaseStatus status = 2;
+  string reporter_user_id = 3;
+  string reported_user_id = 4;
+}
+
+message ListModerationCasesResponse {
+  repeated ModerationCase moderation_cases = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message ResolveModerationCaseRequest {
+  string case_id = 1;
+  string resolution = 2;
+  bool action_taken = 3;
+  string idempotency_key = 4;
+}
+
+message ResolveModerationCaseResponse {
+  ModerationCase moderation_case = 1;
+}

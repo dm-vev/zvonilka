@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package zvonilka.conversation.v1;
+
+import "contracts/common/v1/messages.proto";
+import "contracts/conversation/v1/models.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1;conversationv1";
+
+message CreateThreadRequest {
+  string conversation_id = 1;
+  string root_message_id = 2;
+  string title = 3;
+  string idempotency_key = 4;
+}
+
+message CreateThreadResponse {
+  Thread thread = 1;
+}
+
+message GetThreadRequest {
+  string conversation_id = 1;
+  string thread_id = 2;
+}
+
+message GetThreadResponse {
+  Thread thread = 1;
+  repeated Message messages = 2;
+}
+
+message ListThreadsRequest {
+  string conversation_id = 1;
+  zvonilka.common.v1.PageRequest page = 2;
+}
+
+message ListThreadsResponse {
+  repeated Thread threads = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}

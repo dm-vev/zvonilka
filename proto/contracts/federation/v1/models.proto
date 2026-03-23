@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package zvonilka.federation.v1;
+
+import "google/protobuf/timestamp.proto";
+import "contracts/common/v1/types.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/federation/v1;federationv1";
+
+enum PeerState {
+  PEER_STATE_UNSPECIFIED = 0;
+  PEER_STATE_PENDING = 1;
+  PEER_STATE_ACTIVE = 2;
+  PEER_STATE_DEGRADED = 3;
+  PEER_STATE_REVOKED = 4;
+}
+
+message Peer {
+  string peer_id = 1;
+  string server_name = 2;
+  string base_url = 3;
+  repeated zvonilka.common.v1.FederationCapability capabilities = 4;
+  bool trusted = 5;
+  PeerState status = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  google.protobuf.Timestamp last_seen_at = 9;
+  string verification_fingerprint = 10;
+}
+
+message ReplicationReceipt {
+  string peer_id = 1;
+  uint64 last_sequence = 2;
+  repeated string acknowledged_event_ids = 3;
+  google.protobuf.Timestamp acknowledged_at = 4;
+  bool accepted = 5;
+}

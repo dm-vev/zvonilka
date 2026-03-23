@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package zvonilka.auth.v1;
+
+import "google/protobuf/timestamp.proto";
+import "contracts/common/v1/messages.proto";
+import "contracts/common/v1/types.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/auth/v1;authv1";
+
+enum LoginDeliveryChannel {
+  LOGIN_DELIVERY_CHANNEL_UNSPECIFIED = 0;
+  LOGIN_DELIVERY_CHANNEL_SMS = 1;
+  LOGIN_DELIVERY_CHANNEL_EMAIL = 2;
+  LOGIN_DELIVERY_CHANNEL_PUSH = 3;
+  LOGIN_DELIVERY_CHANNEL_TOTP = 4;
+  LOGIN_DELIVERY_CHANNEL_MANUAL = 5;
+}
+
+enum LoginFactor {
+  LOGIN_FACTOR_UNSPECIFIED = 0;
+  LOGIN_FACTOR_CODE = 1;
+  LOGIN_FACTOR_PASSWORD = 2;
+  LOGIN_FACTOR_TWO_FACTOR = 3;
+  LOGIN_FACTOR_RECOVERY_PASSWORD = 4;
+}
+
+message LoginOption {
+  LoginFactor factor = 1;
+  bool required = 2;
+  repeated LoginDeliveryChannel channels = 3;
+}
+
+message LoginTarget {
+  LoginDeliveryChannel channel = 1;
+  string destination_mask = 2;
+  bool primary = 3;
+  bool verified = 4;
+}
+
+message Device {
+  string device_id = 1;
+  string user_id = 2;
+  string device_name = 3;
+  zvonilka.common.v1.DevicePlatform platform = 4;
+  zvonilka.common.v1.DeviceStatus status = 5;
+  zvonilka.common.v1.PublicKeyBundle public_key = 6;
+  string push_token = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp last_seen_at = 9;
+  google.protobuf.Timestamp revoked_at = 10;
+}
+
+message Session {
+  string session_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string device_name = 4;
+  zvonilka.common.v1.DevicePlatform device_platform = 5;
+  string ip_address = 6;
+  string user_agent = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp last_seen_at = 9;
+  google.protobuf.Timestamp revoked_at = 10;
+  bool current = 11;
+  bool revoked = 12;
+}

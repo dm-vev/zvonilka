@@ -1,0 +1,130 @@
+syntax = "proto3";
+
+package zvonilka.conversation.v1;
+
+import "contracts/common/v1/messages.proto";
+import "contracts/conversation/v1/models.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1;conversationv1";
+
+message ListMessagesRequest {
+  string conversation_id = 1;
+  zvonilka.common.v1.PageRequest page = 2;
+  string thread_id = 3;
+  bool include_reactions = 4;
+  bool include_deleted = 5;
+  bool include_forwarded = 6;
+}
+
+message ListMessagesResponse {
+  repeated Message messages = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message GetMessageRequest {
+  string conversation_id = 1;
+  string message_id = 2;
+}
+
+message GetMessageResponse {
+  Message message = 1;
+}
+
+message SendMessageRequest {
+  string conversation_id = 1;
+  zvonilka.common.v1.MessageDraft draft = 2;
+  string idempotency_key = 3;
+}
+
+message SendMessageResponse {
+  Message message = 1;
+  zvonilka.common.v1.EventEnvelope event = 2;
+}
+
+message EditMessageRequest {
+  string conversation_id = 1;
+  string message_id = 2;
+  zvonilka.common.v1.MessageDraft draft = 3;
+  string idempotency_key = 4;
+}
+
+message EditMessageResponse {
+  Message message = 1;
+}
+
+message DeleteMessageRequest {
+  string conversation_id = 1;
+  string message_id = 2;
+  bool delete_for_everyone = 3;
+  string reason = 4;
+  string idempotency_key = 5;
+}
+
+message DeleteMessageResponse {
+  Message message = 1;
+}
+
+message ForwardMessageRequest {
+  string from_conversation_id = 1;
+  string message_id = 2;
+  string to_conversation_id = 3;
+  string idempotency_key = 4;
+}
+
+message ForwardMessageResponse {
+  Message message = 1;
+}
+
+message AddReactionRequest {
+  string conversation_id = 1;
+  string message_id = 2;
+  string emoji = 3;
+  string idempotency_key = 4;
+}
+
+message AddReactionResponse {
+  Message message = 1;
+}
+
+message RemoveReactionRequest {
+  string conversation_id = 1;
+  string message_id = 2;
+  string emoji = 3;
+  string idempotency_key = 4;
+}
+
+message RemoveReactionResponse {
+  Message message = 1;
+}
+
+message PinMessageRequest {
+  string conversation_id = 1;
+  string message_id = 2;
+  bool pin_for_everyone = 3;
+  string idempotency_key = 4;
+}
+
+message PinMessageResponse {
+  Message message = 1;
+}
+
+message UnpinMessageRequest {
+  string conversation_id = 1;
+  string message_id = 2;
+  string idempotency_key = 3;
+}
+
+message UnpinMessageResponse {
+  Message message = 1;
+}
+
+message MarkReadRequest {
+  string conversation_id = 1;
+  string message_id = 2;
+  uint64 read_through_sequence = 3;
+  string idempotency_key = 4;
+}
+
+message MarkReadResponse {
+  uint64 read_through_sequence = 1;
+}

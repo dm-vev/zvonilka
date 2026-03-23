@@ -2,44 +2,10 @@ syntax = "proto3";
 
 package zvonilka.search.v1;
 
-import "google/protobuf/timestamp.proto";
-import "contracts/common/v1/types.proto";
+import "contracts/search/v1/requests.proto";
 
 option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/search/v1;searchv1";
 
 service SearchService {
   rpc Search(SearchRequest) returns (SearchResponse);
-}
-
-message SearchHit {
-  string hit_id = 1;
-  zvonilka.common.v1.SearchScope scope = 2;
-  string title = 3;
-  string subtitle = 4;
-  string snippet = 5;
-  string target_id = 6;
-  string conversation_id = 7;
-  string message_id = 8;
-  string media_id = 9;
-  string user_id = 10;
-  string bot_id = 11;
-  map<string, string> metadata = 12;
-  google.protobuf.Timestamp updated_at = 13;
-}
-
-message SearchRequest {
-  string query = 1;
-  repeated zvonilka.common.v1.SearchScope scopes = 2;
-  zvonilka.common.v1.PageRequest page = 3;
-  repeated string conversation_ids = 4;
-  repeated string user_ids = 5;
-  bool include_snippets = 6;
-  bool fuzzy_match = 7;
-  google.protobuf.Timestamp updated_after = 8;
-  google.protobuf.Timestamp updated_before = 9;
-}
-
-message SearchResponse {
-  repeated SearchHit hits = 1;
-  zvonilka.common.v1.PageResponse page = 2;
 }

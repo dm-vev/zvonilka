@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package zvonilka.conversation.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "contracts/common/v1/messages.proto";
+import "contracts/common/v1/types.proto";
+import "contracts/users/v1/models.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1;conversationv1";
+
+message ConversationSettings {
+  bool only_admins_can_write = 1;
+  bool only_admins_can_add_members = 2;
+  bool allow_reactions = 3;
+  bool allow_forwards = 4;
+  bool allow_threads = 5;
+  bool require_join_approval = 6;
+  bool pinned_messages_only_admins = 7;
+  google.protobuf.Duration slow_mode_interval = 8;
+}
+
+message Conversation {
+  string conversation_id = 1;
+  zvonilka.common.v1.ConversationKind kind = 2;
+  string title = 3;
+  string description = 4;
+  string avatar_media_id = 5;
+  string owner_user_id = 6;
+  ConversationSettings settings = 7;
+  bool archived = 8;
+  bool muted = 9;
+  bool pinned = 10;
+  bool hidden = 11;
+  uint64 last_sequence = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+  google.protobuf.Timestamp last_message_at = 15;
+}
+
+message ConversationMember {
+  string conversation_id = 1;
+  string user_id = 2;
+  zvonilka.users.v1.UserProfile profile = 3;
+  zvonilka.common.v1.MemberRole role = 4;
+  string invited_by_user_id = 5;
+  bool muted = 6;
+  bool banned = 7;
+  google.protobuf.Timestamp joined_at = 8;
+  google.protobuf.Timestamp left_at = 9;
+}
+
+message Invite {
+  string invite_id = 1;
+  string conversation_id = 2;
+  string code = 3;
+  string created_by_user_id = 4;
+  repeated zvonilka.common.v1.MemberRole allowed_roles = 5;
+  google.protobuf.Timestamp expires_at = 6;
+  uint32 max_uses = 7;
+  uint32 use_count = 8;
+  bool revoked = 9;
+  google.protobuf.Timestamp revoked_at = 10;
+}
+
+message Reaction {
+  string emoji = 1;
+  string user_id = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message Message {
+  string message_id = 1;
+  string conversation_id = 2;
+  string sender_user_id = 3;
+  zvonilka.users.v1.UserProfile sender_profile = 4;
+  string sender_device_id = 5;
+  zvonilka.common.v1.MessageKind kind = 6;
+  zvonilka.common.v1.MessageStatus status = 7;
+  zvonilka.common.v1.EncryptedPayload payload = 8;
+  repeated zvonilka.common.v1.AttachmentRef attachments = 9;
+  zvonilka.common.v1.MessageReference reply_to = 10;
+  string thread_id = 11;
+  bool silent = 12;
+  bool pinned = 13;
+  repeated Reaction reactions = 14;
+  uint64 view_count = 15;
+  google.protobuf.Timestamp created_at = 16;
+  google.protobuf.Timestamp edited_at = 17;
+  google.protobuf.Timestamp deleted_at = 18;
+}
+
+message Thread {
+  string thread_id = 1;
+  string conversation_id = 2;
+  string root_message_id = 3;
+  string title = 4;
+  uint32 reply_count = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
