@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
@@ -29,7 +31,7 @@ func NewBuilder(cfg config.Configuration, factories ...Factory) (*Builder, error
 		return nil, fmt.Errorf("configure storage builder: %w", domainstorage.ErrInvalidInput)
 	}
 	for _, factory := range factories {
-		if factory == nil {
+		if isNilFactory(factory) {
 			return nil, fmt.Errorf("configure storage builder: %w", domainstorage.ErrInvalidInput)
 		}
 	}
@@ -42,6 +44,9 @@ func NewBuilder(cfg config.Configuration, factories ...Factory) (*Builder, error
 
 // Build constructs and validates a storage catalog.
 func (b *Builder) Build(ctx context.Context) (*domainstorage.Catalog, error) {
+	if b == nil {
+		return nil, fmt.Errorf("build storage catalog: %w", domainstorage.ErrInvalidInput)
+	}
 	if ctx == nil {
 		return nil, fmt.Errorf("build storage catalog: %w", domainstorage.ErrInvalidInput)
 	}
@@ -53,9 +58,14 @@ func (b *Builder) Build(ctx context.Context) (*domainstorage.Catalog, error) {
 	for _, factory := range b.factories {
 		provider, err := factory.Build(ctx, b.cfg)
 		if err != nil {
-			return nil, errors.Join(fmt.Errorf("build storage provider: %w", err), closeProviders(ctx, providers))
+			cleanupProviders := append([]domainstorage.Provider(nil), providers...)
+			if !isNilProvider(provider) {
+				cleanupProviders = append(cleanupProviders, provider)
+			}
+
+			return nil, errors.Join(fmt.Errorf("build storage provider: %w", err), closeProviders(ctx, cleanupProviders))
 		}
-		if provider == nil {
+		if isNilProvider(provider) {
 			return nil, errors.Join(
 				fmt.Errorf("build storage provider: %w", domainstorage.ErrInvalidInput),
 				closeProviders(ctx, providers),
@@ -133,9 +143,11 @@ func (b *Builder) validateBindings(catalog *domainstorage.Catalog) error {
 		}
 		if !provider.Capabilities().Has(binding.required) {
 			return fmt.Errorf(
-				"resolve %s storage binding %q: provider lacks required capabilities",
+				"resolve %s storage binding %q: provider lacks required capabilities: required=%s actual=%s",
 				binding.logical,
 				binding.name,
+				describeCapabilities(binding.required),
+				describeCapabilities(provider.Capabilities()),
 			)
 		}
 	}
@@ -147,6 +159,9 @@ func (b *Builder) validateBindings(catalog *domainstorage.Catalog) error {
 func closeProviders(ctx context.Context, providers []domainstorage.Provider) error {
 	var closeErr error
 	for i := len(providers) - 1; i >= 0; i-- {
+		if isNilProvider(providers[i]) {
+			continue
+		}
 		if err := providers[i].Close(ctx); err != nil {
 			closeErr = errors.Join(
 				closeErr,
@@ -156,4 +171,58 @@ func closeProviders(ctx context.Context, providers []domainstorage.Provider) err
 	}
 
 	return closeErr
+}
+
+func describeCapabilities(c domainstorage.Capability) string {
+	if c == 0 {
+		return "none"
+	}
+
+	parts := make([]string, 0, 6)
+	add := func(required domainstorage.Capability, label string) {
+		if c.Has(required) {
+			parts = append(parts, label)
+		}
+	}
+
+	add(domainstorage.CapabilityRead, "read")
+	add(domainstorage.CapabilityWrite, "write")
+	add(domainstorage.CapabilityTransactions, "transactions")
+	add(domainstorage.CapabilityBlob, "blob")
+	add(domainstorage.CapabilityKeyValue, "key-value")
+	add(domainstorage.CapabilityListing, "listing")
+
+	if len(parts) == 0 {
+		return fmt.Sprintf("unknown(%d)", c)
+	}
+
+	return strings.Join(parts, "|")
+}
+
+func isNilProvider(provider domainstorage.Provider) bool {
+	if provider == nil {
+		return true
+	}
+
+	value := reflect.ValueOf(provider)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
+}
+
+func isNilFactory(factory Factory) bool {
+	if factory == nil {
+		return true
+	}
+
+	value := reflect.ValueOf(factory)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
 }
