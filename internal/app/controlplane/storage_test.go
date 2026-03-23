@@ -2,16 +2,19 @@ package controlplane
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"reflect"
 	"strings"
 	"testing"
 
+	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
+	platformstorage "github.com/dm-vev/zvonilka/internal/platform/storage"
 )
 
-func TestBuildAppStorageDisabledReturnsNilArtifacts(t *testing.T) {
+func TestBuildAppStorageReturnsNilWhenPostgresDisabled(t *testing.T) {
 	t.Parallel()
 
 	catalog, service, err := buildAppStorage(context.Background(), config.Configuration{})
@@ -19,10 +22,67 @@ func TestBuildAppStorageDisabledReturnsNilArtifacts(t *testing.T) {
 		t.Fatalf("build app storage: %v", err)
 	}
 	if catalog != nil {
-		t.Fatal("expected nil catalog when postgres is disabled")
+		t.Fatalf("expected nil catalog, got %#v", catalog)
 	}
 	if service != nil {
-		t.Fatal("expected nil identity service when postgres is disabled")
+		t.Fatalf("expected nil identity service, got %#v", service)
+	}
+}
+
+func TestBuildAppStorageJoinsCleanupErrorOnStartupFailure(t *testing.T) {
+	originalBuilder := newStorageBuilder
+	originalIdentityStore := newIdentityStore
+	originalIdentityService := newIdentityService
+	t.Cleanup(func() {
+		newStorageBuilder = originalBuilder
+		newIdentityStore = originalIdentityStore
+		newIdentityService = originalIdentityService
+	})
+
+	startupErr := errors.New("identity store failed")
+	closeErr := errors.New("catalog close failed")
+	catalog, err := domainstorage.NewCatalog(
+		&fakeRelationalProvider{
+			name:         "primary",
+			closeErr:     closeErr,
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+		},
+	)
+	if err != nil {
+		t.Fatalf("new catalog: %v", err)
+	}
+
+	newStorageBuilder = func(config.Configuration, ...platformstorage.Factory) (storageBuilder, error) {
+		return &fakeBuilder{catalog: catalog}, nil
+	}
+	newIdentityStore = func(*sql.DB, string) (domainidentity.Store, error) {
+		return nil, startupErr
+	}
+	newIdentityService = func(domainidentity.Store, domainidentity.CodeSender, ...domainidentity.Option) (*domainidentity.Service, error) {
+		t.Fatal("identity service constructor should not be called")
+		return nil, nil
+	}
+
+	cfg := config.Configuration{
+		Infrastructure: config.InfrastructureConfig{
+			Postgres: config.PostgresConfig{
+				Enabled: true,
+			},
+		},
+	}
+
+	_, _, gotErr := buildAppStorage(context.Background(), cfg)
+	if gotErr == nil {
+		t.Fatal("expected startup error")
+	}
+	if !errors.Is(gotErr, startupErr) {
+		t.Fatalf("expected startup error to be preserved, got %v", gotErr)
+	}
+	if !errors.Is(gotErr, closeErr) {
+		t.Fatalf("expected cleanup error to be preserved, got %v", gotErr)
+	}
+	if !strings.Contains(gotErr.Error(), "close storage catalog") {
+		t.Fatalf("expected cleanup wrapper in error: %v", gotErr)
 	}
 }
 
@@ -68,34 +128,24 @@ func TestCloseStorageCatalogReturnsProviderError(t *testing.T) {
 	}
 }
 
-func TestFinalizeRunJoinsRunAndCloseErrors(t *testing.T) {
+func TestFinalizeRunReturnsRunErrorUnchangedWhenCloseSucceeds(t *testing.T) {
 	t.Parallel()
 
-	runtimeErr := errors.New("runtime failed")
-	closeErr := errors.New("close failed")
-	catalog, err := domainstorage.NewCatalog(&fakeProvider{name: "first", closeErr: closeErr})
+	runErr := errors.New("runtime failed")
+	catalog, err := domainstorage.NewCatalog(&fakeProvider{name: "first"})
 	if err != nil {
 		t.Fatalf("new catalog: %v", err)
 	}
 
-	got := finalizeRun(context.Background(), &app{catalog: catalog}, runtimeErr)
+	got := finalizeRun(context.Background(), &app{catalog: catalog}, runErr)
 	if got == nil {
-		t.Fatal("expected joined error")
+		t.Fatal("expected runtime error")
 	}
-	if !errors.Is(got, runtimeErr) {
+	if !errors.Is(got, runErr) {
 		t.Fatalf("expected runtime error in final error: %v", got)
 	}
-	if !errors.Is(got, closeErr) {
-		t.Fatalf("expected close error in final error: %v", got)
-	}
-	if got.Error() == "" {
-		t.Fatal("expected non-empty joined error")
-	}
-	if !strings.Contains(got.Error(), runtimeErr.Error()) {
-		t.Fatalf("expected runtime error text in final error: %v", got)
-	}
-	if !strings.Contains(got.Error(), closeErr.Error()) {
-		t.Fatalf("expected close error text in final error: %v", got)
+	if strings.Contains(got.Error(), "close controlplane app") {
+		t.Fatalf("did not expect close wrapper when close succeeded: %v", got)
 	}
 }
 
@@ -103,7 +153,7 @@ func TestFinalizeRunReturnsCloseErrorWhenRunSucceeds(t *testing.T) {
 	t.Parallel()
 
 	closeErr := errors.New("close failed")
-	catalog, err := domainstorage.NewCatalog(&fakeProvider{name: "first", closeErr: closeErr})
+	catalog, err := domainstorage.NewCatalog(&fakeProvider{name: "primary", closeErr: closeErr})
 	if err != nil {
 		t.Fatalf("new catalog: %v", err)
 	}
@@ -117,6 +167,34 @@ func TestFinalizeRunReturnsCloseErrorWhenRunSucceeds(t *testing.T) {
 	}
 	if !strings.Contains(got.Error(), "close controlplane app") {
 		t.Fatalf("expected wrapped close error: %v", got)
+	}
+}
+
+func TestFinalizeRunJoinsRunAndCloseErrors(t *testing.T) {
+	t.Parallel()
+
+	closeErr := errors.New("close failed")
+	runErr := errors.New("runtime failed")
+	catalog, err := domainstorage.NewCatalog(&fakeProvider{name: "primary", closeErr: closeErr})
+	if err != nil {
+		t.Fatalf("new catalog: %v", err)
+	}
+
+	got := finalizeRun(context.Background(), &app{catalog: catalog}, runErr)
+	if got == nil {
+		t.Fatal("expected joined error")
+	}
+	if !errors.Is(got, runErr) {
+		t.Fatalf("expected runtime error in final error: %v", got)
+	}
+	if !errors.Is(got, closeErr) {
+		t.Fatalf("expected close error in final error: %v", got)
+	}
+	if !strings.Contains(got.Error(), runErr.Error()) {
+		t.Fatalf("expected runtime error text in final error: %v", got)
+	}
+	if !strings.Contains(got.Error(), closeErr.Error()) {
+		t.Fatalf("expected close error text in final error: %v", got)
 	}
 }
 
@@ -148,4 +226,42 @@ func (p *fakeProvider) Close(context.Context) error {
 	}
 
 	return p.closeErr
+}
+
+type fakeRelationalProvider struct {
+	name         string
+	closeErr     error
+	capabilities domainstorage.Capability
+}
+
+func (p *fakeRelationalProvider) Name() string {
+	return p.name
+}
+
+func (p *fakeRelationalProvider) Kind() domainstorage.Kind {
+	return domainstorage.KindRelational
+}
+
+func (p *fakeRelationalProvider) Purpose() domainstorage.Purpose {
+	return domainstorage.PurposePrimary
+}
+
+func (p *fakeRelationalProvider) Capabilities() domainstorage.Capability {
+	return p.capabilities
+}
+
+func (p *fakeRelationalProvider) Close(context.Context) error {
+	return p.closeErr
+}
+
+func (p *fakeRelationalProvider) DB() *sql.DB {
+	return nil
+}
+
+type fakeBuilder struct {
+	catalog *domainstorage.Catalog
+}
+
+func (b *fakeBuilder) Build(context.Context) (*domainstorage.Catalog, error) {
+	return b.catalog, nil
 }
