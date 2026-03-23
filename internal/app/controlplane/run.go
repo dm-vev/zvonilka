@@ -2,6 +2,7 @@ package controlplane
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/dm-vev/zvonilka/internal/platform/buildinfo"
@@ -11,7 +12,7 @@ import (
 )
 
 // Run boots the controlplane skeleton.
-func Run(ctx context.Context) error {
+func Run(ctx context.Context) (err error) {
 	cfg, err := config.Load("controlplane")
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -23,7 +24,7 @@ func Run(ctx context.Context) error {
 		return fmt.Errorf("initialize controlplane app: %w", err)
 	}
 	defer func() {
-		_ = app.close(ctx)
+		err = finalizeRun(ctx, app, err)
 	}()
 
 	logger.InfoContext(
@@ -41,7 +42,7 @@ func Run(ctx context.Context) error {
 		cfg.Runtime.GRPC.Address,
 	)
 
-	return runtime.Run(
+	err = runtime.Run(
 		ctx,
 		cfg.Runtime.ToRuntime(cfg.Service),
 		logger,
@@ -49,4 +50,23 @@ func Run(ctx context.Context) error {
 		app.handler,
 		nil,
 	)
+	return err
+}
+
+func finalizeRun(ctx context.Context, app *app, runErr error) error {
+	if app == nil {
+		return runErr
+	}
+
+	closeErr := app.close(ctx)
+	if closeErr == nil {
+		return runErr
+	}
+
+	wrappedCloseErr := fmt.Errorf("close controlplane app: %w", closeErr)
+	if runErr != nil {
+		return errors.Join(runErr, wrappedCloseErr)
+	}
+
+	return wrappedCloseErr
 }

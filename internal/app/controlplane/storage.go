@@ -2,6 +2,7 @@ package controlplane
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
@@ -67,27 +68,58 @@ func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstor
 
 	provider, err := catalog.Select(domainstorage.PurposePrimary, domainstorage.CapabilityTransactions)
 	if err != nil {
-		_ = catalog.Close(ctx)
-		return nil, nil, fmt.Errorf("select primary storage provider: %w", err)
+		return nil, nil, joinStorageError(
+			fmt.Errorf("select primary storage provider: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
 	}
 
 	relational, ok := provider.(domainstorage.RelationalProvider)
 	if !ok {
-		_ = catalog.Close(ctx)
-		return nil, nil, fmt.Errorf("select primary storage provider: expected relational provider")
+		return nil, nil, joinStorageError(
+			fmt.Errorf("select primary storage provider: expected relational provider"),
+			closeStorageCatalog(ctx, catalog),
+		)
 	}
 
 	store, err := postgresdomain.New(relational.DB(), cfg.Infrastructure.Postgres.Schema)
 	if err != nil {
-		_ = catalog.Close(ctx)
-		return nil, nil, fmt.Errorf("construct postgres identity store: %w", err)
+		return nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres identity store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
 	}
 
 	service, err := domainidentity.NewService(store, domainidentity.NoopCodeSender{}, domainidentity.WithSettings(cfg.Identity.ToSettings()))
 	if err != nil {
-		_ = catalog.Close(ctx)
-		return nil, nil, fmt.Errorf("construct identity service: %w", err)
+		return nil, nil, joinStorageError(
+			fmt.Errorf("construct identity service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
 	}
 
 	return catalog, service, nil
+}
+
+func closeStorageCatalog(ctx context.Context, catalog *domainstorage.Catalog) error {
+	if catalog == nil {
+		return nil
+	}
+
+	if err := catalog.Close(ctx); err != nil {
+		return fmt.Errorf("close storage catalog: %w", err)
+	}
+
+	return nil
+}
+
+func joinStorageError(cause error, cleanupErr error) error {
+	if cleanupErr == nil {
+		return cause
+	}
+	if cause == nil {
+		return cleanupErr
+	}
+
+	return errors.Join(cause, cleanupErr)
 }
