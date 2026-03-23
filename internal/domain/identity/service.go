@@ -153,6 +153,22 @@ func (s *Service) lockAccount(ctx context.Context, store Store, accountID string
 	return account, nil
 }
 
+// touchAccount persists the current account snapshot after the account boundary is held.
+//
+// The helper is used for flows that need the lock serialization boundary and a benign
+// write so concurrent profile edits cannot race with the session lifecycle update.
+func (s *Service) touchAccount(ctx context.Context, store Store, account Account) error {
+	if account.ID == "" {
+		return ErrInvalidInput
+	}
+
+	if _, err := store.SaveAccount(ctx, account); err != nil {
+		return fmt.Errorf("touch account %s: %w", account.ID, err)
+	}
+
+	return nil
+}
+
 // issueSession creates a device/session pair and returns bearer tokens for the account.
 //
 // The caller is expected to run the helper inside a store transaction when the
