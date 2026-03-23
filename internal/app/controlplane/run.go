@@ -18,7 +18,13 @@ func Run(ctx context.Context) error {
 	}
 
 	logger := observability.NewLogger(cfg.Logging, cfg.Service)
-	app := newApp(cfg)
+	app, err := newApp(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("initialize controlplane app: %w", err)
+	}
+	defer func() {
+		_ = app.close(ctx)
+	}()
 
 	logger.InfoContext(
 		ctx,

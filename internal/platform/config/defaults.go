@@ -75,6 +75,7 @@ func defaultConfiguration(serviceName string) Configuration {
 				MaxIdleConns:    defaultPostgresMaxIdle,
 				ConnMaxLifetime: defaultPostgresConnLifetime,
 				ConnMaxIdleTime: defaultPostgresConnIdle,
+				MigrationsPath:  "deploy/migrations/postgres",
 			},
 			Redis: RedisConfig{
 				PoolSize:        defaultRedisPoolSize,
