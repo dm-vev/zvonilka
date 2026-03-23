@@ -1,101 +1,114 @@
 package identity
 
-import "sync"
+import (
+	"strconv"
+	"strings"
+	"sync"
+)
 
 type idempotencyCache struct {
 	mu                sync.Mutex
-	beginLogin        map[string]beginLoginCacheEntry
-	verifyLogin       map[string]LoginResult
-	registerDevice    map[string]registerDeviceCacheEntry
+	beginLogin        map[string]idempotencyEntry[beginLoginCacheResult]
+	verifyLogin       map[string]idempotencyEntry[LoginResult]
+	registerDevice    map[string]idempotencyEntry[registerDeviceCacheResult]
 	revokeSession     map[string]Session
 	revokeAllSessions map[string]uint32
 }
 
-type beginLoginCacheEntry struct {
+type idempotencyEntry[T any] struct {
+	fingerprint string
+	value       T
+}
+
+type beginLoginCacheResult struct {
 	challenge LoginChallenge
 	targets   []LoginTarget
 }
 
-type registerDeviceCacheEntry struct {
+type registerDeviceCacheResult struct {
 	device  Device
 	session Session
 }
 
 func newIdempotencyCache() *idempotencyCache {
 	return &idempotencyCache{
-		beginLogin:        make(map[string]beginLoginCacheEntry),
-		verifyLogin:       make(map[string]LoginResult),
-		registerDevice:    make(map[string]registerDeviceCacheEntry),
+		beginLogin:        make(map[string]idempotencyEntry[beginLoginCacheResult]),
+		verifyLogin:       make(map[string]idempotencyEntry[LoginResult]),
+		registerDevice:    make(map[string]idempotencyEntry[registerDeviceCacheResult]),
 		revokeSession:     make(map[string]Session),
 		revokeAllSessions: make(map[string]uint32),
 	}
 }
 
-func (c *idempotencyCache) beginLoginResult(key string) (LoginChallenge, []LoginTarget, bool) {
+func (c *idempotencyCache) beginLoginResult(
+	key string,
+	fingerprint string,
+) (beginLoginCacheResult, bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	entry, ok := c.beginLogin[key]
-	if !ok {
-		return LoginChallenge{}, nil, false
-	}
-
-	return entry.challenge, cloneLoginTargets(entry.targets), true
+	return lookupIdempotencyEntry(c.beginLogin, key, fingerprint)
 }
 
 func (c *idempotencyCache) storeBeginLoginResult(
 	key string,
-	challenge LoginChallenge,
-	targets []LoginTarget,
+	fingerprint string,
+	result beginLoginCacheResult,
 ) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.beginLogin[key] = beginLoginCacheEntry{
-		challenge: challenge,
-		targets:   cloneLoginTargets(targets),
-	}
+	storeIdempotencyEntry(c.beginLogin, key, fingerprint, result)
 }
 
-func (c *idempotencyCache) verifyLoginResult(key string) (LoginResult, bool) {
+func (c *idempotencyCache) verifyLoginResult(
+	key string,
+	fingerprint string,
+) (LoginResult, bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	result, ok := c.verifyLogin[key]
-	if !ok {
-		return LoginResult{}, false
-	}
-
-	return result, true
+	return lookupIdempotencyEntry(c.verifyLogin, key, fingerprint)
 }
 
-func (c *idempotencyCache) storeVerifyLoginResult(key string, result LoginResult) {
+func (c *idempotencyCache) storeVerifyLoginResult(
+	key string,
+	fingerprint string,
+	result LoginResult,
+) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.verifyLogin[key] = result
+	storeIdempotencyEntry(c.verifyLogin, key, fingerprint, result)
 }
 
-func (c *idempotencyCache) registerDeviceResult(key string) (Device, Session, bool) {
+func (c *idempotencyCache) registerDeviceResult(
+	key string,
+	fingerprint string,
+) (Device, Session, bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	entry, ok := c.registerDevice[key]
 	if !ok {
-		return Device{}, Session{}, false
+		return Device{}, Session{}, false, nil
+	}
+	if entry.fingerprint != fingerprint {
+		return Device{}, Session{}, false, ErrConflict
 	}
 
-	return entry.device, entry.session, true
+	return entry.value.device, entry.value.session, true, nil
 }
 
-func (c *idempotencyCache) storeRegisterDeviceResult(key string, device Device, session Session) {
+func (c *idempotencyCache) storeRegisterDeviceResult(
+	key string,
+	fingerprint string,
+	result registerDeviceCacheResult,
+) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.registerDevice[key] = registerDeviceCacheEntry{
-		device:  device,
-		session: session,
-	}
+	storeIdempotencyEntry(c.registerDevice, key, fingerprint, result)
 }
 
 func (c *idempotencyCache) revokeSessionResult(key string) (Session, bool) {
@@ -136,10 +149,84 @@ func (c *idempotencyCache) storeRevokeAllSessionsResult(key string, revoked uint
 	c.revokeAllSessions[key] = revoked
 }
 
+func beginLoginFingerprint(params BeginLoginParams) string {
+	return idempotencyFingerprint(
+		"begin-login",
+		normalizeUsername(params.Username),
+		normalizeEmail(params.Email),
+		normalizePhone(params.Phone),
+		string(params.Delivery),
+		params.DeviceName,
+		string(params.Platform),
+		params.ClientVersion,
+		params.Locale,
+	)
+}
+
+func verifyLoginFingerprint(params VerifyLoginCodeParams) string {
+	return idempotencyFingerprint(
+		"verify-login",
+		params.ChallengeID,
+		params.Code,
+		params.TwoFactorCode,
+		params.RecoveryPassword,
+		strconv.FormatBool(params.EnablePasswordRecovery),
+		params.DeviceName,
+		string(params.Platform),
+		params.PublicKey,
+		params.PushToken,
+	)
+}
+
+func registerDeviceFingerprint(params RegisterDeviceParams) string {
+	return idempotencyFingerprint(
+		"register-device",
+		params.SessionID,
+		params.DeviceName,
+		string(params.Platform),
+		params.PublicKey,
+		params.PushToken,
+	)
+}
+
+func idempotencyFingerprint(parts ...string) string {
+	return hashSecret(strings.Join(parts, "\x1f"))
+}
+
 func cloneLoginTargets(targets []LoginTarget) []LoginTarget {
 	if len(targets) == 0 {
 		return nil
 	}
 
 	return append([]LoginTarget(nil), targets...)
+}
+
+func lookupIdempotencyEntry[T any](
+	cache map[string]idempotencyEntry[T],
+	key string,
+	fingerprint string,
+) (T, bool, error) {
+	entry, ok := cache[key]
+	if !ok {
+		var zero T
+		return zero, false, nil
+	}
+	if entry.fingerprint != fingerprint {
+		var zero T
+		return zero, false, ErrConflict
+	}
+
+	return entry.value, true, nil
+}
+
+func storeIdempotencyEntry[T any](
+	cache map[string]idempotencyEntry[T],
+	key string,
+	fingerprint string,
+	value T,
+) {
+	cache[key] = idempotencyEntry[T]{
+		fingerprint: fingerprint,
+		value:       value,
+	}
 }

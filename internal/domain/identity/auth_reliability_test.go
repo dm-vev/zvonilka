@@ -102,15 +102,40 @@ func TestVerifyLoginCodeRollsBackOnAccountSaveFailure(t *testing.T) {
 		t.Fatalf("expected LastAuthAt to remain zero, got %s", storedAccount.LastAuthAt)
 	}
 
-	_, err = svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
-		ChallengeID: challenge.ID,
-		Code:        code,
-		DeviceName:  "Rollback Device",
-		Platform:    identity.DevicePlatformIOS,
-		PublicKey:   "rollback-key-2",
+	retryResult, err := svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
+		ChallengeID:    challenge.ID,
+		Code:           code,
+		DeviceName:     "Rollback Device",
+		Platform:       identity.DevicePlatformIOS,
+		PublicKey:      "rollback-key",
+		IdempotencyKey: "verify-rollback",
 	})
-	if !errors.Is(err, identity.ErrConflict) {
-		t.Fatalf("expected replay-safe conflict after rollback, got %v", err)
+	if err != nil {
+		t.Fatalf("expected replay-safe retry after rollback, got %v", err)
+	}
+	if retryResult.Session.ID == "" || retryResult.Device.ID == "" {
+		t.Fatalf("expected replay-safe retry to issue session and device")
+	}
+	if retryResult.Session.ID == "" {
+		t.Fatalf("expected session on retry")
+	}
+	if retryResult.Device.ID == "" {
+		t.Fatalf("expected device on retry")
+	}
+
+	cachedResult, err := svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
+		ChallengeID:    challenge.ID,
+		Code:           code,
+		DeviceName:     "Rollback Device",
+		Platform:       identity.DevicePlatformIOS,
+		PublicKey:      "rollback-key",
+		IdempotencyKey: "verify-rollback",
+	})
+	if err != nil {
+		t.Fatalf("expected cached retry to succeed, got %v", err)
+	}
+	if cachedResult.Session.ID != retryResult.Session.ID {
+		t.Fatalf("expected cached session %s, got %s", retryResult.Session.ID, cachedResult.Session.ID)
 	}
 }
 
