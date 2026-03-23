@@ -84,6 +84,9 @@ func (s *Store) DeleteSession(ctx context.Context, sessionID string) error {
 	query := fmt.Sprintf(`DELETE FROM %s WHERE id = $1`, s.table("identity_sessions"))
 	result, err := s.conn().ExecContext(ctx, query, sessionID)
 	if err != nil {
+		if isForeignKeyViolation(err) {
+			return identity.ErrConflict
+		}
 		return fmt.Errorf("delete session %s: %w", sessionID, err)
 	}
 

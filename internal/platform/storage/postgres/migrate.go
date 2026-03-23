@@ -12,6 +12,11 @@ import (
 	"strings"
 )
 
+// ApplyMigrations executes ordered SQL migration files against the database.
+func ApplyMigrations(ctx context.Context, db *sql.DB, migrationsPath string, schema string) error {
+	return applyMigrations(ctx, db, migrationsPath, schema)
+}
+
 // applyMigrations executes ordered SQL migration files against the database.
 func applyMigrations(ctx context.Context, db *sql.DB, migrationsPath string, schema string) error {
 	if ctx == nil {
