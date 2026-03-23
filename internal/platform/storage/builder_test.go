@@ -17,7 +17,7 @@ type testFactory struct {
 
 func (f testFactory) Build(context.Context, config.Configuration) (domainstorage.Provider, error) {
 	if f.err != nil {
-		return nil, f.err
+		return f.provider, f.err
 	}
 
 	return f.provider, nil
@@ -199,6 +199,164 @@ func TestBuilderPropagatesCleanupErrors(t *testing.T) {
 	}
 }
 
+func TestBuilderCleansUpPartialProviderOnFactoryError(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := config.Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	closed := make([]string, 0, 2)
+	builder, err := NewBuilder(
+		cfg,
+		testFactory{provider: testProvider{
+			name:    "primary",
+			kind:    domainstorage.KindRelational,
+			purpose: domainstorage.PurposePrimary,
+			caps:    domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+			closed:  &closed,
+		}},
+		testFactory{
+			provider: testProvider{
+				name:     "partial",
+				kind:     domainstorage.KindCache,
+				purpose:  domainstorage.PurposeCache,
+				caps:     domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityKeyValue,
+				closed:   &closed,
+				closeErr: errors.New("partial close boom"),
+			},
+			err: errors.New("factory boom"),
+		},
+	)
+	if err != nil {
+		t.Fatalf("new builder: %v", err)
+	}
+
+	_, err = builder.Build(context.Background())
+	if err == nil {
+		t.Fatal("expected build to fail")
+	}
+	if !strings.Contains(err.Error(), "factory boom") {
+		t.Fatalf("unexpected build error: %v", err)
+	}
+	if !strings.Contains(err.Error(), "partial close boom") {
+		t.Fatalf("expected partial provider cleanup error, got %v", err)
+	}
+	if len(closed) != 2 {
+		t.Fatalf("expected both providers to close, got %v", closed)
+	}
+	if closed[0] != "partial" || closed[1] != "primary" {
+		t.Fatalf("expected partial provider to close before previously built providers, got %v", closed)
+	}
+}
+
+func TestBuilderRejectsTypedNilProvider(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := config.Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	closed := make([]string, 0, 1)
+	var nilProvider *testProvider
+
+	builder, err := NewBuilder(
+		cfg,
+		testFactory{provider: testProvider{
+			name:    "primary",
+			kind:    domainstorage.KindRelational,
+			purpose: domainstorage.PurposePrimary,
+			caps:    domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+			closed:  &closed,
+		}},
+		testFactory{provider: domainstorage.Provider(nilProvider)},
+	)
+	if err != nil {
+		t.Fatalf("new builder: %v", err)
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("expected typed nil provider to return error, panicked: %v", r)
+		}
+	}()
+
+	_, err = builder.Build(context.Background())
+	if err == nil {
+		t.Fatal("expected build to fail")
+	}
+	if !strings.Contains(err.Error(), "invalid input") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(closed) != 1 || closed[0] != "primary" {
+		t.Fatalf("expected already built provider to be closed, got %v", closed)
+	}
+}
+
+func TestBuilderRejectsTypedNilFactory(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := config.Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	var nilFactory *testFactory
+
+	_, err = NewBuilder(cfg, nilFactory)
+	if err == nil {
+		t.Fatal("expected new builder to fail")
+	}
+	if !strings.Contains(err.Error(), "invalid input") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBuilderBuildRejectsTypedNilFactory(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := config.Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	closed := make([]string, 0, 1)
+	var nilFactory *testFactory
+
+	builder := &Builder{
+		cfg: cfg,
+		factories: []Factory{
+			testFactory{provider: testProvider{
+				name:    "primary",
+				kind:    domainstorage.KindRelational,
+				purpose: domainstorage.PurposePrimary,
+				caps:    domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+				closed:  &closed,
+			}},
+			nilFactory,
+		},
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("expected typed nil factory to return error, panicked: %v", r)
+		}
+	}()
+
+	_, err = builder.Build(context.Background())
+	if err == nil {
+		t.Fatal("expected build to fail")
+	}
+	if !strings.Contains(err.Error(), "invalid input") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(closed) != 1 || closed[0] != "primary" {
+		t.Fatalf("expected already built provider to be closed, got %v", closed)
+	}
+}
+
 func TestBuilderRejectsNilFactory(t *testing.T) {
 	t.Parallel()
 
@@ -318,6 +476,73 @@ func TestBuilderRejectsWrongCapabilities(t *testing.T) {
 		t.Fatal("expected build to fail")
 	}
 	if !strings.Contains(err.Error(), "lacks required capabilities") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(err.Error(), "required=read|write|transactions") {
+		t.Fatalf("expected required capability details, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "actual=read|transactions") {
+		t.Fatalf("expected actual capability details, got %v", err)
+	}
+}
+
+func TestBuilderDoesNotDoubleCloseOnCatalogConstructionFailure(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := config.Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	closed := make([]string, 0, 1)
+	builder, err := NewBuilder(
+		cfg,
+		testFactory{provider: testProvider{
+			name:    "primary",
+			kind:    domainstorage.KindRelational,
+			purpose: domainstorage.PurposePrimary,
+			caps:    domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+			closed:  &closed,
+		}},
+		testFactory{provider: testProvider{
+			name:    "primary",
+			kind:    domainstorage.KindRelational,
+			purpose: domainstorage.PurposePrimary,
+			caps:    domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+			closed:  &closed,
+		}},
+	)
+	if err != nil {
+		t.Fatalf("new builder: %v", err)
+	}
+
+	_, err = builder.Build(context.Background())
+	if err == nil {
+		t.Fatal("expected build to fail")
+	}
+	if !strings.Contains(err.Error(), "construct storage catalog") {
+		t.Fatalf("unexpected build error: %v", err)
+	}
+	if len(closed) != 1 || closed[0] != "primary" {
+		t.Fatalf("expected partial catalog providers to close exactly once, got %v", closed)
+	}
+}
+
+func TestBuilderBuildRejectsNilReceiver(t *testing.T) {
+	t.Parallel()
+
+	var builder *Builder
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("expected nil builder to return error, panicked: %v", r)
+		}
+	}()
+
+	_, err := builder.Build(context.Background())
+	if err == nil {
+		t.Fatal("expected build to fail")
+	}
+	if !strings.Contains(err.Error(), "invalid input") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
