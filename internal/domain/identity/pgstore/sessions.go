@@ -12,10 +12,10 @@ import (
 
 // SaveSession stores a session and indexes it by account.
 func (s *Store) SaveSession(ctx context.Context, session identity.Session) (identity.Session, error) {
-	if err := s.requireStore(); err != nil {
+	if err := s.requireContext(ctx); err != nil {
 		return identity.Session{}, err
 	}
-	if err := s.requireContext(ctx); err != nil {
+	if err := s.requireStore(); err != nil {
 		return identity.Session{}, err
 	}
 	if session.ID == "" {
@@ -71,10 +71,10 @@ RETURNING %s
 
 // DeleteSession removes a session by primary key.
 func (s *Store) DeleteSession(ctx context.Context, sessionID string) error {
-	if err := s.requireStore(); err != nil {
+	if err := s.requireContext(ctx); err != nil {
 		return err
 	}
-	if err := s.requireContext(ctx); err != nil {
+	if err := s.requireStore(); err != nil {
 		return err
 	}
 	if sessionID == "" {
@@ -100,10 +100,10 @@ func (s *Store) DeleteSession(ctx context.Context, sessionID string) error {
 
 // SessionByID resolves a session by primary key.
 func (s *Store) SessionByID(ctx context.Context, sessionID string) (identity.Session, error) {
-	if err := s.requireStore(); err != nil {
+	if err := s.requireContext(ctx); err != nil {
 		return identity.Session{}, err
 	}
-	if err := s.requireContext(ctx); err != nil {
+	if err := s.requireStore(); err != nil {
 		return identity.Session{}, err
 	}
 	if strings.TrimSpace(sessionID) == "" {
@@ -124,10 +124,10 @@ func (s *Store) SessionByID(ctx context.Context, sessionID string) (identity.Ses
 
 // SessionsByAccountID lists sessions for an account.
 func (s *Store) SessionsByAccountID(ctx context.Context, accountID string) ([]identity.Session, error) {
-	if err := s.requireStore(); err != nil {
+	if err := s.requireContext(ctx); err != nil {
 		return nil, err
 	}
-	if err := s.requireContext(ctx); err != nil {
+	if err := s.requireStore(); err != nil {
 		return nil, err
 	}
 	query := fmt.Sprintf(
@@ -158,10 +158,10 @@ func (s *Store) SessionsByAccountID(ctx context.Context, accountID string) ([]id
 
 // UpdateSession replaces an existing session row while preserving the account index.
 func (s *Store) UpdateSession(ctx context.Context, session identity.Session) (identity.Session, error) {
-	if err := s.requireStore(); err != nil {
+	if err := s.requireContext(ctx); err != nil {
 		return identity.Session{}, err
 	}
-	if err := s.requireContext(ctx); err != nil {
+	if err := s.requireStore(); err != nil {
 		return identity.Session{}, err
 	}
 	if session.ID == "" {

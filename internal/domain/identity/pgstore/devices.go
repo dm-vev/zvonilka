@@ -12,10 +12,10 @@ import (
 
 // SaveDevice stores a device and indexes it by account.
 func (s *Store) SaveDevice(ctx context.Context, device identity.Device) (identity.Device, error) {
-	if err := s.requireStore(); err != nil {
+	if err := s.requireContext(ctx); err != nil {
 		return identity.Device{}, err
 	}
-	if err := s.requireContext(ctx); err != nil {
+	if err := s.requireStore(); err != nil {
 		return identity.Device{}, err
 	}
 	if device.ID == "" {
@@ -71,10 +71,10 @@ RETURNING %s
 
 // DeleteDevice removes a device by primary key.
 func (s *Store) DeleteDevice(ctx context.Context, deviceID string) error {
-	if err := s.requireStore(); err != nil {
+	if err := s.requireContext(ctx); err != nil {
 		return err
 	}
-	if err := s.requireContext(ctx); err != nil {
+	if err := s.requireStore(); err != nil {
 		return err
 	}
 	if deviceID == "" {
@@ -100,10 +100,10 @@ func (s *Store) DeleteDevice(ctx context.Context, deviceID string) error {
 
 // DeviceByID resolves a device by primary key.
 func (s *Store) DeviceByID(ctx context.Context, deviceID string) (identity.Device, error) {
-	if err := s.requireStore(); err != nil {
+	if err := s.requireContext(ctx); err != nil {
 		return identity.Device{}, err
 	}
-	if err := s.requireContext(ctx); err != nil {
+	if err := s.requireStore(); err != nil {
 		return identity.Device{}, err
 	}
 	if strings.TrimSpace(deviceID) == "" {
@@ -124,10 +124,10 @@ func (s *Store) DeviceByID(ctx context.Context, deviceID string) (identity.Devic
 
 // DevicesByAccountID lists devices for an account.
 func (s *Store) DevicesByAccountID(ctx context.Context, accountID string) ([]identity.Device, error) {
-	if err := s.requireStore(); err != nil {
+	if err := s.requireContext(ctx); err != nil {
 		return nil, err
 	}
-	if err := s.requireContext(ctx); err != nil {
+	if err := s.requireStore(); err != nil {
 		return nil, err
 	}
 	query := fmt.Sprintf(
