@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package zvonilka.conversation.v1;
 
-import "contracts/conversation/v1/message_requests.proto";
+import "contracts/conversation/v1/messages.proto";
 import "contracts/conversation/v1/requests.proto";
-import "contracts/conversation/v1/thread_requests.proto";
+import "contracts/conversation/v1/threads.proto";
 
 option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1;conversationv1";
 
