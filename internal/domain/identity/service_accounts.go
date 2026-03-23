@@ -112,20 +112,21 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 
 	now := s.currentTime()
 
+	// Approval retries must create a fresh account after rollback instead of
+	// reusing a stale create-account cache entry.
 	account, botToken, err := s.createAccount(
 		ctx,
 		CreateAccountParams{
-			Username:       joinRequest.Username,
-			DisplayName:    joinRequest.DisplayName,
-			Email:          joinRequest.Email,
-			Phone:          joinRequest.Phone,
-			Roles:          params.Roles,
-			Note:           params.Note,
-			InviteCode:     "",
-			AccountKind:    AccountKindUser,
-			CreatedBy:      params.ReviewedBy,
-			IdempotencyKey: params.IdempotencyKey,
-			RequestedAt:    now,
+			Username:    joinRequest.Username,
+			DisplayName: joinRequest.DisplayName,
+			Email:       joinRequest.Email,
+			Phone:       joinRequest.Phone,
+			Roles:       params.Roles,
+			Note:        params.Note,
+			InviteCode:  "",
+			AccountKind: AccountKindUser,
+			CreatedBy:   params.ReviewedBy,
+			RequestedAt: now,
 		},
 	)
 	if err != nil {

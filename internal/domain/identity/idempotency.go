@@ -70,6 +70,7 @@ func (c *idempotencyCache) submitJoinRequestResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	return lookupIdempotencyResult(c.submitJoinRequest, key, fingerprint, now)
 }
 
@@ -82,6 +83,7 @@ func (c *idempotencyCache) storeSubmitJoinRequestResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	storeIdempotencyResult(c.submitJoinRequest, key, fingerprint, joinRequest, now)
 }
 
@@ -93,6 +95,7 @@ func (c *idempotencyCache) approveJoinRequestResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	result, ok, err := lookupIdempotencyResult(c.approveJoinRequest, key, fingerprint, now)
 	if err != nil || !ok {
 		return approveJoinRequestCacheResult{}, ok, err
@@ -110,6 +113,7 @@ func (c *idempotencyCache) storeApproveJoinRequestResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	storeIdempotencyResult(c.approveJoinRequest, key, fingerprint, cloneApproveJoinRequestCacheResult(result), now)
 }
 
@@ -121,6 +125,7 @@ func (c *idempotencyCache) rejectJoinRequestResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	return lookupIdempotencyResult(c.rejectJoinRequest, key, fingerprint, now)
 }
 
@@ -133,6 +138,7 @@ func (c *idempotencyCache) storeRejectJoinRequestResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	storeIdempotencyResult(c.rejectJoinRequest, key, fingerprint, joinRequest, now)
 }
 
@@ -144,6 +150,7 @@ func (c *idempotencyCache) createAccountResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	result, ok, err := lookupIdempotencyResult(c.createAccount, key, fingerprint, now)
 	if err != nil || !ok {
 		return createAccountCacheResult{}, ok, err
@@ -161,6 +168,7 @@ func (c *idempotencyCache) storeCreateAccountResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	storeIdempotencyResult(c.createAccount, key, fingerprint, cloneCreateAccountCacheResult(result), now)
 }
 
@@ -172,6 +180,7 @@ func (c *idempotencyCache) beginLoginResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	result, ok, err := lookupIdempotencyResult(c.beginLogin, key, fingerprint, now)
 	if err != nil || !ok {
 		return beginLoginCacheResult{}, ok, err
@@ -189,6 +198,7 @@ func (c *idempotencyCache) storeBeginLoginResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	storeIdempotencyResult(c.beginLogin, key, fingerprint, cloneBeginLoginCacheResult(result), now)
 }
 
@@ -200,6 +210,7 @@ func (c *idempotencyCache) verifyLoginResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	return lookupIdempotencyResult(c.verifyLogin, key, fingerprint, now)
 }
 
@@ -212,6 +223,7 @@ func (c *idempotencyCache) storeVerifyLoginResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	storeIdempotencyResult(c.verifyLogin, key, fingerprint, result, now)
 }
 
@@ -223,6 +235,7 @@ func (c *idempotencyCache) authenticateBotResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	return lookupIdempotencyResult(c.authenticateBot, key, fingerprint, now)
 }
 
@@ -235,6 +248,7 @@ func (c *idempotencyCache) storeAuthenticateBotResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	storeIdempotencyResult(c.authenticateBot, key, fingerprint, result, now)
 }
 
@@ -246,6 +260,7 @@ func (c *idempotencyCache) registerDeviceResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	result, ok, err := lookupIdempotencyResult(c.registerDevice, key, fingerprint, now)
 	if err != nil || !ok {
 		return Device{}, Session{}, ok, err
@@ -263,6 +278,7 @@ func (c *idempotencyCache) storeRegisterDeviceResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	storeIdempotencyResult(c.registerDevice, key, fingerprint, result, now)
 }
 
@@ -274,6 +290,7 @@ func (c *idempotencyCache) revokeSessionResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	return lookupIdempotencyResult(c.revokeSession, key, fingerprint, now)
 }
 
@@ -286,6 +303,7 @@ func (c *idempotencyCache) storeRevokeSessionResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	storeIdempotencyResult(c.revokeSession, key, fingerprint, session, now)
 }
 
@@ -297,6 +315,7 @@ func (c *idempotencyCache) revokeAllSessionsResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	return lookupIdempotencyResult(c.revokeAllSessions, key, fingerprint, now)
 }
 
@@ -309,7 +328,21 @@ func (c *idempotencyCache) storeRevokeAllSessionsResult(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.cleanupExpiredLocked(now)
 	storeIdempotencyResult(c.revokeAllSessions, key, fingerprint, revoked, now)
+}
+
+func (c *idempotencyCache) cleanupExpiredLocked(now time.Time) {
+	cleanupExpiredEntries(c.submitJoinRequest, now)
+	cleanupExpiredEntries(c.approveJoinRequest, now)
+	cleanupExpiredEntries(c.rejectJoinRequest, now)
+	cleanupExpiredEntries(c.createAccount, now)
+	cleanupExpiredEntries(c.beginLogin, now)
+	cleanupExpiredEntries(c.verifyLogin, now)
+	cleanupExpiredEntries(c.authenticateBot, now)
+	cleanupExpiredEntries(c.registerDevice, now)
+	cleanupExpiredEntries(c.revokeSession, now)
+	cleanupExpiredEntries(c.revokeAllSessions, now)
 }
 
 func lookupIdempotencyResult[T any](
@@ -348,6 +381,19 @@ func storeIdempotencyResult[T any](
 		fingerprint: fingerprint,
 		expiresAt:   now.Add(defaultIdempotencyTTL),
 		value:       value,
+	}
+}
+
+func cleanupExpiredEntries[T any](entries map[string]idempotencyEntry[T], now time.Time) {
+	for key, entry := range entries {
+		if entry.expiresAt.IsZero() {
+			continue
+		}
+		if now.Before(entry.expiresAt) {
+			continue
+		}
+
+		delete(entries, key)
 	}
 }
 
