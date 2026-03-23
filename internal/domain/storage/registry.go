@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -23,8 +24,15 @@ func NewCatalog(providers ...Provider) (*Catalog, error) {
 	catalog := &Catalog{}
 	for _, provider := range providers {
 		if err := catalog.Register(provider); err != nil {
+			var cleanupErr error
+			if err := closeRegisteredProvider(context.Background(), provider); err != nil {
+				cleanupErr = err
+			}
 			if closeErr := catalog.Close(context.Background()); closeErr != nil {
-				return nil, errors.Join(err, fmt.Errorf("close partial storage catalog: %w", closeErr))
+				cleanupErr = errors.Join(cleanupErr, fmt.Errorf("close partial storage catalog: %w", closeErr))
+			}
+			if cleanupErr != nil {
+				return nil, errors.Join(err, cleanupErr)
 			}
 
 			return nil, err
@@ -39,7 +47,7 @@ func (c *Catalog) Register(provider Provider) error {
 	if c == nil {
 		return ErrInvalidInput
 	}
-	if provider == nil {
+	if isNilProvider(provider) {
 		return ErrInvalidInput
 	}
 
@@ -90,6 +98,9 @@ func (c *Catalog) Provider(name string) (Provider, error) {
 	if !ok {
 		return nil, fmt.Errorf("storage provider %q: %w", name, ErrNotFound)
 	}
+	if isNilProvider(provider) {
+		return nil, fmt.Errorf("storage provider %q: %w", name, ErrNotFound)
+	}
 
 	return provider, nil
 }
@@ -110,7 +121,7 @@ func (c *Catalog) Select(purpose Purpose, required Capability) (Provider, error)
 	names := c.byPurpose[purpose]
 	for _, name := range names {
 		provider := c.providers[name]
-		if provider == nil {
+		if isNilProvider(provider) {
 			continue
 		}
 		if provider.Capabilities().Has(required) {
@@ -134,7 +145,7 @@ func (c *Catalog) ProvidersByPurpose(purpose Purpose) []Provider {
 	names := c.byPurpose[purpose]
 	providers := make([]Provider, 0, len(names))
 	for _, name := range names {
-		if provider := c.providers[name]; provider != nil {
+		if provider := c.providers[name]; !isNilProvider(provider) {
 			providers = append(providers, provider)
 		}
 	}
@@ -155,7 +166,7 @@ func (c *Catalog) ProvidersByKind(kind Kind) []Provider {
 	names := c.byKind[kind]
 	providers := make([]Provider, 0, len(names))
 	for _, name := range names {
-		if provider := c.providers[name]; provider != nil {
+		if provider := c.providers[name]; !isNilProvider(provider) {
 			providers = append(providers, provider)
 		}
 	}
@@ -179,7 +190,7 @@ func (c *Catalog) Close(ctx context.Context) error {
 	var closeErr error
 	for i := len(names) - 1; i >= 0; i-- {
 		provider := providers[names[i]]
-		if provider == nil {
+		if isNilProvider(provider) {
 			continue
 		}
 		if err := provider.Close(ctx); err != nil {
@@ -223,5 +234,31 @@ func normalizePurpose(purpose Purpose) Purpose {
 		return purpose
 	default:
 		return PurposeUnspecified
+	}
+}
+
+func closeRegisteredProvider(ctx context.Context, provider Provider) error {
+	if isNilProvider(provider) {
+		return nil
+	}
+
+	if err := provider.Close(ctx); err != nil {
+		return fmt.Errorf("close storage provider %q: %w", provider.Name(), err)
+	}
+
+	return nil
+}
+
+func isNilProvider(provider Provider) bool {
+	if provider == nil {
+		return true
+	}
+
+	value := reflect.ValueOf(provider)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
 	}
 }

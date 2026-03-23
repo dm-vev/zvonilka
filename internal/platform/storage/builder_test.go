@@ -486,7 +486,7 @@ func TestBuilderRejectsWrongCapabilities(t *testing.T) {
 	}
 }
 
-func TestBuilderDoesNotDoubleCloseOnCatalogConstructionFailure(t *testing.T) {
+func TestBuilderClosesBuiltProvidersOnCatalogConstructionFailure(t *testing.T) {
 	t.Parallel()
 
 	cfg, err := config.Load("controlplane")
@@ -523,8 +523,8 @@ func TestBuilderDoesNotDoubleCloseOnCatalogConstructionFailure(t *testing.T) {
 	if !strings.Contains(err.Error(), "construct storage catalog") {
 		t.Fatalf("unexpected build error: %v", err)
 	}
-	if len(closed) != 1 || closed[0] != "primary" {
-		t.Fatalf("expected partial catalog providers to close exactly once, got %v", closed)
+	if len(closed) != 2 || closed[0] != "primary" || closed[1] != "primary" {
+		t.Fatalf("expected failing provider and partial catalog to close, got %v", closed)
 	}
 }
 

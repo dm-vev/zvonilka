@@ -168,6 +168,7 @@ func TestNewCatalogClosesPartialProvidersOnRegistrationFailure(t *testing.T) {
 			kind:         KindCache,
 			purpose:      PurposeCache,
 			capabilities: CapabilityRead | CapabilityWrite | CapabilityKeyValue,
+			closed:       &closed,
 		},
 	)
 	if err == nil {
@@ -179,8 +180,8 @@ func TestNewCatalogClosesPartialProvidersOnRegistrationFailure(t *testing.T) {
 	if !errors.Is(err, closeErr) {
 		t.Fatalf("expected cleanup error in error, got %v", err)
 	}
-	if len(closed) != 1 || closed[0] != "primary" {
-		t.Fatalf("expected partial provider to close, got %v", closed)
+	if len(closed) != 2 || closed[0] != "primary" || closed[1] != "primary" {
+		t.Fatalf("expected failing provider and partial catalog to close, got %v", closed)
 	}
 }
 
@@ -209,6 +210,17 @@ func TestCatalogNilReceiverIsSafe(t *testing.T) {
 	}
 	if err := catalog.Close(context.Background()); err != nil {
 		t.Fatalf("expected nil close receiver to be safe, got %v", err)
+	}
+}
+
+func TestCatalogRejectsTypedNilProvider(t *testing.T) {
+	t.Parallel()
+
+	var catalog Catalog
+	var nilProvider *testProvider
+
+	if err := catalog.Register(nilProvider); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input from typed nil provider, got %v", err)
 	}
 }
 
