@@ -58,7 +58,7 @@ func finalizeRun(ctx context.Context, app *app, runErr error) error {
 		return runErr
 	}
 
-	closeErr := app.close(ctx)
+	closeErr := app.close()
 	if closeErr == nil {
 		return runErr
 	}

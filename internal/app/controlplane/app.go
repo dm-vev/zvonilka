@@ -18,12 +18,12 @@ type app struct {
 	identity *identity.Service
 }
 
-func (a *app) close(ctx context.Context) error {
+func (a *app) close() error {
 	if a == nil || a.catalog == nil {
 		return nil
 	}
 
-	return a.catalog.Close(ctx)
+	return a.catalog.Close(context.Background())
 }
 
 func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
@@ -39,4 +39,9 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 		catalog:  storageCatalog,
 		identity: identityService,
 	}, nil
+}
+
+// cleanupContext returns a context detached from runtime cancellation.
+func cleanupContext(ctx context.Context) context.Context {
+	return context.Background()
 }
