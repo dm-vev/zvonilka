@@ -2,6 +2,7 @@ package identity_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -32,6 +33,24 @@ func (s *recordingCodeSender) codeFor(mask string) string {
 	defer s.mu.Unlock()
 
 	return s.codes[mask]
+}
+
+type failingSaveDeviceStore struct {
+	identity.Store
+	failErr error
+	failed  bool
+}
+
+func (s *failingSaveDeviceStore) SaveDevice(ctx context.Context, device identity.Device) (identity.Device, error) {
+	if s.failErr == nil {
+		s.failErr = errors.New("forced save device failure")
+	}
+	if !s.failed {
+		s.failed = true
+		return identity.Device{}, s.failErr
+	}
+
+	return s.Store.SaveDevice(ctx, device)
 }
 
 func TestUserAccountLifecycle(t *testing.T) {
@@ -204,5 +223,74 @@ func TestBotAccountAuthentication(t *testing.T) {
 	}
 	if loginResult.Device.AccountID != account.ID {
 		t.Fatalf("expected device for account %s, got %s", account.ID, loginResult.Device.AccountID)
+	}
+}
+
+func TestVerifyLoginCodeConsumesChallengeBeforeSessionIssue(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseStore := teststore.NewMemoryStore()
+	store := &failingSaveDeviceStore{
+		Store: baseStore,
+	}
+	sender := &recordingCodeSender{}
+	fixedNow := time.Date(2026, time.March, 23, 19, 0, 0, 0, time.UTC)
+
+	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time { return fixedNow }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	account, _, err := svc.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "replay-user",
+		DisplayName: "Replay User",
+		Email:       "replay@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	challenge, targets, err := svc.BeginLogin(ctx, identity.BeginLoginParams{
+		Username: account.Username,
+		Delivery: identity.LoginDeliveryChannelEmail,
+	})
+	if err != nil {
+		t.Fatalf("begin login: %v", err)
+	}
+	if len(targets) != 1 {
+		t.Fatalf("expected one login target, got %d", len(targets))
+	}
+
+	code := sender.codeFor(targets[0].DestinationMask)
+	if code == "" {
+		t.Fatalf("expected recorded login code")
+	}
+
+	_, err = svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
+		ChallengeID: challenge.ID,
+		Code:        code,
+		DeviceName:  "Replay Device",
+		Platform:    identity.DevicePlatformIOS,
+		PublicKey:   "replay-key-1",
+	})
+	if err == nil {
+		t.Fatalf("expected verify login to fail on downstream save")
+	}
+	if errors.Is(err, identity.ErrConflict) {
+		t.Fatalf("expected first verify error from downstream failure, got conflict")
+	}
+
+	_, err = svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
+		ChallengeID: challenge.ID,
+		Code:        code,
+		DeviceName:  "Replay Device",
+		Platform:    identity.DevicePlatformIOS,
+		PublicKey:   "replay-key-2",
+	})
+	if !errors.Is(err, identity.ErrConflict) {
+		t.Fatalf("expected second verify to fail with conflict, got %v", err)
 	}
 }

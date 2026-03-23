@@ -103,6 +103,12 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 		return LoginResult{}, ErrInvalidCode
 	}
 
+	challenge.Used = true
+	challenge.UsedAt = now
+	if _, err := s.store.SaveLoginChallenge(ctx, challenge); err != nil {
+		return LoginResult{}, fmt.Errorf("consume login challenge %s: %w", challenge.ID, err)
+	}
+
 	account, err := s.store.AccountByID(ctx, challenge.AccountID)
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("load account %s from challenge %s: %w", challenge.AccountID, challenge.ID, err)
@@ -111,12 +117,6 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 	result, err := s.issueSession(ctx, account, params.DeviceName, params.Platform, params.PublicKey, params.PushToken)
 	if err != nil {
 		return LoginResult{}, err
-	}
-
-	challenge.Used = true
-	challenge.UsedAt = now
-	if _, err := s.store.SaveLoginChallenge(ctx, challenge); err != nil {
-		return LoginResult{}, fmt.Errorf("mark login challenge %s as used: %w", challenge.ID, err)
 	}
 
 	return result, nil
