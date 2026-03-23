@@ -7,6 +7,7 @@ import (
 	"github.com/dm-vev/zvonilka/internal/platform/buildinfo"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
 	"github.com/dm-vev/zvonilka/internal/platform/observability"
+	"github.com/dm-vev/zvonilka/internal/platform/runtime"
 )
 
 // Run boots the bot API skeleton.
@@ -17,16 +18,35 @@ func Run(ctx context.Context) error {
 	}
 
 	logger := observability.NewLogger(cfg.Env, "botapi")
+	app := newApp(cfg)
+
 	logger.InfoContext(
 		ctx,
 		"service initialized",
 		"version",
 		buildinfo.Version,
+		"commit",
+		buildinfo.Commit,
+		"date",
+		buildinfo.Date,
 		"http_addr",
 		cfg.HTTPAddr,
 		"grpc_addr",
 		cfg.GRPCAddr,
 	)
 
-	return nil
+	return runtime.Run(
+		ctx,
+		runtime.Config{
+			ServiceName:     cfg.ServiceName,
+			Env:             cfg.Env,
+			HTTPAddr:        cfg.HTTPAddr,
+			GRPCAddr:        cfg.GRPCAddr,
+			ShutdownTimeout: cfg.ShutdownTimeout,
+		},
+		logger,
+		app.health,
+		app.handler,
+		nil,
+	)
 }

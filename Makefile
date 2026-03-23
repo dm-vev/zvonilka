@@ -17,6 +17,18 @@ build:
 	$(GO) build ./...
 	cd rust && $(CARGO) build --workspace
 
+.PHONY: run-controlplane
+run-controlplane:
+	$(GO) run ./cmd/controlplane
+
+.PHONY: run-gateway
+run-gateway:
+	$(GO) run ./cmd/gateway
+
+.PHONY: run-botapi
+run-botapi:
+	$(GO) run ./cmd/botapi
+
 .PHONY: proto-lint
 proto-lint:
 	$(BUF) lint
