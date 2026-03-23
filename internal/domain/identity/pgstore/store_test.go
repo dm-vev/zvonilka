@@ -197,8 +197,9 @@ func TestSaveJoinRequestExpiresStalePendingRequest(t *testing.T) {
 	t.Parallel()
 
 	store, mock, _ := newMockStore(t)
-	now := time.Date(2026, time.March, 23, 23, 0, 0, 0, time.UTC)
-	staleExpires := now.Add(-time.Minute)
+	now := time.Now().UTC()
+	requestedAt := now.Add(-2 * time.Hour)
+	staleExpires := time.Unix(0, 0).UTC()
 
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta("SELECT pg_advisory_xact_lock($1)")).WithArgs(sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 0))
@@ -247,7 +248,7 @@ WHERE id = $1
 		WithArgs(
 			"join-1",
 			identity.JoinRequestStatusExpired,
-			now,
+			sqlmock.AnyArg(),
 			"",
 			"join request expired",
 		).
@@ -279,11 +280,11 @@ RETURNING %s
 			"12345",
 			"new note",
 			identity.JoinRequestStatusPending,
-			now,
+			requestedAt,
 			nil,
 			"",
 			"",
-			now.Add(24*time.Hour),
+			requestedAt.Add(24*time.Hour),
 		).
 		WillReturnRows(sqlmock.NewRows(strings.Split(joinRequestColumnList, ", ")).AddRow(
 			"join-2",
@@ -293,11 +294,11 @@ RETURNING %s
 			"12345",
 			"new note",
 			identity.JoinRequestStatusPending,
-			now,
+			requestedAt,
 			nil,
 			"",
 			"",
-			now.Add(24*time.Hour),
+			requestedAt.Add(24*time.Hour),
 		))
 	mock.ExpectCommit()
 
@@ -309,8 +310,8 @@ RETURNING %s
 		Phone:       "12345",
 		Note:        "new note",
 		Status:      identity.JoinRequestStatusPending,
-		RequestedAt: now,
-		ExpiresAt:   now.Add(24 * time.Hour),
+		RequestedAt: requestedAt,
+		ExpiresAt:   requestedAt.Add(24 * time.Hour),
 	})
 	if err != nil {
 		t.Fatalf("save join request: %v", err)

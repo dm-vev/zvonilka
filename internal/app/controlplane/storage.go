@@ -2,6 +2,8 @@ package controlplane
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
@@ -12,13 +14,36 @@ import (
 	postgresplatform "github.com/dm-vev/zvonilka/internal/platform/storage/postgres"
 )
 
+type storageBuilder interface {
+	Build(ctx context.Context) (*domainstorage.Catalog, error)
+}
+
+var newStorageBuilder = func(
+	cfg config.Configuration,
+	factories ...platformstorage.Factory,
+) (storageBuilder, error) {
+	return platformstorage.NewBuilder(cfg, factories...)
+}
+
+var newIdentityStore = func(db *sql.DB, schema string) (domainidentity.Store, error) {
+	return postgresdomain.New(db, schema)
+}
+
+var newIdentityService = func(
+	store domainidentity.Store,
+	sender domainidentity.CodeSender,
+	opts ...domainidentity.Option,
+) (*domainidentity.Service, error) {
+	return domainidentity.NewService(store, sender, opts...)
+}
+
 func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstorage.Catalog, *domainidentity.Service, error) {
 	if !cfg.Infrastructure.Postgres.Enabled {
 		return nil, nil, nil
 	}
 
 	bootstrap := postgresplatform.NewBootstrap(cfg)
-	builder, err := platformstorage.NewBuilder(
+	builder, err := newStorageBuilder(
 		cfg,
 		postgresplatform.NewFactory(
 			bootstrap,
@@ -65,29 +90,60 @@ func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstor
 		return nil, nil, err
 	}
 
-	provider, err := catalog.Select(domainstorage.PurposePrimary, domainstorage.CapabilityTransactions)
+	provider, err := catalog.Provider(cfg.Storage.PrimaryProvider)
 	if err != nil {
-		_ = catalog.Close(ctx)
-		return nil, nil, fmt.Errorf("select primary storage provider: %w", err)
+		return nil, nil, joinStorageError(
+			fmt.Errorf("select primary storage provider %q: %w", cfg.Storage.PrimaryProvider, err),
+			closeStorageCatalog(ctx, catalog),
+		)
 	}
 
 	relational, ok := provider.(domainstorage.RelationalProvider)
 	if !ok {
-		_ = catalog.Close(ctx)
-		return nil, nil, fmt.Errorf("select primary storage provider: expected relational provider")
+		return nil, nil, joinStorageError(
+			fmt.Errorf("select primary storage provider: expected relational provider"),
+			closeStorageCatalog(ctx, catalog),
+		)
 	}
 
-	store, err := postgresdomain.New(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	store, err := newIdentityStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
 	if err != nil {
-		_ = catalog.Close(ctx)
-		return nil, nil, fmt.Errorf("construct postgres identity store: %w", err)
+		return nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres identity store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
 	}
 
-	service, err := domainidentity.NewService(store, domainidentity.NoopCodeSender{}, domainidentity.WithSettings(cfg.Identity.ToSettings()))
+	service, err := newIdentityService(store, domainidentity.NoopCodeSender{}, domainidentity.WithSettings(cfg.Identity.ToSettings()))
 	if err != nil {
-		_ = catalog.Close(ctx)
-		return nil, nil, fmt.Errorf("construct identity service: %w", err)
+		return nil, nil, joinStorageError(
+			fmt.Errorf("construct identity service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
 	}
 
 	return catalog, service, nil
+}
+
+func closeStorageCatalog(ctx context.Context, catalog *domainstorage.Catalog) error {
+	if catalog == nil {
+		return nil
+	}
+
+	if err := catalog.Close(ctx); err != nil {
+		return fmt.Errorf("close storage catalog: %w", err)
+	}
+
+	return nil
+}
+
+func joinStorageError(cause error, cleanupErr error) error {
+	if cleanupErr == nil {
+		return cause
+	}
+	if cause == nil {
+		return cleanupErr
+	}
+
+	return errors.Join(cause, cleanupErr)
 }
