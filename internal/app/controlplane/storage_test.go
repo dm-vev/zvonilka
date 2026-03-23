@@ -9,7 +9,10 @@ import (
 	"strings"
 	"testing"
 
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
+
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
+	postgresdomain "github.com/dm-vev/zvonilka/internal/domain/identity/pgstore"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
 	platformstorage "github.com/dm-vev/zvonilka/internal/platform/storage"
@@ -27,6 +30,180 @@ func TestBuildAppStorageReturnsNilWhenPostgresDisabled(t *testing.T) {
 	}
 	if service != nil {
 		t.Fatalf("expected nil identity service, got %#v", service)
+	}
+}
+
+func TestBuildAppStorageRejectsNilStorageBuilder(t *testing.T) {
+	originalBuilder := newStorageBuilder
+	t.Cleanup(func() {
+		newStorageBuilder = originalBuilder
+	})
+
+	newStorageBuilder = func(config.Configuration, ...platformstorage.Factory) (storageBuilder, error) {
+		return nil, nil
+	}
+
+	cfg := config.Configuration{
+		Infrastructure: config.InfrastructureConfig{
+			Postgres: config.PostgresConfig{
+				Enabled: true,
+			},
+		},
+		Storage: config.StorageConfig{
+			PrimaryProvider: "primary",
+		},
+	}
+
+	_, _, err := buildAppStorage(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("expected storage builder error")
+	}
+	if !strings.Contains(err.Error(), "configure storage builder") {
+		t.Fatalf("expected builder error, got %v", err)
+	}
+}
+
+func TestBuildAppStorageRejectsNilCatalog(t *testing.T) {
+	originalBuilder := newStorageBuilder
+	t.Cleanup(func() {
+		newStorageBuilder = originalBuilder
+	})
+
+	newStorageBuilder = func(config.Configuration, ...platformstorage.Factory) (storageBuilder, error) {
+		return &fakeBuilder{}, nil
+	}
+
+	cfg := config.Configuration{
+		Infrastructure: config.InfrastructureConfig{
+			Postgres: config.PostgresConfig{
+				Enabled: true,
+			},
+		},
+		Storage: config.StorageConfig{
+			PrimaryProvider: "primary",
+		},
+	}
+
+	_, _, err := buildAppStorage(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("expected catalog error")
+	}
+	if !strings.Contains(err.Error(), "build storage catalog") {
+		t.Fatalf("expected catalog error, got %v", err)
+	}
+}
+
+func TestBuildAppStorageRejectsNilIdentityStore(t *testing.T) {
+	originalBuilder := newStorageBuilder
+	originalStore := newIdentityStore
+	originalService := newIdentityService
+	t.Cleanup(func() {
+		newStorageBuilder = originalBuilder
+		newIdentityStore = originalStore
+		newIdentityService = originalService
+	})
+
+	catalog, err := domainstorage.NewCatalog(
+		&fakeRelationalProvider{
+			name:         "primary",
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+		},
+	)
+	if err != nil {
+		t.Fatalf("new catalog: %v", err)
+	}
+
+	newStorageBuilder = func(config.Configuration, ...platformstorage.Factory) (storageBuilder, error) {
+		return &fakeBuilder{catalog: catalog}, nil
+	}
+	newIdentityStore = func(*sql.DB, string) (domainidentity.Store, error) {
+		return nil, nil
+	}
+	newIdentityService = func(domainidentity.Store, domainidentity.CodeSender, ...domainidentity.Option) (*domainidentity.Service, error) {
+		t.Fatal("identity service constructor should not be called")
+		return nil, nil
+	}
+
+	cfg := config.Configuration{
+		Infrastructure: config.InfrastructureConfig{
+			Postgres: config.PostgresConfig{
+				Enabled: true,
+			},
+		},
+		Storage: config.StorageConfig{
+			PrimaryProvider: "primary",
+		},
+	}
+
+	_, _, err = buildAppStorage(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("expected identity store error")
+	}
+	if !strings.Contains(err.Error(), "construct postgres identity store") {
+		t.Fatalf("expected store error, got %v", err)
+	}
+}
+
+func TestBuildAppStorageRejectsNilIdentityService(t *testing.T) {
+	originalBuilder := newStorageBuilder
+	originalStore := newIdentityStore
+	originalService := newIdentityService
+	t.Cleanup(func() {
+		newStorageBuilder = originalBuilder
+		newIdentityStore = originalStore
+		newIdentityService = originalService
+	})
+
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	store, err := postgresdomain.New(db, "tenant")
+	if err != nil {
+		t.Fatalf("new postgres store: %v", err)
+	}
+
+	catalog, err := domainstorage.NewCatalog(
+		&fakeRelationalProvider{
+			name:         "primary",
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+		},
+	)
+	if err != nil {
+		t.Fatalf("new catalog: %v", err)
+	}
+
+	newStorageBuilder = func(config.Configuration, ...platformstorage.Factory) (storageBuilder, error) {
+		return &fakeBuilder{catalog: catalog}, nil
+	}
+	newIdentityStore = func(*sql.DB, string) (domainidentity.Store, error) {
+		return store, nil
+	}
+	newIdentityService = func(domainidentity.Store, domainidentity.CodeSender, ...domainidentity.Option) (*domainidentity.Service, error) {
+		return nil, nil
+	}
+
+	cfg := config.Configuration{
+		Infrastructure: config.InfrastructureConfig{
+			Postgres: config.PostgresConfig{
+				Enabled: true,
+			},
+		},
+		Storage: config.StorageConfig{
+			PrimaryProvider: "primary",
+		},
+	}
+
+	_, _, err = buildAppStorage(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("expected identity service error")
+	}
+	if !strings.Contains(err.Error(), "construct identity service") {
+		t.Fatalf("expected service error, got %v", err)
 	}
 }
 
@@ -95,7 +272,15 @@ func TestBuildAppStorageJoinsCleanupErrorOnStartupFailure(t *testing.T) {
 }
 
 func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
-	correctDB := new(sql.DB)
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	correctDB := db
 	wrongDB := new(sql.DB)
 
 	catalog, err := domainstorage.NewCatalog(
@@ -134,8 +319,11 @@ func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
 		if db != correctDB {
 			return nil, fmt.Errorf("unexpected primary database selected for schema %q", schema)
 		}
+		if schema != "tenant" {
+			return nil, fmt.Errorf("unexpected schema %q", schema)
+		}
 
-		return nil, nil
+		return postgresdomain.New(db, schema)
 	}
 	newIdentityService = func(domainidentity.Store, domainidentity.CodeSender, ...domainidentity.Option) (*domainidentity.Service, error) {
 		return &domainidentity.Service{}, nil
@@ -145,6 +333,7 @@ func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
 		Infrastructure: config.InfrastructureConfig{
 			Postgres: config.PostgresConfig{
 				Enabled: true,
+				Schema:  "tenant",
 			},
 		},
 		Storage: config.StorageConfig{
@@ -284,9 +473,10 @@ func TestFinalizeRunJoinsRunAndCloseErrors(t *testing.T) {
 }
 
 type fakeProvider struct {
-	name     string
-	closeErr error
-	order    *[]string
+	name         string
+	closeErr     error
+	order        *[]string
+	closeCtxErrs *[]error
 }
 
 func (p *fakeProvider) Name() string {
@@ -305,9 +495,19 @@ func (p *fakeProvider) Capabilities() domainstorage.Capability {
 	return domainstorage.CapabilityTransactions
 }
 
-func (p *fakeProvider) Close(context.Context) error {
+func (p *fakeProvider) Close(ctx context.Context) error {
+	return p.close(ctx)
+}
+
+func (p *fakeProvider) close(ctx context.Context) error {
 	if p.order != nil {
 		*p.order = append(*p.order, p.name)
+	}
+	if p.closeCtxErrs != nil {
+		*p.closeCtxErrs = append(*p.closeCtxErrs, ctx.Err())
+	}
+	if ctx != nil && ctx.Err() != nil {
+		return ctx.Err()
 	}
 
 	return p.closeErr
@@ -318,6 +518,7 @@ type fakeRelationalProvider struct {
 	db           *sql.DB
 	closeErr     error
 	capabilities domainstorage.Capability
+	closeCtxErrs *[]error
 }
 
 func (p *fakeRelationalProvider) Name() string {
@@ -336,7 +537,18 @@ func (p *fakeRelationalProvider) Capabilities() domainstorage.Capability {
 	return p.capabilities
 }
 
-func (p *fakeRelationalProvider) Close(context.Context) error {
+func (p *fakeRelationalProvider) Close(ctx context.Context) error {
+	return p.close(ctx)
+}
+
+func (p *fakeRelationalProvider) close(ctx context.Context) error {
+	if p.closeCtxErrs != nil {
+		*p.closeCtxErrs = append(*p.closeCtxErrs, ctx.Err())
+	}
+	if ctx != nil && ctx.Err() != nil {
+		return ctx.Err()
+	}
+
 	return p.closeErr
 }
 

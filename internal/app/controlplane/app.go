@@ -18,12 +18,12 @@ type app struct {
 	identity *identity.Service
 }
 
-func (a *app) close() error {
+func (a *app) close(ctx context.Context) error {
 	if a == nil || a.catalog == nil {
 		return nil
 	}
 
-	return a.catalog.Close(context.Background())
+	return a.catalog.Close(cleanupContext(ctx))
 }
 
 func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {

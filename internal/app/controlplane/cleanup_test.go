@@ -16,10 +16,10 @@ func TestAppCloseUsesCleanupContextWhenRuntimeContextCanceled(t *testing.T) {
 	catalog, err := domainstorage.NewCatalog(provider)
 	require.NoError(t, err)
 
-	_, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err = (&app{catalog: catalog}).close()
+	err = (&app{catalog: catalog}).close(ctx)
 	require.NoError(t, err)
 	require.True(t, provider.closed)
 	require.NoError(t, provider.closeCtxErr)
