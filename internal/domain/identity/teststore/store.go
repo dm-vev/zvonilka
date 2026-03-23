@@ -192,7 +192,7 @@ func (s *memoryStore) expireJoinRequestLocked(joinRequest identity.JoinRequest, 
 // deviceIDsForAccountLocked returns the device-ID set for an account, creating it on demand.
 func (s *memoryStore) deviceIDsForAccountLocked(accountID string) map[string]struct{} {
 	ids, ok := s.deviceIDsByAccount[accountID]
-	if !ok {
+	if !ok || ids == nil {
 		ids = make(map[string]struct{})
 		s.deviceIDsByAccount[accountID] = ids
 	}
@@ -202,7 +202,7 @@ func (s *memoryStore) deviceIDsForAccountLocked(accountID string) map[string]str
 // sessionIDsForAccountLocked returns the session-ID set for an account, creating it on demand.
 func (s *memoryStore) sessionIDsForAccountLocked(accountID string) map[string]struct{} {
 	ids, ok := s.sessionIDsByAccount[accountID]
-	if !ok {
+	if !ok || ids == nil {
 		ids = make(map[string]struct{})
 		s.sessionIDsByAccount[accountID] = ids
 	}

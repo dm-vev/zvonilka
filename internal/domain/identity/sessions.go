@@ -144,7 +144,7 @@ func (s *Service) RevokeAllSessions(ctx context.Context, accountID string, param
 		return nil
 	})
 	if err != nil {
-		return revoked, err
+		return 0, err
 	}
 
 	if params.IdempotencyKey != "" {

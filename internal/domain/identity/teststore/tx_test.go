@@ -62,6 +62,42 @@ func TestWithinTxCommitMarkerCommitsState(t *testing.T) {
 	}
 }
 
+func TestWithinTxReindexesLastSessionWithoutPanic(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := NewMemoryStore().(*memoryStore)
+
+	if _, err := store.SaveAccount(ctx, identity.Account{ID: "acc-1", Username: "alice"}); err != nil {
+		t.Fatalf("save account: %v", err)
+	}
+	if _, err := store.SaveSession(ctx, identity.Session{ID: "sess-1", AccountID: "acc-1"}); err != nil {
+		t.Fatalf("save session: %v", err)
+	}
+
+	err := store.WithinTx(ctx, func(tx identity.Store) error {
+		session, loadErr := tx.SessionByID(ctx, "sess-1")
+		if loadErr != nil {
+			return loadErr
+		}
+
+		session.LastSeenAt = session.LastSeenAt.Add(1)
+		_, updateErr := tx.UpdateSession(ctx, session)
+		return updateErr
+	})
+	if err != nil {
+		t.Fatalf("update session in tx: %v", err)
+	}
+
+	sessions, err := store.SessionsByAccountID(ctx, "acc-1")
+	if err != nil {
+		t.Fatalf("list sessions after tx update: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("expected one session after tx update, got %d", len(sessions))
+	}
+}
+
 func TestSaveAccountCopiesRolesAcrossReads(t *testing.T) {
 	t.Parallel()
 
