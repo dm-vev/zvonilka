@@ -11,13 +11,16 @@ func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (Logi
 	if err := s.validateContext(ctx, "begin login"); err != nil {
 		return LoginChallenge{}, nil, err
 	}
+	username, email, phone := s.normalizeAccountInput(params.Username, params.Email, params.Phone)
+	fingerprint := beginLoginFingerprint(params)
 	if params.IdempotencyKey != "" {
-		if challenge, targets, ok := s.idempotency.beginLoginResult(params.IdempotencyKey); ok {
-			return challenge, targets, nil
+		if cached, ok, err := s.idempotency.beginLoginResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
+			return LoginChallenge{}, nil, err
+		} else if ok {
+			return cached.challenge, cached.targets, nil
 		}
 	}
 
-	username, email, phone := s.normalizeAccountInput(params.Username, params.Email, params.Phone)
 	account, err := s.lookupAccountByIdentifier(ctx, username, email, phone)
 	if err != nil {
 		return LoginChallenge{}, nil, err
@@ -81,7 +84,15 @@ func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (Logi
 	}
 
 	if params.IdempotencyKey != "" {
-		s.idempotency.storeBeginLoginResult(params.IdempotencyKey, savedChallenge, targets)
+		s.idempotency.storeBeginLoginResult(
+			params.IdempotencyKey,
+			fingerprint,
+			beginLoginCacheResult{
+				challenge: savedChallenge,
+				targets:   targets,
+			},
+			s.currentTime(),
+		)
 	}
 
 	return savedChallenge, targets, nil
@@ -93,7 +104,10 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 		return LoginResult{}, err
 	}
 	if params.IdempotencyKey != "" {
-		if result, ok := s.idempotency.verifyLoginResult(params.IdempotencyKey); ok {
+		fingerprint := verifyLoginFingerprint(params)
+		if result, ok, err := s.idempotency.verifyLoginResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
+			return LoginResult{}, err
+		} else if ok {
 			return result, nil
 		}
 	}
@@ -141,7 +155,12 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 	}
 
 	if params.IdempotencyKey != "" {
-		s.idempotency.storeVerifyLoginResult(params.IdempotencyKey, result)
+		s.idempotency.storeVerifyLoginResult(
+			params.IdempotencyKey,
+			verifyLoginFingerprint(params),
+			result,
+			s.currentTime(),
+		)
 	}
 
 	return result, nil
@@ -155,6 +174,14 @@ func (s *Service) AuthenticateBot(ctx context.Context, params AuthenticateBotPar
 	if params.BotToken == "" || params.PublicKey == "" {
 		return LoginResult{}, ErrInvalidInput
 	}
+	fingerprint := authenticateBotFingerprint(params)
+	if params.IdempotencyKey != "" {
+		if result, ok, err := s.idempotency.authenticateBotResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
+			return LoginResult{}, err
+		} else if ok {
+			return result, nil
+		}
+	}
 
 	tokenHash := hashSecret(params.BotToken)
 	account, err := s.store.AccountByBotTokenHash(ctx, tokenHash)
@@ -165,7 +192,21 @@ func (s *Service) AuthenticateBot(ctx context.Context, params AuthenticateBotPar
 		return LoginResult{}, ErrForbidden
 	}
 
-	return s.issueSession(ctx, account, params.DeviceName, params.Platform, params.PublicKey, "")
+	result, err := s.issueSession(ctx, account, params.DeviceName, params.Platform, params.PublicKey, "")
+	if err != nil {
+		return LoginResult{}, err
+	}
+
+	if params.IdempotencyKey != "" {
+		s.idempotency.storeAuthenticateBotResult(
+			params.IdempotencyKey,
+			fingerprint,
+			result,
+			s.currentTime(),
+		)
+	}
+
+	return result, nil
 }
 
 // RegisterDevice attaches another trusted device to an active session.
@@ -174,7 +215,10 @@ func (s *Service) RegisterDevice(ctx context.Context, params RegisterDeviceParam
 		return Device{}, Session{}, err
 	}
 	if params.IdempotencyKey != "" {
-		if device, session, ok := s.idempotency.registerDeviceResult(params.IdempotencyKey); ok {
+		fingerprint := registerDeviceFingerprint(params)
+		if device, session, ok, err := s.idempotency.registerDeviceResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
+			return Device{}, Session{}, err
+		} else if ok {
 			return device, session, nil
 		}
 	}
@@ -243,7 +287,15 @@ func (s *Service) RegisterDevice(ctx context.Context, params RegisterDeviceParam
 	}
 
 	if params.IdempotencyKey != "" {
-		s.idempotency.storeRegisterDeviceResult(params.IdempotencyKey, savedDevice, savedSession)
+		s.idempotency.storeRegisterDeviceResult(
+			params.IdempotencyKey,
+			registerDeviceFingerprint(params),
+			registerDeviceCacheResult{
+				device:  savedDevice,
+				session: savedSession,
+			},
+			s.currentTime(),
+		)
 	}
 
 	return savedDevice, savedSession, nil

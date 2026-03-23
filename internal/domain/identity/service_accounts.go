@@ -11,6 +11,14 @@ func (s *Service) SubmitJoinRequest(ctx context.Context, params SubmitJoinReques
 	if err := s.validateContext(ctx, "submit join request"); err != nil {
 		return JoinRequest{}, err
 	}
+	fingerprint := submitJoinRequestFingerprint(params)
+	if params.IdempotencyKey != "" {
+		if joinRequest, ok, err := s.idempotency.submitJoinRequestResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
+			return JoinRequest{}, err
+		} else if ok {
+			return joinRequest, nil
+		}
+	}
 
 	username, email, phone := s.normalizeAccountInput(params.Username, params.Email, params.Phone)
 	if username == "" {
@@ -69,6 +77,10 @@ func (s *Service) SubmitJoinRequest(ctx context.Context, params SubmitJoinReques
 		return JoinRequest{}, fmt.Errorf("save join request for username %s: %w", username, err)
 	}
 
+	if params.IdempotencyKey != "" {
+		s.idempotency.storeSubmitJoinRequestResult(params.IdempotencyKey, fingerprint, saved, s.currentTime())
+	}
+
 	return saved, nil
 }
 
@@ -79,6 +91,14 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 	}
 	if params.JoinRequestID == "" {
 		return JoinRequest{}, Account{}, ErrInvalidInput
+	}
+	fingerprint := approveJoinRequestFingerprint(params)
+	if params.IdempotencyKey != "" {
+		if result, ok, err := s.idempotency.approveJoinRequestResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
+			return JoinRequest{}, Account{}, err
+		} else if ok {
+			return result.joinRequest, result.account, nil
+		}
 	}
 
 	joinRequest, err := s.loadPendingJoinRequest(ctx, params.JoinRequestID, params.ReviewedBy)
@@ -136,6 +156,18 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 		return JoinRequest{}, Account{}, fmt.Errorf("update join request %s: %w", joinRequest.ID, err)
 	}
 
+	if params.IdempotencyKey != "" {
+		s.idempotency.storeApproveJoinRequestResult(
+			params.IdempotencyKey,
+			fingerprint,
+			approveJoinRequestCacheResult{
+				joinRequest: savedJoinRequest,
+				account:     account,
+			},
+			s.currentTime(),
+		)
+	}
+
 	return savedJoinRequest, account, nil
 }
 
@@ -146,6 +178,14 @@ func (s *Service) RejectJoinRequest(ctx context.Context, params RejectJoinReques
 	}
 	if params.JoinRequestID == "" {
 		return JoinRequest{}, ErrInvalidInput
+	}
+	fingerprint := rejectJoinRequestFingerprint(params)
+	if params.IdempotencyKey != "" {
+		if joinRequest, ok, err := s.idempotency.rejectJoinRequestResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
+			return JoinRequest{}, err
+		} else if ok {
+			return joinRequest, nil
+		}
 	}
 
 	joinRequest, err := s.loadPendingJoinRequest(ctx, params.JoinRequestID, params.ReviewedBy)
@@ -168,6 +208,10 @@ func (s *Service) RejectJoinRequest(ctx context.Context, params RejectJoinReques
 		return JoinRequest{}, fmt.Errorf("update join request %s: %w", joinRequest.ID, err)
 	}
 
+	if params.IdempotencyKey != "" {
+		s.idempotency.storeRejectJoinRequestResult(params.IdempotencyKey, fingerprint, savedJoinRequest, s.currentTime())
+	}
+
 	return savedJoinRequest, nil
 }
 
@@ -181,6 +225,15 @@ func (s *Service) CreateAccount(ctx context.Context, params CreateAccountParams)
 }
 
 func (s *Service) createAccount(ctx context.Context, params CreateAccountParams) (Account, string, error) {
+	fingerprint := createAccountFingerprint(params)
+	if params.IdempotencyKey != "" {
+		if result, ok, err := s.idempotency.createAccountResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
+			return Account{}, "", err
+		} else if ok {
+			return result.account, result.botToken, nil
+		}
+	}
+
 	username, email, phone := s.normalizeAccountInput(params.Username, params.Email, params.Phone)
 	if username == "" {
 		return Account{}, "", ErrInvalidInput
@@ -253,6 +306,18 @@ func (s *Service) createAccount(ctx context.Context, params CreateAccountParams)
 	savedAccount, err := s.store.SaveAccount(ctx, account)
 	if err != nil {
 		return Account{}, "", fmt.Errorf("save account %s: %w", username, err)
+	}
+
+	if params.IdempotencyKey != "" {
+		s.idempotency.storeCreateAccountResult(
+			params.IdempotencyKey,
+			fingerprint,
+			createAccountCacheResult{
+				account:  savedAccount,
+				botToken: botToken,
+			},
+			s.currentTime(),
+		)
 	}
 
 	return savedAccount, botToken, nil

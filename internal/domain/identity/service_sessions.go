@@ -44,8 +44,11 @@ func (s *Service) RevokeSession(ctx context.Context, params RevokeSessionParams)
 	if err := s.validateContext(ctx, "revoke session"); err != nil {
 		return Session{}, err
 	}
+	fingerprint := revokeSessionFingerprint(params)
 	if params.IdempotencyKey != "" {
-		if session, ok := s.idempotency.revokeSessionResult(params.IdempotencyKey); ok {
+		if session, ok, err := s.idempotency.revokeSessionResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
+			return Session{}, err
+		} else if ok {
 			return session, nil
 		}
 	}
@@ -76,7 +79,7 @@ func (s *Service) RevokeSession(ctx context.Context, params RevokeSessionParams)
 	}
 
 	if params.IdempotencyKey != "" {
-		s.idempotency.storeRevokeSessionResult(params.IdempotencyKey, updatedSession)
+		s.idempotency.storeRevokeSessionResult(params.IdempotencyKey, fingerprint, updatedSession, s.currentTime())
 	}
 
 	return updatedSession, nil
@@ -87,8 +90,11 @@ func (s *Service) RevokeAllSessions(ctx context.Context, accountID string, param
 	if err := s.validateContext(ctx, "revoke all sessions"); err != nil {
 		return 0, err
 	}
+	fingerprint := revokeAllSessionsFingerprint(accountID, params)
 	if params.IdempotencyKey != "" {
-		if revoked, ok := s.idempotency.revokeAllSessionsResult(params.IdempotencyKey); ok {
+		if revoked, ok, err := s.idempotency.revokeAllSessionsResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
+			return 0, err
+		} else if ok {
 			return revoked, nil
 		}
 	}
@@ -122,7 +128,7 @@ func (s *Service) RevokeAllSessions(ctx context.Context, accountID string, param
 	}
 
 	if params.IdempotencyKey != "" {
-		s.idempotency.storeRevokeAllSessionsResult(params.IdempotencyKey, revoked)
+		s.idempotency.storeRevokeAllSessionsResult(params.IdempotencyKey, fingerprint, revoked, s.currentTime())
 	}
 
 	return revoked, nil

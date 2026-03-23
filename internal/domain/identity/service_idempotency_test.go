@@ -2,6 +2,7 @@ package identity_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -358,5 +359,50 @@ func TestRegisterDeviceIdempotencyKeyDeduplicatesSuccessfulRegistration(t *testi
 	}
 	if updateSession != 1 {
 		t.Fatalf("expected one UpdateSession call, got %d", updateSession)
+	}
+}
+
+func TestBeginLoginIdempotencyKeyConflictsOnDifferentRequest(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseStore := teststore.NewMemoryStore()
+	store := &countingAuthStore{Store: baseStore}
+	sender := &recordingCodeSender{}
+	now := time.Date(2026, time.March, 24, 0, 0, 0, 0, time.UTC)
+
+	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time { return now }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	_, _, err = svc.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "begin-login-conflict-user",
+		DisplayName: "Begin Login Conflict User",
+		Email:       "begin-login-conflict@example.com",
+		Phone:       "+1 555 0101",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	_, _, err = svc.BeginLogin(ctx, identity.BeginLoginParams{
+		Username:       "begin-login-conflict-user",
+		Delivery:       identity.LoginDeliveryChannelEmail,
+		IdempotencyKey: "begin-login-conflict-key",
+	})
+	if err != nil {
+		t.Fatalf("first begin login: %v", err)
+	}
+
+	_, _, err = svc.BeginLogin(ctx, identity.BeginLoginParams{
+		Username:       "begin-login-conflict-user",
+		Delivery:       identity.LoginDeliveryChannelSMS,
+		IdempotencyKey: "begin-login-conflict-key",
+	})
+	if !errors.Is(err, identity.ErrConflict) {
+		t.Fatalf("expected conflict on mismatched replay, got %v", err)
 	}
 }

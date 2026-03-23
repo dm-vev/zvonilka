@@ -275,7 +275,7 @@ func TestRegisterDeviceDeduplicatesSuccessfulRequestsByIdempotencyKey(t *testing
 		SessionID:      loginResult.Session.ID,
 		DeviceName:     "desktop",
 		Platform:       identity.DevicePlatformDesktop,
-		PublicKey:      "desktop-key-2",
+		PublicKey:      "desktop-key-1",
 		IdempotencyKey: "register-idem-key",
 	})
 	if err != nil {
@@ -295,6 +295,47 @@ func TestRegisterDeviceDeduplicatesSuccessfulRequestsByIdempotencyKey(t *testing
 	}
 	if len(devices) != 2 {
 		t.Fatalf("expected two devices after deduped register, got %d", len(devices))
+	}
+}
+
+func TestRegisterDeviceConflictsOnDifferentRequest(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	sender := &recordingCodeSender{}
+	now := time.Date(2026, time.March, 23, 20, 17, 0, 0, time.UTC)
+
+	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time { return now }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	account := createAccount(t, svc, ctx, "register-conflict-user", "register-conflict@example.com")
+	challenge, targets := beginLogin(t, svc, ctx, account.Username, "")
+	code := sender.codeFor(targets[0].DestinationMask)
+	loginResult := verifyLogin(t, svc, ctx, challenge.ID, code, "", "register conflict login")
+
+	_, _, err = svc.RegisterDevice(ctx, identity.RegisterDeviceParams{
+		SessionID:      loginResult.Session.ID,
+		DeviceName:     "desktop",
+		Platform:       identity.DevicePlatformDesktop,
+		PublicKey:      "register-conflict-key-1",
+		IdempotencyKey: "register-conflict-key",
+	})
+	if err != nil {
+		t.Fatalf("first register device: %v", err)
+	}
+
+	_, _, err = svc.RegisterDevice(ctx, identity.RegisterDeviceParams{
+		SessionID:      loginResult.Session.ID,
+		DeviceName:     "tablet",
+		Platform:       identity.DevicePlatformIOS,
+		PublicKey:      "register-conflict-key-2",
+		IdempotencyKey: "register-conflict-key",
+	})
+	if !errors.Is(err, identity.ErrConflict) {
+		t.Fatalf("expected conflict on mismatched replay, got %v", err)
 	}
 }
 
