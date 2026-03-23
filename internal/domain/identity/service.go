@@ -153,6 +153,22 @@ func (s *Service) lockAccount(ctx context.Context, store Store, accountID string
 	return account, nil
 }
 
+// touchAccount persists the current account snapshot after the account boundary is held.
+//
+// The helper is used after lockAccount has reloaded the latest row so benign account
+// metadata updates can be written without clobbering concurrent edits.
+func (s *Service) touchAccount(ctx context.Context, store Store, account Account) error {
+	if account.ID == "" {
+		return ErrInvalidInput
+	}
+
+	if _, err := store.SaveAccount(ctx, account); err != nil {
+		return fmt.Errorf("touch account %s: %w", account.ID, err)
+	}
+
+	return nil
+}
+
 // issueSession creates a device/session pair and returns bearer tokens for the account.
 //
 // The caller is expected to run the helper inside a store transaction when the
@@ -188,6 +204,12 @@ func (s *Service) issueSession(
 	}
 
 	now := s.currentTime()
+	account.LastAuthAt = now
+	account.UpdatedAt = now
+	if err = s.touchAccount(ctx, store, account); err != nil {
+		err = fmt.Errorf("update account %s before session issuance: %w", account.ID, err)
+		return
+	}
 	if deviceName == "" {
 		deviceName = account.DisplayName
 		if deviceName == "" {
