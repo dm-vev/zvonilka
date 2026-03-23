@@ -8,7 +8,7 @@ import (
 
 // ListJoinRequestsByStatus returns join requests for the requested status.
 //
-// Pending requests are normalized before the result is returned so expired
+// Pending requests are filtered before the result is returned so expired
 // requests do not continue to surface as pending business state.
 func (s *Service) ListJoinRequestsByStatus(
 	ctx context.Context,
@@ -27,7 +27,7 @@ func (s *Service) ListJoinRequestsByStatus(
 		return joinRequests, nil
 	}
 
-	return s.normalizePendingJoinRequests(ctx, joinRequests)
+	return s.filterActivePendingJoinRequests(joinRequests)
 }
 
 func (s *Service) loadPendingJoinRequest(
@@ -56,10 +56,7 @@ func (s *Service) loadPendingJoinRequest(
 	return joinRequest, nil
 }
 
-func (s *Service) normalizePendingJoinRequests(
-	ctx context.Context,
-	joinRequests []JoinRequest,
-) ([]JoinRequest, error) {
+func (s *Service) filterActivePendingJoinRequests(joinRequests []JoinRequest) ([]JoinRequest, error) {
 	if len(joinRequests) == 0 {
 		return joinRequests, nil
 	}
@@ -70,10 +67,6 @@ func (s *Service) normalizePendingJoinRequests(
 		if !joinRequestExpiredAt(joinRequest, now) {
 			activeJoinRequests = append(activeJoinRequests, joinRequest)
 			continue
-		}
-
-		if _, err := s.expireJoinRequest(ctx, joinRequest, now, ""); err != nil {
-			return nil, fmt.Errorf("mark join request %s as expired: %w", joinRequest.ID, err)
 		}
 	}
 

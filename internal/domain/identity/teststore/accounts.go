@@ -69,3 +69,33 @@ func (s *memoryStore) AccountByPhone(_ context.Context, phone string) (identity.
 func (s *memoryStore) AccountByBotTokenHash(_ context.Context, tokenHash string) (identity.Account, error) {
 	return s.accountByIndex(s.accountIDsByBotHash, tokenHash)
 }
+
+func (s *memoryStore) HasAccountConflict(
+	_ context.Context,
+	username string,
+	email string,
+	phone string,
+) (bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if username != "" {
+		if _, ok := s.accountIDsByUsername[username]; ok {
+			return true, nil
+		}
+	}
+
+	if email != "" {
+		if _, ok := s.accountIDsByEmail[email]; ok {
+			return true, nil
+		}
+	}
+
+	if phone != "" {
+		if _, ok := s.accountIDsByPhone[phone]; ok {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}

@@ -135,19 +135,13 @@ func (s *Service) issueSession(
 	}
 
 	var (
-		savedDevice     Device
-		savedSession    Session
-		currentSessions []Session
+		savedDevice  Device
+		savedSession Session
 	)
 
 	defer func() {
 		if err == nil {
 			return
-		}
-		if len(currentSessions) > 0 {
-			if restoreErr := s.restoreSessions(ctx, currentSessions); restoreErr != nil {
-				err = errors.Join(err, restoreErr)
-			}
 		}
 		if rollbackErr := s.rollbackDeviceAndSession(ctx, savedDevice.ID, savedSession.ID); rollbackErr != nil {
 			err = errors.Join(err, rollbackErr)
@@ -211,12 +205,6 @@ func (s *Service) issueSession(
 		return
 	}
 
-	currentSessions, saveErr = s.ensureSingleCurrentSession(ctx, account.ID, savedSession.ID)
-	if saveErr != nil {
-		err = fmt.Errorf("normalize current sessions for account %s: %w", account.ID, saveErr)
-		return
-	}
-
 	accessToken, err := randomToken(32)
 	if err != nil {
 		err = fmt.Errorf("generate access token for account %s: %w", account.ID, err)
@@ -248,50 +236,6 @@ func (s *Service) issueSession(
 		Device:  savedDevice,
 	}
 	return
-}
-
-func (s *Service) ensureSingleCurrentSession(
-	ctx context.Context,
-	accountID string,
-	currentSessionID string,
-) ([]Session, error) {
-	sessions, err := s.store.SessionsByAccountID(ctx, accountID)
-	if err != nil {
-		return nil, fmt.Errorf("load sessions for account %s: %w", accountID, err)
-	}
-
-	updatedSessions := make([]Session, 0)
-	for _, session := range sessions {
-		if session.ID == currentSessionID || !session.Current {
-			continue
-		}
-
-		previousSession := session
-		session.Current = false
-
-		if _, err := s.store.UpdateSession(ctx, session); err != nil {
-			return updatedSessions, fmt.Errorf("clear current session %s for account %s: %w", session.ID, accountID, err)
-		}
-
-		updatedSessions = append(updatedSessions, previousSession)
-	}
-
-	return updatedSessions, nil
-}
-
-func (s *Service) restoreSessions(ctx context.Context, sessions []Session) error {
-	var rollbackErr error
-
-	for i := len(sessions) - 1; i >= 0; i-- {
-		if _, err := s.store.UpdateSession(ctx, sessions[i]); err != nil {
-			rollbackErr = errors.Join(
-				rollbackErr,
-				fmt.Errorf("restore session %s: %w", sessions[i].ID, err),
-			)
-		}
-	}
-
-	return rollbackErr
 }
 
 func (s *Service) rollbackDeviceAndSession(ctx context.Context, deviceID, sessionID string) error {

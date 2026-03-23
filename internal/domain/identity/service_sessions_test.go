@@ -170,3 +170,72 @@ func TestListSessionsExposesOnlyOneCurrentSessionAfterMultipleLogins(t *testing.
 		t.Fatalf("expected distinct sessions")
 	}
 }
+
+func TestVerifyLoginCodeDoesNotRewriteCurrentSessions(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseStore := teststore.NewMemoryStore()
+	store := &countingSessionStore{Store: baseStore}
+	sender := &recordingCodeSender{}
+	clock := &steppedClock{
+		now:  time.Date(2026, time.March, 23, 20, 30, 0, 0, time.UTC),
+		step: time.Minute,
+	}
+
+	svc, err := identity.NewService(store, sender, identity.WithNow(clock.Now))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	account, _, err := svc.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "no-rewrite-current-session",
+		DisplayName: "No Rewrite Current Session",
+		Email:       "no-rewrite-current-session@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	firstSession := newLoggedInAccount(t, svc, sender, account.Username, "phone-1", "public-key-1")
+	secondSession := newLoggedInAccount(t, svc, sender, account.Username, "phone-2", "public-key-2")
+
+	_, _, updateSessionCalls := store.counts()
+	if updateSessionCalls != 0 {
+		t.Fatalf("expected no UpdateSession calls during login, got %d", updateSessionCalls)
+	}
+
+	sessions, err := svc.ListSessions(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("list sessions: %v", err)
+	}
+	if len(sessions) != 2 {
+		t.Fatalf("expected 2 sessions, got %d", len(sessions))
+	}
+
+	currentCount := 0
+	currentSessionID := ""
+	for _, session := range sessions {
+		if !session.Current {
+			continue
+		}
+		currentCount++
+		currentSessionID = session.ID
+	}
+	if currentCount != 1 {
+		t.Fatalf("expected exactly one current session, got %d", currentCount)
+	}
+	if currentSessionID != secondSession.ID {
+		t.Fatalf("expected newest session %s to be current, got %s", secondSession.ID, currentSessionID)
+	}
+	if firstSession.ID == secondSession.ID {
+		t.Fatalf("expected distinct sessions")
+	}
+
+	_, _, updateSessionCalls = store.counts()
+	if updateSessionCalls != 0 {
+		t.Fatalf("expected no UpdateSession calls after listing sessions, got %d", updateSessionCalls)
+	}
+}

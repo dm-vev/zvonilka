@@ -28,26 +28,8 @@ func (s *Service) SubmitJoinRequest(ctx context.Context, params SubmitJoinReques
 		return JoinRequest{}, ErrInvalidInput
 	}
 
-	if _, err := s.store.AccountByUsername(ctx, username); err == nil {
-		return JoinRequest{}, ErrConflict
-	} else if err != nil && !isNotFound(err) {
-		return JoinRequest{}, fmt.Errorf("check username availability for %s: %w", username, err)
-	}
-
-	if email != "" {
-		if _, err := s.store.AccountByEmail(ctx, email); err == nil {
-			return JoinRequest{}, ErrConflict
-		} else if err != nil && !isNotFound(err) {
-			return JoinRequest{}, fmt.Errorf("check email availability for %s: %w", email, err)
-		}
-	}
-
-	if phone != "" {
-		if _, err := s.store.AccountByPhone(ctx, phone); err == nil {
-			return JoinRequest{}, ErrConflict
-		} else if err != nil && !isNotFound(err) {
-			return JoinRequest{}, fmt.Errorf("check phone availability for %s: %w", phone, err)
-		}
+	if err := s.ensureAccountIdentifiersAvailable(ctx, username, email, phone); err != nil {
+		return JoinRequest{}, err
 	}
 
 	now := params.RequestedAt
@@ -251,26 +233,8 @@ func (s *Service) createAccount(ctx context.Context, params CreateAccountParams)
 		return Account{}, "", ErrInvalidInput
 	}
 
-	if _, err := s.store.AccountByUsername(ctx, username); err == nil {
-		return Account{}, "", ErrConflict
-	} else if err != nil && !isNotFound(err) {
-		return Account{}, "", fmt.Errorf("check username availability for %s: %w", username, err)
-	}
-
-	if email != "" {
-		if _, err := s.store.AccountByEmail(ctx, email); err == nil {
-			return Account{}, "", ErrConflict
-		} else if err != nil && !isNotFound(err) {
-			return Account{}, "", fmt.Errorf("check email availability for %s: %w", email, err)
-		}
-	}
-
-	if phone != "" {
-		if _, err := s.store.AccountByPhone(ctx, phone); err == nil {
-			return Account{}, "", ErrConflict
-		} else if err != nil && !isNotFound(err) {
-			return Account{}, "", fmt.Errorf("check phone availability for %s: %w", phone, err)
-		}
+	if err := s.ensureAccountIdentifiersAvailable(ctx, username, email, phone); err != nil {
+		return Account{}, "", err
 	}
 
 	now := params.RequestedAt
@@ -331,4 +295,21 @@ func (s *Service) createAccount(ctx context.Context, params CreateAccountParams)
 
 func isNotFound(err error) bool {
 	return errors.Is(err, ErrNotFound)
+}
+
+func (s *Service) ensureAccountIdentifiersAvailable(
+	ctx context.Context,
+	username string,
+	email string,
+	phone string,
+) error {
+	conflict, err := s.store.HasAccountConflict(ctx, username, email, phone)
+	if err != nil {
+		return fmt.Errorf("check account availability for username %s: %w", username, err)
+	}
+	if conflict {
+		return ErrConflict
+	}
+
+	return nil
 }

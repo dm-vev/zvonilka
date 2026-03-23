@@ -150,7 +150,7 @@ func TestApproveJoinRequestRollsBackAccountWhenJoinRequestSaveFails(t *testing.T
 	}
 }
 
-func TestListJoinRequestsByStatusExpiresPendingRequestsBeforeReturning(t *testing.T) {
+func TestListJoinRequestsByStatusFiltersExpiredPendingRequestsWithoutPersisting(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -178,15 +178,18 @@ func TestListJoinRequestsByStatusExpiresPendingRequestsBeforeReturning(t *testin
 		t.Fatalf("list pending join requests: %v", err)
 	}
 	if len(pendingJoinRequests) != 0 {
-		t.Fatalf("expected no pending join requests after cleanup, got %d", len(pendingJoinRequests))
+		t.Fatalf("expected no pending join requests after filtering, got %d", len(pendingJoinRequests))
 	}
 
 	storedJoinRequest, err := store.JoinRequestByID(ctx, joinRequest.ID)
 	if err != nil {
 		t.Fatalf("load join request: %v", err)
 	}
-	if storedJoinRequest.Status != identity.JoinRequestStatusExpired {
-		t.Fatalf("stored join request should be expired, got %s", storedJoinRequest.Status)
+	if storedJoinRequest.Status != identity.JoinRequestStatusPending {
+		t.Fatalf("stored join request should remain pending, got %s", storedJoinRequest.Status)
+	}
+	if !storedJoinRequest.ReviewedAt.IsZero() {
+		t.Fatalf("stored join request should not be reviewed during read-only filtering")
 	}
 }
 
