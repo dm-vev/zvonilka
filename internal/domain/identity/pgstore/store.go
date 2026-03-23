@@ -135,17 +135,6 @@ func (s *Store) requireContext(ctx context.Context) error {
 	return nil
 }
 
-func (s *Store) requireContext(ctx context.Context) error {
-	if ctx == nil {
-		return identity.ErrInvalidInput
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (s *Store) table(name string) string {
 	return qualifiedName(s.schema, name)
 }
