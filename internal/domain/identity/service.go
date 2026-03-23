@@ -8,14 +8,6 @@ import (
 	"time"
 )
 
-// These defaults keep the service usable in tests and local development without extra configuration.
-const (
-	defaultJoinRequestTTL = 72 * time.Hour
-	defaultChallengeTTL   = 10 * time.Minute
-	defaultAccessTTL      = 30 * time.Minute
-	defaultRefreshTTL     = 30 * 24 * time.Hour
-)
-
 // Service coordinates account lifecycle, login, and session management.
 type Service struct {
 	store           Store
@@ -26,6 +18,7 @@ type Service struct {
 	challengeTTL    time.Duration
 	accessTokenTTL  time.Duration
 	refreshTokenTTL time.Duration
+	loginCodeLength int
 }
 
 // NewService constructs a service backed by the provided store and sender.
@@ -41,15 +34,18 @@ func NewService(store Store, sender CodeSender, opts ...Option) (*Service, error
 	}
 
 	service := &Service{
-		store:           store,
-		sender:          sender,
-		idempotency:     newIdempotencyCache(),
-		now:             func() time.Time { return time.Now().UTC() },
-		joinRequestTTL:  defaultJoinRequestTTL,
-		challengeTTL:    defaultChallengeTTL,
-		accessTokenTTL:  defaultAccessTTL,
-		refreshTokenTTL: defaultRefreshTTL,
+		store:       store,
+		sender:      sender,
+		now:         func() time.Time { return time.Now().UTC() },
+		idempotency: newIdempotencyCache(),
 	}
+
+	defaults := DefaultSettings()
+	service.joinRequestTTL = defaults.JoinRequestTTL
+	service.challengeTTL = defaults.ChallengeTTL
+	service.accessTokenTTL = defaults.AccessTokenTTL
+	service.refreshTokenTTL = defaults.RefreshTokenTTL
+	service.loginCodeLength = defaults.LoginCodeLength
 
 	for _, opt := range opts {
 		if opt != nil {

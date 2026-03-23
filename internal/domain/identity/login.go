@@ -43,7 +43,7 @@ func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (Logi
 		return LoginChallenge{}, nil, err
 	}
 
-	code, err := newSecret(6)
+	code, err := newSecret(s.loginCodeLength)
 	if err != nil {
 		return LoginChallenge{}, nil, fmt.Errorf("generate login code for account %s: %w", account.ID, err)
 	}

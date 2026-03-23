@@ -1,6 +1,11 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
+)
 
 func TestFromEnvUsesDistinctServiceDefaults(t *testing.T) {
 	resetConfigEnv(t)
@@ -46,22 +51,22 @@ func TestFromEnvUsesDistinctServiceDefaults(t *testing.T) {
 			t.Fatalf("from env for %s: %v", tc.service, err)
 		}
 
-		if cfg.HTTPAddr != tc.want.http {
-			t.Fatalf("http addr for %s: got %s, want %s", tc.service, cfg.HTTPAddr, tc.want.http)
+		if cfg.Runtime.HTTP.Address != tc.want.http {
+			t.Fatalf("http addr for %s: got %s, want %s", tc.service, cfg.Runtime.HTTP.Address, tc.want.http)
 		}
-		if cfg.GRPCAddr != tc.want.grpc {
-			t.Fatalf("grpc addr for %s: got %s, want %s", tc.service, cfg.GRPCAddr, tc.want.grpc)
+		if cfg.Runtime.GRPC.Address != tc.want.grpc {
+			t.Fatalf("grpc addr for %s: got %s, want %s", tc.service, cfg.Runtime.GRPC.Address, tc.want.grpc)
 		}
 
-		if owner, ok := httpOwners[cfg.HTTPAddr]; ok {
-			t.Fatalf("http addr %s reused by %s and %s", cfg.HTTPAddr, owner, tc.service)
+		if owner, ok := httpOwners[cfg.Runtime.HTTP.Address]; ok {
+			t.Fatalf("http addr %s reused by %s and %s", cfg.Runtime.HTTP.Address, owner, tc.service)
 		}
-		httpOwners[cfg.HTTPAddr] = tc.service
+		httpOwners[cfg.Runtime.HTTP.Address] = tc.service
 
-		if owner, ok := grpcOwners[cfg.GRPCAddr]; ok {
-			t.Fatalf("grpc addr %s reused by %s and %s", cfg.GRPCAddr, owner, tc.service)
+		if owner, ok := grpcOwners[cfg.Runtime.GRPC.Address]; ok {
+			t.Fatalf("grpc addr %s reused by %s and %s", cfg.Runtime.GRPC.Address, owner, tc.service)
 		}
-		grpcOwners[cfg.GRPCAddr] = tc.service
+		grpcOwners[cfg.Runtime.GRPC.Address] = tc.service
 	}
 }
 
@@ -77,22 +82,73 @@ func TestFromEnvExplicitOverridesWin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("from env for gateway: %v", err)
 	}
-	if gatewayCfg.HTTPAddr != ":28080" {
-		t.Fatalf("gateway http addr: got %s, want :28080", gatewayCfg.HTTPAddr)
+	if gatewayCfg.Runtime.HTTP.Address != ":28080" {
+		t.Fatalf("gateway http addr: got %s, want :28080", gatewayCfg.Runtime.HTTP.Address)
 	}
-	if gatewayCfg.GRPCAddr != ":29090" {
-		t.Fatalf("gateway grpc addr: got %s, want :29090", gatewayCfg.GRPCAddr)
+	if gatewayCfg.Runtime.GRPC.Address != ":29090" {
+		t.Fatalf("gateway grpc addr: got %s, want :29090", gatewayCfg.Runtime.GRPC.Address)
 	}
 
 	botAPICfg, err := FromEnv("botapi")
 	if err != nil {
 		t.Fatalf("from env for botapi: %v", err)
 	}
-	if botAPICfg.HTTPAddr != ":18080" {
-		t.Fatalf("botapi http addr: got %s, want :18080", botAPICfg.HTTPAddr)
+	if botAPICfg.Runtime.HTTP.Address != ":18080" {
+		t.Fatalf("botapi http addr: got %s, want :18080", botAPICfg.Runtime.HTTP.Address)
 	}
-	if botAPICfg.GRPCAddr != ":19090" {
-		t.Fatalf("botapi grpc addr: got %s, want :19090", botAPICfg.GRPCAddr)
+	if botAPICfg.Runtime.GRPC.Address != ":19090" {
+		t.Fatalf("botapi grpc addr: got %s, want :19090", botAPICfg.Runtime.GRPC.Address)
+	}
+}
+
+func TestLoadRejectsExplicitZeroIdentityValue(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_IDENTITY_LOGIN_CODE_LENGTH", "0")
+
+	_, err := Load("controlplane")
+	if err == nil {
+		t.Fatal("expected load to fail")
+	}
+	if !strings.Contains(err.Error(), "identity login code length must be positive") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadIdentityDefaultsMatchDomainSettings(t *testing.T) {
+	resetConfigEnv(t)
+
+	cfg, err := Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if got, want := cfg.Identity.ToSettings(), domainidentity.DefaultSettings(); got != want {
+		t.Fatalf("identity settings mismatch: got %+v, want %+v", got, want)
+	}
+}
+
+func TestLoadUsesProductionDefaultsForRuntimeAndLogging(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_ENV", "production")
+
+	cfg, err := Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.Logging.Level != "info" {
+		t.Fatalf("logging level: got %s, want info", cfg.Logging.Level)
+	}
+	if cfg.Logging.Format != "json" {
+		t.Fatalf("logging format: got %s, want json", cfg.Logging.Format)
+	}
+	if cfg.Logging.AddSource {
+		t.Fatal("expected add source to be disabled in production")
+	}
+	if cfg.Runtime.GRPC.ReflectionEnabled {
+		t.Fatal("expected grpc reflection to be disabled in production")
 	}
 }
 

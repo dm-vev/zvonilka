@@ -13,8 +13,8 @@ type app struct {
 	handler http.Handler
 }
 
-func newApp(cfg config.Config) *app {
-	health := runtime.NewHealth(cfg.ServiceName, buildinfo.Version, buildinfo.Commit, buildinfo.Date)
+func newApp(cfg config.Configuration) *app {
+	health := runtime.NewHealth(cfg.Service.Name, buildinfo.Version, buildinfo.Commit, buildinfo.Date)
 
 	return &app{
 		health:  health,
