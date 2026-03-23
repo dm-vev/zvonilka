@@ -130,6 +130,61 @@ func TestSubmitJoinRequestRejectsDuplicatePendingRequest(t *testing.T) {
 	}
 }
 
+func TestSubmitJoinRequestAllowsExpiredPendingRequest(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 23, 12, 25, 0, 0, time.UTC)
+
+	svc, err := identity.NewService(
+		store,
+		identity.NoopCodeSender{},
+		identity.WithNow(func() time.Time {
+			return now
+		}),
+		identity.WithSettings(identity.Settings{
+			JoinRequestTTL: time.Hour,
+		}),
+	)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	firstJoinRequest, err := svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
+		Username:    "expired-resubmit-user",
+		DisplayName: "Expired Resubmit User",
+		Email:       "expired-resubmit@example.com",
+		Note:        "first request",
+	})
+	if err != nil {
+		t.Fatalf("submit first join request: %v", err)
+	}
+
+	now = now.Add(2 * time.Hour)
+
+	secondJoinRequest, err := svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
+		Username:    "expired-resubmit-user",
+		DisplayName: "Expired Resubmit User",
+		Email:       "expired-resubmit@example.com",
+		Note:        "second request",
+	})
+	if err != nil {
+		t.Fatalf("submit expired join request again: %v", err)
+	}
+	if secondJoinRequest.ID == firstJoinRequest.ID {
+		t.Fatalf("expected a fresh join request after expiry")
+	}
+
+	storedFirstJoinRequest, err := store.JoinRequestByID(ctx, firstJoinRequest.ID)
+	if err != nil {
+		t.Fatalf("load first join request: %v", err)
+	}
+	if storedFirstJoinRequest.Status != identity.JoinRequestStatusExpired {
+		t.Fatalf("expected first join request to be expired, got %s", storedFirstJoinRequest.Status)
+	}
+}
+
 func TestRejectJoinRequestMarksExpiredAndSkipsRejection(t *testing.T) {
 	t.Parallel()
 

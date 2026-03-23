@@ -2,6 +2,7 @@ package teststore
 
 import (
 	"sync"
+	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 )
@@ -115,31 +116,77 @@ func (s *memoryStore) deleteJoinRequestIndexes(joinRequest identity.JoinRequest)
 }
 
 // hasJoinRequestConflictLocked reports whether any other pending join request already uses the same identifiers.
+//
+// Stale pending requests are converted to expired rows before the conflict is reported,
+// which lets a fresh submission reuse the same identifiers once the TTL has elapsed.
 func (s *memoryStore) hasJoinRequestConflictLocked(
+	requestedAt time.Time,
 	joinRequestID string,
 	username string,
 	email string,
 	phone string,
 ) bool {
 	if username != "" {
-		if otherID, ok := s.joinRequestIDsByUsername[username]; ok && otherID != joinRequestID {
+		if s.joinRequestConflictLocked(requestedAt, joinRequestID, username, s.joinRequestIDsByUsername) {
 			return true
 		}
 	}
 
 	if email != "" {
-		if otherID, ok := s.joinRequestIDsByEmail[email]; ok && otherID != joinRequestID {
+		if s.joinRequestConflictLocked(requestedAt, joinRequestID, email, s.joinRequestIDsByEmail) {
 			return true
 		}
 	}
 
 	if phone != "" {
-		if otherID, ok := s.joinRequestIDsByPhone[phone]; ok && otherID != joinRequestID {
+		if s.joinRequestConflictLocked(requestedAt, joinRequestID, phone, s.joinRequestIDsByPhone) {
 			return true
 		}
 	}
 
 	return false
+}
+
+// joinRequestConflictLocked checks one secondary index for a conflicting pending request.
+func (s *memoryStore) joinRequestConflictLocked(
+	requestedAt time.Time,
+	joinRequestID string,
+	identifier string,
+	index map[string]string,
+) bool {
+	otherID, ok := index[identifier]
+	if !ok || otherID == joinRequestID {
+		return false
+	}
+
+	existing, ok := s.joinRequestsByID[otherID]
+	if !ok {
+		delete(index, identifier)
+		return false
+	}
+
+	if existing.Status != identity.JoinRequestStatusPending || !existing.ReviewedAt.IsZero() {
+		delete(index, identifier)
+		return false
+	}
+
+	if requestedAt.Before(existing.ExpiresAt) {
+		return true
+	}
+
+	s.expireJoinRequestLocked(existing, requestedAt)
+	return false
+}
+
+// expireJoinRequestLocked marks a stale pending request as expired and removes its indexes.
+func (s *memoryStore) expireJoinRequestLocked(joinRequest identity.JoinRequest, expiredAt time.Time) {
+	joinRequest.Status = identity.JoinRequestStatusExpired
+	joinRequest.ReviewedAt = expiredAt
+	joinRequest.ReviewedBy = ""
+	joinRequest.DecisionReason = "join request expired"
+
+	s.joinRequestsByID[joinRequest.ID] = joinRequest
+	s.deleteJoinRequestIndexes(joinRequest)
 }
 
 // deviceIDsForAccountLocked returns the device-ID set for an account, creating it on demand.
