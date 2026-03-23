@@ -8,6 +8,10 @@ import (
 
 const defaultIdempotencyTTL = 24 * time.Hour
 
+// idempotencyEntry stores one cached response together with the request fingerprint and TTL.
+//
+// The fingerprint prevents a caller from reusing the same key for a different logical
+// request, while the TTL bounds cache lifetime.
 type idempotencyEntry[T any] struct {
 	fingerprint string
 	expiresAt   time.Time
@@ -34,15 +38,19 @@ type approveJoinRequestCacheResult struct {
 	account     Account
 }
 
+// idempotencyExpiration records when a key should be reaped from a bucket.
 type idempotencyExpiration struct {
 	key       string
 	expiresAt time.Time
 }
 
+// idempotencyExpirationHeap keeps the oldest expiration at the head of the heap.
 type idempotencyExpirationHeap []idempotencyExpiration
 
+// Len implements heap.Interface.
 func (h idempotencyExpirationHeap) Len() int { return len(h) }
 
+// Less orders older expirations first and uses the key as a stable tie-breaker.
 func (h idempotencyExpirationHeap) Less(i, j int) bool {
 	if h[i].expiresAt.Equal(h[j].expiresAt) {
 		return h[i].key < h[j].key
@@ -51,12 +59,15 @@ func (h idempotencyExpirationHeap) Less(i, j int) bool {
 	return h[i].expiresAt.Before(h[j].expiresAt)
 }
 
+// Swap implements heap.Interface.
 func (h idempotencyExpirationHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
 
+// Push appends an expiration to the heap.
 func (h *idempotencyExpirationHeap) Push(value any) {
 	*h = append(*h, value.(idempotencyExpiration))
 }
 
+// Pop removes the oldest expiration from the heap.
 func (h *idempotencyExpirationHeap) Pop() any {
 	old := *h
 	last := len(old) - 1
@@ -65,12 +76,17 @@ func (h *idempotencyExpirationHeap) Pop() any {
 	return value
 }
 
+// idempotencyBucket stores one logical idempotency namespace behind a single mutex.
+//
+// Each bucket owns both the cached values and a min-heap of expiration markers, which
+// keeps cleanup local to the bucket instead of scanning unrelated request types.
 type idempotencyBucket[T any] struct {
 	mu          sync.Mutex
 	entries     map[string]idempotencyEntry[T]
 	expirations idempotencyExpirationHeap
 }
 
+// newIdempotencyBucket constructs an empty bucket with a ready-to-use expiration heap.
 func newIdempotencyBucket[T any]() *idempotencyBucket[T] {
 	bucket := &idempotencyBucket[T]{
 		entries: make(map[string]idempotencyEntry[T]),
@@ -79,6 +95,9 @@ func newIdempotencyBucket[T any]() *idempotencyBucket[T] {
 	return bucket
 }
 
+// get reads a cached value if the key is still valid and the fingerprint matches.
+//
+// Expired entries are removed on access so stale responses do not leak into later calls.
 func (b *idempotencyBucket[T]) get(
 	key string,
 	fingerprint string,
@@ -91,6 +110,7 @@ func (b *idempotencyBucket[T]) get(
 	return lookupIdempotencyResult(b.entries, key, fingerprint, now)
 }
 
+// put stores a value and records its expiration in the heap.
 func (b *idempotencyBucket[T]) put(
 	key string,
 	fingerprint string,
@@ -108,6 +128,7 @@ func (b *idempotencyBucket[T]) put(
 	})
 }
 
+// cleanupExpiredLocked drains expired entries from the heap until the head is still fresh.
 func (b *idempotencyBucket[T]) cleanupExpiredLocked(now time.Time) {
 	for b.expirations.Len() > 0 {
 		next := b.expirations[0]
@@ -120,6 +141,7 @@ func (b *idempotencyBucket[T]) cleanupExpiredLocked(now time.Time) {
 	}
 }
 
+// len returns the number of live entries currently cached in the bucket.
 func (b *idempotencyBucket[T]) len() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -127,6 +149,7 @@ func (b *idempotencyBucket[T]) len() int {
 	return len(b.entries)
 }
 
+// expirationLen returns the number of queued expiration markers.
 func (b *idempotencyBucket[T]) expirationLen() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -134,6 +157,7 @@ func (b *idempotencyBucket[T]) expirationLen() int {
 	return b.expirations.Len()
 }
 
+// idempotencyCache groups the per-operation buckets so unrelated writes do not contend.
 type idempotencyCache struct {
 	submitJoinRequest  *idempotencyBucket[JoinRequest]
 	approveJoinRequest *idempotencyBucket[approveJoinRequestCacheResult]
@@ -147,6 +171,7 @@ type idempotencyCache struct {
 	revokeAllSessions  *idempotencyBucket[uint32]
 }
 
+// newIdempotencyCache constructs the full cache set used by the service.
 func newIdempotencyCache() *idempotencyCache {
 	return &idempotencyCache{
 		submitJoinRequest:  newIdempotencyBucket[JoinRequest](),
@@ -162,6 +187,10 @@ func newIdempotencyCache() *idempotencyCache {
 	}
 }
 
+// The methods below are thin typed adapters over the shared bucket logic.
+//
+// They keep the payload-specific cloning behavior local to the operation that needs it,
+// while the bucket itself stays generic and unaware of the response shape.
 func (c *idempotencyCache) submitJoinRequestResult(
 	key string,
 	fingerprint string,
@@ -352,6 +381,9 @@ func (c *idempotencyCache) storeRevokeAllSessionsResult(
 	c.revokeAllSessions.put(key, fingerprint, revoked, now)
 }
 
+// lookupIdempotencyResult enforces the request fingerprint and TTL contract for one bucket.
+//
+// A missing or expired entry is a cache miss. A mismatched fingerprint is a conflict.
 func lookupIdempotencyResult[T any](
 	entries map[string]idempotencyEntry[T],
 	key string,
@@ -377,6 +409,7 @@ func lookupIdempotencyResult[T any](
 	return entry.value, true, nil
 }
 
+// storeIdempotencyResult writes a value with a fresh TTL.
 func storeIdempotencyResult[T any](
 	entries map[string]idempotencyEntry[T],
 	key string,
@@ -391,6 +424,10 @@ func storeIdempotencyResult[T any](
 	}
 }
 
+// deleteExpiredIdempotencyEntry removes an entry only if the expiration marker still matches.
+//
+// That guard prevents an older expiration record from deleting a fresh value that reused
+// the same key.
 func deleteExpiredIdempotencyEntry[T any](
 	entries map[string]idempotencyEntry[T],
 	key string,
@@ -404,22 +441,26 @@ func deleteExpiredIdempotencyEntry[T any](
 	delete(entries, key)
 }
 
+// cloneBeginLoginCacheResult returns a defensive copy of the cached login challenge.
 func cloneBeginLoginCacheResult(result beginLoginCacheResult) beginLoginCacheResult {
 	result.challenge = cloneLoginChallenge(result.challenge)
 	result.targets = cloneLoginTargets(result.targets)
 	return result
 }
 
+// cloneCreateAccountCacheResult returns a defensive copy of the cached account result.
 func cloneCreateAccountCacheResult(result createAccountCacheResult) createAccountCacheResult {
 	result.account = cloneAccount(result.account)
 	return result
 }
 
+// cloneApproveJoinRequestCacheResult returns a defensive copy of the cached approval result.
 func cloneApproveJoinRequestCacheResult(result approveJoinRequestCacheResult) approveJoinRequestCacheResult {
 	result.account = cloneAccount(result.account)
 	return result
 }
 
+// cloneAccount copies mutable slices before a cached account is returned to callers.
 func cloneAccount(account Account) Account {
 	if len(account.Roles) == 0 {
 		return account
@@ -429,6 +470,7 @@ func cloneAccount(account Account) Account {
 	return account
 }
 
+// cloneLoginChallenge copies the targets slice before returning a cached challenge.
 func cloneLoginChallenge(challenge LoginChallenge) LoginChallenge {
 	if len(challenge.Targets) == 0 {
 		return challenge
@@ -438,6 +480,7 @@ func cloneLoginChallenge(challenge LoginChallenge) LoginChallenge {
 	return challenge
 }
 
+// cloneLoginTargets copies the target slice to keep cache state immutable from the outside.
 func cloneLoginTargets(targets []LoginTarget) []LoginTarget {
 	if len(targets) == 0 {
 		return nil

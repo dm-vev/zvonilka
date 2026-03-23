@@ -7,6 +7,9 @@ import (
 )
 
 // BeginLogin starts a code-based login challenge for a human account.
+//
+// The challenge is persisted before the code is sent so the request can be retried
+// safely if delivery fails or the client retries with the same idempotency key.
 func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (LoginChallenge, []LoginTarget, error) {
 	if err := s.validateContext(ctx, "begin login"); err != nil {
 		return LoginChallenge{}, nil, err
@@ -99,6 +102,9 @@ func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (Logi
 }
 
 // VerifyLoginCode completes a login challenge and issues a new session.
+//
+// The challenge is consumed before session issuance so the same code cannot be replayed
+// if a later write fails. That keeps the login code single-use even across retries.
 func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodeParams) (LoginResult, error) {
 	if err := s.validateContext(ctx, "verify login code"); err != nil {
 		return LoginResult{}, err
@@ -138,6 +144,7 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 		return LoginResult{}, ErrInvalidCode
 	}
 
+	// Mark the challenge as consumed before any session or device writes happen.
 	challenge.Used = true
 	challenge.UsedAt = now
 	if _, err := s.store.SaveLoginChallenge(ctx, challenge); err != nil {
@@ -167,6 +174,9 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 }
 
 // AuthenticateBot logs a bot account in using its issued bot token.
+//
+// Bot login reuses the same session issuance path as human login so the downstream
+// device and session invariants stay identical.
 func (s *Service) AuthenticateBot(ctx context.Context, params AuthenticateBotParams) (LoginResult, error) {
 	if err := s.validateContext(ctx, "authenticate bot"); err != nil {
 		return LoginResult{}, err
@@ -210,6 +220,9 @@ func (s *Service) AuthenticateBot(ctx context.Context, params AuthenticateBotPar
 }
 
 // RegisterDevice attaches another trusted device to an active session.
+//
+// The new device inherits the owning account's display name when the client does not
+// supply one, which keeps the UI default stable across first-party and retry flows.
 func (s *Service) RegisterDevice(ctx context.Context, params RegisterDeviceParams) (Device, Session, error) {
 	if err := s.validateContext(ctx, "register device"); err != nil {
 		return Device{}, Session{}, err

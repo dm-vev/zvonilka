@@ -7,6 +7,10 @@ import (
 )
 
 // SubmitJoinRequest stores a pending request for moderator review.
+//
+// The service canonicalizes the identifiers first and relies on the store to enforce
+// uniqueness atomically, which keeps the write path race-free without a separate
+// read-before-write availability check.
 func (s *Service) SubmitJoinRequest(ctx context.Context, params SubmitJoinRequestParams) (JoinRequest, error) {
 	if err := s.validateContext(ctx, "submit join request"); err != nil {
 		return JoinRequest{}, err
@@ -63,6 +67,10 @@ func (s *Service) SubmitJoinRequest(ctx context.Context, params SubmitJoinReques
 }
 
 // ApproveJoinRequest converts a join request into an active user account.
+//
+// The approval path can recover an already-persisted account when a previous attempt
+// rolled back too late. The reusedExisting flag tells the rollback branch whether it
+// is still allowed to delete the account on a later join-request save failure.
 func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequestParams) (JoinRequest, Account, error) {
 	if err := s.validateContext(ctx, "approve join request"); err != nil {
 		return JoinRequest{}, Account{}, err
@@ -155,6 +163,9 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 }
 
 // RejectJoinRequest marks a join request as rejected.
+//
+// Rejection only mutates the join-request row itself, so there is no account-side
+// rollback path to manage.
 func (s *Service) RejectJoinRequest(ctx context.Context, params RejectJoinRequestParams) (JoinRequest, error) {
 	if err := s.validateContext(ctx, "reject join request"); err != nil {
 		return JoinRequest{}, err
@@ -199,6 +210,9 @@ func (s *Service) RejectJoinRequest(ctx context.Context, params RejectJoinReques
 }
 
 // CreateAccount creates a human or bot account directly.
+//
+// It shares the same internal write path as approval-driven account creation so both
+// flows normalize identifiers, enforce uniqueness, and cache the result identically.
 func (s *Service) CreateAccount(ctx context.Context, params CreateAccountParams) (Account, string, error) {
 	if err := s.validateContext(ctx, "create account"); err != nil {
 		return Account{}, "", err
@@ -208,12 +222,19 @@ func (s *Service) CreateAccount(ctx context.Context, params CreateAccountParams)
 	return account, botToken, err
 }
 
+/*
+	createAccount executes the shared account write path for direct creation and approval retries.
+
+The allowExisting flag is only enabled by approval flows so they can recover an active
+account that survived a partial rollback. Direct admin creation still fails on conflicts.
+*/
 func (s *Service) createAccount(
 	ctx context.Context,
 	params CreateAccountParams,
 	allowExisting bool,
 ) (Account, string, bool, error) {
 	fingerprint := createAccountFingerprint(params)
+	// Replay the cached result first so retried writes do not consume new IDs or tokens.
 	if params.IdempotencyKey != "" {
 		if result, ok, err := s.idempotency.createAccountResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
 			return Account{}, "", false, err
@@ -226,6 +247,8 @@ func (s *Service) createAccount(
 		}
 	}
 
+	// Canonicalize identifiers before validation so the store sees the same values that
+	// all lookup paths will use later.
 	username, email, phone := s.normalizeAccountInput(params.Username, params.Email, params.Phone)
 	if username == "" {
 		return Account{}, "", false, ErrInvalidInput
@@ -273,9 +296,13 @@ func (s *Service) createAccount(
 		account.BotTokenHash = hashSecret(botToken)
 	}
 
+	// Save the account once the request is fully normalized. Any conflict after this point
+	// is handled by the store or by the approval retry recovery path below.
 	savedAccount, err := s.store.SaveAccount(ctx, account)
 	if err != nil {
 		if allowExisting && params.AccountKind == AccountKindUser && errors.Is(err, ErrConflict) {
+			// Approval retries may hit an account that already exists because a previous
+			// attempt created it and then failed during the join-request update.
 			existingAccount, lookupErr := s.store.AccountByUsername(ctx, username)
 			if lookupErr != nil {
 				return Account{}, "", false, fmt.Errorf("load existing account %s after conflict: %w", username, lookupErr)
@@ -288,6 +315,8 @@ func (s *Service) createAccount(
 			}
 
 			if params.IdempotencyKey != "" {
+				// Cache the recovered account so subsequent retries do not re-run the conflict
+				// recovery path or consume any additional identifiers.
 				s.idempotency.storeCreateAccountResult(
 					params.IdempotencyKey,
 					fingerprint,
@@ -305,6 +334,7 @@ func (s *Service) createAccount(
 		return Account{}, "", false, fmt.Errorf("save account %s: %w", username, err)
 	}
 
+	// Persist the successful result after the account is durably written.
 	if params.IdempotencyKey != "" {
 		s.idempotency.storeCreateAccountResult(
 			params.IdempotencyKey,
@@ -320,6 +350,7 @@ func (s *Service) createAccount(
 	return savedAccount, botToken, false, nil
 }
 
+// isNotFound centralizes the store-specific not-found check used by rollback paths.
 func isNotFound(err error) bool {
 	return errors.Is(err, ErrNotFound)
 }

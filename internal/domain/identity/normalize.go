@@ -7,14 +7,17 @@ import (
 	"unicode"
 )
 
+// normalizeUsername canonicalizes usernames for lookup and uniqueness checks.
 func normalizeUsername(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }
 
+// normalizeEmail canonicalizes email addresses for lookup and uniqueness checks.
 func normalizeEmail(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }
 
+// normalizePhone strips all non-digit characters from a phone number.
 func normalizePhone(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -31,6 +34,7 @@ func normalizePhone(value string) string {
 	return string(digits)
 }
 
+// maskEmail returns a partially redacted email address for UI and logs.
 func maskEmail(value string) string {
 	value = normalizeEmail(value)
 	if value == "" {
@@ -50,6 +54,7 @@ func maskEmail(value string) string {
 	return localPart[:1] + "***@" + parts[1]
 }
 
+// maskPhone returns a partially redacted phone number for UI and logs.
 func maskPhone(value string) string {
 	value = normalizePhone(value)
 	if value == "" {
@@ -63,6 +68,7 @@ func maskPhone(value string) string {
 	return value[:2] + "***" + value[len(value)-2:]
 }
 
+// hashSecret hashes a secret value into a stable opaque string.
 func hashSecret(value string) string {
 	sum := sha256.Sum256([]byte(value))
 	return base64.RawStdEncoding.EncodeToString(sum[:])

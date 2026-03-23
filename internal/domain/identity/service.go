@@ -28,6 +28,9 @@ type Service struct {
 }
 
 // NewService constructs a service backed by the provided store and sender.
+//
+// The service defaults are safe for tests and local bootstraps, but callers may override
+// the clock and lifecycle limits with options when they need deterministic behavior.
 func NewService(store Store, sender CodeSender, opts ...Option) (*Service, error) {
 	if store == nil {
 		return nil, ErrInvalidInput
@@ -56,6 +59,10 @@ func NewService(store Store, sender CodeSender, opts ...Option) (*Service, error
 	return service, nil
 }
 
+// currentTime returns the service clock in UTC.
+//
+// The helper centralizes the nil-clock fallback so the rest of the package can assume
+// a stable, UTC-normalized time source.
 func (s *Service) currentTime() time.Time {
 	if s.now == nil {
 		return time.Now().UTC()
@@ -64,6 +71,10 @@ func (s *Service) currentTime() time.Time {
 	return s.now().UTC()
 }
 
+// validateContext rejects nil or cancelled contexts before a domain operation starts.
+//
+// The returned error is wrapped with the operation name so callers can trace which
+// boundary rejected the request.
 func (s *Service) validateContext(ctx context.Context, operation string) error {
 	if ctx == nil {
 		return fmt.Errorf("%s: %w", operation, ErrInvalidInput)
@@ -76,10 +87,18 @@ func (s *Service) validateContext(ctx context.Context, operation string) error {
 	return nil
 }
 
+// normalizeAccountInput canonicalizes the account identifiers that can be used for lookup.
+//
+// Username and email are trimmed and lower-cased; phone numbers are reduced to digits only.
+// That keeps uniqueness checks and login lookups aligned with the persisted representation.
 func (s *Service) normalizeAccountInput(username, email, phone string) (string, string, string) {
 	return normalizeUsername(username), normalizeEmail(email), normalizePhone(phone)
 }
 
+// lookupAccountByIdentifier resolves exactly one normalized identifier.
+//
+// The login flow accepts one of username, email, or phone. Supporting more than one at once
+// would make retry and idempotency semantics ambiguous, so the helper fails fast.
 func (s *Service) lookupAccountByIdentifier(ctx context.Context, username, email, phone string) (Account, error) {
 	count := 0
 	if username != "" {
@@ -117,6 +136,14 @@ func (s *Service) lookupAccountByIdentifier(ctx context.Context, username, email
 	}
 }
 
+/*
+	issueSession creates a device/session pair and returns bearer tokens for the account.
+
+The store interface is intentionally not transactional yet, so the function records the
+device first, then the session, then the auth metadata. If any later step fails, the
+defer block rolls back the partial writes so callers do not observe half-created login
+state.
+*/
 func (s *Service) issueSession(
 	ctx context.Context,
 	account Account,
@@ -139,6 +166,8 @@ func (s *Service) issueSession(
 		savedSession Session
 	)
 
+	// Roll back partial writes if any later step fails after the device/session pair starts
+	// materializing. The saved IDs are captured separately so cleanup can stay idempotent.
 	defer func() {
 		if err == nil {
 			return
@@ -238,6 +267,10 @@ func (s *Service) issueSession(
 	return
 }
 
+// rollbackDeviceAndSession deletes the session and device created by a failed login path.
+//
+// Missing rows are tolerated because the caller may already have removed one side of the
+// pair during its own cleanup.
 func (s *Service) rollbackDeviceAndSession(ctx context.Context, deviceID, sessionID string) error {
 	var rollbackErr error
 
@@ -262,6 +295,10 @@ func (s *Service) rollbackDeviceAndSession(ctx context.Context, deviceID, sessio
 	return rollbackErr
 }
 
+// selectLoginTargets chooses the available code delivery channels for an account.
+//
+// Email is preferred over SMS when both are present, but the caller can still request a
+// specific channel or a manual bootstrap path.
 func (s *Service) selectLoginTargets(account Account, delivery LoginDeliveryChannel) ([]LoginTarget, LoginDeliveryChannel, error) {
 	available := make([]LoginTarget, 0, 2)
 
@@ -310,10 +347,12 @@ func (s *Service) selectLoginTargets(account Account, delivery LoginDeliveryChan
 	}
 }
 
+// hasContactInformation reports whether the account can receive a login challenge.
 func hasContactInformation(account Account) bool {
 	return account.Email != "" || account.Phone != ""
 }
 
+// trimmed removes leading and trailing whitespace from user-provided text.
 func trimmed(value string) string {
 	return strings.TrimSpace(value)
 }

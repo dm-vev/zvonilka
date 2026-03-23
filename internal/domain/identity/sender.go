@@ -3,6 +3,8 @@ package identity
 import "context"
 
 // CodeSender delivers verification codes to login targets.
+//
+// The interface stays small so tests can replace delivery with a deterministic fake.
 type CodeSender interface {
 	SendLoginCode(ctx context.Context, target LoginTarget, code string) error
 }

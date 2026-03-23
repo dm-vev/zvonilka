@@ -7,6 +7,10 @@ import (
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 )
 
+// SaveJoinRequest inserts or updates a join request.
+//
+// Pending requests are conflict-checked against existing accounts before they are stored so
+// the approval flow sees the same atomic uniqueness behavior as account creation.
 func (s *memoryStore) SaveJoinRequest(_ context.Context, joinRequest identity.JoinRequest) (identity.JoinRequest, error) {
 	if joinRequest.ID == "" {
 		return identity.JoinRequest{}, identity.ErrInvalidInput
@@ -27,6 +31,7 @@ func (s *memoryStore) SaveJoinRequest(_ context.Context, joinRequest identity.Jo
 	return joinRequest, nil
 }
 
+// JoinRequestByID resolves a join request by its primary key.
 func (s *memoryStore) JoinRequestByID(_ context.Context, joinRequestID string) (identity.JoinRequest, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -39,6 +44,7 @@ func (s *memoryStore) JoinRequestByID(_ context.Context, joinRequestID string) (
 	return joinRequest, nil
 }
 
+// JoinRequestsByStatus returns join requests filtered by lifecycle status.
 func (s *memoryStore) JoinRequestsByStatus(_ context.Context, status identity.JoinRequestStatus) ([]identity.JoinRequest, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

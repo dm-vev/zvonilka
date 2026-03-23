@@ -8,8 +8,8 @@ import (
 
 // ListJoinRequestsByStatus returns join requests for the requested status.
 //
-// Pending requests are filtered before the result is returned so expired
-// requests do not continue to surface as pending business state.
+// Pending requests are filtered before the result is returned so expired requests do not
+// continue to surface as pending business state. The read path stays side-effect free.
 func (s *Service) ListJoinRequestsByStatus(
 	ctx context.Context,
 	status JoinRequestStatus,
@@ -30,6 +30,10 @@ func (s *Service) ListJoinRequestsByStatus(
 	return s.filterActivePendingJoinRequests(joinRequests)
 }
 
+// loadPendingJoinRequest resolves a join request and normalizes it to an actionable state.
+//
+// Non-pending requests fail fast. Expired requests are persisted as expired so the caller
+// can surface the state transition even when the original review happens late.
 func (s *Service) loadPendingJoinRequest(
 	ctx context.Context,
 	joinRequestID string,
@@ -56,6 +60,10 @@ func (s *Service) loadPendingJoinRequest(
 	return joinRequest, nil
 }
 
+// filterActivePendingJoinRequests removes expired rows from a pending-only listing.
+//
+// This keeps the business state clean without turning a list call into a write-heavy
+// operation.
 func (s *Service) filterActivePendingJoinRequests(joinRequests []JoinRequest) ([]JoinRequest, error) {
 	if len(joinRequests) == 0 {
 		return joinRequests, nil
@@ -73,6 +81,9 @@ func (s *Service) filterActivePendingJoinRequests(joinRequests []JoinRequest) ([
 	return activeJoinRequests, nil
 }
 
+// expireJoinRequest persists the expired status with an audit-friendly reason string.
+//
+// The helper is called from both approve and reject paths when a moderator acts too late.
 func (s *Service) expireJoinRequest(
 	ctx context.Context,
 	joinRequest JoinRequest,
@@ -92,6 +103,7 @@ func (s *Service) expireJoinRequest(
 	return savedJoinRequest, nil
 }
 
+// joinRequestExpiredAt reports whether a join request has reached or passed its TTL.
 func joinRequestExpiredAt(joinRequest JoinRequest, now time.Time) bool {
 	if joinRequest.ExpiresAt.IsZero() {
 		return false
