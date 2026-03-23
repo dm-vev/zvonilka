@@ -115,6 +115,18 @@ func TestLoadRejectsExplicitZeroIdentityValue(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsUnsupportedServiceName(t *testing.T) {
+	resetConfigEnv(t)
+
+	_, err := Load("worker")
+	if err == nil {
+		t.Fatal("expected load to fail")
+	}
+	if !strings.Contains(err.Error(), "unsupported service name") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestLoadIdentityDefaultsMatchDomainSettings(t *testing.T) {
 	resetConfigEnv(t)
 
@@ -373,6 +385,20 @@ func TestLoadNormalizesServiceAndEnvironmentCase(t *testing.T) {
 	}
 	if !cfg.Runtime.GRPC.ReflectionEnabled {
 		t.Fatal("expected grpc reflection to stay enabled in development profile")
+	}
+}
+
+func TestValidateNormalizesStorageProviderBindingsBeforeDistinctnessCheck(t *testing.T) {
+	cfg := defaultConfiguration("controlplane")
+	cfg.Storage.PrimaryProvider = " Primary "
+	cfg.Storage.CacheProvider = "PRIMARY"
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected validate to fail")
+	}
+	if !strings.Contains(err.Error(), "storage provider bindings must be distinct") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

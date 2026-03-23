@@ -23,7 +23,7 @@ func (a *app) close(ctx context.Context) error {
 		return nil
 	}
 
-	return a.catalog.Close(ctx)
+	return a.catalog.Close(cleanupContext(ctx))
 }
 
 func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
@@ -39,4 +39,9 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 		catalog:  storageCatalog,
 		identity: identityService,
 	}, nil
+}
+
+// cleanupContext returns a context detached from runtime cancellation.
+func cleanupContext(ctx context.Context) context.Context {
+	return context.Background()
 }

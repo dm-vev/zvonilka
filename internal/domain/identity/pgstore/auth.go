@@ -107,8 +107,16 @@ func (s *Store) DeleteLoginChallenge(ctx context.Context, challengeID string) er
 	}
 
 	query := fmt.Sprintf(`DELETE FROM %s WHERE id = $1`, s.table("identity_login_challenges"))
-	if _, err := s.conn().ExecContext(ctx, query, challengeID); err != nil {
+	result, err := s.conn().ExecContext(ctx, query, challengeID)
+	if err != nil {
 		return fmt.Errorf("delete login challenge %s: %w", challengeID, err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("delete login challenge %s: %w", challengeID, err)
+	}
+	if rowsAffected == 0 {
+		return identity.ErrNotFound
 	}
 
 	return nil

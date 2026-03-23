@@ -25,6 +25,9 @@ func Load(serviceName string) (Configuration, error) {
 	if serviceName == "" {
 		return Configuration{}, fmt.Errorf("service name is required")
 	}
+	if err := validateServiceName(serviceName); err != nil {
+		return Configuration{}, err
+	}
 
 	cfg := defaultConfiguration(serviceName)
 	if err := applyEnvOverrides(&cfg, serviceName); err != nil {
