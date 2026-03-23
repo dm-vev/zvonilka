@@ -20,6 +20,27 @@ func (s *memoryStore) SaveDevice(_ context.Context, device identity.Device) (ide
 	return device, nil
 }
 
+func (s *memoryStore) DeleteDevice(_ context.Context, deviceID string) error {
+	if deviceID == "" {
+		return identity.ErrInvalidInput
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	device, ok := s.devicesByID[deviceID]
+	if !ok {
+		return identity.ErrNotFound
+	}
+
+	delete(s.devicesByID, deviceID)
+	if deviceIDs, ok := s.deviceIDsByAccount[device.AccountID]; ok {
+		delete(deviceIDs, deviceID)
+	}
+
+	return nil
+}
+
 func (s *memoryStore) DeviceByID(_ context.Context, deviceID string) (identity.Device, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -65,6 +86,27 @@ func (s *memoryStore) SaveSession(_ context.Context, session identity.Session) (
 	s.sessionIDsForAccountLocked(session.AccountID)[session.ID] = struct{}{}
 
 	return session, nil
+}
+
+func (s *memoryStore) DeleteSession(_ context.Context, sessionID string) error {
+	if sessionID == "" {
+		return identity.ErrInvalidInput
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session, ok := s.sessionsByID[sessionID]
+	if !ok {
+		return identity.ErrNotFound
+	}
+
+	delete(s.sessionsByID, sessionID)
+	if sessionIDs, ok := s.sessionIDsByAccount[session.AccountID]; ok {
+		delete(sessionIDs, sessionID)
+	}
+
+	return nil
 }
 
 func (s *memoryStore) SessionByID(_ context.Context, sessionID string) (identity.Session, error) {

@@ -14,6 +14,7 @@ import (
 type recordingCodeSender struct {
 	mu    sync.Mutex
 	codes map[string]string
+	count int
 }
 
 func (s *recordingCodeSender) SendLoginCode(_ context.Context, target identity.LoginTarget, code string) error {
@@ -24,6 +25,7 @@ func (s *recordingCodeSender) SendLoginCode(_ context.Context, target identity.L
 		s.codes = make(map[string]string)
 	}
 
+	s.count++
 	s.codes[target.DestinationMask] = code
 	return nil
 }
@@ -33,6 +35,13 @@ func (s *recordingCodeSender) codeFor(mask string) string {
 	defer s.mu.Unlock()
 
 	return s.codes[mask]
+}
+
+func (s *recordingCodeSender) totalSends() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.count
 }
 
 type failingSaveDeviceStore struct {
@@ -51,6 +60,24 @@ func (s *failingSaveDeviceStore) SaveDevice(ctx context.Context, device identity
 	}
 
 	return s.Store.SaveDevice(ctx, device)
+}
+
+type failingSaveAccountStore struct {
+	identity.Store
+	failErr error
+	calls   int
+}
+
+func (s *failingSaveAccountStore) SaveAccount(ctx context.Context, account identity.Account) (identity.Account, error) {
+	if s.failErr == nil {
+		s.failErr = errors.New("forced save account failure")
+	}
+	s.calls++
+	if s.calls == 2 {
+		return identity.Account{}, s.failErr
+	}
+
+	return s.Store.SaveAccount(ctx, account)
 }
 
 func TestUserAccountLifecycle(t *testing.T) {
@@ -226,7 +253,7 @@ func TestBotAccountAuthentication(t *testing.T) {
 	}
 }
 
-func TestVerifyLoginCodeConsumesChallengeBeforeSessionIssue(t *testing.T) {
+func TestVerifyLoginCodeKeepsChallengeConsumedAfterSessionFailure(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -283,6 +310,22 @@ func TestVerifyLoginCodeConsumesChallengeBeforeSessionIssue(t *testing.T) {
 		t.Fatalf("expected first verify error from downstream failure, got conflict")
 	}
 
+	devices, err := baseStore.DevicesByAccountID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("list devices after failed verify: %v", err)
+	}
+	if len(devices) != 0 {
+		t.Fatalf("expected no devices after failed verify, got %d", len(devices))
+	}
+
+	sessions, err := baseStore.SessionsByAccountID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("list sessions after failed verify: %v", err)
+	}
+	if len(sessions) != 0 {
+		t.Fatalf("expected no sessions after failed verify, got %d", len(sessions))
+	}
+
 	_, err = svc.VerifyLoginCode(ctx, identity.VerifyLoginCodeParams{
 		ChallengeID: challenge.ID,
 		Code:        code,
@@ -291,6 +334,6 @@ func TestVerifyLoginCodeConsumesChallengeBeforeSessionIssue(t *testing.T) {
 		PublicKey:   "replay-key-2",
 	})
 	if !errors.Is(err, identity.ErrConflict) {
-		t.Fatalf("expected second verify to fail with conflict, got %v", err)
+		t.Fatalf("expected second verify to conflict after rollback, got %v", err)
 	}
 }

@@ -2,6 +2,7 @@ package identity
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -9,6 +10,11 @@ import (
 func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (LoginChallenge, []LoginTarget, error) {
 	if err := s.validateContext(ctx, "begin login"); err != nil {
 		return LoginChallenge{}, nil, err
+	}
+	if params.IdempotencyKey != "" {
+		if challenge, targets, ok := s.idempotency.beginLoginResult(params.IdempotencyKey); ok {
+			return challenge, targets, nil
+		}
 	}
 
 	username, email, phone := s.normalizeAccountInput(params.Username, params.Email, params.Phone)
@@ -64,8 +70,18 @@ func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (Logi
 
 	for _, target := range targets {
 		if err := s.sender.SendLoginCode(ctx, target, code); err != nil {
+			if deleteErr := s.store.DeleteLoginChallenge(ctx, savedChallenge.ID); deleteErr != nil {
+				return LoginChallenge{}, nil, errors.Join(
+					fmt.Errorf("send login code for account %s: %w", account.ID, err),
+					fmt.Errorf("delete login challenge %s: %w", savedChallenge.ID, deleteErr),
+				)
+			}
 			return LoginChallenge{}, nil, fmt.Errorf("send login code for account %s: %w", account.ID, err)
 		}
+	}
+
+	if params.IdempotencyKey != "" {
+		s.idempotency.storeBeginLoginResult(params.IdempotencyKey, savedChallenge, targets)
 	}
 
 	return savedChallenge, targets, nil
@@ -75,6 +91,11 @@ func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (Logi
 func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodeParams) (LoginResult, error) {
 	if err := s.validateContext(ctx, "verify login code"); err != nil {
 		return LoginResult{}, err
+	}
+	if params.IdempotencyKey != "" {
+		if result, ok := s.idempotency.verifyLoginResult(params.IdempotencyKey); ok {
+			return result, nil
+		}
 	}
 	if params.ChallengeID == "" || params.Code == "" {
 		return LoginResult{}, ErrInvalidInput
@@ -119,6 +140,10 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 		return LoginResult{}, err
 	}
 
+	if params.IdempotencyKey != "" {
+		s.idempotency.storeVerifyLoginResult(params.IdempotencyKey, result)
+	}
+
 	return result, nil
 }
 
@@ -147,6 +172,11 @@ func (s *Service) AuthenticateBot(ctx context.Context, params AuthenticateBotPar
 func (s *Service) RegisterDevice(ctx context.Context, params RegisterDeviceParams) (Device, Session, error) {
 	if err := s.validateContext(ctx, "register device"); err != nil {
 		return Device{}, Session{}, err
+	}
+	if params.IdempotencyKey != "" {
+		if device, session, ok := s.idempotency.registerDeviceResult(params.IdempotencyKey); ok {
+			return device, session, nil
+		}
 	}
 	if params.SessionID == "" || params.PublicKey == "" {
 		return Device{}, Session{}, ErrInvalidInput
@@ -203,7 +233,17 @@ func (s *Service) RegisterDevice(ctx context.Context, params RegisterDeviceParam
 	session.LastSeenAt = now
 	savedSession, err := s.store.UpdateSession(ctx, session)
 	if err != nil {
+		if deleteErr := s.store.DeleteDevice(ctx, savedDevice.ID); deleteErr != nil {
+			return Device{}, Session{}, errors.Join(
+				fmt.Errorf("update session %s after device registration: %w", session.ID, err),
+				fmt.Errorf("delete device %s: %w", savedDevice.ID, deleteErr),
+			)
+		}
 		return Device{}, Session{}, fmt.Errorf("update session %s after device registration: %w", session.ID, err)
+	}
+
+	if params.IdempotencyKey != "" {
+		s.idempotency.storeRegisterDeviceResult(params.IdempotencyKey, savedDevice, savedSession)
 	}
 
 	return savedDevice, savedSession, nil

@@ -2,6 +2,7 @@ package identity
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ const (
 type Service struct {
 	store           Store
 	sender          CodeSender
+	idempotency     *idempotencyCache
 	now             func() time.Time
 	joinRequestTTL  time.Duration
 	challengeTTL    time.Duration
@@ -37,6 +39,7 @@ func NewService(store Store, sender CodeSender, opts ...Option) (*Service, error
 	service := &Service{
 		store:           store,
 		sender:          sender,
+		idempotency:     newIdempotencyCache(),
 		now:             func() time.Time { return time.Now().UTC() },
 		joinRequestTTL:  defaultJoinRequestTTL,
 		challengeTTL:    defaultChallengeTTL,
@@ -121,13 +124,50 @@ func (s *Service) issueSession(
 	platform DevicePlatform,
 	publicKey string,
 	pushToken string,
-) (LoginResult, error) {
+) (result LoginResult, err error) {
 	if publicKey == "" {
-		return LoginResult{}, ErrInvalidInput
+		err = ErrInvalidInput
+		return
 	}
 	if account.Status != AccountStatusActive {
-		return LoginResult{}, ErrForbidden
+		err = ErrForbidden
+		return
 	}
+
+	var (
+		deviceSaved     bool
+		sessionSaved    bool
+		savedDevice     Device
+		savedSession    Session
+		currentSessions []Session
+	)
+
+	defer func() {
+		if err == nil {
+			return
+		}
+		if len(currentSessions) > 0 {
+			if restoreErr := s.restoreSessions(ctx, currentSessions); restoreErr != nil {
+				err = errors.Join(err, restoreErr)
+			}
+		}
+		if sessionSaved {
+			if deleteErr := s.store.DeleteSession(ctx, savedSession.ID); deleteErr != nil && !errors.Is(deleteErr, ErrNotFound) {
+				err = errors.Join(
+					err,
+					fmt.Errorf("delete session %s after authentication failure: %w", savedSession.ID, deleteErr),
+				)
+			}
+		}
+		if deviceSaved {
+			if deleteErr := s.store.DeleteDevice(ctx, savedDevice.ID); deleteErr != nil && !errors.Is(deleteErr, ErrNotFound) {
+				err = errors.Join(
+					err,
+					fmt.Errorf("delete device %s after authentication failure: %w", savedDevice.ID, deleteErr),
+				)
+			}
+		}
+	}()
 
 	now := s.currentTime()
 	if deviceName == "" {
@@ -139,12 +179,14 @@ func (s *Service) issueSession(
 
 	deviceID, err := newID("dev")
 	if err != nil {
-		return LoginResult{}, fmt.Errorf("generate device ID: %w", err)
+		err = fmt.Errorf("generate device ID: %w", err)
+		return
 	}
 
 	sessionID, err := newID("sess")
 	if err != nil {
-		return LoginResult{}, fmt.Errorf("generate session ID: %w", err)
+		err = fmt.Errorf("generate session ID: %w", err)
+		return
 	}
 
 	device := Device{
@@ -160,10 +202,12 @@ func (s *Service) issueSession(
 		LastSeenAt: now,
 	}
 
-	savedDevice, err := s.store.SaveDevice(ctx, device)
-	if err != nil {
-		return LoginResult{}, fmt.Errorf("save device for account %s: %w", account.ID, err)
+	savedDevice, saveErr := s.store.SaveDevice(ctx, device)
+	if saveErr != nil {
+		err = fmt.Errorf("save device for account %s: %w", account.ID, saveErr)
+		return
 	}
+	deviceSaved = true
 
 	session := Session{
 		ID:             sessionID,
@@ -177,28 +221,39 @@ func (s *Service) issueSession(
 		LastSeenAt:     now,
 	}
 
-	savedSession, err := s.store.SaveSession(ctx, session)
-	if err != nil {
-		return LoginResult{}, fmt.Errorf("save session for account %s: %w", account.ID, err)
+	savedSession, saveErr = s.store.SaveSession(ctx, session)
+	if saveErr != nil {
+		err = fmt.Errorf("save session for account %s: %w", account.ID, saveErr)
+		return
 	}
+	sessionSaved = true
 
-	account.LastAuthAt = now
-	account.UpdatedAt = now
-	if _, err := s.store.SaveAccount(ctx, account); err != nil {
-		return LoginResult{}, fmt.Errorf("update account %s after authentication: %w", account.ID, err)
+	currentSessions, saveErr = s.ensureSingleCurrentSession(ctx, account.ID, savedSession.ID)
+	if saveErr != nil {
+		err = fmt.Errorf("normalize current sessions for account %s: %w", account.ID, saveErr)
+		return
 	}
 
 	accessToken, err := randomToken(32)
 	if err != nil {
-		return LoginResult{}, fmt.Errorf("generate access token for account %s: %w", account.ID, err)
+		err = fmt.Errorf("generate access token for account %s: %w", account.ID, err)
+		return
 	}
 
 	refreshToken, err := randomToken(32)
 	if err != nil {
-		return LoginResult{}, fmt.Errorf("generate refresh token for account %s: %w", account.ID, err)
+		err = fmt.Errorf("generate refresh token for account %s: %w", account.ID, err)
+		return
 	}
 
-	return LoginResult{
+	account.LastAuthAt = now
+	account.UpdatedAt = now
+	if _, saveErr := s.store.SaveAccount(ctx, account); saveErr != nil {
+		err = fmt.Errorf("update account %s after authentication: %w", account.ID, saveErr)
+		return
+	}
+
+	result = LoginResult{
 		Tokens: Tokens{
 			AccessToken:      accessToken,
 			RefreshToken:     refreshToken,
@@ -208,7 +263,76 @@ func (s *Service) issueSession(
 		},
 		Session: savedSession,
 		Device:  savedDevice,
-	}, nil
+	}
+	return
+}
+
+func (s *Service) ensureSingleCurrentSession(
+	ctx context.Context,
+	accountID string,
+	currentSessionID string,
+) ([]Session, error) {
+	sessions, err := s.store.SessionsByAccountID(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("load sessions for account %s: %w", accountID, err)
+	}
+
+	updatedSessions := make([]Session, 0)
+	for _, session := range sessions {
+		if session.ID == currentSessionID || !session.Current {
+			continue
+		}
+
+		previousSession := session
+		session.Current = false
+
+		if _, err := s.store.UpdateSession(ctx, session); err != nil {
+			return updatedSessions, fmt.Errorf("clear current session %s for account %s: %w", session.ID, accountID, err)
+		}
+
+		updatedSessions = append(updatedSessions, previousSession)
+	}
+
+	return updatedSessions, nil
+}
+
+func (s *Service) restoreSessions(ctx context.Context, sessions []Session) error {
+	var rollbackErr error
+
+	for i := len(sessions) - 1; i >= 0; i-- {
+		if _, err := s.store.UpdateSession(ctx, sessions[i]); err != nil {
+			rollbackErr = errors.Join(
+				rollbackErr,
+				fmt.Errorf("restore session %s: %w", sessions[i].ID, err),
+			)
+		}
+	}
+
+	return rollbackErr
+}
+
+func (s *Service) rollbackDeviceAndSession(ctx context.Context, deviceID, sessionID string) error {
+	var rollbackErr error
+
+	if sessionID != "" {
+		if err := s.store.DeleteSession(ctx, sessionID); err != nil && !errors.Is(err, ErrNotFound) {
+			rollbackErr = errors.Join(
+				rollbackErr,
+				fmt.Errorf("delete session %s: %w", sessionID, err),
+			)
+		}
+	}
+
+	if deviceID != "" {
+		if err := s.store.DeleteDevice(ctx, deviceID); err != nil && !errors.Is(err, ErrNotFound) {
+			rollbackErr = errors.Join(
+				rollbackErr,
+				fmt.Errorf("delete device %s: %w", deviceID, err),
+			)
+		}
+	}
+
+	return rollbackErr
 }
 
 func (s *Service) selectLoginTargets(account Account, delivery LoginDeliveryChannel) ([]LoginTarget, LoginDeliveryChannel, error) {

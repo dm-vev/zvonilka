@@ -21,10 +21,12 @@ type Store interface {
 	DeleteLoginChallenge(ctx context.Context, challengeID string) error
 
 	SaveDevice(ctx context.Context, device Device) (Device, error)
+	DeleteDevice(ctx context.Context, deviceID string) error
 	DeviceByID(ctx context.Context, deviceID string) (Device, error)
 	DevicesByAccountID(ctx context.Context, accountID string) ([]Device, error)
 
 	SaveSession(ctx context.Context, session Session) (Session, error)
+	DeleteSession(ctx context.Context, sessionID string) error
 	SessionByID(ctx context.Context, sessionID string) (Session, error)
 	SessionsByAccountID(ctx context.Context, accountID string) ([]Session, error)
 	UpdateSession(ctx context.Context, session Session) (Session, error)
