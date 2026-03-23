@@ -233,6 +233,57 @@ func TestLoadNormalizesStorageProviderNames(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsDuplicateStorageProviderBindings(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_STORAGE_PRIMARY_PROVIDER", "shared")
+	t.Setenv("ZVONILKA_STORAGE_CACHE_PROVIDER", "SHARED")
+
+	_, err := Load("controlplane")
+	if err == nil {
+		t.Fatal("expected load to fail")
+	}
+	if !strings.Contains(err.Error(), "storage provider bindings must be distinct") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadUsesServiceSpecificStorageProviderOverrides(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_STORAGE_PRIMARY_PROVIDER", "primary")
+	t.Setenv("ZVONILKA_STORAGE_CACHE_PROVIDER", "cache")
+	t.Setenv("ZVONILKA_STORAGE_OBJECT_PROVIDER", "object")
+	t.Setenv("ZVONILKA_STORAGE_AUDIT_PROVIDER", "audit")
+	t.Setenv("ZVONILKA_STORAGE_SEARCH_PROVIDER", "search")
+	t.Setenv("ZVONILKA_GATEWAY_STORAGE_PRIMARY_PROVIDER", "gateway-primary")
+	t.Setenv("ZVONILKA_GATEWAY_STORAGE_CACHE_PROVIDER", "gateway-cache")
+	t.Setenv("ZVONILKA_GATEWAY_STORAGE_OBJECT_PROVIDER", "gateway-object")
+	t.Setenv("ZVONILKA_GATEWAY_STORAGE_AUDIT_PROVIDER", "gateway-audit")
+	t.Setenv("ZVONILKA_GATEWAY_STORAGE_SEARCH_PROVIDER", "gateway-search")
+
+	cfg, err := Load("gateway")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.Storage.PrimaryProvider != "gateway-primary" {
+		t.Fatalf("storage primary provider: got %s, want gateway-primary", cfg.Storage.PrimaryProvider)
+	}
+	if cfg.Storage.CacheProvider != "gateway-cache" {
+		t.Fatalf("storage cache provider: got %s, want gateway-cache", cfg.Storage.CacheProvider)
+	}
+	if cfg.Storage.ObjectProvider != "gateway-object" {
+		t.Fatalf("storage object provider: got %s, want gateway-object", cfg.Storage.ObjectProvider)
+	}
+	if cfg.Storage.AuditProvider != "gateway-audit" {
+		t.Fatalf("storage audit provider: got %s, want gateway-audit", cfg.Storage.AuditProvider)
+	}
+	if cfg.Storage.SearchProvider != "gateway-search" {
+		t.Fatalf("storage search provider: got %s, want gateway-search", cfg.Storage.SearchProvider)
+	}
+}
+
 func TestLoadNormalizesServiceAndEnvironmentCase(t *testing.T) {
 	resetConfigEnv(t)
 
@@ -283,6 +334,21 @@ func resetConfigEnv(t *testing.T) {
 		"ZVONILKA_BOTAPI_HTTP_ADDR",
 		"ZVONILKA_BOTAPI_GRPC_ADDR",
 		"ZVONILKA_BOTAPI_SHUTDOWN_TIMEOUT",
+		"ZVONILKA_CONTROLPLANE_STORAGE_PRIMARY_PROVIDER",
+		"ZVONILKA_CONTROLPLANE_STORAGE_CACHE_PROVIDER",
+		"ZVONILKA_CONTROLPLANE_STORAGE_OBJECT_PROVIDER",
+		"ZVONILKA_CONTROLPLANE_STORAGE_AUDIT_PROVIDER",
+		"ZVONILKA_CONTROLPLANE_STORAGE_SEARCH_PROVIDER",
+		"ZVONILKA_GATEWAY_STORAGE_PRIMARY_PROVIDER",
+		"ZVONILKA_GATEWAY_STORAGE_CACHE_PROVIDER",
+		"ZVONILKA_GATEWAY_STORAGE_OBJECT_PROVIDER",
+		"ZVONILKA_GATEWAY_STORAGE_AUDIT_PROVIDER",
+		"ZVONILKA_GATEWAY_STORAGE_SEARCH_PROVIDER",
+		"ZVONILKA_BOTAPI_STORAGE_PRIMARY_PROVIDER",
+		"ZVONILKA_BOTAPI_STORAGE_CACHE_PROVIDER",
+		"ZVONILKA_BOTAPI_STORAGE_OBJECT_PROVIDER",
+		"ZVONILKA_BOTAPI_STORAGE_AUDIT_PROVIDER",
+		"ZVONILKA_BOTAPI_STORAGE_SEARCH_PROVIDER",
 		"ZVONILKA_STORAGE_PRIMARY_PROVIDER",
 		"ZVONILKA_STORAGE_CACHE_PROVIDER",
 		"ZVONILKA_STORAGE_OBJECT_PROVIDER",
