@@ -7,6 +7,26 @@ import (
 	"time"
 )
 
+type listenDefaults struct {
+	http string
+	grpc string
+}
+
+var serviceListenDefaults = map[string]listenDefaults{
+	"controlplane": {
+		http: ":8080",
+		grpc: ":9090",
+	},
+	"gateway": {
+		http: ":8081",
+		grpc: ":9091",
+	},
+	"botapi": {
+		http: ":8082",
+		grpc: ":9092",
+	},
+}
+
 // Config contains the shared runtime settings for service skeletons.
 type Config struct {
 	ServiceName     string
@@ -22,11 +42,13 @@ func FromEnv(serviceName string) (Config, error) {
 		return Config{}, fmt.Errorf("service name is required")
 	}
 
+	defaults := defaultsForService(serviceName)
+
 	cfg := Config{
 		ServiceName: serviceName,
 		Env:         envOrDefault(serviceEnvKey(serviceName, "ENV"), envOrDefault("ZVONILKA_ENV", "development")),
-		HTTPAddr:    envOrDefault(serviceEnvKey(serviceName, "HTTP_ADDR"), envOrDefault("ZVONILKA_HTTP_ADDR", ":8080")),
-		GRPCAddr:    envOrDefault(serviceEnvKey(serviceName, "GRPC_ADDR"), envOrDefault("ZVONILKA_GRPC_ADDR", ":9090")),
+		HTTPAddr:    envOrDefault(serviceEnvKey(serviceName, "HTTP_ADDR"), envOrDefault("ZVONILKA_HTTP_ADDR", defaults.http)),
+		GRPCAddr:    envOrDefault(serviceEnvKey(serviceName, "GRPC_ADDR"), envOrDefault("ZVONILKA_GRPC_ADDR", defaults.grpc)),
 	}
 
 	shutdownTimeout, err := durationOrDefault(
@@ -49,6 +71,18 @@ func envOrDefault(key string, fallback string) string {
 	}
 
 	return value
+}
+
+func defaultsForService(serviceName string) listenDefaults {
+	defaults, ok := serviceListenDefaults[serviceName]
+	if ok {
+		return defaults
+	}
+
+	return listenDefaults{
+		http: ":8080",
+		grpc: ":9090",
+	}
 }
 
 func serviceEnvKey(serviceName, suffix string) string {
