@@ -279,3 +279,111 @@ func TestRevokeAllSessionsBlocksConcurrentRegisterDeviceUntilAccountBoundaryRele
 		}
 	}
 }
+
+func TestRevokeAllSessionsBlocksConcurrentBotAuthUntilAccountBoundaryReleases(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseStore := teststore.NewMemoryStore()
+	store := newAccountGateStore(baseStore)
+	clock := &steppedClock{
+		now:  time.Date(2026, time.March, 24, 3, 0, 0, 0, time.UTC),
+		step: time.Minute,
+	}
+
+	svc, err := identity.NewService(store, identity.NoopCodeSender{}, identity.WithNow(clock.Now))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	account, botToken, err := svc.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "revoke-bot-race-user",
+		DisplayName: "Revoke Bot Race User",
+		AccountKind: identity.AccountKindBot,
+		CreatedBy:   "admin-1",
+		Roles:       []identity.Role{identity.RoleSupport},
+	})
+	if err != nil {
+		t.Fatalf("create bot account: %v", err)
+	}
+	if botToken == "" {
+		t.Fatalf("expected bot token")
+	}
+
+	firstResult, err := svc.AuthenticateBot(ctx, identity.AuthenticateBotParams{
+		BotToken:      botToken,
+		DeviceName:    "bot-worker-1",
+		Platform:      identity.DevicePlatformServer,
+		PublicKey:     "bot-public-key-1",
+		ClientVersion: "1.0.0",
+		Locale:        "en",
+	})
+	if err != nil {
+		t.Fatalf("authenticate bot before race: %v", err)
+	}
+	if firstResult.Session.ID == "" {
+		t.Fatalf("expected first bot session")
+	}
+
+	store.enableBlocking()
+
+	revokeDone := make(chan error, 1)
+	go func() {
+		_, err := svc.RevokeAllSessions(ctx, account.ID, identity.RevokeAllSessionsParams{
+			Reason:         "revoke all",
+			IdempotencyKey: "revoke-bot-race-key",
+		})
+		revokeDone <- err
+	}()
+
+	<-store.entered
+
+	botAuthDone := make(chan error, 1)
+	go func() {
+		_, err := svc.AuthenticateBot(ctx, identity.AuthenticateBotParams{
+			BotToken:      botToken,
+			DeviceName:    "bot-worker-2",
+			Platform:      identity.DevicePlatformServer,
+			PublicKey:     "bot-public-key-2",
+			ClientVersion: "1.0.1",
+			Locale:        "en",
+		})
+		botAuthDone <- err
+	}()
+
+	select {
+	case err := <-botAuthDone:
+		t.Fatalf("bot auth completed while revoke was blocked: %v", err)
+	case <-time.After(250 * time.Millisecond):
+	}
+
+	close(store.release)
+
+	if err := <-revokeDone; err != nil {
+		t.Fatalf("revoke all sessions: %v", err)
+	}
+	if err := <-botAuthDone; err != nil {
+		t.Fatalf("authenticate bot after revoke: %v", err)
+	}
+
+	sessions, err := svc.ListSessions(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("list sessions after bot race: %v", err)
+	}
+	activeCount := 0
+	currentCount := 0
+	for _, session := range sessions {
+		if session.Status == identity.SessionStatusActive {
+			activeCount++
+		}
+		if session.Current {
+			currentCount++
+		}
+	}
+	if activeCount != 1 {
+		t.Fatalf("expected one active session after revoke/bot serialization, got %d", activeCount)
+	}
+	if currentCount != 1 {
+		t.Fatalf("expected one current session after revoke/bot serialization, got %d", currentCount)
+	}
+}
