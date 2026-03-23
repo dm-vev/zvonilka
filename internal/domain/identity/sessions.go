@@ -117,6 +117,16 @@ func (s *Service) RevokeAllSessions(ctx context.Context, accountID string, param
 
 	var revoked uint32
 	err := s.store.WithinTx(ctx, func(tx Store) error {
+		// Touch the account row first so concurrent login or device-registration
+		// flows have to serialize behind this account-wide revoke.
+		account, loadErr := tx.AccountByID(ctx, accountID)
+		if loadErr != nil {
+			return fmt.Errorf("load account %s for revoke all sessions: %w", accountID, loadErr)
+		}
+		if loadErr := s.touchAccount(ctx, tx, account); loadErr != nil {
+			return fmt.Errorf("touch account %s before revoking sessions: %w", accountID, loadErr)
+		}
+
 		sessions, loadErr := tx.SessionsByAccountID(ctx, accountID)
 		if loadErr != nil {
 			return fmt.Errorf("list sessions for account %s: %w", accountID, loadErr)
