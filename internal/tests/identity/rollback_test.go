@@ -270,3 +270,52 @@ func TestApproveJoinRequestRetryKeepsRecoveredAccountOnSaveFailureAfterCacheExpi
 		t.Fatalf("expected join request to remain pending after failed retry, got %s", storedJoinRequest.Status)
 	}
 }
+
+func TestApproveJoinRequestRejectsRecoveredAccountWithMismatchedRoles(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	sender := &recordingCodeSender{}
+	svc := newReliabilityService(t, store, sender, time.Date(2026, time.March, 24, 2, 0, 0, 0, time.UTC))
+
+	joinRequest, err := svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
+		Username:    "approval-role-mismatch-user",
+		DisplayName: "Approval Role Mismatch User",
+		Email:       "approval-role-mismatch@example.com",
+	})
+	if err != nil {
+		t.Fatalf("submit join request: %v", err)
+	}
+
+	if _, err := store.SaveAccount(ctx, identity.Account{
+		ID:          "acc-role-mismatch",
+		Kind:        identity.AccountKindUser,
+		Username:    joinRequest.Username,
+		DisplayName: joinRequest.DisplayName,
+		Email:       joinRequest.Email,
+		Phone:       joinRequest.Phone,
+		Roles:       []identity.Role{identity.RoleModerator},
+		Status:      identity.AccountStatusActive,
+		CreatedBy:   "admin-1",
+	}); err != nil {
+		t.Fatalf("save conflicting account: %v", err)
+	}
+
+	_, _, err = svc.ApproveJoinRequest(ctx, identity.ApproveJoinRequestParams{
+		JoinRequestID: joinRequest.ID,
+		ReviewedBy:    "admin-1",
+		Roles:         []identity.Role{identity.RoleAdmin},
+	})
+	if !errors.Is(err, identity.ErrConflict) {
+		t.Fatalf("expected conflict for mismatched recovered account, got %v", err)
+	}
+
+	storedJoinRequest, err := store.JoinRequestByID(ctx, joinRequest.ID)
+	if err != nil {
+		t.Fatalf("load join request: %v", err)
+	}
+	if storedJoinRequest.Status != identity.JoinRequestStatusPending {
+		t.Fatalf("expected join request to remain pending, got %s", storedJoinRequest.Status)
+	}
+}

@@ -24,12 +24,13 @@ func TestIdempotencyCacheCleanupIsBucketScoped(t *testing.T) {
 		t.Fatalf("new service: %v", err)
 	}
 
-	if _, err := svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
+	firstJoinRequest, err := svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
 		Username:       "cleanup-submit",
 		DisplayName:    "Cleanup Submit",
 		Email:          "cleanup-submit@example.com",
 		IdempotencyKey: "submit-key",
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("submit join request: %v", err)
 	}
 
@@ -67,13 +68,17 @@ func TestIdempotencyCacheCleanupIsBucketScoped(t *testing.T) {
 
 	now = now.Add(12*time.Hour + time.Minute)
 
-	if _, err := svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
-		Username:       "cleanup-trigger",
-		DisplayName:    "Cleanup Trigger",
-		Email:          "cleanup-trigger@example.com",
-		IdempotencyKey: "submit-trigger",
-	}); err != nil {
-		t.Fatalf("trigger submit cleanup: %v", err)
+	repeatedJoinRequest, err := svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
+		Username:       "cleanup-submit",
+		DisplayName:    "Cleanup Submit",
+		Email:          "cleanup-submit@example.com",
+		IdempotencyKey: "submit-key",
+	})
+	if err != nil {
+		t.Fatalf("repeat submit join request: %v", err)
+	}
+	if repeatedJoinRequest.ID == firstJoinRequest.ID {
+		t.Fatalf("expected expired submit cache to produce a new join request")
 	}
 
 	repeatedAccount, repeatedBotToken, err := svc.CreateAccount(ctx, identity.CreateAccountParams{

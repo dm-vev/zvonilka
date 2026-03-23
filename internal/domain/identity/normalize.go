@@ -61,11 +61,12 @@ func maskPhone(value string) string {
 		return ""
 	}
 
-	if len(value) <= 4 {
-		return "***" + value
+	phoneRunes := []rune(value)
+	if len(phoneRunes) <= 4 {
+		return "***" + string(phoneRunes)
 	}
 
-	return value[:2] + "***" + value[len(value)-2:]
+	return string(phoneRunes[:2]) + "***" + string(phoneRunes[len(phoneRunes)-2:])
 }
 
 // hashSecret hashes a secret value into a stable opaque string.

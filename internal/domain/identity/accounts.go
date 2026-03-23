@@ -305,10 +305,7 @@ func (s *Service) createAccount(
 			if lookupErr != nil {
 				return Account{}, "", false, fmt.Errorf("load existing account %s after conflict: %w", username, lookupErr)
 			}
-			if existingAccount.Status != AccountStatusActive {
-				return Account{}, "", false, ErrConflict
-			}
-			if existingAccount.Kind != params.AccountKind || existingAccount.Email != email || existingAccount.Phone != phone {
+			if !accountsMatchForRecovery(existingAccount, account) {
 				return Account{}, "", false, ErrConflict
 			}
 
@@ -346,6 +343,40 @@ func (s *Service) createAccount(
 	}
 
 	return savedAccount, botToken, false, nil
+}
+
+// accountsMatchForRecovery reports whether a persisted account still matches the intended create payload.
+//
+// The approval retry path only recovers an existing account when the persisted values
+// still match the normalized creation request. That prevents a stale orphan from being
+// silently reused for a different approval payload.
+func accountsMatchForRecovery(existing, expected Account) bool {
+	if existing.Status != AccountStatusActive {
+		return false
+	}
+	if existing.Kind != expected.Kind {
+		return false
+	}
+	if existing.Username != expected.Username {
+		return false
+	}
+	if existing.DisplayName != expected.DisplayName {
+		return false
+	}
+	if existing.Email != expected.Email {
+		return false
+	}
+	if existing.Phone != expected.Phone {
+		return false
+	}
+	if existing.CreatedBy != expected.CreatedBy {
+		return false
+	}
+	if rolesFingerprint(existing.Roles) != rolesFingerprint(expected.Roles) {
+		return false
+	}
+
+	return true
 }
 
 // isNotFound centralizes the store-specific not-found check used by rollback paths.
