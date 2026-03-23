@@ -34,6 +34,7 @@ message UserProfile {
   google.protobuf.Timestamp updated_at = 15;
   bool is_contact = 16;
   bool is_blocked = 17;
+  zvonilka.common.v1.AccountKind account_kind = 18;
 }
 
 message PrivacySettings {

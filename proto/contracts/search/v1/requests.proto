@@ -19,6 +19,7 @@ message SearchRequest {
   bool fuzzy_match = 7;
   google.protobuf.Timestamp updated_after = 8;
   google.protobuf.Timestamp updated_before = 9;
+  repeated zvonilka.common.v1.AccountKind account_kinds = 10;
 }
 
 message SearchResponse {

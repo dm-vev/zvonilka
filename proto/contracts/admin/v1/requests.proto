@@ -52,12 +52,14 @@ message CreateAccountRequest {
   string note = 6;
   string invite_code = 7;
   string idempotency_key = 8;
+  zvonilka.common.v1.AccountKind account_kind = 9;
 }
 
 message CreateAccountResponse {
   zvonilka.users.v1.UserProfile profile = 1;
   string invite_code = 2;
   google.protobuf.Timestamp invite_expires_at = 3;
+  string bot_token = 4;
 }
 
 message SuspendAccountRequest {

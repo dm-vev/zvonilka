@@ -21,6 +21,7 @@ message GetLoginOptionsResponse {
   repeated LoginOption options = 1;
   bool password_recovery_enabled = 2;
   bool requires_admin_approval = 3;
+  zvonilka.common.v1.AccountKind account_kind = 4;
 }
 
 message SubmitJoinRequestRequest {
@@ -82,6 +83,22 @@ message VerifyLoginCodeResponse {
   Session session = 2;
   Device device = 3;
   bool recovery_enabled = 4;
+}
+
+message AuthenticateBotRequest {
+  string bot_token = 1;
+  string device_name = 2;
+  zvonilka.common.v1.DevicePlatform device_platform = 3;
+  zvonilka.common.v1.PublicKeyBundle device_key = 4;
+  string client_version = 5;
+  string locale = 6;
+  string idempotency_key = 7;
+}
+
+message AuthenticateBotResponse {
+  zvonilka.common.v1.AuthTokens tokens = 1;
+  Session session = 2;
+  Device device = 3;
 }
 
 message RefreshSessionRequest {

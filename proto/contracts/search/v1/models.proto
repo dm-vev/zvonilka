@@ -18,7 +18,7 @@ message SearchHit {
   string message_id = 8;
   string media_id = 9;
   string user_id = 10;
-  string bot_id = 11;
+  zvonilka.common.v1.AccountKind account_kind = 11;
   map<string, string> metadata = 12;
   google.protobuf.Timestamp updated_at = 13;
 }

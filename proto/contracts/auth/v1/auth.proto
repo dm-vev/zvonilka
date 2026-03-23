@@ -11,6 +11,7 @@ service AuthService {
   rpc SubmitJoinRequest(SubmitJoinRequestRequest) returns (SubmitJoinRequestResponse);
   rpc BeginLogin(BeginLoginRequest) returns (BeginLoginResponse);
   rpc VerifyLoginCode(VerifyLoginCodeRequest) returns (VerifyLoginCodeResponse);
+  rpc AuthenticateBot(AuthenticateBotRequest) returns (AuthenticateBotResponse);
   rpc RefreshSession(RefreshSessionRequest) returns (RefreshSessionResponse);
   rpc RegisterDevice(RegisterDeviceRequest) returns (RegisterDeviceResponse);
   rpc RotateDeviceKey(RotateDeviceKeyRequest) returns (RotateDeviceKeyResponse);
