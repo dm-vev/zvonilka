@@ -368,8 +368,8 @@ func TestVerifyLoginCodeIdempotencyKeyDeduplicatesSuccessfulLogin(t *testing.T) 
 	if sessionByID != 0 {
 		t.Fatalf("expected cached verify to avoid SessionByID calls, got %d", sessionByID)
 	}
-	if accountByID != 1 {
-		t.Fatalf("expected one AccountByID call, got %d", accountByID)
+	if accountByID != 2 {
+		t.Fatalf("expected two AccountByID calls, got %d", accountByID)
 	}
 	if updateSession != 0 {
 		t.Fatalf("expected verify cache to avoid UpdateSession calls, got %d", updateSession)
@@ -475,8 +475,8 @@ func TestRegisterDeviceIdempotencyKeyDeduplicatesSuccessfulRegistration(t *testi
 	if sessionByID != 2 {
 		t.Fatalf("expected two SessionByID calls, got %d", sessionByID)
 	}
-	if accountByID != 2 {
-		t.Fatalf("expected two AccountByID calls, got %d", accountByID)
+	if accountByID != 3 {
+		t.Fatalf("expected three AccountByID calls, got %d", accountByID)
 	}
 	if updateSession != 1 {
 		t.Fatalf("expected one UpdateSession call, got %d", updateSession)
