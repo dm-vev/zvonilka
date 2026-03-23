@@ -17,13 +17,9 @@ var openDatabase = sql.Open
 
 // Bootstrap owns the shared PostgreSQL connection pool and migrations.
 type Bootstrap struct {
+	mu  sync.Mutex
 	cfg config.Configuration
-
-	once      sync.Once
-	db        *sql.DB
-	openErr   error
-	closeOnce sync.Once
-	closeErr  error
+	db  *sql.DB
 }
 
 // NewBootstrap constructs a PostgreSQL bootstrap from the service configuration.
@@ -40,14 +36,21 @@ func (b *Bootstrap) Open(ctx context.Context) (*sql.DB, error) {
 		return nil, errors.New("context is required")
 	}
 
-	b.once.Do(func() {
-		b.openErr = b.open(ctx)
-	})
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
-	return b.db, b.openErr
+	if b.db != nil {
+		return b.db, nil
+	}
+
+	if err := b.open(ctx); err != nil {
+		return nil, err
+	}
+
+	return b.db, nil
 }
 
-// Close closes the shared database pool once.
+// Close closes the current database pool if it is open.
 func (b *Bootstrap) Close(ctx context.Context) error {
 	if b == nil {
 		return nil
@@ -56,14 +59,20 @@ func (b *Bootstrap) Close(ctx context.Context) error {
 		return errors.New("context is required")
 	}
 
-	b.closeOnce.Do(func() {
-		if b.db == nil {
-			return
-		}
-		b.closeErr = b.db.Close()
-	})
+	b.mu.Lock()
+	db := b.db
+	b.db = nil
+	b.mu.Unlock()
 
-	return b.closeErr
+	if db == nil {
+		return nil
+	}
+
+	if err := db.Close(); err != nil {
+		return fmt.Errorf("close postgres database: %w", err)
+	}
+
+	return nil
 }
 
 func (b *Bootstrap) open(ctx context.Context) error {
@@ -88,8 +97,10 @@ func (b *Bootstrap) open(ctx context.Context) error {
 	defer pingCancel()
 
 	if err := db.PingContext(pingCtx); err != nil {
-		_ = db.Close()
-		return fmt.Errorf("ping postgres database: %w", err)
+		return errors.Join(
+			fmt.Errorf("ping postgres database: %w", err),
+			closeDatabase(db),
+		)
 	}
 
 	migrationsPath := b.cfg.Infrastructure.Postgres.MigrationsPath
@@ -97,10 +108,21 @@ func (b *Bootstrap) open(ctx context.Context) error {
 		migrationsPath = "deploy/migrations/postgres"
 	}
 	if err := applyMigrations(ctx, db, migrationsPath, b.cfg.Infrastructure.Postgres.Schema); err != nil {
-		_ = db.Close()
-		return err
+		return errors.Join(err, closeDatabase(db))
 	}
 
 	b.db = db
+	return nil
+}
+
+func closeDatabase(db *sql.DB) error {
+	if db == nil {
+		return nil
+	}
+
+	if err := db.Close(); err != nil {
+		return fmt.Errorf("close postgres database: %w", err)
+	}
+
 	return nil
 }
