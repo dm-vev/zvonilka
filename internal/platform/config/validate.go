@@ -8,10 +8,12 @@ import (
 
 // Validate checks that the configuration is internally consistent.
 func (c Configuration) Validate() error {
+	c.normalize()
+
 	var errs []error
 
-	if c.Service.Name == "" {
-		errs = append(errs, errors.New("service name is required"))
+	if err := validateServiceName(c.Service.Name); err != nil {
+		errs = append(errs, err)
 	}
 	if c.Service.Environment == "" {
 		errs = append(errs, errors.New("service environment is required"))
@@ -157,6 +159,18 @@ func validateLogFormat(format string) error {
 	}
 }
 
+func validateServiceName(serviceName string) error {
+	serviceName = strings.ToLower(strings.TrimSpace(serviceName))
+	switch serviceName {
+	case "controlplane", "gateway", "botapi":
+		return nil
+	case "":
+		return errors.New("service name is required")
+	default:
+		return fmt.Errorf("unsupported service name %q", serviceName)
+	}
+}
+
 func validateDistinctStorageProviders(storage StorageConfig) error {
 	type binding struct {
 		name  string
@@ -175,6 +189,7 @@ func validateDistinctStorageProviders(storage StorageConfig) error {
 	var errs []error
 
 	for _, binding := range bindings {
+		binding.value = strings.ToLower(strings.TrimSpace(binding.value))
 		if binding.value == "" {
 			continue
 		}
