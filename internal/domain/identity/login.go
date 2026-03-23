@@ -285,23 +285,18 @@ func (s *Service) RegisterDevice(ctx context.Context, params RegisterDeviceParam
 			return ErrForbidden
 		}
 
-		account, loadErr = tx.AccountByID(ctx, session.AccountID)
+		account, loadErr = s.lockAccount(ctx, tx, session.AccountID)
 		if loadErr != nil {
 			return fmt.Errorf("load account %s for session %s: %w", session.AccountID, session.ID, loadErr)
 		}
 		if account.Status != AccountStatusActive {
 			return ErrForbidden
 		}
-
-		if loadErr := s.touchAccount(ctx, tx, account); loadErr != nil {
-			return fmt.Errorf("touch account %s before device registration: %w", account.ID, loadErr)
-		}
-
-		// Re-load the session after the account touch so a concurrent revoke cannot
+		// Re-load the session after the account boundary so a concurrent revoke cannot
 		// continue from the stale active snapshot we observed before the boundary.
 		session, loadErr = tx.SessionByID(ctx, params.SessionID)
 		if loadErr != nil {
-			return fmt.Errorf("reload session %s after account touch: %w", params.SessionID, loadErr)
+			return fmt.Errorf("reload session %s after account lock: %w", params.SessionID, loadErr)
 		}
 		if session.AccountID != account.ID {
 			return ErrConflict

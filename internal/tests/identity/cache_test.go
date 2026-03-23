@@ -20,6 +20,7 @@ type countingAuthStore struct {
 	saveDevice         int
 	saveSession        int
 	saveAccount        int
+	lockAccount        int
 	sessionByID        int
 	accountByID        int
 	updateSession      int
@@ -83,6 +84,15 @@ func (s *countingAuthStore) SaveAccount(
 	return s.Store.SaveAccount(ctx, account)
 }
 
+// LockAccount counts and forwards account-boundary locks.
+func (s *countingAuthStore) LockAccount(ctx context.Context, accountID string) error {
+	s.mu.Lock()
+	s.lockAccount++
+	s.mu.Unlock()
+
+	return s.Store.LockAccount(ctx, accountID)
+}
+
 // SessionByID counts and forwards session lookups by ID.
 func (s *countingAuthStore) SessionByID(ctx context.Context, sessionID string) (identity.Session, error) {
 	s.mu.Lock()
@@ -114,11 +124,11 @@ func (s *countingAuthStore) UpdateSession(
 }
 
 // counts returns the observed call totals for each tracked method.
-func (s *countingAuthStore) counts() (saveLoginChallenge, saveDevice, saveSession, saveAccount, sessionByID, accountByID, updateSession int) {
+func (s *countingAuthStore) counts() (saveLoginChallenge, saveDevice, saveSession, saveAccount, lockAccount, sessionByID, accountByID, updateSession int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.saveLoginChallenge, s.saveDevice, s.saveSession, s.saveAccount, s.sessionByID, s.accountByID, s.updateSession
+	return s.saveLoginChallenge, s.saveDevice, s.saveSession, s.saveAccount, s.lockAccount, s.sessionByID, s.accountByID, s.updateSession
 }
 
 type countingAuthTxStore struct {
@@ -169,6 +179,15 @@ func (s *countingAuthTxStore) SaveAccount(
 	s.parent.mu.Unlock()
 
 	return s.Store.SaveAccount(ctx, account)
+}
+
+// LockAccount counts and forwards account-boundary locks inside a transaction.
+func (s *countingAuthTxStore) LockAccount(ctx context.Context, accountID string) error {
+	s.parent.mu.Lock()
+	s.parent.lockAccount++
+	s.parent.mu.Unlock()
+
+	return s.Store.LockAccount(ctx, accountID)
 }
 
 func (s *countingAuthTxStore) SessionByID(ctx context.Context, sessionID string) (identity.Session, error) {
@@ -253,7 +272,7 @@ func TestBeginLoginIdempotencyKeyDeduplicatesSuccessfulChallenge(t *testing.T) {
 		t.Fatalf("expected one code send, got %d", sender.totalSends())
 	}
 
-	saveLoginChallenge, _, _, _, _, _, _ := store.counts()
+	saveLoginChallenge, _, _, _, _, _, _, _ := store.counts()
 	if saveLoginChallenge != 1 {
 		t.Fatalf("expected one SaveLoginChallenge call, got %d", saveLoginChallenge)
 	}
@@ -330,7 +349,7 @@ func TestVerifyLoginCodeIdempotencyKeyDeduplicatesSuccessfulLogin(t *testing.T) 
 		t.Fatalf("expected cached device %s, got %s", first.Device.ID, second.Device.ID)
 	}
 
-	saveLoginChallenge, saveDevice, saveSession, saveAccount, sessionByID, accountByID, updateSession := store.counts()
+	saveLoginChallenge, saveDevice, saveSession, saveAccount, lockAccount, sessionByID, accountByID, updateSession := store.counts()
 	if saveLoginChallenge != 2 {
 		t.Fatalf("expected two SaveLoginChallenge calls for begin+verify, got %d", saveLoginChallenge)
 	}
@@ -340,14 +359,17 @@ func TestVerifyLoginCodeIdempotencyKeyDeduplicatesSuccessfulLogin(t *testing.T) 
 	if saveSession != 1 {
 		t.Fatalf("expected one SaveSession call, got %d", saveSession)
 	}
-	if saveAccount != 2 {
-		t.Fatalf("expected two SaveAccount calls, got %d", saveAccount)
+	if saveAccount != 1 {
+		t.Fatalf("expected one SaveAccount call, got %d", saveAccount)
+	}
+	if lockAccount != 1 {
+		t.Fatalf("expected one LockAccount call, got %d", lockAccount)
 	}
 	if sessionByID != 0 {
 		t.Fatalf("expected cached verify to avoid SessionByID calls, got %d", sessionByID)
 	}
-	if accountByID != 1 {
-		t.Fatalf("expected one AccountByID call, got %d", accountByID)
+	if accountByID != 2 {
+		t.Fatalf("expected two AccountByID calls, got %d", accountByID)
 	}
 	if updateSession != 0 {
 		t.Fatalf("expected verify cache to avoid UpdateSession calls, got %d", updateSession)
@@ -434,7 +456,7 @@ func TestRegisterDeviceIdempotencyKeyDeduplicatesSuccessfulRegistration(t *testi
 		t.Fatalf("expected cached session %s, got %s", firstSession.ID, secondSession.ID)
 	}
 
-	saveLoginChallenge, saveDevice, saveSession, saveAccount, sessionByID, accountByID, updateSession := store.counts()
+	saveLoginChallenge, saveDevice, saveSession, saveAccount, lockAccount, sessionByID, accountByID, updateSession := store.counts()
 	if saveLoginChallenge != 2 {
 		t.Fatalf("expected two SaveLoginChallenge calls for begin+verify, got %d", saveLoginChallenge)
 	}
@@ -444,14 +466,17 @@ func TestRegisterDeviceIdempotencyKeyDeduplicatesSuccessfulRegistration(t *testi
 	if saveSession != 1 {
 		t.Fatalf("expected one SaveSession call for login session, got %d", saveSession)
 	}
-	if saveAccount != 3 {
-		t.Fatalf("expected three SaveAccount calls, got %d", saveAccount)
+	if saveAccount != 1 {
+		t.Fatalf("expected one SaveAccount call, got %d", saveAccount)
+	}
+	if lockAccount != 2 {
+		t.Fatalf("expected two LockAccount calls, got %d", lockAccount)
 	}
 	if sessionByID != 2 {
 		t.Fatalf("expected two SessionByID calls, got %d", sessionByID)
 	}
-	if accountByID != 2 {
-		t.Fatalf("expected two AccountByID calls, got %d", accountByID)
+	if accountByID != 3 {
+		t.Fatalf("expected three AccountByID calls, got %d", accountByID)
 	}
 	if updateSession != 1 {
 		t.Fatalf("expected one UpdateSession call, got %d", updateSession)

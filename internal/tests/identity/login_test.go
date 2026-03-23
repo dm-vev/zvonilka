@@ -517,7 +517,7 @@ func TestRegisterDeviceRejectsSuspendedAccount(t *testing.T) {
 		t.Fatalf("suspend account: %v", err)
 	}
 
-	saveLoginChallengeCalls, saveDeviceCalls, saveSessionCalls, saveAccountCalls, sessionByIDCalls, accountByIDCalls, updateSessionCalls := store.counts()
+	saveLoginChallengeCalls, saveDeviceCalls, saveSessionCalls, saveAccountCalls, lockAccountCalls, sessionByIDCalls, accountByIDCalls, updateSessionCalls := store.counts()
 
 	_, _, err = svc.RegisterDevice(ctx, identity.RegisterDeviceParams{
 		SessionID:      loginResult.Session.ID,
@@ -530,7 +530,7 @@ func TestRegisterDeviceRejectsSuspendedAccount(t *testing.T) {
 		t.Fatalf("expected ErrForbidden for suspended account, got %v", err)
 	}
 
-	afterSaveLoginChallengeCalls, afterSaveDeviceCalls, afterSaveSessionCalls, afterSaveAccountCalls, afterSessionByIDCalls, afterAccountByIDCalls, afterUpdateSessionCalls := store.counts()
+	afterSaveLoginChallengeCalls, afterSaveDeviceCalls, afterSaveSessionCalls, afterSaveAccountCalls, afterLockAccountCalls, afterSessionByIDCalls, afterAccountByIDCalls, afterUpdateSessionCalls := store.counts()
 
 	if afterSaveLoginChallengeCalls != saveLoginChallengeCalls {
 		t.Fatalf("expected no login challenge writes, got %d -> %d", saveLoginChallengeCalls, afterSaveLoginChallengeCalls)
@@ -543,6 +543,9 @@ func TestRegisterDeviceRejectsSuspendedAccount(t *testing.T) {
 	}
 	if afterSaveAccountCalls != saveAccountCalls {
 		t.Fatalf("expected no account writes, got %d -> %d", saveAccountCalls, afterSaveAccountCalls)
+	}
+	if afterLockAccountCalls != lockAccountCalls+1 {
+		t.Fatalf("expected one account lock for register device, got %d -> %d", lockAccountCalls, afterLockAccountCalls)
 	}
 	if afterSessionByIDCalls != sessionByIDCalls+1 {
 		t.Fatalf("expected one session lookup for register device, got %d -> %d", sessionByIDCalls, afterSessionByIDCalls)

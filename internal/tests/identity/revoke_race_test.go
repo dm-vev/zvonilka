@@ -39,19 +39,20 @@ func (s *accountGateStore) WithinTx(ctx context.Context, fn func(identity.Store)
 	return fn(tx)
 }
 
-// SaveAccount is only used outside the race harness, so it forwards directly.
+// SaveAccount forwards directly; the gate only intercepts LockAccount so a
+// concurrent profile edit can proceed while the transaction is paused.
 func (s *accountGateStore) SaveAccount(ctx context.Context, account identity.Account) (identity.Account, error) {
 	return s.Store.SaveAccount(ctx, account)
 }
 
-// enableBlocking turns on the SaveAccount gate after setup work is complete.
+// enableBlocking turns on the account boundary gate after setup work is complete.
 func (s *accountGateStore) enableBlocking() {
 	s.stateMu.Lock()
 	s.blocking = true
 	s.stateMu.Unlock()
 }
 
-// accountGateTxStore serializes SaveAccount calls on the shared account boundary.
+// accountGateTxStore serializes LockAccount calls on the shared account boundary.
 type accountGateTxStore struct {
 	identity.Store
 
@@ -60,8 +61,8 @@ type accountGateTxStore struct {
 	holdsAccountLock bool
 }
 
-// SaveAccount acquires the shared account boundary for the duration of the transaction.
-func (s *accountGateTxStore) SaveAccount(ctx context.Context, account identity.Account) (identity.Account, error) {
+// LockAccount acquires the shared account boundary for the duration of the transaction.
+func (s *accountGateTxStore) LockAccount(ctx context.Context, accountID string) error {
 	s.parent.lock.Lock()
 	s.holdsAccountLock = true
 
@@ -75,11 +76,11 @@ func (s *accountGateTxStore) SaveAccount(ctx context.Context, account identity.A
 		<-s.parent.release
 	}
 
-	saved, err := s.Store.SaveAccount(ctx, account)
-	return saved, err
+	err := s.Store.LockAccount(ctx, accountID)
+	return err
 }
 
-// newAccountGateStore wraps a store with a controllable SaveAccount gate.
+// newAccountGateStore wraps a store with a controllable account-boundary gate.
 func newAccountGateStore(store identity.Store) *accountGateStore {
 	return &accountGateStore{
 		Store:   store,

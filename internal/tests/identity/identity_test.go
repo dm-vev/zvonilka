@@ -96,7 +96,7 @@ func (s *failingSaveDeviceTxStore) SaveDevice(ctx context.Context, device identi
 	return s.Store.SaveDevice(ctx, device)
 }
 
-// failingSaveAccountStore fails a chosen SaveAccount call to exercise late rollback paths.
+// failingSaveAccountStore fails a chosen SaveAccount call to exercise boundary rollback paths.
 type failingSaveAccountStore struct {
 	identity.Store
 	failErr    error
@@ -117,7 +117,7 @@ func (s *failingSaveAccountStore) WithinTx(ctx context.Context, fn func(identity
 // SaveAccount injects a failure on the configured call number before delegating to the wrapped store.
 func (s *failingSaveAccountStore) SaveAccount(ctx context.Context, account identity.Account) (identity.Account, error) {
 	if s.failErr == nil {
-		s.failErr = errors.New("forced save account failure")
+		s.failErr = errors.New("forced account save failure")
 	}
 	s.calls++
 	failOnCall := s.failOnCall
@@ -137,12 +137,20 @@ type failingSaveAccountTxStore struct {
 	parent *failingSaveAccountStore
 }
 
-func (s *failingSaveAccountTxStore) SaveAccount(
-	ctx context.Context,
-	account identity.Account,
-) (identity.Account, error) {
+// SaveAccount forwards account writes without injecting failure.
+func (s *failingSaveAccountTxStore) SaveAccount(ctx context.Context, account identity.Account) (identity.Account, error) {
+	return s.Store.SaveAccount(ctx, account)
+}
+
+// LockAccount forwards account boundary calls without injecting failure.
+func (s *failingSaveAccountStore) LockAccount(ctx context.Context, accountID string) error {
+	return s.Store.LockAccount(ctx, accountID)
+}
+
+// LockAccount injects a failure on the configured call number before delegating to the wrapped store.
+func (s *failingSaveAccountTxStore) LockAccount(ctx context.Context, accountID string) error {
 	if s.parent.failErr == nil {
-		s.parent.failErr = errors.New("forced save account failure")
+		s.parent.failErr = errors.New("forced account boundary failure")
 	}
 	s.parent.calls++
 	failOnCall := s.parent.failOnCall
@@ -150,10 +158,10 @@ func (s *failingSaveAccountTxStore) SaveAccount(
 		failOnCall = 2
 	}
 	if s.parent.calls == failOnCall {
-		return identity.Account{}, s.parent.failErr
+		return s.parent.failErr
 	}
 
-	return s.Store.SaveAccount(ctx, account)
+	return s.Store.LockAccount(ctx, accountID)
 }
 
 func TestUserAccountLifecycle(t *testing.T) {

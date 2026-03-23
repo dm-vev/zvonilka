@@ -38,6 +38,30 @@ func (s *Store) SaveAccount(ctx context.Context, account identity.Account) (iden
 	return saved, nil
 }
 
+// LockAccount acquires an account boundary without modifying any fields.
+//
+// Callers must hold the surrounding transaction open for the lock to serialize later
+// writes on the same account boundary.
+func (s *Store) LockAccount(ctx context.Context, accountID string) error {
+	if err := s.requireContext(ctx); err != nil {
+		return err
+	}
+	if err := s.requireStore(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(accountID) == "" {
+		return identity.ErrInvalidInput
+	}
+
+	if s.tx != nil {
+		return s.lockAccount(ctx, accountID)
+	}
+
+	return s.withTransaction(ctx, func(tx identity.Store) error {
+		return tx.(*Store).lockAccount(ctx, accountID)
+	})
+}
+
 func (s *Store) saveAccount(ctx context.Context, account identity.Account) (identity.Account, error) {
 	account.ID = strings.TrimSpace(account.ID)
 	account.Username = strings.TrimSpace(account.Username)
@@ -116,6 +140,23 @@ RETURNING %s
 	}
 
 	return saved, nil
+}
+
+func (s *Store) lockAccount(ctx context.Context, accountID string) error {
+	if err := s.lockIdentifiers(ctx, lockKey("identity:account:id", accountID)); err != nil {
+		return err
+	}
+
+	query := fmt.Sprintf(`SELECT id FROM %s WHERE id = $1 FOR UPDATE`, s.table("identity_accounts"))
+	var lockedID string
+	if err := s.conn().QueryRowContext(ctx, query, accountID).Scan(&lockedID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return identity.ErrNotFound
+		}
+		return fmt.Errorf("lock account %s: %w", accountID, err)
+	}
+
+	return nil
 }
 
 // DeleteAccount removes an account and all cascading rows.

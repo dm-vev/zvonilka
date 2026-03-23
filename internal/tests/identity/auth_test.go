@@ -388,6 +388,37 @@ func TestLoginIssuesSingleCurrentSession(t *testing.T) {
 	}
 }
 
+func TestVerifyLoginCodeUpdatesLastAuthAt(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	sender := &recordingCodeSender{}
+	now := time.Date(2026, time.March, 23, 20, 45, 0, 0, time.UTC)
+	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time { return now }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	account := createUserAccount(t, svc, ctx, "last-auth-at")
+	now = now.Add(3 * time.Minute)
+	_, _ = loginUser(t, svc, sender, ctx, account.Username, "begin-last-auth", "verify-last-auth")
+
+	storedAccount, err := store.AccountByID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("load account after login: %v", err)
+	}
+	if storedAccount.LastAuthAt.IsZero() {
+		t.Fatalf("expected LastAuthAt to be updated")
+	}
+	if !storedAccount.LastAuthAt.Equal(now) {
+		t.Fatalf("expected LastAuthAt %s, got %s", now, storedAccount.LastAuthAt)
+	}
+	if !storedAccount.UpdatedAt.Equal(now) {
+		t.Fatalf("expected UpdatedAt %s, got %s", now, storedAccount.UpdatedAt)
+	}
+}
+
 // newReliabilityService constructs a service with a deterministic clock for reliability tests.
 func newReliabilityService(
 	t *testing.T,
