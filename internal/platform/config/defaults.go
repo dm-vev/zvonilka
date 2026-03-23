@@ -28,7 +28,7 @@ var serviceListenDefaults = map[string]listenDefaults{
 }
 
 const (
-	defaultEnvironment          = "development"
+	defaultEnvironment          = "production"
 	defaultShutdownTimeout      = 10 * time.Second
 	defaultReadHeaderTimeout    = 5 * time.Second
 	defaultReadTimeout          = 10 * time.Second

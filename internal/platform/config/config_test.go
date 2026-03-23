@@ -152,6 +152,31 @@ func TestLoadUsesProductionDefaultsForRuntimeAndLogging(t *testing.T) {
 	}
 }
 
+func TestLoadUsesProductionDefaultsWhenEnvironmentUnset(t *testing.T) {
+	resetConfigEnv(t)
+
+	cfg, err := Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.Service.Environment != "production" {
+		t.Fatalf("service environment: got %s, want production", cfg.Service.Environment)
+	}
+	if cfg.Logging.Level != "info" {
+		t.Fatalf("logging level: got %s, want info", cfg.Logging.Level)
+	}
+	if cfg.Logging.Format != "json" {
+		t.Fatalf("logging format: got %s, want json", cfg.Logging.Format)
+	}
+	if cfg.Logging.AddSource {
+		t.Fatal("expected add source to be disabled by default")
+	}
+	if cfg.Runtime.GRPC.ReflectionEnabled {
+		t.Fatal("expected grpc reflection to be disabled by default")
+	}
+}
+
 func TestLoadNormalizesServiceAndEnvironmentCase(t *testing.T) {
 	resetConfigEnv(t)
 
