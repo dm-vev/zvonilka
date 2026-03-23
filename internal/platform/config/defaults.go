@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
@@ -116,6 +117,7 @@ func defaultRuntime(serviceName string, environment string) RuntimeConfig {
 }
 
 func defaultLogging(environment string) LoggingConfig {
+	environment = strings.ToLower(strings.TrimSpace(environment))
 	level := "info"
 	format := "json"
 	addSource := false
@@ -134,6 +136,7 @@ func defaultLogging(environment string) LoggingConfig {
 }
 
 func isDevelopmentLikeEnvironment(environment string) bool {
+	environment = strings.ToLower(strings.TrimSpace(environment))
 	switch environment {
 	case "development", "dev", "local", "test":
 		return true

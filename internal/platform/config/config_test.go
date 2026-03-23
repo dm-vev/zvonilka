@@ -152,6 +152,36 @@ func TestLoadUsesProductionDefaultsForRuntimeAndLogging(t *testing.T) {
 	}
 }
 
+func TestLoadNormalizesServiceAndEnvironmentCase(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_ENV", "DEV")
+
+	cfg, err := Load("GATEWAY")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.Service.Name != "gateway" {
+		t.Fatalf("service name: got %s, want gateway", cfg.Service.Name)
+	}
+	if cfg.Runtime.HTTP.Address != ":8081" {
+		t.Fatalf("gateway http addr: got %s, want :8081", cfg.Runtime.HTTP.Address)
+	}
+	if cfg.Runtime.GRPC.Address != ":9091" {
+		t.Fatalf("gateway grpc addr: got %s, want :9091", cfg.Runtime.GRPC.Address)
+	}
+	if cfg.Logging.Level != "debug" {
+		t.Fatalf("logging level: got %s, want debug", cfg.Logging.Level)
+	}
+	if cfg.Logging.Format != "text" {
+		t.Fatalf("logging format: got %s, want text", cfg.Logging.Format)
+	}
+	if !cfg.Runtime.GRPC.ReflectionEnabled {
+		t.Fatal("expected grpc reflection to stay enabled in development profile")
+	}
+}
+
 func resetConfigEnv(t *testing.T) {
 	t.Helper()
 

@@ -1,6 +1,9 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Configuration contains the full service configuration surface.
 type Configuration struct {
@@ -17,6 +20,7 @@ type Config = Configuration
 
 // Load builds a fully validated configuration for the requested service.
 func Load(serviceName string) (Configuration, error) {
+	serviceName = strings.ToLower(strings.TrimSpace(serviceName))
 	if serviceName == "" {
 		return Configuration{}, fmt.Errorf("service name is required")
 	}
