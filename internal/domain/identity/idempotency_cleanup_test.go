@@ -49,7 +49,6 @@ func TestIdempotencyCacheCleanupIsBucketScoped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("lookup through idempotency cache: %v", err)
 	}
-
 	if got := cache.submitJoinRequest.len(); got != 0 {
 		t.Fatalf("expected expired submit-join-request entry to be evicted, got %d", got)
 	}
