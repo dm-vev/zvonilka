@@ -21,6 +21,12 @@ func (c *Configuration) normalize() {
 	c.Runtime.HTTP.Address = strings.TrimSpace(c.Runtime.HTTP.Address)
 	c.Runtime.GRPC.Address = strings.TrimSpace(c.Runtime.GRPC.Address)
 
+	c.Storage.PrimaryProvider = strings.ToLower(strings.TrimSpace(c.Storage.PrimaryProvider))
+	c.Storage.CacheProvider = strings.ToLower(strings.TrimSpace(c.Storage.CacheProvider))
+	c.Storage.ObjectProvider = strings.ToLower(strings.TrimSpace(c.Storage.ObjectProvider))
+	c.Storage.AuditProvider = strings.ToLower(strings.TrimSpace(c.Storage.AuditProvider))
+	c.Storage.SearchProvider = strings.ToLower(strings.TrimSpace(c.Storage.SearchProvider))
+
 	c.Infrastructure.Postgres.DSN = strings.TrimSpace(c.Infrastructure.Postgres.DSN)
 	c.Infrastructure.Postgres.MigrationsPath = strings.TrimSpace(c.Infrastructure.Postgres.MigrationsPath)
 	c.Infrastructure.Postgres.Schema = strings.TrimSpace(c.Infrastructure.Postgres.Schema)

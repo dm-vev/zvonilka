@@ -9,7 +9,7 @@ The important invariants are:
   - user-facing identifiers are normalized before lookups and writes;
   - idempotency is scoped per operation and per request fingerprint;
   - approval retries may recover an already persisted account instead of creating a second one;
-  - session/device writes are rolled back explicitly because the store contract is intentionally
-    transaction-free at this stage of the project.
+  - multi-step writes run inside store-managed transactions so the service can keep
+    commit and rollback behavior inside the storage boundary.
 */
 package identity

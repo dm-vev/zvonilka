@@ -88,6 +88,13 @@ func defaultConfiguration(serviceName string) Configuration {
 				ForcePathStyle: false,
 			},
 		},
+		Storage: StorageConfig{
+			PrimaryProvider: "primary",
+			CacheProvider:   "cache",
+			ObjectProvider:  "object",
+			AuditProvider:   "audit",
+			SearchProvider:  "search",
+		},
 	}
 
 	return cfg

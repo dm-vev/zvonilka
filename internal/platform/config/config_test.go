@@ -177,6 +177,62 @@ func TestLoadUsesProductionDefaultsWhenEnvironmentUnset(t *testing.T) {
 	}
 }
 
+func TestLoadUsesStorageProviderDefaults(t *testing.T) {
+	resetConfigEnv(t)
+
+	cfg, err := Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.Storage.PrimaryProvider != "primary" {
+		t.Fatalf("storage primary provider: got %s, want primary", cfg.Storage.PrimaryProvider)
+	}
+	if cfg.Storage.CacheProvider != "cache" {
+		t.Fatalf("storage cache provider: got %s, want cache", cfg.Storage.CacheProvider)
+	}
+	if cfg.Storage.ObjectProvider != "object" {
+		t.Fatalf("storage object provider: got %s, want object", cfg.Storage.ObjectProvider)
+	}
+	if cfg.Storage.AuditProvider != "audit" {
+		t.Fatalf("storage audit provider: got %s, want audit", cfg.Storage.AuditProvider)
+	}
+	if cfg.Storage.SearchProvider != "search" {
+		t.Fatalf("storage search provider: got %s, want search", cfg.Storage.SearchProvider)
+	}
+}
+
+func TestLoadNormalizesStorageProviderNames(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_STORAGE_PRIMARY_PROVIDER", " Primary ")
+	t.Setenv("ZVONILKA_STORAGE_CACHE_PROVIDER", "CACHE")
+	t.Setenv("ZVONILKA_STORAGE_OBJECT_PROVIDER", "Object")
+	t.Setenv("ZVONILKA_STORAGE_AUDIT_PROVIDER", " Audit ")
+	t.Setenv("ZVONILKA_STORAGE_SEARCH_PROVIDER", "SEARCH")
+
+	cfg, err := Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.Storage.PrimaryProvider != "primary" {
+		t.Fatalf("storage primary provider: got %s, want primary", cfg.Storage.PrimaryProvider)
+	}
+	if cfg.Storage.CacheProvider != "cache" {
+		t.Fatalf("storage cache provider: got %s, want cache", cfg.Storage.CacheProvider)
+	}
+	if cfg.Storage.ObjectProvider != "object" {
+		t.Fatalf("storage object provider: got %s, want object", cfg.Storage.ObjectProvider)
+	}
+	if cfg.Storage.AuditProvider != "audit" {
+		t.Fatalf("storage audit provider: got %s, want audit", cfg.Storage.AuditProvider)
+	}
+	if cfg.Storage.SearchProvider != "search" {
+		t.Fatalf("storage search provider: got %s, want search", cfg.Storage.SearchProvider)
+	}
+}
+
 func TestLoadNormalizesServiceAndEnvironmentCase(t *testing.T) {
 	resetConfigEnv(t)
 
@@ -227,6 +283,11 @@ func resetConfigEnv(t *testing.T) {
 		"ZVONILKA_BOTAPI_HTTP_ADDR",
 		"ZVONILKA_BOTAPI_GRPC_ADDR",
 		"ZVONILKA_BOTAPI_SHUTDOWN_TIMEOUT",
+		"ZVONILKA_STORAGE_PRIMARY_PROVIDER",
+		"ZVONILKA_STORAGE_CACHE_PROVIDER",
+		"ZVONILKA_STORAGE_OBJECT_PROVIDER",
+		"ZVONILKA_STORAGE_AUDIT_PROVIDER",
+		"ZVONILKA_STORAGE_SEARCH_PROVIDER",
 	}
 
 	for _, key := range keys {

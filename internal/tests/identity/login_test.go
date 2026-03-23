@@ -49,6 +49,16 @@ type failingUpdateSessionStore struct {
 	failed  bool
 }
 
+// WithinTx preserves the injected failure semantics inside transactional callbacks.
+func (s *failingUpdateSessionStore) WithinTx(ctx context.Context, fn func(identity.Store) error) error {
+	return s.Store.WithinTx(ctx, func(tx identity.Store) error {
+		return fn(&failingUpdateSessionTxStore{
+			Store:  tx,
+			parent: s,
+		})
+	})
+}
+
 // UpdateSession injects a one-shot failure before delegating to the wrapped store.
 func (s *failingUpdateSessionStore) UpdateSession(ctx context.Context, session identity.Session) (identity.Session, error) {
 	if s.failErr == nil {
@@ -57,6 +67,24 @@ func (s *failingUpdateSessionStore) UpdateSession(ctx context.Context, session i
 	if !s.failed {
 		s.failed = true
 		return identity.Session{}, s.failErr
+	}
+
+	return s.Store.UpdateSession(ctx, session)
+}
+
+type failingUpdateSessionTxStore struct {
+	identity.Store
+
+	parent *failingUpdateSessionStore
+}
+
+func (s *failingUpdateSessionTxStore) UpdateSession(ctx context.Context, session identity.Session) (identity.Session, error) {
+	if s.parent.failErr == nil {
+		s.parent.failErr = errors.New("forced update session failure")
+	}
+	if !s.parent.failed {
+		s.parent.failed = true
+		return identity.Session{}, s.parent.failErr
 	}
 
 	return s.Store.UpdateSession(ctx, session)

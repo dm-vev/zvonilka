@@ -36,10 +36,11 @@ func (s *Service) ListJoinRequestsByStatus(
 // can surface the state transition even when the original review happens late.
 func (s *Service) loadPendingJoinRequest(
 	ctx context.Context,
+	store Store,
 	joinRequestID string,
 	reviewedBy string,
 ) (JoinRequest, error) {
-	joinRequest, err := s.store.JoinRequestByID(ctx, joinRequestID)
+	joinRequest, err := store.JoinRequestByID(ctx, joinRequestID)
 	if err != nil {
 		return JoinRequest{}, fmt.Errorf("load join request %s: %w", joinRequestID, err)
 	}
@@ -49,7 +50,7 @@ func (s *Service) loadPendingJoinRequest(
 
 	now := s.currentTime()
 	if joinRequestExpiredAt(joinRequest, now) {
-		expiredJoinRequest, saveErr := s.expireJoinRequest(ctx, joinRequest, now, reviewedBy)
+		expiredJoinRequest, saveErr := s.expireJoinRequest(ctx, store, joinRequest, now, reviewedBy)
 		if saveErr != nil {
 			return JoinRequest{}, fmt.Errorf("mark join request %s as expired: %w", joinRequest.ID, saveErr)
 		}
@@ -74,7 +75,6 @@ func (s *Service) filterActivePendingJoinRequests(joinRequests []JoinRequest) ([
 	for _, joinRequest := range joinRequests {
 		if !joinRequestExpiredAt(joinRequest, now) {
 			activeJoinRequests = append(activeJoinRequests, joinRequest)
-			continue
 		}
 	}
 
@@ -86,6 +86,7 @@ func (s *Service) filterActivePendingJoinRequests(joinRequests []JoinRequest) ([
 // The helper is called from both approve and reject paths when a moderator acts too late.
 func (s *Service) expireJoinRequest(
 	ctx context.Context,
+	store Store,
 	joinRequest JoinRequest,
 	now time.Time,
 	reviewedBy string,
@@ -95,7 +96,7 @@ func (s *Service) expireJoinRequest(
 	joinRequest.ReviewedBy = trimmed(reviewedBy)
 	joinRequest.DecisionReason = "join request expired"
 
-	savedJoinRequest, err := s.store.SaveJoinRequest(ctx, joinRequest)
+	savedJoinRequest, err := store.SaveJoinRequest(ctx, joinRequest)
 	if err != nil {
 		return JoinRequest{}, fmt.Errorf("save join request %s: %w", joinRequest.ID, err)
 	}

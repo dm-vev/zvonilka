@@ -2,7 +2,6 @@ package identity
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -135,12 +134,11 @@ func (s *Service) lookupAccountByIdentifier(ctx context.Context, username, email
 
 // issueSession creates a device/session pair and returns bearer tokens for the account.
 //
-// The store interface is intentionally not transactional yet, so the function records the
-// device first, then the session, then the auth metadata. If any later step fails, the
-// defer block rolls back the partial writes so callers do not observe half-created login
-// state.
+// The caller is expected to run the helper inside a store transaction when the
+// provider supports it so device, session, and account updates commit atomically.
 func (s *Service) issueSession(
 	ctx context.Context,
+	store Store,
 	account Account,
 	deviceName string,
 	platform DevicePlatform,
@@ -155,22 +153,6 @@ func (s *Service) issueSession(
 		err = ErrForbidden
 		return
 	}
-
-	var (
-		savedDevice  Device
-		savedSession Session
-	)
-
-	// Roll back partial writes if any later step fails after the device/session pair starts
-	// materializing. The saved IDs are captured separately so cleanup can stay idempotent.
-	defer func() {
-		if err == nil {
-			return
-		}
-		if rollbackErr := s.rollbackDeviceAndSession(ctx, savedDevice.ID, savedSession.ID); rollbackErr != nil {
-			err = errors.Join(err, rollbackErr)
-		}
-	}()
 
 	now := s.currentTime()
 	if deviceName == "" {
@@ -205,7 +187,7 @@ func (s *Service) issueSession(
 		LastSeenAt: now,
 	}
 
-	savedDevice, saveErr := s.store.SaveDevice(ctx, device)
+	savedDevice, saveErr := store.SaveDevice(ctx, device)
 	if saveErr != nil {
 		err = fmt.Errorf("save device for account %s: %w", account.ID, saveErr)
 		return
@@ -223,7 +205,7 @@ func (s *Service) issueSession(
 		LastSeenAt:     now,
 	}
 
-	savedSession, saveErr = s.store.SaveSession(ctx, session)
+	savedSession, saveErr := store.SaveSession(ctx, session)
 	if saveErr != nil {
 		err = fmt.Errorf("save session for account %s: %w", account.ID, saveErr)
 		return
@@ -243,7 +225,7 @@ func (s *Service) issueSession(
 
 	account.LastAuthAt = now
 	account.UpdatedAt = now
-	if _, saveErr := s.store.SaveAccount(ctx, account); saveErr != nil {
+	if _, saveErr := store.SaveAccount(ctx, account); saveErr != nil {
 		err = fmt.Errorf("update account %s after authentication: %w", account.ID, saveErr)
 		return
 	}
@@ -260,34 +242,6 @@ func (s *Service) issueSession(
 		Device:  savedDevice,
 	}
 	return
-}
-
-// rollbackDeviceAndSession deletes the session and device created by a failed login path.
-//
-// Missing rows are tolerated because the caller may already have removed one side of the
-// pair during its own cleanup.
-func (s *Service) rollbackDeviceAndSession(ctx context.Context, deviceID, sessionID string) error {
-	var rollbackErr error
-
-	if sessionID != "" {
-		if err := s.store.DeleteSession(ctx, sessionID); err != nil && !errors.Is(err, ErrNotFound) {
-			rollbackErr = errors.Join(
-				rollbackErr,
-				fmt.Errorf("delete session %s: %w", sessionID, err),
-			)
-		}
-	}
-
-	if deviceID != "" {
-		if err := s.store.DeleteDevice(ctx, deviceID); err != nil && !errors.Is(err, ErrNotFound) {
-			rollbackErr = errors.Join(
-				rollbackErr,
-				fmt.Errorf("delete device %s: %w", deviceID, err),
-			)
-		}
-	}
-
-	return rollbackErr
 }
 
 // selectLoginTargets chooses the available code delivery channels for an account.

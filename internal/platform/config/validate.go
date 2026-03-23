@@ -113,6 +113,21 @@ func (c Configuration) Validate() error {
 	if c.Infrastructure.Telemetry.TracingEnabled && c.Infrastructure.Telemetry.OTLPAddress == "" {
 		errs = append(errs, errors.New("OTLP address is required when tracing is enabled"))
 	}
+	if c.Storage.PrimaryProvider == "" {
+		errs = append(errs, errors.New("storage primary provider is required"))
+	}
+	if c.Storage.CacheProvider == "" {
+		errs = append(errs, errors.New("storage cache provider is required"))
+	}
+	if c.Storage.ObjectProvider == "" {
+		errs = append(errs, errors.New("storage object provider is required"))
+	}
+	if c.Storage.AuditProvider == "" {
+		errs = append(errs, errors.New("storage audit provider is required"))
+	}
+	if c.Storage.SearchProvider == "" {
+		errs = append(errs, errors.New("storage search provider is required"))
+	}
 
 	if len(errs) == 0 {
 		return nil

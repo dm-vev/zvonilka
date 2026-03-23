@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/dm-vev/zvonilka/internal/domain/storage"
 )
 
 // SubmitJoinRequest stores a pending request for moderator review.
@@ -68,9 +70,8 @@ func (s *Service) SubmitJoinRequest(ctx context.Context, params SubmitJoinReques
 
 // ApproveJoinRequest converts a join request into an active user account.
 //
-// The approval path can recover an already-persisted account when a previous attempt
-// rolled back too late. The reusedExisting flag tells the rollback branch whether it
-// is still allowed to delete the account on a later join-request save failure.
+// The entire approval flow runs inside a store-managed transaction so account creation
+// and join-request state changes commit or roll back together.
 func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequestParams) (JoinRequest, Account, error) {
 	if err := s.validateContext(ctx, "approve join request"); err != nil {
 		return JoinRequest{}, Account{}, err
@@ -87,64 +88,68 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 		}
 	}
 
-	joinRequest, err := s.loadPendingJoinRequest(ctx, params.JoinRequestID, params.ReviewedBy)
+	var (
+		savedJoinRequest JoinRequest
+		account          Account
+		botToken         string
+		expiredJoin      JoinRequest
+	)
+
+	err := s.store.WithinTx(ctx, func(tx Store) error {
+		joinRequest, loadErr := s.loadPendingJoinRequest(ctx, tx, params.JoinRequestID, params.ReviewedBy)
+		if loadErr != nil {
+			if errors.Is(loadErr, ErrExpiredJoinRequest) {
+				expiredJoin = joinRequest
+				return storage.Commit(loadErr)
+			}
+
+			return loadErr
+		}
+
+		now := s.currentTime()
+		account, botToken, loadErr = s.createAccount(
+			ctx,
+			tx,
+			CreateAccountParams{
+				Username:       joinRequest.Username,
+				DisplayName:    joinRequest.DisplayName,
+				Email:          joinRequest.Email,
+				Phone:          joinRequest.Phone,
+				Roles:          params.Roles,
+				Note:           params.Note,
+				InviteCode:     "",
+				AccountKind:    AccountKindUser,
+				CreatedBy:      params.ReviewedBy,
+				IdempotencyKey: params.IdempotencyKey,
+				RequestedAt:    now,
+			},
+			true,
+		)
+		if loadErr != nil {
+			return loadErr
+		}
+		if botToken != "" {
+			return fmt.Errorf("join request created unexpected bot token")
+		}
+
+		joinRequest.Status = JoinRequestStatusApproved
+		joinRequest.ReviewedAt = now
+		joinRequest.ReviewedBy = params.ReviewedBy
+		joinRequest.DecisionReason = trimmed(params.DecisionReason)
+
+		savedJoinRequest, loadErr = tx.SaveJoinRequest(ctx, joinRequest)
+		if loadErr != nil {
+			return loadErr
+		}
+
+		return nil
+	})
 	if err != nil {
 		if errors.Is(err, ErrExpiredJoinRequest) {
-			return joinRequest, Account{}, err
+			return expiredJoin, Account{}, err
 		}
 
 		return JoinRequest{}, Account{}, err
-	}
-
-	now := s.currentTime()
-
-	// Approval retries must reuse a still-persisted cached account, or recreate
-	// it if rollback removed the previous one.
-	account, botToken, reusedExisting, err := s.createAccount(
-		ctx,
-		CreateAccountParams{
-			Username:       joinRequest.Username,
-			DisplayName:    joinRequest.DisplayName,
-			Email:          joinRequest.Email,
-			Phone:          joinRequest.Phone,
-			Roles:          params.Roles,
-			Note:           params.Note,
-			InviteCode:     "",
-			AccountKind:    AccountKindUser,
-			CreatedBy:      params.ReviewedBy,
-			IdempotencyKey: params.IdempotencyKey,
-			RequestedAt:    now,
-		},
-		true,
-	)
-	if err != nil {
-		return JoinRequest{}, Account{}, err
-	}
-	if botToken != "" {
-		return JoinRequest{}, Account{}, fmt.Errorf("join request created unexpected bot token")
-	}
-
-	joinRequest.Status = JoinRequestStatusApproved
-	joinRequest.ReviewedAt = now
-	joinRequest.ReviewedBy = params.ReviewedBy
-	joinRequest.DecisionReason = trimmed(params.DecisionReason)
-
-	savedJoinRequest, err := s.store.SaveJoinRequest(ctx, joinRequest)
-	if err != nil {
-		if !reusedExisting {
-			rollbackErr := s.store.DeleteAccount(ctx, account.ID)
-			if rollbackErr != nil && !isNotFound(rollbackErr) {
-				return JoinRequest{}, Account{}, fmt.Errorf(
-					"update join request %s: %w: rollback account %s: %w",
-					joinRequest.ID,
-					err,
-					account.ID,
-					rollbackErr,
-				)
-			}
-		}
-
-		return JoinRequest{}, Account{}, fmt.Errorf("update join request %s: %w", joinRequest.ID, err)
 	}
 
 	if params.IdempotencyKey != "" {
@@ -164,8 +169,8 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 
 // RejectJoinRequest marks a join request as rejected.
 //
-// Rejection only mutates the join-request row itself, so there is no account-side
-// rollback path to manage.
+// The rejection path also runs inside a transaction so late-expiry transitions can
+// be committed while keeping the write path consistent.
 func (s *Service) RejectJoinRequest(ctx context.Context, params RejectJoinRequestParams) (JoinRequest, error) {
 	if err := s.validateContext(ctx, "reject join request"); err != nil {
 		return JoinRequest{}, err
@@ -182,24 +187,41 @@ func (s *Service) RejectJoinRequest(ctx context.Context, params RejectJoinReques
 		}
 	}
 
-	joinRequest, err := s.loadPendingJoinRequest(ctx, params.JoinRequestID, params.ReviewedBy)
+	var (
+		savedJoinRequest JoinRequest
+		expiredJoin      JoinRequest
+	)
+
+	err := s.store.WithinTx(ctx, func(tx Store) error {
+		joinRequest, loadErr := s.loadPendingJoinRequest(ctx, tx, params.JoinRequestID, params.ReviewedBy)
+		if loadErr != nil {
+			if errors.Is(loadErr, ErrExpiredJoinRequest) {
+				expiredJoin = joinRequest
+				return storage.Commit(loadErr)
+			}
+
+			return loadErr
+		}
+
+		now := s.currentTime()
+		joinRequest.Status = JoinRequestStatusRejected
+		joinRequest.ReviewedAt = now
+		joinRequest.ReviewedBy = params.ReviewedBy
+		joinRequest.DecisionReason = trimmed(params.Reason)
+
+		savedJoinRequest, loadErr = tx.SaveJoinRequest(ctx, joinRequest)
+		if loadErr != nil {
+			return loadErr
+		}
+
+		return nil
+	})
 	if err != nil {
 		if errors.Is(err, ErrExpiredJoinRequest) {
-			return joinRequest, err
+			return expiredJoin, err
 		}
 
 		return JoinRequest{}, err
-	}
-
-	now := s.currentTime()
-	joinRequest.Status = JoinRequestStatusRejected
-	joinRequest.ReviewedAt = now
-	joinRequest.ReviewedBy = params.ReviewedBy
-	joinRequest.DecisionReason = trimmed(params.Reason)
-
-	savedJoinRequest, err := s.store.SaveJoinRequest(ctx, joinRequest)
-	if err != nil {
-		return JoinRequest{}, fmt.Errorf("update join request %s: %w", joinRequest.ID, err)
 	}
 
 	if params.IdempotencyKey != "" {
@@ -218,29 +240,46 @@ func (s *Service) CreateAccount(ctx context.Context, params CreateAccountParams)
 		return Account{}, "", err
 	}
 
-	account, botToken, _, err := s.createAccount(ctx, params, false)
-	return account, botToken, err
+	account, botToken, err := s.createAccount(ctx, s.store, params, false)
+	if err != nil {
+		return Account{}, "", err
+	}
+
+	if params.IdempotencyKey != "" {
+		s.idempotency.storeCreateAccountResult(
+			params.IdempotencyKey,
+			createAccountFingerprint(params),
+			createAccountCacheResult{
+				account:  account,
+				botToken: botToken,
+			},
+			s.currentTime(),
+		)
+	}
+
+	return account, botToken, nil
 }
 
 // createAccount executes the shared account write path for direct creation and approval retries.
 //
-// The allowExisting flag is only enabled by approval flows so they can recover an active
-// account that survived a partial rollback. Direct admin creation still fails on conflicts.
+// The helper accepts the store to write against so callers can run it inside a transaction
+// while keeping the domain logic in one place.
 func (s *Service) createAccount(
 	ctx context.Context,
+	store Store,
 	params CreateAccountParams,
 	allowExisting bool,
-) (Account, string, bool, error) {
+) (Account, string, error) {
 	fingerprint := createAccountFingerprint(params)
 	// Replay the cached result first so retried writes do not consume new IDs or tokens.
 	if params.IdempotencyKey != "" {
 		if result, ok, err := s.idempotency.createAccountResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
-			return Account{}, "", false, err
+			return Account{}, "", err
 		} else if ok {
-			if _, err := s.store.AccountByID(ctx, result.account.ID); err == nil {
-				return result.account, result.botToken, false, nil
+			if _, err := store.AccountByID(ctx, result.account.ID); err == nil {
+				return result.account, result.botToken, nil
 			} else if !isNotFound(err) {
-				return Account{}, "", false, fmt.Errorf("verify cached account %s: %w", result.account.ID, err)
+				return Account{}, "", fmt.Errorf("verify cached account %s: %w", result.account.ID, err)
 			}
 		}
 	}
@@ -249,13 +288,13 @@ func (s *Service) createAccount(
 	// all lookup paths will use later.
 	username, email, phone := s.normalizeAccountInput(params.Username, params.Email, params.Phone)
 	if username == "" {
-		return Account{}, "", false, ErrInvalidInput
+		return Account{}, "", ErrInvalidInput
 	}
 	if params.AccountKind == AccountKindUnspecified {
-		return Account{}, "", false, ErrInvalidInput
+		return Account{}, "", ErrInvalidInput
 	}
 	if params.AccountKind == AccountKindUser && email == "" && phone == "" {
-		return Account{}, "", false, ErrInvalidInput
+		return Account{}, "", ErrInvalidInput
 	}
 
 	now := params.RequestedAt
@@ -265,7 +304,7 @@ func (s *Service) createAccount(
 
 	accountID, err := newID("acc")
 	if err != nil {
-		return Account{}, "", false, fmt.Errorf("generate account ID: %w", err)
+		return Account{}, "", fmt.Errorf("generate account ID: %w", err)
 	}
 
 	account := Account{
@@ -289,60 +328,33 @@ func (s *Service) createAccount(
 	if params.AccountKind == AccountKindBot {
 		botToken, err = randomToken(32)
 		if err != nil {
-			return Account{}, "", false, fmt.Errorf("generate bot token for account %s: %w", accountID, err)
+			return Account{}, "", fmt.Errorf("generate bot token for account %s: %w", accountID, err)
 		}
 		account.BotTokenHash = hashSecret(botToken)
 	}
 
 	// Save the account once the request is fully normalized. Any conflict after this point
 	// is handled by the store or by the approval retry recovery path below.
-	savedAccount, err := s.store.SaveAccount(ctx, account)
+	savedAccount, err := store.SaveAccount(ctx, account)
 	if err != nil {
 		if allowExisting && params.AccountKind == AccountKindUser && errors.Is(err, ErrConflict) {
 			// Approval retries may hit an account that already exists because a previous
 			// attempt created it and then failed during the join-request update.
-			existingAccount, lookupErr := s.store.AccountByUsername(ctx, username)
+			existingAccount, lookupErr := store.AccountByUsername(ctx, username)
 			if lookupErr != nil {
-				return Account{}, "", false, fmt.Errorf("load existing account %s after conflict: %w", username, lookupErr)
+				return Account{}, "", fmt.Errorf("load existing account %s after conflict: %w", username, lookupErr)
 			}
 			if !accountsMatchForRecovery(existingAccount, account) {
-				return Account{}, "", false, ErrConflict
+				return Account{}, "", ErrConflict
 			}
 
-			if params.IdempotencyKey != "" {
-				// Cache the recovered account so subsequent retries do not re-run the conflict
-				// recovery path or consume any additional identifiers.
-				s.idempotency.storeCreateAccountResult(
-					params.IdempotencyKey,
-					fingerprint,
-					createAccountCacheResult{
-						account:  existingAccount,
-						botToken: "",
-					},
-					s.currentTime(),
-				)
-			}
-
-			return existingAccount, "", true, nil
+			return existingAccount, "", nil
 		}
 
-		return Account{}, "", false, fmt.Errorf("save account %s: %w", username, err)
+		return Account{}, "", fmt.Errorf("save account %s: %w", username, err)
 	}
 
-	// Persist the successful result after the account is durably written.
-	if params.IdempotencyKey != "" {
-		s.idempotency.storeCreateAccountResult(
-			params.IdempotencyKey,
-			fingerprint,
-			createAccountCacheResult{
-				account:  savedAccount,
-				botToken: botToken,
-			},
-			s.currentTime(),
-		)
-	}
-
-	return savedAccount, botToken, false, nil
+	return savedAccount, botToken, nil
 }
 
 // accountsMatchForRecovery reports whether a persisted account still matches the intended create payload.
@@ -377,9 +389,4 @@ func accountsMatchForRecovery(existing, expected Account) bool {
 	}
 
 	return true
-}
-
-// isNotFound centralizes the store-specific not-found check used by rollback paths.
-func isNotFound(err error) bool {
-	return errors.Is(err, ErrNotFound)
 }

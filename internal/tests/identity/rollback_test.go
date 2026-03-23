@@ -11,94 +11,73 @@ import (
 	teststore "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
 )
 
-var errApprovalRollbackDeleteFailure = errors.New("forced approval rollback delete failure")
-
-// onceFailingApprovalRollbackStore fails approval once and then fails rollback delete once.
-type onceFailingApprovalRollbackStore struct {
+// onceFailingApprovalStore fails the first approved join-request write.
+type onceFailingApprovalStore struct {
 	identity.Store
 
-	mu           sync.Mutex
-	saveFailed   bool
-	deleteFailed bool
+	mu     sync.Mutex
+	failed bool
+}
+
+// WithinTx preserves the injected failure semantics inside transactional callbacks.
+func (s *onceFailingApprovalStore) WithinTx(ctx context.Context, fn func(identity.Store) error) error {
+	return s.Store.WithinTx(ctx, func(tx identity.Store) error {
+		return fn(&onceFailingApprovalTxStore{
+			Store:  tx,
+			parent: s,
+		})
+	})
 }
 
 // SaveJoinRequest injects a single approved-write failure.
-func (s *onceFailingApprovalRollbackStore) SaveJoinRequest(
+func (s *onceFailingApprovalStore) SaveJoinRequest(
 	ctx context.Context,
 	joinRequest identity.JoinRequest,
 ) (identity.JoinRequest, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if joinRequest.Status == identity.JoinRequestStatusApproved && !s.saveFailed {
-		s.saveFailed = true
+	if joinRequest.Status == identity.JoinRequestStatusApproved && !s.failed {
+		s.failed = true
 		return identity.JoinRequest{}, errApprovedJoinRequestSave
 	}
 
 	return s.Store.SaveJoinRequest(ctx, joinRequest)
 }
 
-// DeleteAccount injects a single rollback-delete failure before delegating.
-func (s *onceFailingApprovalRollbackStore) DeleteAccount(ctx context.Context, accountID string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if !s.deleteFailed {
-		s.deleteFailed = true
-		return errApprovalRollbackDeleteFailure
-	}
-
-	return s.Store.DeleteAccount(ctx, accountID)
-}
-
-// alwaysFailApprovedJoinRequestDeleteOnceStore always fails approved writes and fails delete once.
-type alwaysFailApprovedJoinRequestDeleteOnceStore struct {
+type onceFailingApprovalTxStore struct {
 	identity.Store
 
-	mu           sync.Mutex
-	deleteFailed bool
+	parent *onceFailingApprovalStore
 }
 
-// SaveJoinRequest always fails approved join-request writes.
-func (s *alwaysFailApprovedJoinRequestDeleteOnceStore) SaveJoinRequest(
+func (s *onceFailingApprovalTxStore) SaveJoinRequest(
 	ctx context.Context,
 	joinRequest identity.JoinRequest,
 ) (identity.JoinRequest, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.parent.mu.Lock()
+	defer s.parent.mu.Unlock()
 
-	if joinRequest.Status == identity.JoinRequestStatusApproved {
+	if joinRequest.Status == identity.JoinRequestStatusApproved && !s.parent.failed {
+		s.parent.failed = true
 		return identity.JoinRequest{}, errApprovedJoinRequestSave
 	}
 
 	return s.Store.SaveJoinRequest(ctx, joinRequest)
 }
 
-// DeleteAccount injects a single rollback-delete failure before delegating.
-func (s *alwaysFailApprovedJoinRequestDeleteOnceStore) DeleteAccount(ctx context.Context, accountID string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if !s.deleteFailed {
-		s.deleteFailed = true
-		return errApprovalRollbackDeleteFailure
-	}
-
-	return s.Store.DeleteAccount(ctx, accountID)
-}
-
-func TestApproveJoinRequestRetryRecoversAfterRollbackDeleteFailure(t *testing.T) {
+func TestApproveJoinRequestRetryRecoversAfterTransactionRollback(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	baseStore := teststore.NewMemoryStore()
-	store := &onceFailingApprovalRollbackStore{Store: baseStore}
+	store := &onceFailingApprovalStore{Store: baseStore}
 	sender := &recordingCodeSender{}
 	svc := newReliabilityService(t, store, sender, time.Date(2026, time.March, 24, 0, 15, 0, 0, time.UTC))
 
 	joinRequest, err := svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
-		Username: "approval-delete-retry-user",
-		Email:    "approval-delete-retry@example.com",
+		Username: "approval-tx-retry-user",
+		Email:    "approval-tx-retry@example.com",
 	})
 	if err != nil {
 		t.Fatalf("submit join request: %v", err)
@@ -107,50 +86,54 @@ func TestApproveJoinRequestRetryRecoversAfterRollbackDeleteFailure(t *testing.T)
 	_, _, err = svc.ApproveJoinRequest(ctx, identity.ApproveJoinRequestParams{
 		JoinRequestID:  joinRequest.ID,
 		ReviewedBy:     "admin-1",
-		IdempotencyKey: "approve-delete-retry-key",
+		IdempotencyKey: "approve-tx-retry-key",
 	})
-	if !errors.Is(err, errApprovalRollbackDeleteFailure) {
-		t.Fatalf("expected rollback delete failure, got %v", err)
+	if !errors.Is(err, errApprovedJoinRequestSave) {
+		t.Fatalf("expected approval save failure, got %v", err)
 	}
 
-	orphanAccount, err := baseStore.AccountByUsername(ctx, joinRequest.Username)
-	if err != nil {
-		t.Fatalf("load orphan account: %v", err)
-	}
-	if orphanAccount.ID == "" {
-		t.Fatalf("expected orphan account to remain after rollback failure")
-	}
-
-	recoveredJoinRequest, recoveredAccount, err := svc.ApproveJoinRequest(ctx, identity.ApproveJoinRequestParams{
-		JoinRequestID:  joinRequest.ID,
-		ReviewedBy:     "admin-1",
-		IdempotencyKey: "approve-delete-retry-key",
-	})
-	if err != nil {
-		t.Fatalf("retry approve join request: %v", err)
-	}
-	if recoveredJoinRequest.Status != identity.JoinRequestStatusApproved {
-		t.Fatalf("expected approved join request, got %s", recoveredJoinRequest.Status)
-	}
-	if recoveredAccount.ID != orphanAccount.ID {
-		t.Fatalf("expected retry to reuse orphan account %s, got %s", orphanAccount.ID, recoveredAccount.ID)
+	if _, err := baseStore.AccountByUsername(ctx, joinRequest.Username); !errors.Is(err, identity.ErrNotFound) {
+		t.Fatalf("expected no persisted account after rollback, got %v", err)
 	}
 
 	storedJoinRequest, err := baseStore.JoinRequestByID(ctx, joinRequest.ID)
 	if err != nil {
-		t.Fatalf("load approved join request: %v", err)
+		t.Fatalf("load join request after rollback: %v", err)
 	}
-	if storedJoinRequest.Status != identity.JoinRequestStatusApproved {
-		t.Fatalf("expected stored join request approved, got %s", storedJoinRequest.Status)
+	if storedJoinRequest.Status != identity.JoinRequestStatusPending {
+		t.Fatalf("expected join request to remain pending, got %s", storedJoinRequest.Status)
+	}
+
+	approvedJoinRequest, account, err := svc.ApproveJoinRequest(ctx, identity.ApproveJoinRequestParams{
+		JoinRequestID:  joinRequest.ID,
+		ReviewedBy:     "admin-1",
+		IdempotencyKey: "approve-tx-retry-key",
+	})
+	if err != nil {
+		t.Fatalf("retry approve join request: %v", err)
+	}
+	if approvedJoinRequest.Status != identity.JoinRequestStatusApproved {
+		t.Fatalf("expected approved join request, got %s", approvedJoinRequest.Status)
+	}
+	if account.ID == "" {
+		t.Fatalf("expected approved account on retry")
+	}
+
+	storedAccount, err := baseStore.AccountByID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("load approved account: %v", err)
+	}
+	if storedAccount.ID != account.ID {
+		t.Fatalf("expected stored account %s, got %s", account.ID, storedAccount.ID)
 	}
 }
 
-func TestApproveJoinRequestRetryRecoversAfterRollbackDeleteFailureAndCacheExpiry(t *testing.T) {
+func TestApproveJoinRequestRetryAfterCacheExpiryCreatesFreshAccount(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	baseStore := teststore.NewMemoryStore()
-	store := &onceFailingApprovalRollbackStore{Store: baseStore}
+	store := &onceFailingApprovalStore{Store: baseStore}
 	sender := &recordingCodeSender{}
 	now := time.Date(2026, time.March, 24, 1, 0, 0, 0, time.UTC)
 	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time {
@@ -173,8 +156,8 @@ func TestApproveJoinRequestRetryRecoversAfterRollbackDeleteFailureAndCacheExpiry
 		ReviewedBy:     "admin-1",
 		IdempotencyKey: "approve-cache-expiry-key",
 	})
-	if !errors.Is(err, errApprovalRollbackDeleteFailure) {
-		t.Fatalf("expected rollback delete failure, got %v", err)
+	if !errors.Is(err, errApprovedJoinRequestSave) {
+		t.Fatalf("expected approval save failure, got %v", err)
 	}
 
 	now = now.Add(24*time.Hour + time.Minute)
@@ -191,87 +174,19 @@ func TestApproveJoinRequestRetryRecoversAfterRollbackDeleteFailureAndCacheExpiry
 		t.Fatalf("expected approved join request, got %s", recoveredJoinRequest.Status)
 	}
 	if recoveredAccount.ID == "" {
-		t.Fatalf("expected recovered account after cache expiry")
-	}
-
-	storedJoinRequest, err := baseStore.JoinRequestByID(ctx, joinRequest.ID)
-	if err != nil {
-		t.Fatalf("load approved join request: %v", err)
-	}
-	if storedJoinRequest.Status != identity.JoinRequestStatusApproved {
-		t.Fatalf("expected stored join request approved, got %s", storedJoinRequest.Status)
+		t.Fatalf("expected created account after cache expiry")
 	}
 
 	storedAccount, err := baseStore.AccountByUsername(ctx, joinRequest.Username)
 	if err != nil {
-		t.Fatalf("load recovered account: %v", err)
+		t.Fatalf("load account after cache expiry: %v", err)
 	}
 	if storedAccount.ID != recoveredAccount.ID {
-		t.Fatalf("expected recovered account %s, got %s", recoveredAccount.ID, storedAccount.ID)
+		t.Fatalf("expected stored account %s, got %s", recoveredAccount.ID, storedAccount.ID)
 	}
 }
 
-func TestApproveJoinRequestRetryKeepsRecoveredAccountOnSaveFailureAfterCacheExpiry(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	baseStore := teststore.NewMemoryStore()
-	store := &alwaysFailApprovedJoinRequestDeleteOnceStore{Store: baseStore}
-	sender := &recordingCodeSender{}
-	now := time.Date(2026, time.March, 24, 1, 30, 0, 0, time.UTC)
-	svc, err := identity.NewService(store, sender, identity.WithNow(func() time.Time {
-		return now
-	}))
-	if err != nil {
-		t.Fatalf("new service: %v", err)
-	}
-
-	joinRequest, err := svc.SubmitJoinRequest(ctx, identity.SubmitJoinRequestParams{
-		Username: "approval-recovered-account-user",
-		Email:    "approval-recovered-account@example.com",
-	})
-	if err != nil {
-		t.Fatalf("submit join request: %v", err)
-	}
-
-	_, _, err = svc.ApproveJoinRequest(ctx, identity.ApproveJoinRequestParams{
-		JoinRequestID:  joinRequest.ID,
-		ReviewedBy:     "admin-1",
-		IdempotencyKey: "approve-recovered-account-key",
-	})
-	if !errors.Is(err, errApprovalRollbackDeleteFailure) {
-		t.Fatalf("expected rollback delete failure, got %v", err)
-	}
-
-	now = now.Add(24*time.Hour + time.Minute)
-
-	_, _, err = svc.ApproveJoinRequest(ctx, identity.ApproveJoinRequestParams{
-		JoinRequestID:  joinRequest.ID,
-		ReviewedBy:     "admin-1",
-		IdempotencyKey: "approve-recovered-account-key",
-	})
-	if !errors.Is(err, errApprovedJoinRequestSave) {
-		t.Fatalf("expected approved join request save failure, got %v", err)
-	}
-
-	storedAccount, err := baseStore.AccountByUsername(ctx, joinRequest.Username)
-	if err != nil {
-		t.Fatalf("load recovered account: %v", err)
-	}
-	if storedAccount.ID == "" {
-		t.Fatalf("expected recovered account to remain after failed retry")
-	}
-
-	storedJoinRequest, err := baseStore.JoinRequestByID(ctx, joinRequest.ID)
-	if err != nil {
-		t.Fatalf("load join request after failed retry: %v", err)
-	}
-	if storedJoinRequest.Status != identity.JoinRequestStatusPending {
-		t.Fatalf("expected join request to remain pending after failed retry, got %s", storedJoinRequest.Status)
-	}
-}
-
-func TestApproveJoinRequestRejectsRecoveredAccountWithMismatchedRoles(t *testing.T) {
+func TestApproveJoinRequestRejectsExistingAccountWithMismatchedRoles(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()

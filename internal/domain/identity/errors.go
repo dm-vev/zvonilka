@@ -20,3 +20,7 @@ var (
 	// ErrInvalidCode indicates a login code does not match the challenge.
 	ErrInvalidCode = errors.New("invalid code")
 )
+
+func isNotFound(err error) bool {
+	return errors.Is(err, ErrNotFound)
+}

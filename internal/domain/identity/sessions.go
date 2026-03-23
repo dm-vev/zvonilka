@@ -97,8 +97,8 @@ func (s *Service) RevokeSession(ctx context.Context, params RevokeSessionParams)
 
 // RevokeAllSessions marks every active session for the account as revoked.
 //
-// The store interface does not yet expose a bulk update primitive, so the service walks
-// the current session set and revokes each active row individually.
+// The bulk update runs inside a store transaction so either all active sessions are
+// revoked or none of them are.
 func (s *Service) RevokeAllSessions(ctx context.Context, accountID string, params RevokeAllSessionsParams) (uint32, error) {
 	if err := s.validateContext(ctx, "revoke all sessions"); err != nil {
 		return 0, err
@@ -115,29 +115,36 @@ func (s *Service) RevokeAllSessions(ctx context.Context, accountID string, param
 		return 0, ErrInvalidInput
 	}
 
-	sessions, err := s.store.SessionsByAccountID(ctx, accountID)
-	if err != nil {
-		return 0, fmt.Errorf("list sessions for account %s: %w", accountID, err)
-	}
-
-	now := params.RequestedAt
-	if now.IsZero() {
-		now = s.currentTime()
-	}
-
 	var revoked uint32
-	for _, session := range sessions {
-		if session.Status == SessionStatusRevoked {
-			continue
+	err := s.store.WithinTx(ctx, func(tx Store) error {
+		sessions, loadErr := tx.SessionsByAccountID(ctx, accountID)
+		if loadErr != nil {
+			return fmt.Errorf("list sessions for account %s: %w", accountID, loadErr)
 		}
 
-		session.Status = SessionStatusRevoked
-		session.RevokedAt = now
-		session.Current = false
-		if _, err := s.store.UpdateSession(ctx, session); err != nil {
-			return revoked, fmt.Errorf("revoke session %s for account %s: %w", session.ID, accountID, err)
+		now := params.RequestedAt
+		if now.IsZero() {
+			now = s.currentTime()
 		}
-		revoked++
+
+		for _, session := range sessions {
+			if session.Status == SessionStatusRevoked {
+				continue
+			}
+
+			session.Status = SessionStatusRevoked
+			session.RevokedAt = now
+			session.Current = false
+			if _, loadErr := tx.UpdateSession(ctx, session); loadErr != nil {
+				return fmt.Errorf("revoke session %s for account %s: %w", session.ID, accountID, loadErr)
+			}
+			revoked++
+		}
+
+		return nil
+	})
+	if err != nil {
+		return revoked, err
 	}
 
 	if params.IdempotencyKey != "" {

@@ -103,8 +103,9 @@ func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (Logi
 
 // VerifyLoginCode completes a login challenge and issues a new session.
 //
-// The challenge is consumed before session issuance so the same code cannot be replayed
-// if a later write fails. That keeps the login code single-use even across retries.
+// The challenge is consumed before session issuance. If session issuance fails, the
+// challenge is restored so the client can retry the same code once the downstream issue
+// clears.
 func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodeParams) (result LoginResult, err error) {
 	if err = s.validateContext(ctx, "verify login code"); err != nil {
 		return LoginResult{}, err
@@ -167,12 +168,15 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 		}
 	}()
 
-	account, err := s.store.AccountByID(ctx, challenge.AccountID)
-	if err != nil {
-		return LoginResult{}, fmt.Errorf("load account %s from challenge %s: %w", challenge.AccountID, challenge.ID, err)
-	}
+	err = s.store.WithinTx(ctx, func(tx Store) error {
+		account, loadErr := tx.AccountByID(ctx, challenge.AccountID)
+		if loadErr != nil {
+			return fmt.Errorf("load account %s from challenge %s: %w", challenge.AccountID, challenge.ID, loadErr)
+		}
 
-	result, err = s.issueSession(ctx, account, params.DeviceName, params.Platform, params.PublicKey, params.PushToken)
+		result, err = s.issueSession(ctx, tx, account, params.DeviceName, params.Platform, params.PublicKey, params.PushToken)
+		return err
+	})
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -210,16 +214,21 @@ func (s *Service) AuthenticateBot(ctx context.Context, params AuthenticateBotPar
 		}
 	}
 
+	var result LoginResult
 	tokenHash := hashSecret(params.BotToken)
-	account, err := s.store.AccountByBotTokenHash(ctx, tokenHash)
-	if err != nil {
-		return LoginResult{}, fmt.Errorf("authenticate bot by token: %w", err)
-	}
-	if account.Kind != AccountKindBot {
-		return LoginResult{}, ErrForbidden
-	}
+	err := s.store.WithinTx(ctx, func(tx Store) error {
+		account, loadErr := tx.AccountByBotTokenHash(ctx, tokenHash)
+		if loadErr != nil {
+			return fmt.Errorf("authenticate bot by token: %w", loadErr)
+		}
+		if account.Kind != AccountKindBot {
+			return ErrForbidden
+		}
 
-	result, err := s.issueSession(ctx, account, params.DeviceName, params.Platform, params.PublicKey, "")
+		var sessionErr error
+		result, sessionErr = s.issueSession(ctx, tx, account, params.DeviceName, params.Platform, params.PublicKey, "")
+		return sessionErr
+	})
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -256,67 +265,78 @@ func (s *Service) RegisterDevice(ctx context.Context, params RegisterDeviceParam
 		return Device{}, Session{}, ErrInvalidInput
 	}
 
-	session, err := s.store.SessionByID(ctx, params.SessionID)
-	if err != nil {
-		return Device{}, Session{}, fmt.Errorf("load session %s: %w", params.SessionID, err)
-	}
-	if session.Status != SessionStatusActive {
-		return Device{}, Session{}, ErrForbidden
-	}
+	var (
+		session      Session
+		account      Account
+		savedDevice  Device
+		savedSession Session
+		err          error
+	)
 
-	account, err := s.store.AccountByID(ctx, session.AccountID)
-	if err != nil {
-		return Device{}, Session{}, fmt.Errorf("load account %s for session %s: %w", session.AccountID, session.ID, err)
-	}
-	if account.Status != AccountStatusActive {
-		return Device{}, Session{}, ErrForbidden
-	}
+	err = s.store.WithinTx(ctx, func(tx Store) error {
+		var loadErr error
 
-	if params.DeviceName == "" {
-		params.DeviceName = account.DisplayName
+		session, loadErr = tx.SessionByID(ctx, params.SessionID)
+		if loadErr != nil {
+			return fmt.Errorf("load session %s: %w", params.SessionID, loadErr)
+		}
+		if session.Status != SessionStatusActive {
+			return ErrForbidden
+		}
+
+		account, loadErr = tx.AccountByID(ctx, session.AccountID)
+		if loadErr != nil {
+			return fmt.Errorf("load account %s for session %s: %w", session.AccountID, session.ID, loadErr)
+		}
+		if account.Status != AccountStatusActive {
+			return ErrForbidden
+		}
+
 		if params.DeviceName == "" {
-			params.DeviceName = account.Username
+			params.DeviceName = account.DisplayName
+			if params.DeviceName == "" {
+				params.DeviceName = account.Username
+			}
 		}
-	}
 
-	now := params.RequestedAt
-	if now.IsZero() {
-		now = s.currentTime()
-	}
-
-	deviceID, err := newID("dev")
-	if err != nil {
-		return Device{}, Session{}, fmt.Errorf("generate device ID: %w", err)
-	}
-
-	device := Device{
-		ID:         deviceID,
-		AccountID:  account.ID,
-		SessionID:  session.ID,
-		Name:       params.DeviceName,
-		Platform:   params.Platform,
-		Status:     DeviceStatusActive,
-		PublicKey:  params.PublicKey,
-		PushToken:  params.PushToken,
-		CreatedAt:  now,
-		LastSeenAt: now,
-	}
-
-	savedDevice, err := s.store.SaveDevice(ctx, device)
-	if err != nil {
-		return Device{}, Session{}, fmt.Errorf("save device for session %s: %w", session.ID, err)
-	}
-
-	session.LastSeenAt = now
-	savedSession, err := s.store.UpdateSession(ctx, session)
-	if err != nil {
-		if deleteErr := s.store.DeleteDevice(ctx, savedDevice.ID); deleteErr != nil {
-			return Device{}, Session{}, errors.Join(
-				fmt.Errorf("update session %s after device registration: %w", session.ID, err),
-				fmt.Errorf("delete device %s: %w", savedDevice.ID, deleteErr),
-			)
+		now := params.RequestedAt
+		if now.IsZero() {
+			now = s.currentTime()
 		}
-		return Device{}, Session{}, fmt.Errorf("update session %s after device registration: %w", session.ID, err)
+
+		deviceID, idErr := newID("dev")
+		if idErr != nil {
+			return fmt.Errorf("generate device ID: %w", idErr)
+		}
+
+		device := Device{
+			ID:         deviceID,
+			AccountID:  account.ID,
+			SessionID:  session.ID,
+			Name:       params.DeviceName,
+			Platform:   params.Platform,
+			Status:     DeviceStatusActive,
+			PublicKey:  params.PublicKey,
+			PushToken:  params.PushToken,
+			CreatedAt:  now,
+			LastSeenAt: now,
+		}
+
+		savedDevice, loadErr = tx.SaveDevice(ctx, device)
+		if loadErr != nil {
+			return fmt.Errorf("save device for session %s: %w", session.ID, loadErr)
+		}
+
+		session.LastSeenAt = now
+		savedSession, loadErr = tx.UpdateSession(ctx, session)
+		if loadErr != nil {
+			return fmt.Errorf("update session %s after device registration: %w", session.ID, loadErr)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return Device{}, Session{}, err
 	}
 
 	if params.IdempotencyKey != "" {

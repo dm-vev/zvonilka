@@ -21,6 +21,16 @@ type onceFailingApprovedJoinRequestStore struct {
 	failed bool
 }
 
+// WithinTx preserves the injected failure semantics inside transactional callbacks.
+func (s *onceFailingApprovedJoinRequestStore) WithinTx(ctx context.Context, fn func(identity.Store) error) error {
+	return s.Store.WithinTx(ctx, func(tx identity.Store) error {
+		return fn(&onceFailingApprovedJoinRequestTxStore{
+			Store:  tx,
+			parent: s,
+		})
+	})
+}
+
 // SaveJoinRequest injects a one-shot failure for approved join requests.
 func (s *onceFailingApprovedJoinRequestStore) SaveJoinRequest(
 	ctx context.Context,
@@ -31,6 +41,27 @@ func (s *onceFailingApprovedJoinRequestStore) SaveJoinRequest(
 
 	if joinRequest.Status == identity.JoinRequestStatusApproved && !s.failed {
 		s.failed = true
+		return identity.JoinRequest{}, errApprovedJoinRequestSave
+	}
+
+	return s.Store.SaveJoinRequest(ctx, joinRequest)
+}
+
+type onceFailingApprovedJoinRequestTxStore struct {
+	identity.Store
+
+	parent *onceFailingApprovedJoinRequestStore
+}
+
+func (s *onceFailingApprovedJoinRequestTxStore) SaveJoinRequest(
+	ctx context.Context,
+	joinRequest identity.JoinRequest,
+) (identity.JoinRequest, error) {
+	s.parent.mu.Lock()
+	defer s.parent.mu.Unlock()
+
+	if joinRequest.Status == identity.JoinRequestStatusApproved && !s.parent.failed {
+		s.parent.failed = true
 		return identity.JoinRequest{}, errApprovedJoinRequestSave
 	}
 

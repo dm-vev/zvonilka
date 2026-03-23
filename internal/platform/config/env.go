@@ -264,6 +264,32 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 		cfg.Infrastructure.Telemetry.SentryDSN = value
 	}
 
+	if value, ok, err := stringValueWithPresence(serviceName, "STORAGE_PRIMARY_PROVIDER", cfg.Storage.PrimaryProvider); err != nil {
+		return err
+	} else if ok {
+		cfg.Storage.PrimaryProvider = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "STORAGE_CACHE_PROVIDER", cfg.Storage.CacheProvider); err != nil {
+		return err
+	} else if ok {
+		cfg.Storage.CacheProvider = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "STORAGE_OBJECT_PROVIDER", cfg.Storage.ObjectProvider); err != nil {
+		return err
+	} else if ok {
+		cfg.Storage.ObjectProvider = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "STORAGE_AUDIT_PROVIDER", cfg.Storage.AuditProvider); err != nil {
+		return err
+	} else if ok {
+		cfg.Storage.AuditProvider = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "STORAGE_SEARCH_PROVIDER", cfg.Storage.SearchProvider); err != nil {
+		return err
+	} else if ok {
+		cfg.Storage.SearchProvider = value
+	}
+
 	if value, ok, err := boolValue(serviceName, "FEATURE_FEDERATION_ENABLED", cfg.Features.FederationEnabled); err != nil {
 		return err
 	} else if ok {

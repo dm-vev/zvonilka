@@ -20,6 +20,16 @@ type countingSessionStore struct {
 	updateSessionCalls       int
 }
 
+// WithinTx preserves read-model counting while executing the callback against a transactional store.
+func (s *countingSessionStore) WithinTx(ctx context.Context, fn func(identity.Store) error) error {
+	return s.Store.WithinTx(ctx, func(tx identity.Store) error {
+		return fn(&countingSessionTxStore{
+			Store:  tx,
+			parent: s,
+		})
+	})
+}
+
 // SessionByID counts and forwards single-session lookups.
 func (s *countingSessionStore) SessionByID(ctx context.Context, sessionID string) (identity.Session, error) {
 	s.mu.Lock()
@@ -56,6 +66,39 @@ func (s *countingSessionStore) counts() (sessionByID, sessionsByAccountID, updat
 	defer s.mu.Unlock()
 
 	return s.sessionByIDCalls, s.sessionsByAccountIDCalls, s.updateSessionCalls
+}
+
+type countingSessionTxStore struct {
+	identity.Store
+
+	parent *countingSessionStore
+}
+
+func (s *countingSessionTxStore) SessionByID(ctx context.Context, sessionID string) (identity.Session, error) {
+	s.parent.mu.Lock()
+	s.parent.sessionByIDCalls++
+	s.parent.mu.Unlock()
+
+	return s.Store.SessionByID(ctx, sessionID)
+}
+
+func (s *countingSessionTxStore) SessionsByAccountID(
+	ctx context.Context,
+	accountID string,
+) ([]identity.Session, error) {
+	s.parent.mu.Lock()
+	s.parent.sessionsByAccountIDCalls++
+	s.parent.mu.Unlock()
+
+	return s.Store.SessionsByAccountID(ctx, accountID)
+}
+
+func (s *countingSessionTxStore) UpdateSession(ctx context.Context, session identity.Session) (identity.Session, error) {
+	s.parent.mu.Lock()
+	s.parent.updateSessionCalls++
+	s.parent.mu.Unlock()
+
+	return s.Store.UpdateSession(ctx, session)
 }
 
 // steppedClock returns monotonically increasing timestamps on each call.

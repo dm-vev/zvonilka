@@ -324,8 +324,30 @@ type failJoinRequestApprovalStore struct {
 	identity.Store
 }
 
+// WithinTx preserves the injected failure semantics inside transactional callbacks.
+func (s *failJoinRequestApprovalStore) WithinTx(ctx context.Context, fn func(identity.Store) error) error {
+	return s.Store.WithinTx(ctx, func(tx identity.Store) error {
+		return fn(&failJoinRequestApprovalTxStore{Store: tx})
+	})
+}
+
 // SaveJoinRequest injects a failure for approved join requests.
 func (s *failJoinRequestApprovalStore) SaveJoinRequest(
+	ctx context.Context,
+	joinRequest identity.JoinRequest,
+) (identity.JoinRequest, error) {
+	if joinRequest.Status == identity.JoinRequestStatusApproved {
+		return identity.JoinRequest{}, errInjectedJoinRequestSave
+	}
+
+	return s.Store.SaveJoinRequest(ctx, joinRequest)
+}
+
+type failJoinRequestApprovalTxStore struct {
+	identity.Store
+}
+
+func (s *failJoinRequestApprovalTxStore) SaveJoinRequest(
 	ctx context.Context,
 	joinRequest identity.JoinRequest,
 ) (identity.JoinRequest, error) {

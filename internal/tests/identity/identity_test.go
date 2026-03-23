@@ -55,6 +55,16 @@ type failingSaveDeviceStore struct {
 	failed  bool
 }
 
+// WithinTx preserves the injected failure semantics inside transactional callbacks.
+func (s *failingSaveDeviceStore) WithinTx(ctx context.Context, fn func(identity.Store) error) error {
+	return s.Store.WithinTx(ctx, func(tx identity.Store) error {
+		return fn(&failingSaveDeviceTxStore{
+			Store:  tx,
+			parent: s,
+		})
+	})
+}
+
 // SaveDevice injects a one-shot failure before delegating to the wrapped store.
 func (s *failingSaveDeviceStore) SaveDevice(ctx context.Context, device identity.Device) (identity.Device, error) {
 	if s.failErr == nil {
@@ -68,12 +78,40 @@ func (s *failingSaveDeviceStore) SaveDevice(ctx context.Context, device identity
 	return s.Store.SaveDevice(ctx, device)
 }
 
+type failingSaveDeviceTxStore struct {
+	identity.Store
+
+	parent *failingSaveDeviceStore
+}
+
+func (s *failingSaveDeviceTxStore) SaveDevice(ctx context.Context, device identity.Device) (identity.Device, error) {
+	if s.parent.failErr == nil {
+		s.parent.failErr = errors.New("forced save device failure")
+	}
+	if !s.parent.failed {
+		s.parent.failed = true
+		return identity.Device{}, s.parent.failErr
+	}
+
+	return s.Store.SaveDevice(ctx, device)
+}
+
 // failingSaveAccountStore fails a chosen SaveAccount call to exercise late rollback paths.
 type failingSaveAccountStore struct {
 	identity.Store
 	failErr    error
 	failOnCall int
 	calls      int
+}
+
+// WithinTx preserves the injected failure semantics inside transactional callbacks.
+func (s *failingSaveAccountStore) WithinTx(ctx context.Context, fn func(identity.Store) error) error {
+	return s.Store.WithinTx(ctx, func(tx identity.Store) error {
+		return fn(&failingSaveAccountTxStore{
+			Store:  tx,
+			parent: s,
+		})
+	})
 }
 
 // SaveAccount injects a failure on the configured call number before delegating to the wrapped store.
@@ -88,6 +126,31 @@ func (s *failingSaveAccountStore) SaveAccount(ctx context.Context, account ident
 	}
 	if s.calls == failOnCall {
 		return identity.Account{}, s.failErr
+	}
+
+	return s.Store.SaveAccount(ctx, account)
+}
+
+type failingSaveAccountTxStore struct {
+	identity.Store
+
+	parent *failingSaveAccountStore
+}
+
+func (s *failingSaveAccountTxStore) SaveAccount(
+	ctx context.Context,
+	account identity.Account,
+) (identity.Account, error) {
+	if s.parent.failErr == nil {
+		s.parent.failErr = errors.New("forced save account failure")
+	}
+	s.parent.calls++
+	failOnCall := s.parent.failOnCall
+	if failOnCall == 0 {
+		failOnCall = 2
+	}
+	if s.parent.calls == failOnCall {
+		return identity.Account{}, s.parent.failErr
 	}
 
 	return s.Store.SaveAccount(ctx, account)

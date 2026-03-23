@@ -25,6 +25,16 @@ type countingAuthStore struct {
 	updateSession      int
 }
 
+// WithinTx preserves call counting while executing the callback against the transactional store.
+func (s *countingAuthStore) WithinTx(ctx context.Context, fn func(identity.Store) error) error {
+	return s.Store.WithinTx(ctx, func(tx identity.Store) error {
+		return fn(&countingAuthTxStore{
+			Store:  tx,
+			parent: s,
+		})
+	})
+}
+
 // SaveLoginChallenge counts and forwards login-challenge writes.
 func (s *countingAuthStore) SaveLoginChallenge(
 	ctx context.Context,
@@ -109,6 +119,83 @@ func (s *countingAuthStore) counts() (saveLoginChallenge, saveDevice, saveSessio
 	defer s.mu.Unlock()
 
 	return s.saveLoginChallenge, s.saveDevice, s.saveSession, s.saveAccount, s.sessionByID, s.accountByID, s.updateSession
+}
+
+type countingAuthTxStore struct {
+	identity.Store
+
+	parent *countingAuthStore
+}
+
+func (s *countingAuthTxStore) SaveLoginChallenge(
+	ctx context.Context,
+	challenge identity.LoginChallenge,
+) (identity.LoginChallenge, error) {
+	s.parent.mu.Lock()
+	s.parent.saveLoginChallenge++
+	s.parent.mu.Unlock()
+
+	return s.Store.SaveLoginChallenge(ctx, challenge)
+}
+
+func (s *countingAuthTxStore) SaveDevice(
+	ctx context.Context,
+	device identity.Device,
+) (identity.Device, error) {
+	s.parent.mu.Lock()
+	s.parent.saveDevice++
+	s.parent.mu.Unlock()
+
+	return s.Store.SaveDevice(ctx, device)
+}
+
+func (s *countingAuthTxStore) SaveSession(
+	ctx context.Context,
+	session identity.Session,
+) (identity.Session, error) {
+	s.parent.mu.Lock()
+	s.parent.saveSession++
+	s.parent.mu.Unlock()
+
+	return s.Store.SaveSession(ctx, session)
+}
+
+func (s *countingAuthTxStore) SaveAccount(
+	ctx context.Context,
+	account identity.Account,
+) (identity.Account, error) {
+	s.parent.mu.Lock()
+	s.parent.saveAccount++
+	s.parent.mu.Unlock()
+
+	return s.Store.SaveAccount(ctx, account)
+}
+
+func (s *countingAuthTxStore) SessionByID(ctx context.Context, sessionID string) (identity.Session, error) {
+	s.parent.mu.Lock()
+	s.parent.sessionByID++
+	s.parent.mu.Unlock()
+
+	return s.Store.SessionByID(ctx, sessionID)
+}
+
+func (s *countingAuthTxStore) AccountByID(ctx context.Context, accountID string) (identity.Account, error) {
+	s.parent.mu.Lock()
+	s.parent.accountByID++
+	s.parent.mu.Unlock()
+
+	return s.Store.AccountByID(ctx, accountID)
+}
+
+func (s *countingAuthTxStore) UpdateSession(
+	ctx context.Context,
+	session identity.Session,
+) (identity.Session, error) {
+	s.parent.mu.Lock()
+	s.parent.updateSession++
+	s.parent.mu.Unlock()
+
+	return s.Store.UpdateSession(ctx, session)
 }
 
 func TestBeginLoginIdempotencyKeyDeduplicatesSuccessfulChallenge(t *testing.T) {

@@ -4,6 +4,8 @@ import "context"
 
 // Store persists identity state for the service.
 type Store interface {
+	WithinTx(ctx context.Context, fn func(Store) error) error
+
 	SaveJoinRequest(ctx context.Context, joinRequest JoinRequest) (JoinRequest, error)
 	JoinRequestByID(ctx context.Context, joinRequestID string) (JoinRequest, error)
 	JoinRequestsByStatus(ctx context.Context, status JoinRequestStatus) ([]JoinRequest, error)
