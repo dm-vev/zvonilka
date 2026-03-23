@@ -15,6 +15,10 @@ func (s *memoryStore) SaveDevice(_ context.Context, device identity.Device) (ide
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if previous, ok := s.devicesByID[device.ID]; ok {
+		s.removeDeviceIndexLocked(previous.AccountID, previous.ID)
+	}
+
 	s.devicesByID[device.ID] = device
 	s.deviceIDsForAccountLocked(device.AccountID)[device.ID] = struct{}{}
 
@@ -36,9 +40,7 @@ func (s *memoryStore) DeleteDevice(_ context.Context, deviceID string) error {
 	}
 
 	delete(s.devicesByID, deviceID)
-	if deviceIDs, ok := s.deviceIDsByAccount[device.AccountID]; ok {
-		delete(deviceIDs, deviceID)
-	}
+	s.removeDeviceIndexLocked(device.AccountID, deviceID)
 
 	return nil
 }
@@ -76,4 +78,14 @@ func (s *memoryStore) DevicesByAccountID(_ context.Context, accountID string) ([
 	}
 
 	return devices, nil
+}
+
+// removeDeviceIndexLocked detaches a device from the per-account index.
+func (s *memoryStore) removeDeviceIndexLocked(accountID string, deviceID string) {
+	if deviceIDs, ok := s.deviceIDsByAccount[accountID]; ok {
+		delete(deviceIDs, deviceID)
+		if len(deviceIDs) == 0 {
+			delete(s.deviceIDsByAccount, accountID)
+		}
+	}
 }

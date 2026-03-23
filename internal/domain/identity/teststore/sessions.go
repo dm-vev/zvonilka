@@ -15,6 +15,10 @@ func (s *memoryStore) SaveSession(_ context.Context, session identity.Session) (
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if previous, ok := s.sessionsByID[session.ID]; ok {
+		s.removeSessionIndexLocked(previous.AccountID, previous.ID)
+	}
+
 	s.sessionsByID[session.ID] = session
 	s.sessionIDsForAccountLocked(session.AccountID)[session.ID] = struct{}{}
 
@@ -36,9 +40,7 @@ func (s *memoryStore) DeleteSession(_ context.Context, sessionID string) error {
 	}
 
 	delete(s.sessionsByID, sessionID)
-	if sessionIDs, ok := s.sessionIDsByAccount[session.AccountID]; ok {
-		delete(sessionIDs, sessionID)
-	}
+	s.removeSessionIndexLocked(session.AccountID, sessionID)
 
 	return nil
 }
@@ -91,11 +93,22 @@ func (s *memoryStore) UpdateSession(_ context.Context, session identity.Session)
 		return identity.Session{}, identity.ErrNotFound
 	}
 
-	s.sessionsByID[session.ID] = session
-	if _, ok := s.sessionIDsByAccount[session.AccountID]; !ok {
-		return identity.Session{}, identity.ErrNotFound
+	if previous, ok := s.sessionsByID[session.ID]; ok {
+		s.removeSessionIndexLocked(previous.AccountID, previous.ID)
 	}
-	s.sessionIDsByAccount[session.AccountID][session.ID] = struct{}{}
+
+	s.sessionsByID[session.ID] = session
+	s.sessionIDsForAccountLocked(session.AccountID)[session.ID] = struct{}{}
 
 	return session, nil
+}
+
+// removeSessionIndexLocked detaches a session from the per-account index.
+func (s *memoryStore) removeSessionIndexLocked(accountID string, sessionID string) {
+	if sessionIDs, ok := s.sessionIDsByAccount[accountID]; ok {
+		delete(sessionIDs, sessionID)
+		if len(sessionIDs) == 0 {
+			delete(s.sessionIDsByAccount, accountID)
+		}
+	}
 }

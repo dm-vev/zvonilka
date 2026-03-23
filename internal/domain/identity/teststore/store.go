@@ -68,7 +68,7 @@ func (s *memoryStore) accountByIndex(index map[string]string, key string) (ident
 		return identity.Account{}, identity.ErrNotFound
 	}
 
-	return account, nil
+	return cloneAccount(account), nil
 }
 
 // indexAccountLocked updates all secondary account indexes for a freshly saved account.

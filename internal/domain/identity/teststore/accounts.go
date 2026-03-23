@@ -26,10 +26,11 @@ func (s *memoryStore) SaveAccount(_ context.Context, account identity.Account) (
 		s.deleteAccountIndexes(previous)
 	}
 
-	s.accountsByID[account.ID] = account
-	s.indexAccountLocked(account)
+	storedAccount := cloneAccount(account)
+	s.accountsByID[storedAccount.ID] = storedAccount
+	s.indexAccountLocked(storedAccount)
 
-	return account, nil
+	return cloneAccount(storedAccount), nil
 }
 
 // DeleteAccount removes an account and all of its secondary indexes.
@@ -46,8 +47,7 @@ func (s *memoryStore) DeleteAccount(_ context.Context, accountID string) error {
 		return identity.ErrNotFound
 	}
 
-	delete(s.accountsByID, accountID)
-	s.deleteAccountIndexes(account)
+	s.deleteAccountLocked(account)
 	return nil
 }
 
@@ -61,7 +61,7 @@ func (s *memoryStore) AccountByID(_ context.Context, accountID string) (identity
 		return identity.Account{}, identity.ErrNotFound
 	}
 
-	return account, nil
+	return cloneAccount(account), nil
 }
 
 // AccountByUsername resolves an account by its normalized username.
@@ -82,6 +82,35 @@ func (s *memoryStore) AccountByPhone(_ context.Context, phone string) (identity.
 // AccountByBotTokenHash resolves a bot account by its token hash.
 func (s *memoryStore) AccountByBotTokenHash(_ context.Context, tokenHash string) (identity.Account, error) {
 	return s.accountByIndex(s.accountIDsByBotHash, tokenHash)
+}
+
+// deleteAccountLocked removes an account and all records that point to it.
+func (s *memoryStore) deleteAccountLocked(account identity.Account) {
+	delete(s.accountsByID, account.ID)
+	s.deleteAccountIndexes(account)
+
+	for deviceID, device := range s.devicesByID {
+		if device.AccountID != account.ID {
+			continue
+		}
+		delete(s.devicesByID, deviceID)
+		s.removeDeviceIndexLocked(account.ID, deviceID)
+	}
+
+	for sessionID, session := range s.sessionsByID {
+		if session.AccountID != account.ID {
+			continue
+		}
+		delete(s.sessionsByID, sessionID)
+		s.removeSessionIndexLocked(account.ID, sessionID)
+	}
+
+	for challengeID, challenge := range s.challengesByID {
+		if challenge.AccountID != account.ID {
+			continue
+		}
+		delete(s.challengesByID, challengeID)
+	}
 }
 
 // hasAccountConflictLocked reports whether any uniqueness index already points at another account.
