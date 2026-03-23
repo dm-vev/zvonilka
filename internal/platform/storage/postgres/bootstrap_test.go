@@ -183,8 +183,6 @@ func TestBootstrapOpenRetriesAfterTransientFailure(t *testing.T) {
 }
 
 func TestBootstrapOpenRetriesAfterMigrationFailure(t *testing.T) {
-	t.Parallel()
-
 	dir := t.TempDir()
 	script := "CREATE TABLE IF NOT EXISTS {{schema}}.alpha (id INT PRIMARY KEY);"
 	if err := os.WriteFile(filepath.Join(dir, "0001.sql"), []byte(script), 0o600); err != nil {
