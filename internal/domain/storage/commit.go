@@ -22,6 +22,9 @@ func Commit(err error) error {
 	if err == nil {
 		return nil
 	}
+	if IsCommit(err) {
+		return err
+	}
 
 	return &commitError{err: err}
 }

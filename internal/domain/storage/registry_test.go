@@ -99,6 +99,54 @@ func TestCatalogNormalizesProviderNames(t *testing.T) {
 	}
 }
 
+func TestCatalogNormalizesProviderMetadata(t *testing.T) {
+	t.Parallel()
+
+	catalog := &Catalog{}
+	err := catalog.Register(testProvider{
+		name:         "primary",
+		kind:         " Relational ",
+		purpose:      " PRIMARY ",
+		capabilities: CapabilityTransactions,
+	})
+	if err != nil {
+		t.Fatalf("register provider: %v", err)
+	}
+
+	byPurpose := catalog.ProvidersByPurpose(PurposePrimary)
+	if len(byPurpose) != 1 || byPurpose[0].Name() != "primary" {
+		t.Fatalf("expected normalized purpose lookup to find provider, got %+v", byPurpose)
+	}
+
+	byKind := catalog.ProvidersByKind(KindRelational)
+	if len(byKind) != 1 || byKind[0].Name() != "primary" {
+		t.Fatalf("expected normalized kind lookup to find provider, got %+v", byKind)
+	}
+
+	selected, err := catalog.Select(Purpose(" primary "), CapabilityTransactions)
+	if err != nil {
+		t.Fatalf("select provider: %v", err)
+	}
+	if selected.Name() != "primary" {
+		t.Fatalf("expected normalized selection to find provider, got %s", selected.Name())
+	}
+}
+
+func TestCatalogRejectsUnsupportedProviderMetadata(t *testing.T) {
+	t.Parallel()
+
+	catalog := &Catalog{}
+	err := catalog.Register(testProvider{
+		name:         "primary",
+		kind:         Kind("bucket"),
+		purpose:      PurposePrimary,
+		capabilities: CapabilityTransactions,
+	})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input, got %v", err)
+	}
+}
+
 func TestCommitMarksErrors(t *testing.T) {
 	t.Parallel()
 
@@ -112,5 +160,19 @@ func TestCommitMarksErrors(t *testing.T) {
 	}
 	if UnwrapCommit(committed) != err {
 		t.Fatalf("expected wrapped error %v, got %v", err, UnwrapCommit(committed))
+	}
+}
+
+func TestCommitIsIdempotent(t *testing.T) {
+	t.Parallel()
+
+	err := errors.New("boom")
+	committed := Commit(err)
+	nested := Commit(committed)
+	if nested != committed {
+		t.Fatalf("expected commit wrapper to be idempotent")
+	}
+	if UnwrapCommit(nested) != err {
+		t.Fatalf("expected nested unwrap to return original error, got %v", UnwrapCommit(nested))
 	}
 }
