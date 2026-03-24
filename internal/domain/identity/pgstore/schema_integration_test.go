@@ -18,6 +18,7 @@ import (
 
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	platformpostgres "github.com/dm-vev/zvonilka/internal/platform/storage/postgres"
+	"github.com/dm-vev/zvonilka/internal/testsupport/dockermutex"
 )
 
 func TestIdentitySchemaHardening(t *testing.T) {
@@ -420,6 +421,97 @@ func TestIdentitySchemaHardening(t *testing.T) {
 		}
 	})
 
+	t.Run("rejects raw cross-account device and session pair on tx commit", func(t *testing.T) {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatalf("begin tx: %v", err)
+		}
+		t.Cleanup(func() {
+			_ = tx.Rollback()
+		})
+
+		const rawDeviceID = "dev-raw-cross"
+		const rawSessionID = "sess-raw-cross"
+
+		_, err = tx.ExecContext(ctx, fmt.Sprintf(`
+INSERT INTO %s (
+	id,
+	account_id,
+	session_id,
+	name,
+	platform,
+	status,
+	public_key,
+	push_token,
+	created_at,
+	last_seen_at,
+	revoked_at,
+	last_rotated_at
+) VALUES (
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+)`, qualifiedName("tenant", "identity_devices")),
+			rawDeviceID,
+			account.ID,
+			rawSessionID,
+			"Raw cross-account device",
+			identity.DevicePlatformWeb,
+			identity.DeviceStatusActive,
+			"pk-raw-device",
+			"",
+			now,
+			now,
+			nil,
+			nil,
+		)
+		if err != nil {
+			t.Fatalf("insert raw cross-account device: %v", err)
+		}
+
+		_, err = tx.ExecContext(ctx, fmt.Sprintf(`
+INSERT INTO %s (
+	id,
+	account_id,
+	device_id,
+	device_name,
+	device_platform,
+	ip_address,
+	user_agent,
+	status,
+	current,
+	created_at,
+	last_seen_at,
+	revoked_at
+) VALUES (
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+)`, qualifiedName("tenant", "identity_sessions")),
+			rawSessionID,
+			peerAccount.ID,
+			rawDeviceID,
+			"Raw cross-account session",
+			identity.DevicePlatformWeb,
+			"",
+			"",
+			identity.SessionStatusActive,
+			true,
+			now,
+			now,
+			nil,
+		)
+		if err != nil {
+			t.Fatalf("insert raw cross-account session: %v", err)
+		}
+
+		err = tx.Commit()
+		requirePgCode(t, err, "23503")
+
+		if _, err := store.DeviceByID(ctx, rawDeviceID); !errors.Is(err, identity.ErrNotFound) {
+			t.Fatalf("expected raw cross-account device to roll back, got %v", err)
+		}
+		if _, err := store.SessionByID(ctx, rawSessionID); !errors.Is(err, identity.ErrNotFound) {
+			t.Fatalf("expected raw cross-account session to roll back, got %v", err)
+		}
+	})
+
 	t.Run("rejects session update to an already attached device", func(t *testing.T) {
 		session, err := store.SessionByID(ctx, sessionID)
 		if err != nil {
@@ -470,6 +562,202 @@ func TestIdentitySchemaHardening(t *testing.T) {
 		if !errors.Is(err, identity.ErrConflict) {
 			t.Fatalf("expected conflict, got %v", err)
 		}
+	})
+
+	t.Run("allows raw same-account device/session pair on commit", func(t *testing.T) {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatalf("begin tx: %v", err)
+		}
+		defer func() {
+			_ = tx.Rollback()
+		}()
+
+		_, err = tx.ExecContext(ctx, fmt.Sprintf(`
+INSERT INTO %s (
+	id,
+	account_id,
+	session_id,
+	name,
+	platform,
+	status,
+	public_key,
+	push_token,
+	created_at,
+	last_seen_at,
+	revoked_at,
+	last_rotated_at
+) VALUES (
+	$1,
+	$2,
+	$3,
+	$4,
+	$5,
+	$6,
+	$7,
+	'',
+	$8,
+	$9,
+	NULL,
+	NULL
+)
+`, qualifiedName("tenant", "identity_devices")),
+			"dev-raw-valid",
+			account.ID,
+			"sess-raw-valid",
+			"Raw valid device",
+			identity.DevicePlatformWeb,
+			identity.DeviceStatusActive,
+			"pk-raw-valid",
+			now,
+			now,
+		)
+		if err != nil {
+			t.Fatalf("insert valid device: %v", err)
+		}
+
+		_, err = tx.ExecContext(ctx, fmt.Sprintf(`
+INSERT INTO %s (
+	id,
+	account_id,
+	device_id,
+	device_name,
+	device_platform,
+	ip_address,
+	user_agent,
+	status,
+	current,
+	created_at,
+	last_seen_at,
+	revoked_at
+) VALUES (
+	$1,
+	$2,
+	$3,
+	$4,
+	$5,
+	'',
+	'',
+	$6,
+	TRUE,
+	$7,
+	$8,
+	NULL
+)
+`, qualifiedName("tenant", "identity_sessions")),
+			"sess-raw-valid",
+			account.ID,
+			"dev-raw-valid",
+			"Raw valid session",
+			identity.DevicePlatformWeb,
+			identity.SessionStatusActive,
+			now,
+			now,
+		)
+		if err != nil {
+			t.Fatalf("insert valid session: %v", err)
+		}
+
+		if err := tx.Commit(); err != nil {
+			t.Fatalf("commit valid device/session pair: %v", err)
+		}
+	})
+
+	t.Run("rejects raw cross-account device/session pair on commit", func(t *testing.T) {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatalf("begin tx: %v", err)
+		}
+		defer func() {
+			_ = tx.Rollback()
+		}()
+
+		_, err = tx.ExecContext(ctx, fmt.Sprintf(`
+INSERT INTO %s (
+	id,
+	account_id,
+	session_id,
+	name,
+	platform,
+	status,
+	public_key,
+	push_token,
+	created_at,
+	last_seen_at,
+	revoked_at,
+	last_rotated_at
+) VALUES (
+	$1,
+	$2,
+	$3,
+	$4,
+	$5,
+	$6,
+	$7,
+	'',
+	$8,
+	$9,
+	NULL,
+	NULL
+)
+`, qualifiedName("tenant", "identity_devices")),
+			"dev-raw-cross",
+			peerAccount.ID,
+			"sess-raw-cross",
+			"Raw cross device",
+			identity.DevicePlatformWeb,
+			identity.DeviceStatusActive,
+			"pk-raw-cross",
+			now,
+			now,
+		)
+		if err != nil {
+			t.Fatalf("insert cross-account device: %v", err)
+		}
+
+		_, err = tx.ExecContext(ctx, fmt.Sprintf(`
+INSERT INTO %s (
+	id,
+	account_id,
+	device_id,
+	device_name,
+	device_platform,
+	ip_address,
+	user_agent,
+	status,
+	current,
+	created_at,
+	last_seen_at,
+	revoked_at
+) VALUES (
+	$1,
+	$2,
+	$3,
+	$4,
+	$5,
+	'',
+	'',
+	$6,
+	TRUE,
+	$7,
+	$8,
+	NULL
+)
+`, qualifiedName("tenant", "identity_sessions")),
+			"sess-raw-cross",
+			account.ID,
+			"dev-raw-cross",
+			"Raw cross session",
+			identity.DevicePlatformWeb,
+			identity.SessionStatusActive,
+			now,
+			now,
+		)
+		if err != nil {
+			t.Fatalf("insert cross-account session: %v", err)
+		}
+
+		requirePgCode(t, tx.Commit(), "23503")
 	})
 
 	t.Run("rejects session deletion when attached devices remain", func(t *testing.T) {
@@ -584,11 +872,14 @@ func TestIdentitySchemaHardening(t *testing.T) {
 func openDockerPostgres(t *testing.T) *sql.DB {
 	t.Helper()
 
+	unlock := dockermutex.Acquire(t, "postgres-integration")
+	t.Cleanup(unlock)
+
 	if _, err := exec.LookPath("docker"); err != nil {
 		t.Skip("docker is not available")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), postgresReadinessTimeout())
 	defer cancel()
 
 	cmd := exec.CommandContext(
@@ -635,7 +926,7 @@ func openDockerPostgres(t *testing.T) *sql.DB {
 		t.Fatalf("open postgres database: %v", err)
 	}
 
-	pingCtx, pingCancel := context.WithTimeout(context.Background(), 90*time.Second)
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), postgresReadinessTimeout())
 	defer pingCancel()
 	for pingCtx.Err() == nil {
 		if err := db.PingContext(pingCtx); err == nil {
@@ -647,6 +938,41 @@ func openDockerPostgres(t *testing.T) *sql.DB {
 	_ = db.Close()
 	t.Skip("postgres container did not become ready")
 	return nil
+}
+
+func postgresReadinessTimeout() time.Duration {
+	const envName = "ZVONILKA_PGSTORE_READY_TIMEOUT"
+
+	if raw := strings.TrimSpace(os.Getenv(envName)); raw != "" {
+		if d, err := time.ParseDuration(raw); err == nil && d > 0 {
+			return d
+		}
+	}
+
+	return 3 * time.Minute
+}
+
+func TestPostgresReadinessTimeout(t *testing.T) {
+	t.Run("uses default when unset", func(t *testing.T) {
+		t.Setenv("ZVONILKA_PGSTORE_READY_TIMEOUT", "")
+		if got := postgresReadinessTimeout(); got != 3*time.Minute {
+			t.Fatalf("expected default timeout, got %v", got)
+		}
+	})
+
+	t.Run("uses valid override", func(t *testing.T) {
+		t.Setenv("ZVONILKA_PGSTORE_READY_TIMEOUT", "45s")
+		if got := postgresReadinessTimeout(); got != 45*time.Second {
+			t.Fatalf("expected override timeout, got %v", got)
+		}
+	})
+
+	t.Run("ignores invalid override", func(t *testing.T) {
+		t.Setenv("ZVONILKA_PGSTORE_READY_TIMEOUT", "bogus")
+		if got := postgresReadinessTimeout(); got != 3*time.Minute {
+			t.Fatalf("expected default timeout for invalid override, got %v", got)
+		}
+	})
 }
 
 func repoMigrationsPath(t *testing.T, names ...string) string {
