@@ -67,36 +67,85 @@ func TestSaveSessionRejectsCrossAccountDevice(t *testing.T) {
 
 	store, mock, _ := newMockStore(t)
 
+	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(
+		`SELECT %s FROM %s WHERE id = $1`,
+		deviceColumnList,
+		qualifiedName("tenant", "identity_devices"),
+	))).
+		WithArgs("dev-1").
+		WillReturnRows(sqlmock.NewRows(strings.Split(deviceColumnList, ", ")).AddRow(
+			"dev-1",
+			"acc-peer",
+			"sess-peer",
+			"Peer device",
+			identity.DevicePlatformWeb,
+			identity.DeviceStatusActive,
+			"pk-peer",
+			"",
+			time.Date(2026, time.March, 24, 0, 30, 0, 0, time.UTC),
+			time.Date(2026, time.March, 24, 0, 30, 0, 0, time.UTC),
+			nil,
+			nil,
+		))
+
+	_, err := store.SaveSession(context.Background(), identity.Session{
+		ID:             "sess-1",
+		AccountID:      "acc-1",
+		DeviceID:       "dev-1",
+		DeviceName:     "Alice laptop",
+		DevicePlatform: identity.DevicePlatformWeb,
+		Status:         identity.SessionStatusActive,
+		Current:        true,
+		CreatedAt:      time.Date(2026, time.March, 24, 0, 30, 0, 0, time.UTC),
+		LastSeenAt:     time.Date(2026, time.March, 24, 0, 30, 0, 0, time.UTC),
+	})
+	if !errors.Is(err, identity.ErrConflict) {
+		t.Fatalf("expected conflict, got %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestUpdateSessionMapsDeferredForeignKeyViolationToNotFound(t *testing.T) {
+	t.Parallel()
+
+	store, mock, _ := newMockStore(t)
+
+	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(
+		`SELECT %s FROM %s WHERE id = $1`,
+		deviceColumnList,
+		qualifiedName("tenant", "identity_devices"),
+	))).
+		WithArgs("dev-missing").
+		WillReturnRows(sqlmock.NewRows(strings.Split(deviceColumnList, ", ")))
+
 	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(`
-INSERT INTO %s (
-	id, account_id, device_id, device_name, device_platform, ip_address, user_agent, status, current, created_at, last_seen_at, revoked_at
-) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
-)
-ON CONFLICT (id) DO UPDATE SET
-	account_id = EXCLUDED.account_id,
-	device_id = EXCLUDED.device_id,
-	device_name = EXCLUDED.device_name,
-	device_platform = EXCLUDED.device_platform,
-	ip_address = EXCLUDED.ip_address,
-	user_agent = EXCLUDED.user_agent,
-	status = EXCLUDED.status,
-	current = EXCLUDED.current,
-	last_seen_at = EXCLUDED.last_seen_at,
-	revoked_at = EXCLUDED.revoked_at
+UPDATE %s
+SET account_id = $2,
+    device_id = $3,
+    device_name = $4,
+    device_platform = $5,
+    ip_address = $6,
+    user_agent = $7,
+    status = $8,
+    current = $9,
+    last_seen_at = $10,
+    revoked_at = $11
+WHERE id = $1
 RETURNING %s
 `, qualifiedName("tenant", "identity_sessions"), sessionColumnList))).
 		WithArgs(
 			"sess-1",
 			"acc-1",
-			"dev-1",
+			"dev-missing",
 			"Alice laptop",
 			identity.DevicePlatformWeb,
 			"",
 			"",
 			identity.SessionStatusActive,
 			true,
-			time.Date(2026, time.March, 24, 0, 30, 0, 0, time.UTC),
 			time.Date(2026, time.March, 24, 0, 30, 0, 0, time.UTC),
 			nil,
 		).
@@ -132,26 +181,13 @@ RETURNING %s
 		deviceColumnList,
 		qualifiedName("tenant", "identity_devices"),
 	))).
-		WithArgs("dev-1").
-		WillReturnRows(sqlmock.NewRows(strings.Split(deviceColumnList, ", ")).AddRow(
-			"dev-1",
-			"acc-peer",
-			"sess-peer",
-			"Peer device",
-			identity.DevicePlatformWeb,
-			identity.DeviceStatusActive,
-			"pk-peer",
-			"",
-			time.Date(2026, time.March, 24, 0, 30, 0, 0, time.UTC),
-			time.Date(2026, time.March, 24, 0, 30, 0, 0, time.UTC),
-			nil,
-			nil,
-		))
+		WithArgs("dev-missing").
+		WillReturnRows(sqlmock.NewRows(strings.Split(deviceColumnList, ", ")))
 
-	_, err := store.SaveSession(context.Background(), identity.Session{
+	_, err := store.UpdateSession(context.Background(), identity.Session{
 		ID:             "sess-1",
 		AccountID:      "acc-1",
-		DeviceID:       "dev-1",
+		DeviceID:       "dev-missing",
 		DeviceName:     "Alice laptop",
 		DevicePlatform: identity.DevicePlatformWeb,
 		Status:         identity.SessionStatusActive,
@@ -159,8 +195,8 @@ RETURNING %s
 		CreatedAt:      time.Date(2026, time.March, 24, 0, 30, 0, 0, time.UTC),
 		LastSeenAt:     time.Date(2026, time.March, 24, 0, 30, 0, 0, time.UTC),
 	})
-	if !errors.Is(err, identity.ErrConflict) {
-		t.Fatalf("expected conflict, got %v", err)
+	if !errors.Is(err, identity.ErrNotFound) {
+		t.Fatalf("expected not found, got %v", err)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

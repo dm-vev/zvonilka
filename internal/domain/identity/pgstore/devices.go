@@ -22,6 +22,16 @@ func (s *Store) SaveDevice(ctx context.Context, device identity.Device) (identit
 		return identity.Device{}, identity.ErrInvalidInput
 	}
 
+	if strings.TrimSpace(device.SessionID) != "" {
+		session, err := s.SessionByID(ctx, device.SessionID)
+		if err != nil && !errors.Is(err, identity.ErrNotFound) {
+			return identity.Device{}, fmt.Errorf("load session %s for device %s: %w", device.SessionID, device.ID, err)
+		}
+		if err == nil && session.AccountID != device.AccountID {
+			return identity.Device{}, identity.ErrConflict
+		}
+	}
+
 	query := fmt.Sprintf(`
 INSERT INTO %s (
 	id, account_id, session_id, name, platform, status, public_key, push_token, created_at, last_seen_at, revoked_at, last_rotated_at

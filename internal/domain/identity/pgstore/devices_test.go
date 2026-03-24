@@ -43,66 +43,6 @@ func TestSaveDeviceRejectsCrossAccountSession(t *testing.T) {
 
 	store, mock, _ := newMockStore(t)
 
-	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(`
-INSERT INTO %s (
-	id, account_id, session_id, name, platform, status, public_key, push_token, created_at, last_seen_at, revoked_at, last_rotated_at
-) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
-)
-ON CONFLICT (id) DO UPDATE SET
-	account_id = EXCLUDED.account_id,
-	session_id = EXCLUDED.session_id,
-	name = EXCLUDED.name,
-	platform = EXCLUDED.platform,
-	status = EXCLUDED.status,
-	public_key = EXCLUDED.public_key,
-	push_token = EXCLUDED.push_token,
-	last_seen_at = EXCLUDED.last_seen_at,
-	revoked_at = EXCLUDED.revoked_at,
-	last_rotated_at = EXCLUDED.last_rotated_at
-RETURNING %s
-`, qualifiedName("tenant", "identity_devices"), deviceColumnList))).
-		WithArgs(
-			"dev-1",
-			"acc-1",
-			"sess-1",
-			"Alice phone",
-			identity.DevicePlatformWeb,
-			identity.DeviceStatusActive,
-			"pk-1",
-			"",
-			time.Date(2026, time.March, 24, 0, 30, 0, 0, time.UTC),
-			time.Date(2026, time.March, 24, 0, 30, 0, 0, time.UTC),
-			nil,
-			nil,
-		).
-		WillReturnError(&pgconn.PgError{Code: "23503"})
-
-	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(
-		`SELECT %s FROM %s WHERE id = $1`,
-		accountColumnList,
-		qualifiedName("tenant", "identity_accounts"),
-	))).
-		WithArgs("acc-1").
-		WillReturnRows(sqlmock.NewRows(strings.Split(accountColumnList, ", ")).AddRow(
-			"acc-1",
-			identity.AccountKindUser,
-			"alice",
-			"Alice",
-			"",
-			"",
-			"",
-			"[]",
-			identity.AccountStatusActive,
-			"",
-			"",
-			time.Date(2026, time.March, 24, 0, 30, 0, 0, time.UTC),
-			time.Date(2026, time.March, 24, 0, 30, 0, 0, time.UTC),
-			nil,
-			nil,
-			"",
-		))
-
 	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(
 		`SELECT %s FROM %s WHERE id = $1`,
 		sessionColumnList,
