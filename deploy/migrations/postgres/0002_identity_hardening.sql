@@ -35,6 +35,11 @@ ALTER TABLE {{schema}}.identity_sessions
 	ADD CONSTRAINT identity_sessions_status_check
 		CHECK (status IN ('active', 'revoked'));
 
+DROP INDEX IF EXISTS identity_devices_session_id_idx;
+
+CREATE INDEX IF NOT EXISTS identity_devices_session_id_idx
+	ON {{schema}}.identity_devices (session_id);
+
 CREATE INDEX IF NOT EXISTS identity_join_requests_pending_expires_at_idx
 	ON {{schema}}.identity_join_requests (expires_at, id)
 	WHERE status = 'pending';

@@ -29,7 +29,7 @@ func TestIdentitySchemaHardening(t *testing.T) {
 	migrationsPath := repoMigrationsPath(t,
 		"0001.sql",
 		"0002_identity_hardening.sql",
-		"0003_identity_device_session_unique.sql",
+		"0003_identity_account_boundaries.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -54,6 +54,52 @@ func TestIdentitySchemaHardening(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("save valid account: %v", err)
+	}
+	peerAccount, err := store.SaveAccount(ctx, identity.Account{
+		ID:          "acc-2",
+		Kind:        identity.AccountKindUser,
+		Username:    "bob",
+		DisplayName: "Bob",
+		Status:      identity.AccountStatusActive,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	})
+	if err != nil {
+		t.Fatalf("save peer account: %v", err)
+	}
+	const peerAccountSessionID = "sess-peer-account"
+	const peerAccountDeviceID = "dev-peer-account"
+
+	if err := store.WithinTx(ctx, func(tx identity.Store) error {
+		if _, err := tx.SaveDevice(ctx, identity.Device{
+			ID:         peerAccountDeviceID,
+			AccountID:  peerAccount.ID,
+			SessionID:  peerAccountSessionID,
+			Name:       "Bob phone",
+			Platform:   identity.DevicePlatformIOS,
+			Status:     identity.DeviceStatusActive,
+			PublicKey:  "pk-peer-account-1",
+			CreatedAt:  now,
+			LastSeenAt: now,
+		}); err != nil {
+			return err
+		}
+		if _, err := tx.SaveSession(ctx, identity.Session{
+			ID:             peerAccountSessionID,
+			AccountID:      peerAccount.ID,
+			DeviceID:       peerAccountDeviceID,
+			DeviceName:     "Bob phone",
+			DevicePlatform: identity.DevicePlatformIOS,
+			Status:         identity.SessionStatusActive,
+			Current:        true,
+			CreatedAt:      now,
+			LastSeenAt:     now,
+		}); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("save peer account device/session pair: %v", err)
 	}
 
 	t.Run("rejects invalid account kind", func(t *testing.T) {
@@ -240,6 +286,23 @@ func TestIdentitySchemaHardening(t *testing.T) {
 		}
 	})
 
+	t.Run("rejects cross-account device session reference", func(t *testing.T) {
+		_, err := store.SaveDevice(ctx, identity.Device{
+			ID:         "dev-cross",
+			AccountID:  account.ID,
+			SessionID:  peerAccountSessionID,
+			Name:       "Cross-account device",
+			Platform:   identity.DevicePlatformWeb,
+			Status:     identity.DeviceStatusActive,
+			PublicKey:  "pk-cross",
+			CreatedAt:  now,
+			LastSeenAt: now,
+		})
+		if !errors.Is(err, identity.ErrConflict) {
+			t.Fatalf("expected conflict, got %v", err)
+		}
+	})
+
 	t.Run("rejects invalid device platform", func(t *testing.T) {
 		_, err := store.SaveDevice(ctx, identity.Device{
 			ID:         "dev-platform",
@@ -340,6 +403,23 @@ func TestIdentitySchemaHardening(t *testing.T) {
 		requireInvalidInput(t, err)
 	})
 
+	t.Run("rejects cross-account session device reference", func(t *testing.T) {
+		_, err := store.SaveSession(ctx, identity.Session{
+			ID:             "sess-cross",
+			AccountID:      account.ID,
+			DeviceID:       peerAccountDeviceID,
+			DeviceName:     "Cross-account session",
+			DevicePlatform: identity.DevicePlatformWeb,
+			Status:         identity.SessionStatusActive,
+			Current:        true,
+			CreatedAt:      now,
+			LastSeenAt:     now,
+		})
+		if !errors.Is(err, identity.ErrConflict) {
+			t.Fatalf("expected conflict, got %v", err)
+		}
+	})
+
 	t.Run("rejects session update to an already attached device", func(t *testing.T) {
 		session, err := store.SessionByID(ctx, sessionID)
 		if err != nil {
@@ -364,6 +444,26 @@ func TestIdentitySchemaHardening(t *testing.T) {
 				PublicKey:  "pk-deferred",
 				CreatedAt:  now,
 				LastSeenAt: now,
+			})
+			return saveErr
+		})
+		if !errors.Is(err, identity.ErrConflict) {
+			t.Fatalf("expected conflict, got %v", err)
+		}
+	})
+
+	t.Run("rejects deferred session device fk on tx commit", func(t *testing.T) {
+		err := store.WithinTx(ctx, func(tx identity.Store) error {
+			_, saveErr := tx.SaveSession(ctx, identity.Session{
+				ID:             "sess-deferred",
+				AccountID:      account.ID,
+				DeviceID:       "dev-missing-tx",
+				DeviceName:     "Deferred",
+				DevicePlatform: identity.DevicePlatformWeb,
+				Status:         identity.SessionStatusActive,
+				Current:        true,
+				CreatedAt:      now,
+				LastSeenAt:     now,
 			})
 			return saveErr
 		})
@@ -451,6 +551,16 @@ func TestIdentitySchemaHardening(t *testing.T) {
 		}
 		if !indexName.Valid || indexName.String == "" {
 			t.Fatal("expected device session index to exist")
+		}
+	})
+
+	t.Run("does not expose unique device session index", func(t *testing.T) {
+		var indexName sql.NullString
+		if err := db.QueryRowContext(ctx, `SELECT to_regclass($1)`, qualifiedName("tenant", "identity_devices_session_id_key")).Scan(&indexName); err != nil {
+			t.Fatalf("load unique device session index: %v", err)
+		}
+		if indexName.Valid && indexName.String != "" {
+			t.Fatalf("expected unique device session index to be absent, got %s", indexName.String)
 		}
 	})
 
