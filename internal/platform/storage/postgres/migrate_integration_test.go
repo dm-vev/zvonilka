@@ -12,6 +12,8 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/dm-vev/zvonilka/internal/testsupport/dockermutex"
 )
 
 func TestApplyMigrationsIsIdempotent(t *testing.T) {
@@ -58,6 +60,9 @@ func TestApplyMigrationsIsIdempotent(t *testing.T) {
 
 func openDockerPostgres(t *testing.T) *sql.DB {
 	t.Helper()
+
+	unlock := dockermutex.Acquire(t, "postgres-integration")
+	t.Cleanup(unlock)
 
 	if _, err := exec.LookPath("docker"); err != nil {
 		t.Skip("docker is not available")
