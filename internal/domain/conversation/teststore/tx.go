@@ -38,19 +38,21 @@ func (s *memoryStore) WithinTx(ctx context.Context, fn func(conversation.Store) 
 
 func (s *memoryStore) cloneLocked() memoryStore {
 	return memoryStore{
-		conversationsByID: cloneConversations(s.conversationsByID),
-		membersByKey:      cloneMembers(s.membersByKey),
-		messagesByID:      cloneMessages(s.messagesByID),
-		readStatesByKey:   cloneReadStates(s.readStatesByKey),
+		conversationsByID:  cloneConversations(s.conversationsByID),
+		topicsByKey:        cloneTopics(s.topicsByKey),
+		membersByKey:       cloneMembers(s.membersByKey),
+		messagesByID:       cloneMessages(s.messagesByID),
+		readStatesByKey:    cloneReadStates(s.readStatesByKey),
 		syncStatesByDevice: cloneSyncStates(s.syncStatesByDevice),
-		eventsByID:        cloneEvents(s.eventsByID),
-		eventOrder:        append([]string(nil), s.eventOrder...),
-		nextSequence:      s.nextSequence,
+		eventsByID:         cloneEvents(s.eventsByID),
+		eventOrder:         append([]string(nil), s.eventOrder...),
+		nextSequence:       s.nextSequence,
 	}
 }
 
 func (s *memoryStore) replaceLocked(tx *memoryStore) {
 	s.conversationsByID = cloneConversations(tx.conversationsByID)
+	s.topicsByKey = cloneTopics(tx.topicsByKey)
 	s.membersByKey = cloneMembers(tx.membersByKey)
 	s.messagesByID = cloneMessages(tx.messagesByID)
 	s.readStatesByKey = cloneReadStates(tx.readStatesByKey)

@@ -106,13 +106,19 @@ func isActiveMember(member ConversationMember) bool {
 	return member.LeftAt.IsZero() && !member.Banned
 }
 
-func conversationEventMetadata(messageID string, extra map[string]string) map[string]string {
+func conversationEventMetadata(messageID string, threadID string, extra map[string]string) map[string]string {
 	metadata := trimMetadata(extra)
 	if messageID != "" {
 		if metadata == nil {
 			metadata = make(map[string]string, 1)
 		}
 		metadata["message_id"] = messageID
+	}
+	if threadID != "" {
+		if metadata == nil {
+			metadata = make(map[string]string, 1)
+		}
+		metadata["thread_id"] = threadID
 	}
 
 	return metadata
@@ -234,6 +240,19 @@ func (s *Service) CreateConversation(ctx context.Context, params CreateConversat
 			return fmt.Errorf("save owner membership: %w", saveErr)
 		}
 		savedMembers = append(savedMembers, owner)
+
+		generalTopic := ConversationTopic{
+			ConversationID:     savedConversation.ID,
+			ID:                 "",
+			Title:              generalTopicTitle,
+			CreatedByAccountID: params.OwnerAccountID,
+			IsGeneral:          true,
+			CreatedAt:          createdAt,
+			UpdatedAt:          createdAt,
+		}
+		if _, saveErr = tx.SaveTopic(ctx, generalTopic); saveErr != nil {
+			return fmt.Errorf("save general topic: %w", saveErr)
+		}
 
 		for _, memberID := range memberIDs {
 			member := ConversationMember{

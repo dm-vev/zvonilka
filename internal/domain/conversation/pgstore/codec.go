@@ -116,8 +116,8 @@ func decodeAttachmentDuration(value int64) time.Duration {
 func scanConversation(row rowScanner) (conversation.Conversation, error) {
 	var (
 		conversationRow conversation.Conversation
-		avatarMediaID  string
-		lastMessageAt  sql.NullTime
+		avatarMediaID   string
+		lastMessageAt   sql.NullTime
 	)
 
 	if err := row.Scan(
@@ -153,6 +153,42 @@ func scanConversation(row rowScanner) (conversation.Conversation, error) {
 	conversationRow.LastMessageAt = decodeTime(lastMessageAt)
 
 	return conversationRow, nil
+}
+
+func scanTopic(row rowScanner) (conversation.ConversationTopic, error) {
+	var (
+		topic         conversation.ConversationTopic
+		lastMessageAt sql.NullTime
+		archivedAt    sql.NullTime
+		closedAt      sql.NullTime
+	)
+
+	if err := row.Scan(
+		&topic.ConversationID,
+		&topic.ID,
+		&topic.Title,
+		&topic.CreatedByAccountID,
+		&topic.IsGeneral,
+		&topic.Archived,
+		&topic.Pinned,
+		&topic.Closed,
+		&topic.LastSequence,
+		&topic.MessageCount,
+		&topic.CreatedAt,
+		&topic.UpdatedAt,
+		&lastMessageAt,
+		&archivedAt,
+		&closedAt,
+	); err != nil {
+		return conversation.ConversationTopic{}, err
+	}
+
+	topic.CreatedAt = topic.CreatedAt.UTC()
+	topic.UpdatedAt = topic.UpdatedAt.UTC()
+	topic.LastMessageAt = decodeTime(lastMessageAt)
+	topic.ArchivedAt = decodeTime(archivedAt)
+	topic.ClosedAt = decodeTime(closedAt)
+	return topic, nil
 }
 
 func scanConversationMember(row rowScanner) (conversation.ConversationMember, error) {
@@ -209,21 +245,21 @@ func scanAttachment(row rowScanner) (conversation.AttachmentRef, error) {
 
 func scanMessage(row rowScanner) (conversation.Message, error) {
 	var (
-		message        conversation.Message
-		keyID          string
-		algorithm      string
-		nonce          []byte
-		ciphertext     []byte
-		aad            []byte
-		rawPayloadMetadata string
-		rawMetadata    string
+		message             conversation.Message
+		keyID               string
+		algorithm           string
+		nonce               []byte
+		ciphertext          []byte
+		aad                 []byte
+		rawPayloadMetadata  string
+		rawMetadata         string
 		replyConversationID sql.NullString
-		replyMessageID  sql.NullString
-		replySenderID   sql.NullString
-		replyKind       sql.NullString
-		replySnippet    sql.NullString
-		editedAt        sql.NullTime
-		deletedAt       sql.NullTime
+		replyMessageID      sql.NullString
+		replySenderID       sql.NullString
+		replyKind           sql.NullString
+		replySnippet        sql.NullString
+		editedAt            sql.NullTime
+		deletedAt           sql.NullTime
 	)
 
 	if err := row.Scan(
@@ -286,7 +322,7 @@ func scanMessage(row rowScanner) (conversation.Message, error) {
 
 func scanReadState(row rowScanner) (conversation.ReadState, error) {
 	var (
-		state conversation.ReadState
+		state     conversation.ReadState
 		updatedAt sql.NullTime
 	)
 
@@ -308,10 +344,10 @@ func scanReadState(row rowScanner) (conversation.ReadState, error) {
 
 func scanSyncState(row rowScanner) (conversation.SyncState, error) {
 	var (
-		state conversation.SyncState
+		state         conversation.SyncState
 		rawWatermarks string
-		serverTime sql.NullTime
-		updatedAt sql.NullTime
+		serverTime    sql.NullTime
+		updatedAt     sql.NullTime
 	)
 
 	if err := row.Scan(

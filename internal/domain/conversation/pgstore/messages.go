@@ -243,8 +243,8 @@ func (s *Store) MessageByID(ctx context.Context, conversationID string, messageI
 	return message, nil
 }
 
-// MessagesByConversationID lists the messages in a conversation.
-func (s *Store) MessagesByConversationID(ctx context.Context, conversationID string, fromSequence uint64, limit int) ([]conversation.Message, error) {
+// MessagesByConversationID lists the messages in a conversation and optional thread.
+func (s *Store) MessagesByConversationID(ctx context.Context, conversationID string, threadID string, fromSequence uint64, limit int) ([]conversation.Message, error) {
 	if err := s.requireStore(); err != nil {
 		return nil, err
 	}
@@ -252,6 +252,7 @@ func (s *Store) MessagesByConversationID(ctx context.Context, conversationID str
 		return nil, err
 	}
 	conversationID = strings.TrimSpace(conversationID)
+	threadID = strings.TrimSpace(threadID)
 	if conversationID == "" {
 		return nil, conversation.ErrInvalidInput
 	}
@@ -259,11 +260,11 @@ func (s *Store) MessagesByConversationID(ctx context.Context, conversationID str
 	query := fmt.Sprintf(`
 SELECT %s
 FROM %s
-WHERE conversation_id = $1 AND sequence > $2
+WHERE conversation_id = $1 AND thread_id = $2 AND sequence > $3
 ORDER BY sequence ASC, created_at ASC, id ASC
-LIMIT $3
+LIMIT $4
 `, messageColumnList, s.table("conversation_messages"))
-	rows, err := s.conn().QueryContext(ctx, query, conversationID, fromSequence, limit)
+	rows, err := s.conn().QueryContext(ctx, query, conversationID, threadID, fromSequence, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list messages for conversation %s: %w", conversationID, err)
 	}

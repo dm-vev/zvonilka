@@ -7,11 +7,11 @@ type ConversationKind string
 
 // Conversation kinds supported by the messenger domain.
 const (
-	ConversationKindUnspecified     ConversationKind = ""
-	ConversationKindDirect           ConversationKind = "direct"
-	ConversationKindGroup            ConversationKind = "group"
-	ConversationKindChannel          ConversationKind = "channel"
-	ConversationKindSavedMessages    ConversationKind = "saved_messages"
+	ConversationKindUnspecified   ConversationKind = ""
+	ConversationKindDirect        ConversationKind = "direct"
+	ConversationKindGroup         ConversationKind = "group"
+	ConversationKindChannel       ConversationKind = "channel"
+	ConversationKindSavedMessages ConversationKind = "saved_messages"
 )
 
 // MemberRole identifies the privilege level of a conversation member.
@@ -77,47 +77,71 @@ type EventType string
 
 // Event types emitted by the messenger domain.
 const (
-	EventTypeUnspecified          EventType = ""
-	EventTypeConversationCreated  EventType = "conversation.created"
-	EventTypeConversationUpdated  EventType = "conversation.updated"
-	EventTypeConversationMembers  EventType = "conversation.members_changed"
-	EventTypeMessageCreated       EventType = "message.created"
-	EventTypeMessageDelivered     EventType = "message.delivered"
-	EventTypeMessageRead          EventType = "message.read"
-	EventTypeMessageEdited        EventType = "message.edited"
-	EventTypeMessageDeleted       EventType = "message.deleted"
-	EventTypeSyncAcknowledged     EventType = "sync.acknowledged"
+	EventTypeUnspecified         EventType = ""
+	EventTypeConversationCreated EventType = "conversation.created"
+	EventTypeConversationUpdated EventType = "conversation.updated"
+	EventTypeConversationMembers EventType = "conversation.members_changed"
+	EventTypeMessageCreated      EventType = "message.created"
+	EventTypeMessageDelivered    EventType = "message.delivered"
+	EventTypeMessageRead         EventType = "message.read"
+	EventTypeMessageEdited       EventType = "message.edited"
+	EventTypeMessageDeleted      EventType = "message.deleted"
+	EventTypeSyncAcknowledged    EventType = "sync.acknowledged"
+	EventTypeTopicCreated        EventType = "topic.created"
+	EventTypeTopicUpdated        EventType = "topic.updated"
+	EventTypeTopicArchived       EventType = "topic.archived"
+	EventTypeTopicPinned         EventType = "topic.pinned"
+	EventTypeTopicClosed         EventType = "topic.closed"
 )
 
 // ConversationSettings controls write and moderation behavior for a conversation.
 type ConversationSettings struct {
-	OnlyAdminsCanWrite        bool
-	OnlyAdminsCanAddMembers   bool
-	AllowReactions            bool
-	AllowForwards             bool
-	AllowThreads              bool
-	RequireJoinApproval       bool
-	PinnedMessagesOnlyAdmins  bool
-	SlowModeInterval          time.Duration
+	OnlyAdminsCanWrite       bool
+	OnlyAdminsCanAddMembers  bool
+	AllowReactions           bool
+	AllowForwards            bool
+	AllowThreads             bool
+	RequireJoinApproval      bool
+	PinnedMessagesOnlyAdmins bool
+	SlowModeInterval         time.Duration
 }
 
 // Conversation describes a chat, channel, or saved-message space.
 type Conversation struct {
-	ID              string
-	Kind            ConversationKind
-	Title           string
-	Description     string
-	AvatarMediaID   string
-	OwnerAccountID  string
-	Settings        ConversationSettings
-	Archived        bool
-	Muted           bool
-	Pinned          bool
-	Hidden          bool
-	LastSequence    uint64
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	LastMessageAt   time.Time
+	ID             string
+	Kind           ConversationKind
+	Title          string
+	Description    string
+	AvatarMediaID  string
+	OwnerAccountID string
+	Settings       ConversationSettings
+	Archived       bool
+	Muted          bool
+	Pinned         bool
+	Hidden         bool
+	LastSequence   uint64
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	LastMessageAt  time.Time
+}
+
+// ConversationTopic describes a conversation topic or the general thread root.
+type ConversationTopic struct {
+	ConversationID     string
+	ID                 string
+	Title              string
+	CreatedByAccountID string
+	IsGeneral          bool
+	Archived           bool
+	Pinned             bool
+	Closed             bool
+	LastSequence       uint64
+	MessageCount       uint64
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	LastMessageAt      time.Time
+	ArchivedAt         time.Time
+	ClosedAt           time.Time
 }
 
 // ConversationMember describes a participant in a conversation.
@@ -158,25 +182,25 @@ type EncryptedPayload struct {
 
 // MessageReference describes a quoted or replied-to message.
 type MessageReference struct {
-	ConversationID string
-	MessageID      string
+	ConversationID  string
+	MessageID       string
 	SenderAccountID string
-	MessageKind    MessageKind
-	Snippet        string
+	MessageKind     MessageKind
+	Snippet         string
 }
 
 // MessageDraft captures client-supplied message content before persistence.
 type MessageDraft struct {
-	ClientMessageID      string
-	Kind                 MessageKind
-	Payload              EncryptedPayload
-	Attachments          []AttachmentRef
-	ReplyTo              MessageReference
-	ThreadID             string
-	DeliverAt            time.Time
-	Silent               bool
-	DisableLinkPreviews   bool
-	Metadata             map[string]string
+	ClientMessageID     string
+	Kind                MessageKind
+	Payload             EncryptedPayload
+	Attachments         []AttachmentRef
+	ReplyTo             MessageReference
+	ThreadID            string
+	DeliverAt           time.Time
+	Silent              bool
+	DisableLinkPreviews bool
+	Metadata            map[string]string
 }
 
 // Message describes a persisted conversation message.
@@ -206,13 +230,13 @@ type Message struct {
 
 // ReadState tracks the read and delivery watermark per device and conversation.
 type ReadState struct {
-	ConversationID      string
-	AccountID           string
-	DeviceID            string
-	LastReadSequence    uint64
+	ConversationID        string
+	AccountID             string
+	DeviceID              string
+	LastReadSequence      uint64
 	LastDeliveredSequence uint64
-	LastAckedSequence   uint64
-	UpdatedAt           time.Time
+	LastAckedSequence     uint64
+	UpdatedAt             time.Time
 }
 
 // SyncState tracks device-level sync cursors.

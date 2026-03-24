@@ -10,13 +10,17 @@ type Store interface {
 	ConversationByID(ctx context.Context, conversationID string) (Conversation, error)
 	ConversationsByAccountID(ctx context.Context, accountID string) ([]Conversation, error)
 
+	SaveTopic(ctx context.Context, topic ConversationTopic) (ConversationTopic, error)
+	TopicByConversationAndID(ctx context.Context, conversationID string, topicID string) (ConversationTopic, error)
+	TopicsByConversationID(ctx context.Context, conversationID string) ([]ConversationTopic, error)
+
 	SaveConversationMember(ctx context.Context, member ConversationMember) (ConversationMember, error)
 	ConversationMemberByConversationAndAccount(ctx context.Context, conversationID string, accountID string) (ConversationMember, error)
 	ConversationMembersByConversationID(ctx context.Context, conversationID string) ([]ConversationMember, error)
 
 	SaveMessage(ctx context.Context, message Message) (Message, error)
 	MessageByID(ctx context.Context, conversationID string, messageID string) (Message, error)
-	MessagesByConversationID(ctx context.Context, conversationID string, fromSequence uint64, limit int) ([]Message, error)
+	MessagesByConversationID(ctx context.Context, conversationID string, threadID string, fromSequence uint64, limit int) ([]Message, error)
 
 	SaveReadState(ctx context.Context, state ReadState) (ReadState, error)
 	ReadStateByConversationAndDevice(ctx context.Context, conversationID string, deviceID string) (ReadState, error)
