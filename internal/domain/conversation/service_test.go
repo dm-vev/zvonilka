@@ -2,6 +2,7 @@ package conversation_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -22,11 +23,11 @@ func TestConversationLifecycle(t *testing.T) {
 	}
 
 	created, members, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{
-		OwnerAccountID:  "acc-owner",
-		Kind:            conversation.ConversationKindDirect,
-		Title:           "Direct",
+		OwnerAccountID:   "acc-owner",
+		Kind:             conversation.ConversationKindDirect,
+		Title:            "Direct",
 		MemberAccountIDs: []string{"acc-peer"},
-		CreatedAt:       fixedNow,
+		CreatedAt:        fixedNow,
 	})
 	if err != nil {
 		t.Fatalf("create conversation: %v", err)
@@ -77,12 +78,12 @@ func TestConversationLifecycle(t *testing.T) {
 	}
 
 	delivered, deliveryEvent, err := svc.RecordDelivery(ctx, conversation.RecordDeliveryParams{
-		ConversationID:        created.ID,
-		AccountID:             "acc-peer",
-		DeviceID:              "dev-peer",
-		MessageID:             message.ID,
+		ConversationID:           created.ID,
+		AccountID:                "acc-peer",
+		DeviceID:                 "dev-peer",
+		MessageID:                message.ID,
 		DeliveredThroughSequence: event.Sequence,
-		CreatedAt:             fixedNow.Add(2 * time.Minute),
+		CreatedAt:                fixedNow.Add(2 * time.Minute),
 	})
 	if err != nil {
 		t.Fatalf("record delivery: %v", err)
@@ -95,11 +96,11 @@ func TestConversationLifecycle(t *testing.T) {
 	}
 
 	readState, readEvent, err := svc.MarkRead(ctx, conversation.MarkReadParams{
-		ConversationID:   created.ID,
-		AccountID:        "acc-peer",
-		DeviceID:         "dev-peer",
+		ConversationID:      created.ID,
+		AccountID:           "acc-peer",
+		DeviceID:            "dev-peer",
 		ReadThroughSequence: event.Sequence,
-		CreatedAt:        fixedNow.Add(3 * time.Minute),
+		CreatedAt:           fixedNow.Add(3 * time.Minute),
 	})
 	if err != nil {
 		t.Fatalf("mark read: %v", err)
@@ -184,5 +185,326 @@ func TestCreateConversationRejectsDirectWithoutPeer(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected direct conversation validation error")
+	}
+}
+
+func TestTopicLifecycleRequiresThreadsEnabled(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	fixedNow := time.Date(2026, time.March, 24, 14, 0, 0, 0, time.UTC)
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time { return fixedNow }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	created, _, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID: "acc-owner",
+		Kind:           conversation.ConversationKindGroup,
+		Title:          "Group",
+		Settings: conversation.ConversationSettings{
+			AllowReactions: true,
+			AllowThreads:   false,
+		},
+		CreatedAt: fixedNow,
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	_, _, err = svc.CreateTopic(ctx, conversation.CreateTopicParams{
+		ConversationID:   created.ID,
+		CreatorAccountID: "acc-owner",
+		Title:            "Announcements",
+		CreatedAt:        fixedNow.Add(time.Minute),
+	})
+	if !errors.Is(err, conversation.ErrForbidden) {
+		t.Fatalf("expected threads-disabled topic create to fail, got %v", err)
+	}
+
+	_, _, err = svc.SendMessage(ctx, conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "acc-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind:     conversation.MessageKindText,
+			ThreadID: "custom-topic",
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-1",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		CreatedAt: fixedNow.Add(2 * time.Minute),
+	})
+	if !errors.Is(err, conversation.ErrForbidden) {
+		t.Fatalf("expected threads-disabled topic message to fail, got %v", err)
+	}
+}
+
+func TestTopicLifecycle(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	fixedNow := time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC)
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time { return fixedNow }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	created, _, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID: "acc-owner",
+		Kind:           conversation.ConversationKindGroup,
+		Title:          "Group",
+		CreatedAt:      fixedNow,
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	topics, err := svc.ListTopics(ctx, conversation.ListTopicsParams{
+		ConversationID: created.ID,
+		AccountID:      "acc-owner",
+	})
+	if err != nil {
+		t.Fatalf("list topics: %v", err)
+	}
+	if len(topics) != 1 || !topics[0].IsGeneral {
+		t.Fatalf("expected general topic only, got %+v", topics)
+	}
+
+	rootMessage, _, err := svc.SendMessage(ctx, conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "acc-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-root",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		CreatedAt: fixedNow.Add(30 * time.Second),
+	})
+	if err != nil {
+		t.Fatalf("send root message: %v", err)
+	}
+
+	topics, err = svc.ListTopics(ctx, conversation.ListTopicsParams{
+		ConversationID: created.ID,
+		AccountID:      "acc-owner",
+	})
+	if err != nil {
+		t.Fatalf("relist topics: %v", err)
+	}
+	if len(topics) != 1 || !topics[0].IsGeneral || topics[0].MessageCount != 1 {
+		t.Fatalf("expected general topic count 1, got %+v", topics)
+	}
+
+	rootMessages, err := svc.ListMessages(ctx, conversation.ListMessagesParams{
+		AccountID:      "acc-owner",
+		ConversationID: created.ID,
+	})
+	if err != nil {
+		t.Fatalf("list root messages: %v", err)
+	}
+	if len(rootMessages) != 1 || rootMessages[0].ID != rootMessage.ID {
+		t.Fatalf("expected root message to be listed, got %+v", rootMessages)
+	}
+
+	topic, event, err := svc.CreateTopic(ctx, conversation.CreateTopicParams{
+		ConversationID:   created.ID,
+		CreatorAccountID: "acc-owner",
+		Title:            "Announcements",
+		CreatedAt:        fixedNow.Add(time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("create topic: %v", err)
+	}
+	if topic.ID == "" || event.EventType != conversation.EventTypeTopicCreated {
+		t.Fatalf("unexpected topic create result: %+v %+v", topic, event)
+	}
+
+	renamed, _, err := svc.RenameTopic(ctx, conversation.RenameTopicParams{
+		ConversationID: created.ID,
+		TopicID:        topic.ID,
+		ActorAccountID: "acc-owner",
+		Title:          "Updates",
+		UpdatedAt:      fixedNow.Add(2 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("rename topic: %v", err)
+	}
+	if renamed.Title != "Updates" {
+		t.Fatalf("expected renamed title, got %q", renamed.Title)
+	}
+
+	message, _, err := svc.SendMessage(ctx, conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "acc-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind:     conversation.MessageKindText,
+			ThreadID: topic.ID,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-1",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		CreatedAt: fixedNow.Add(3 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("send topic message: %v", err)
+	}
+
+	threadMessages, err := svc.ListMessages(ctx, conversation.ListMessagesParams{
+		AccountID:      "acc-owner",
+		ConversationID: created.ID,
+		ThreadID:       topic.ID,
+	})
+	if err != nil {
+		t.Fatalf("list topic messages: %v", err)
+	}
+	if len(threadMessages) != 1 || threadMessages[0].ID != message.ID {
+		t.Fatalf("expected one topic message, got %+v", threadMessages)
+	}
+
+	pinned, _, err := svc.PinTopic(ctx, conversation.PinTopicParams{
+		ConversationID: created.ID,
+		TopicID:        topic.ID,
+		ActorAccountID: "acc-owner",
+		Pinned:         true,
+		UpdatedAt:      fixedNow.Add(4 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("pin topic: %v", err)
+	}
+	if !pinned.Pinned {
+		t.Fatalf("expected pinned topic")
+	}
+
+	archived, _, err := svc.ArchiveTopic(ctx, conversation.ArchiveTopicParams{
+		ConversationID: created.ID,
+		TopicID:        topic.ID,
+		ActorAccountID: "acc-owner",
+		Archived:       true,
+		UpdatedAt:      fixedNow.Add(5 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("archive topic: %v", err)
+	}
+	if !archived.Archived {
+		t.Fatalf("expected archived topic")
+	}
+
+	_, _, err = svc.SendMessage(ctx, conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "acc-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind:     conversation.MessageKindText,
+			ThreadID: topic.ID,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-2",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		CreatedAt: fixedNow.Add(6 * time.Minute),
+	})
+	if !errors.Is(err, conversation.ErrForbidden) {
+		t.Fatalf("expected archived topic to reject writes, got %v", err)
+	}
+
+	unarchived, _, err := svc.ArchiveTopic(ctx, conversation.ArchiveTopicParams{
+		ConversationID: created.ID,
+		TopicID:        topic.ID,
+		ActorAccountID: "acc-owner",
+		Archived:       false,
+		UpdatedAt:      fixedNow.Add(6 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("unarchive topic: %v", err)
+	}
+	if unarchived.Archived {
+		t.Fatalf("expected unarchived topic")
+	}
+
+	_, _, err = svc.SendMessage(ctx, conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "acc-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind:     conversation.MessageKindText,
+			ThreadID: topic.ID,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-2",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		CreatedAt: fixedNow.Add(7 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("send message after unarchive: %v", err)
+	}
+
+	closed, _, err := svc.CloseTopic(ctx, conversation.CloseTopicParams{
+		ConversationID: created.ID,
+		TopicID:        topic.ID,
+		ActorAccountID: "acc-owner",
+		Closed:         true,
+		UpdatedAt:      fixedNow.Add(8 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("close topic: %v", err)
+	}
+	if !closed.Closed {
+		t.Fatalf("expected closed topic")
+	}
+
+	_, _, err = svc.SendMessage(ctx, conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "acc-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind:     conversation.MessageKindText,
+			ThreadID: topic.ID,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-3",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		CreatedAt: fixedNow.Add(9 * time.Minute),
+	})
+	if err == nil {
+		t.Fatal("expected closed topic to reject writes")
+	}
+
+	reopened, _, err := svc.CloseTopic(ctx, conversation.CloseTopicParams{
+		ConversationID: created.ID,
+		TopicID:        topic.ID,
+		ActorAccountID: "acc-owner",
+		Closed:         false,
+		UpdatedAt:      fixedNow.Add(10 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("reopen topic: %v", err)
+	}
+	if reopened.Closed {
+		t.Fatalf("expected reopened topic")
 	}
 }

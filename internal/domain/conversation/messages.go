@@ -13,6 +13,7 @@ func (s *Service) ListMessages(ctx context.Context, params ListMessagesParams) (
 	}
 	params.ConversationID = strings.TrimSpace(params.ConversationID)
 	params.AccountID = strings.TrimSpace(params.AccountID)
+	params.ThreadID = strings.TrimSpace(params.ThreadID)
 	if params.ConversationID == "" || params.AccountID == "" {
 		return nil, ErrInvalidInput
 	}
@@ -24,9 +25,21 @@ func (s *Service) ListMessages(ctx context.Context, params ListMessagesParams) (
 	if !isActiveMember(member) {
 		return nil, ErrForbidden
 	}
+	if params.ThreadID != "" {
+		conversation, err := s.store.ConversationByID(ctx, params.ConversationID)
+		if err != nil {
+			return nil, fmt.Errorf("load conversation %s for thread %s: %w", params.ConversationID, params.ThreadID, err)
+		}
+		if conversation.Kind != ConversationKindGroup || !conversation.Settings.AllowThreads {
+			return nil, ErrForbidden
+		}
+		if _, err := s.store.TopicByConversationAndID(ctx, params.ConversationID, params.ThreadID); err != nil {
+			return nil, fmt.Errorf("load topic %s in conversation %s: %w", params.ThreadID, params.ConversationID, err)
+		}
+	}
 
 	limit := clampLimit(params.Limit, 100, 500)
-	messages, err := s.store.MessagesByConversationID(ctx, params.ConversationID, params.FromSequence, limit)
+	messages, err := s.store.MessagesByConversationID(ctx, params.ConversationID, params.ThreadID, params.FromSequence, limit)
 	if err != nil {
 		return nil, fmt.Errorf("load messages for conversation %s: %w", params.ConversationID, err)
 	}
@@ -54,6 +67,7 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 	params.SenderAccountID = strings.TrimSpace(params.SenderAccountID)
 	params.SenderDeviceID = strings.TrimSpace(params.SenderDeviceID)
 	params.Draft = normalizeMessageDraft(params.Draft)
+	params.Draft.ThreadID = strings.TrimSpace(params.Draft.ThreadID)
 	if params.ConversationID == "" || params.SenderAccountID == "" || params.SenderDeviceID == "" {
 		return Message{}, EventEnvelope{}, ErrInvalidInput
 	}
@@ -84,6 +98,20 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 			return ErrForbidden
 		}
 		if conversation.Settings.OnlyAdminsCanWrite && member.Role != MemberRoleOwner && member.Role != MemberRoleAdmin {
+			return ErrForbidden
+		}
+
+		topicID := params.Draft.ThreadID
+		if topicID != "" {
+			if conversation.Kind != ConversationKindGroup || !conversation.Settings.AllowThreads {
+				return ErrForbidden
+			}
+		}
+		topic, topicErr := tx.TopicByConversationAndID(ctx, conversation.ID, topicID)
+		if topicErr != nil {
+			return fmt.Errorf("load topic %s in conversation %s: %w", topicID, conversation.ID, topicErr)
+		}
+		if topic.Archived || topic.Closed {
 			return ErrForbidden
 		}
 
@@ -128,12 +156,20 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 			MessageID:      savedMessage.ID,
 			PayloadType:    "message",
 			Payload:        params.Draft.Payload,
-			Metadata:       conversationEventMetadata(savedMessage.ID, params.Draft.Metadata),
+			Metadata:       conversationEventMetadata(savedMessage.ID, params.Draft.ThreadID, params.Draft.Metadata),
 			CreatedAt:      now,
 		}
 		savedEvent, err = tx.SaveEvent(ctx, event)
 		if err != nil {
 			return fmt.Errorf("save message event: %w", err)
+		}
+
+		topic.LastSequence = savedEvent.Sequence
+		topic.MessageCount++
+		topic.LastMessageAt = now
+		topic.UpdatedAt = now
+		if _, err = tx.SaveTopic(ctx, topic); err != nil {
+			return fmt.Errorf("update topic %s after message: %w", topic.ID, err)
 		}
 
 		savedMessage.Sequence = savedEvent.Sequence
@@ -144,13 +180,13 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 		}
 
 		readState := ReadState{
-			ConversationID:      conversation.ID,
-			AccountID:           params.SenderAccountID,
-			DeviceID:            params.SenderDeviceID,
+			ConversationID:        conversation.ID,
+			AccountID:             params.SenderAccountID,
+			DeviceID:              params.SenderDeviceID,
 			LastDeliveredSequence: savedEvent.Sequence,
-			LastReadSequence:    savedEvent.Sequence,
-			LastAckedSequence:    savedEvent.Sequence,
-			UpdatedAt:           now,
+			LastReadSequence:      savedEvent.Sequence,
+			LastAckedSequence:     savedEvent.Sequence,
+			UpdatedAt:             now,
 		}
 		if _, err := tx.SaveReadState(ctx, readState); err != nil {
 			return fmt.Errorf("save sender read state: %w", err)

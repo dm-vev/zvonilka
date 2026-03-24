@@ -32,6 +32,7 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 		"0004_identity_session_device_deferrable.sql",
 		"0005.sql",
 		"0006.sql",
+		"0009.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -55,11 +56,11 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 	}
 
 	created, members, err := svc.CreateConversation(context.Background(), conversation.CreateConversationParams{
-		OwnerAccountID:  "id-owner",
-		Kind:            conversation.ConversationKindDirect,
-		Title:           "Direct",
+		OwnerAccountID:   "id-owner",
+		Kind:             conversation.ConversationKindDirect,
+		Title:            "Direct",
 		MemberAccountIDs: []string{"id-peer"},
-		CreatedAt:       time.Date(2026, time.March, 24, 11, 0, 0, 0, time.UTC),
+		CreatedAt:        time.Date(2026, time.March, 24, 11, 0, 0, 0, time.UTC),
 	})
 	if err != nil {
 		t.Fatalf("create conversation: %v", err)
@@ -108,22 +109,22 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 	}
 
 	if _, _, err := svc.RecordDelivery(context.Background(), conversation.RecordDeliveryParams{
-		ConversationID:        created.ID,
-		AccountID:             "id-peer",
-		DeviceID:              "dev-peer",
-		MessageID:             message.ID,
+		ConversationID:           created.ID,
+		AccountID:                "id-peer",
+		DeviceID:                 "dev-peer",
+		MessageID:                message.ID,
 		DeliveredThroughSequence: event.Sequence,
-		CreatedAt:             time.Date(2026, time.March, 24, 11, 2, 0, 0, time.UTC),
+		CreatedAt:                time.Date(2026, time.March, 24, 11, 2, 0, 0, time.UTC),
 	}); err != nil {
 		t.Fatalf("record delivery: %v", err)
 	}
 
 	readState, _, err := svc.MarkRead(context.Background(), conversation.MarkReadParams{
-		ConversationID:   created.ID,
-		AccountID:        "id-peer",
-		DeviceID:         "dev-peer",
+		ConversationID:      created.ID,
+		AccountID:           "id-peer",
+		DeviceID:            "dev-peer",
 		ReadThroughSequence: event.Sequence,
-		CreatedAt:        time.Date(2026, time.March, 24, 11, 3, 0, 0, time.UTC),
+		CreatedAt:           time.Date(2026, time.March, 24, 11, 3, 0, 0, time.UTC),
 	})
 	if err != nil {
 		t.Fatalf("mark read: %v", err)
@@ -177,6 +178,7 @@ func TestConversationSchemaConstraints(t *testing.T) {
 		"0004_identity_session_device_deferrable.sql",
 		"0005.sql",
 		"0006.sql",
+		"0009.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -215,6 +217,211 @@ INSERT INTO tenant.conversation_conversations (
 	}
 }
 
+func TestConversationTopicSchemaLifecycle(t *testing.T) {
+	db := openDockerPostgres(t)
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	migrationsPath := repoMigrationsPath(t,
+		"0001.sql",
+		"0002_identity_hardening.sql",
+		"0003_identity_account_boundaries.sql",
+		"0004_identity_session_device_deferrable.sql",
+		"0005.sql",
+		"0006.sql",
+		"0009.sql",
+	)
+	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	seedIdentity(t, db, "tenant",
+		"id-owner", "owner", "owner@example.com", "dev-owner", "sess-owner",
+		"id-peer", "peer", "peer@example.com", "dev-peer", "sess-peer",
+	)
+
+	store, err := New(db, "tenant")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time {
+		return time.Date(2026, time.March, 24, 13, 0, 0, 0, time.UTC)
+	}))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	created, _, err := svc.CreateConversation(context.Background(), conversation.CreateConversationParams{
+		OwnerAccountID: "id-owner",
+		Kind:           conversation.ConversationKindGroup,
+		Title:          "Group",
+		CreatedAt:      time.Date(2026, time.March, 24, 13, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	topics, err := svc.ListTopics(context.Background(), conversation.ListTopicsParams{
+		ConversationID: created.ID,
+		AccountID:      "id-owner",
+	})
+	if err != nil {
+		t.Fatalf("list topics: %v", err)
+	}
+	if len(topics) != 1 || !topics[0].IsGeneral {
+		t.Fatalf("expected general root topic, got %+v", topics)
+	}
+
+	rootMessage, _, err := svc.SendMessage(context.Background(), conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "id-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-root",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		CreatedAt: time.Date(2026, time.March, 24, 13, 0, 30, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("send root message: %v", err)
+	}
+
+	rootTopic, err := store.TopicByConversationAndID(context.Background(), created.ID, "")
+	if err != nil {
+		t.Fatalf("load root topic: %v", err)
+	}
+	if rootTopic.MessageCount != 1 || rootTopic.LastSequence != rootMessage.Sequence {
+		t.Fatalf("expected root topic counters to advance, got %+v", rootTopic)
+	}
+	rootMessages, err := svc.ListMessages(context.Background(), conversation.ListMessagesParams{
+		AccountID:      "id-owner",
+		ConversationID: created.ID,
+	})
+	if err != nil {
+		t.Fatalf("list root messages: %v", err)
+	}
+	if len(rootMessages) != 1 || rootMessages[0].ID != rootMessage.ID {
+		t.Fatalf("expected root message to be listed, got %+v", rootMessages)
+	}
+
+	topic, _, err := svc.CreateTopic(context.Background(), conversation.CreateTopicParams{
+		ConversationID:   created.ID,
+		CreatorAccountID: "id-owner",
+		Title:            "Announcements",
+		CreatedAt:        time.Date(2026, time.March, 24, 13, 1, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create topic: %v", err)
+	}
+
+	renamed, _, err := svc.RenameTopic(context.Background(), conversation.RenameTopicParams{
+		ConversationID: created.ID,
+		TopicID:        topic.ID,
+		ActorAccountID: "id-owner",
+		Title:          "Updates",
+		UpdatedAt:      time.Date(2026, time.March, 24, 13, 2, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("rename topic: %v", err)
+	}
+	if renamed.Title != "Updates" {
+		t.Fatalf("expected renamed topic, got %q", renamed.Title)
+	}
+
+	message, _, err := svc.SendMessage(context.Background(), conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "id-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind:     conversation.MessageKindText,
+			ThreadID: topic.ID,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-1",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		CreatedAt: time.Date(2026, time.March, 24, 13, 3, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("send topic message: %v", err)
+	}
+
+	threadMessages, err := svc.ListMessages(context.Background(), conversation.ListMessagesParams{
+		AccountID:      "id-owner",
+		ConversationID: created.ID,
+		ThreadID:       topic.ID,
+	})
+	if err != nil {
+		t.Fatalf("list topic messages: %v", err)
+	}
+	if len(threadMessages) != 1 || threadMessages[0].ID != message.ID {
+		t.Fatalf("expected one topic message, got %+v", threadMessages)
+	}
+
+	archived, _, err := svc.ArchiveTopic(context.Background(), conversation.ArchiveTopicParams{
+		ConversationID: created.ID,
+		TopicID:        topic.ID,
+		ActorAccountID: "id-owner",
+		Archived:       true,
+		UpdatedAt:      time.Date(2026, time.March, 24, 13, 4, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("archive topic: %v", err)
+	}
+	if !archived.Archived {
+		t.Fatalf("expected archived topic")
+	}
+
+	_, _, err = svc.SendMessage(context.Background(), conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "id-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind:     conversation.MessageKindText,
+			ThreadID: topic.ID,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-2",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		CreatedAt: time.Date(2026, time.March, 24, 13, 5, 0, 0, time.UTC),
+	})
+	if err == nil {
+		t.Fatal("expected archived topic to reject writes")
+	}
+
+	if _, err := store.SaveMessage(context.Background(), conversation.Message{
+		ID:              "msg-fk",
+		ConversationID:  created.ID,
+		SenderAccountID: "id-owner",
+		SenderDeviceID:  "dev-owner",
+		Kind:            conversation.MessageKindText,
+		Status:          conversation.MessageStatusSent,
+		ThreadID:        "missing-topic",
+		Payload: conversation.EncryptedPayload{
+			KeyID:      "key-3",
+			Algorithm:  "xchacha20poly1305",
+			Nonce:      []byte("nonce"),
+			Ciphertext: []byte("ciphertext"),
+		},
+		CreatedAt: time.Date(2026, time.March, 24, 13, 6, 0, 0, time.UTC),
+		UpdatedAt: time.Date(2026, time.March, 24, 13, 6, 0, 0, time.UTC),
+	}); err == nil {
+		t.Fatal("expected missing topic fk to fail")
+	}
+}
+
 func seedIdentity(t *testing.T, db *sql.DB, schema string, ownerID, ownerUsername, ownerEmail, ownerDeviceID, ownerSessionID string, peer ...string) {
 	t.Helper()
 
@@ -229,26 +436,26 @@ func seedIdentity(t *testing.T, db *sql.DB, schema string, ownerID, ownerUsernam
 
 	now := time.Date(2026, time.March, 24, 10, 59, 0, 0, time.UTC)
 	accounts := []struct {
-		id       string
-		username string
-		email    string
-		deviceID string
+		id        string
+		username  string
+		email     string
+		deviceID  string
 		sessionID string
 	}{
 		{ownerID, ownerUsername, ownerEmail, ownerDeviceID, ownerSessionID},
 	}
 	if len(peer) >= 5 {
 		accounts = append(accounts, struct {
-			id       string
-			username string
-			email    string
-			deviceID string
+			id        string
+			username  string
+			email     string
+			deviceID  string
 			sessionID string
 		}{
-			id:       peer[0],
-			username: peer[1],
-			email:    peer[2],
-			deviceID: peer[3],
+			id:        peer[0],
+			username:  peer[1],
+			email:     peer[2],
+			deviceID:  peer[3],
 			sessionID: peer[4],
 		})
 	}

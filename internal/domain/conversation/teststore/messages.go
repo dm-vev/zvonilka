@@ -38,18 +38,19 @@ func (s *memoryStore) MessageByID(ctx context.Context, conversationID string, me
 	return cloneMessage(message), nil
 }
 
-func (s *memoryStore) MessagesByConversationID(ctx context.Context, conversationID string, fromSequence uint64, limit int) ([]conversation.Message, error) {
+func (s *memoryStore) MessagesByConversationID(ctx context.Context, conversationID string, threadID string, fromSequence uint64, limit int) ([]conversation.Message, error) {
 	if err := s.validateRead(ctx); err != nil {
 		return nil, err
 	}
 	conversationID = strings.TrimSpace(conversationID)
+	threadID = strings.TrimSpace(threadID)
 	if conversationID == "" {
 		return nil, conversation.ErrInvalidInput
 	}
 
 	rows := make([]conversation.Message, 0)
 	for _, message := range s.messagesByID {
-		if message.ConversationID != conversationID {
+		if message.ConversationID != conversationID || strings.TrimSpace(message.ThreadID) != threadID {
 			continue
 		}
 		rows = append(rows, cloneMessage(message))

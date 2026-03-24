@@ -29,7 +29,12 @@ ALTER TABLE {{schema}}.conversation_events
 			'message.read',
 			'message.edited',
 			'message.deleted',
-			'sync.acknowledged'
+			'sync.acknowledged',
+			'topic.created',
+			'topic.updated',
+			'topic.archived',
+			'topic.pinned',
+			'topic.closed'
 		)),
 	ADD CONSTRAINT conversation_events_actor_device_check
 		CHECK (actor_device_id IS NULL OR actor_device_id <> '');

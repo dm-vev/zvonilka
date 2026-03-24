@@ -28,6 +28,19 @@ func cloneMembers(src map[string]conversation.ConversationMember) map[string]con
 	return dst
 }
 
+func cloneTopics(src map[string]conversation.ConversationTopic) map[string]conversation.ConversationTopic {
+	if len(src) == 0 {
+		return make(map[string]conversation.ConversationTopic)
+	}
+
+	dst := make(map[string]conversation.ConversationTopic, len(src))
+	for key, value := range src {
+		dst[key] = cloneTopic(value)
+	}
+
+	return dst
+}
+
 func cloneMessages(src map[string]conversation.Message) map[string]conversation.Message {
 	if len(src) == 0 {
 		return make(map[string]conversation.Message)
@@ -81,6 +94,10 @@ func cloneEvents(src map[string]conversation.EventEnvelope) map[string]conversat
 }
 
 func cloneConversation(value conversation.Conversation) conversation.Conversation {
+	return value
+}
+
+func cloneTopic(value conversation.ConversationTopic) conversation.ConversationTopic {
 	return value
 }
 
