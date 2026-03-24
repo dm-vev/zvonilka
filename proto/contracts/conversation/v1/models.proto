@@ -38,6 +38,8 @@ message Conversation {
   google.protobuf.Timestamp created_at = 13;
   google.protobuf.Timestamp updated_at = 14;
   google.protobuf.Timestamp last_message_at = 15;
+  uint64 unread_count = 16;
+  uint64 unread_mention_count = 17;
 }
 
 message ConversationMember {
@@ -87,9 +89,10 @@ message Message {
   bool pinned = 13;
   repeated Reaction reactions = 14;
   uint64 view_count = 15;
-  google.protobuf.Timestamp created_at = 16;
-  google.protobuf.Timestamp edited_at = 17;
-  google.protobuf.Timestamp deleted_at = 18;
+  repeated string mention_user_ids = 16;
+  google.protobuf.Timestamp created_at = 17;
+  google.protobuf.Timestamp edited_at = 18;
+  google.protobuf.Timestamp deleted_at = 19;
 }
 
 message Thread {

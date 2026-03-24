@@ -154,11 +154,21 @@ func (s *Service) EditMessage(ctx context.Context, params EditMessageParams) (Me
 		); err != nil {
 			return ErrInvalidInput
 		}
+		if len(params.Draft.MentionAccountIDs) > 0 {
+			members, loadErr := tx.ConversationMembersByConversationID(ctx, state.conversation.ID)
+			if loadErr != nil {
+				return fmt.Errorf("load members for conversation %s: %w", state.conversation.ID, loadErr)
+			}
+			if err := validateMentionTargets(members, params.Draft.MentionAccountIDs); err != nil {
+				return err
+			}
+		}
 
 		nextMessage := state.message
 		nextMessage.Kind = params.Draft.Kind
 		nextMessage.Payload = params.Draft.Payload
 		nextMessage.Attachments = append([]AttachmentRef(nil), params.Draft.Attachments...)
+		nextMessage.MentionAccountIDs = append([]string(nil), params.Draft.MentionAccountIDs...)
 		StripMessageHints(&nextMessage)
 		nextMessage.Silent = params.Draft.Silent
 		nextMessage.DisableLinkPreviews = params.Draft.DisableLinkPreviews

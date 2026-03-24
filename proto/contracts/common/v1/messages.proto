@@ -87,6 +87,7 @@ message MessageDraft {
   bool silent = 8;
   bool disable_link_previews = 9;
   map<string, string> metadata = 10;
+  repeated string mention_user_ids = 11;
 }
 
 message EventEnvelope {

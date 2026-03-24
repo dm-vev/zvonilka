@@ -16,6 +16,7 @@ func (s *memoryStore) SaveMessage(ctx context.Context, message conversation.Mess
 	message.ConversationID = strings.TrimSpace(message.ConversationID)
 	message.SenderAccountID = strings.TrimSpace(message.SenderAccountID)
 	message.SenderDeviceID = strings.TrimSpace(message.SenderDeviceID)
+	message.MentionAccountIDs = normalizeIDs(message.MentionAccountIDs)
 	if message.ID == "" || message.ConversationID == "" || message.SenderAccountID == "" || message.SenderDeviceID == "" {
 		return conversation.Message{}, conversation.ErrInvalidInput
 	}
@@ -34,6 +35,7 @@ func (s *memoryStore) SaveMessage(ctx context.Context, message conversation.Mess
 	s.messagesByID[message.ID] = cloneMessage(message)
 
 	saved := cloneMessage(message)
+	saved.MentionAccountIDs = append([]string(nil), message.MentionAccountIDs...)
 	saved.Reactions = s.reactionsByMessageIDs([]string{saved.ID})[saved.ID]
 	return saved, nil
 }
@@ -50,6 +52,7 @@ func (s *memoryStore) MessageByID(ctx context.Context, conversationID string, me
 	}
 
 	saved := cloneMessage(message)
+	saved.MentionAccountIDs = append([]string(nil), message.MentionAccountIDs...)
 	saved.Reactions = s.reactionsByMessageIDs([]string{saved.ID})[saved.ID]
 	return saved, nil
 }

@@ -30,8 +30,9 @@ func normalizeConversationSettings(settings ConversationSettings) ConversationSe
 	return settings
 }
 
-// normalizeMessageDraft trims identifiers and clamps negative durations.
+// normalizeMessageDraft trims identifiers, deduplicates mention targets, and clamps negative durations.
 func normalizeMessageDraft(draft MessageDraft) MessageDraft {
+	draft.MentionAccountIDs = uniqueIDs(draft.MentionAccountIDs)
 	if draft.DeliverAt.Before(time.Time{}) {
 		draft.DeliverAt = time.Time{}
 	}

@@ -46,6 +46,7 @@ func (s *Store) saveMessage(ctx context.Context, message conversation.Message) (
 	message.SenderDeviceID = strings.TrimSpace(message.SenderDeviceID)
 	message.ClientMessageID = strings.TrimSpace(message.ClientMessageID)
 	message.ThreadID = strings.TrimSpace(message.ThreadID)
+	message.MentionAccountIDs = normalizeIDs(message.MentionAccountIDs)
 	if message.ID == "" || message.ConversationID == "" || message.SenderAccountID == "" || message.SenderDeviceID == "" {
 		return conversation.Message{}, conversation.ErrInvalidInput
 	}
@@ -174,6 +175,11 @@ RETURNING %s
 		saved.Attachments = append([]conversation.AttachmentRef(nil), message.Attachments...)
 	}
 
+	if err := s.replaceMentions(ctx, saved.ID, message.MentionAccountIDs); err != nil {
+		return conversation.Message{}, err
+	}
+	saved.MentionAccountIDs = append([]string(nil), message.MentionAccountIDs...)
+
 	reactions, err := s.reactionsByMessageIDs(ctx, []string{saved.ID})
 	if err != nil {
 		return conversation.Message{}, err
@@ -251,6 +257,12 @@ func (s *Store) MessageByID(ctx context.Context, conversationID string, messageI
 	}
 	message.Attachments = attachments[message.ID]
 
+	mentions, err := s.mentionsByMessageIDs(ctx, []string{message.ID})
+	if err != nil {
+		return conversation.Message{}, err
+	}
+	message.MentionAccountIDs = mentions[message.ID]
+
 	reactions, err := s.reactionsByMessageIDs(ctx, []string{message.ID})
 	if err != nil {
 		return conversation.Message{}, err
@@ -307,6 +319,14 @@ LIMIT $4
 	}
 	for idx := range messages {
 		messages[idx].Attachments = attachments[messages[idx].ID]
+	}
+
+	mentions, err := s.mentionsByMessageIDs(ctx, messageIDs)
+	if err != nil {
+		return nil, err
+	}
+	for idx := range messages {
+		messages[idx].MentionAccountIDs = mentions[messages[idx].ID]
 	}
 
 	reactions, err := s.reactionsByMessageIDs(ctx, messageIDs)

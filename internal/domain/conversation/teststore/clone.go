@@ -120,6 +120,7 @@ func cloneMember(value conversation.ConversationMember) conversation.Conversatio
 
 func cloneMessage(value conversation.Message) conversation.Message {
 	value.Attachments = append([]conversation.AttachmentRef(nil), value.Attachments...)
+	value.MentionAccountIDs = append([]string(nil), value.MentionAccountIDs...)
 	value.Reactions = append([]conversation.MessageReaction(nil), value.Reactions...)
 	if len(value.Metadata) > 0 {
 		metadata := make(map[string]string, len(value.Metadata))
