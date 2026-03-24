@@ -3,10 +3,11 @@ package media
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 )
 
-// GetDownloadURL resolves a download target for a ready media asset.
+// GetDownloadURL resolves an application-owned download target for a ready media asset.
 func (s *Service) GetDownloadURL(ctx context.Context, params GetDownloadParams) (MediaAsset, DownloadTarget, error) {
 	if err := s.validateContext(ctx, "get media download URL"); err != nil {
 		return MediaAsset{}, DownloadTarget{}, err
@@ -28,18 +29,10 @@ func (s *Service) GetDownloadURL(ctx context.Context, params GetDownloadParams) 
 		return MediaAsset{}, DownloadTarget{}, ErrNotFound
 	}
 
-	presignedDownload, err := s.blob.PresignGetObject(ctx, asset.ObjectKey, s.settings.DownloadURLTTL)
-	if err != nil {
-		return MediaAsset{}, DownloadTarget{}, fmt.Errorf("presign download for media %s: %w", asset.ID, err)
-	}
-
 	return asset, DownloadTarget{
-		URL:       presignedDownload.URL,
-		Method:    presignedDownload.Method,
-		Headers:   presignedDownload.Headers,
-		ExpiresAt: presignedDownload.ExpiresAt,
-		ObjectKey: asset.ObjectKey,
-		Bucket:    asset.Bucket,
+		URL:       fmt.Sprintf("/media/%s/download", asset.ID),
+		Method:    http.MethodGet,
+		ExpiresAt: s.currentTime().Add(s.settings.DownloadURLTTL),
 	}, nil
 }
 

@@ -6,7 +6,7 @@ import (
 	"github.com/dm-vev/zvonilka/internal/domain/media"
 )
 
-// MediaConfig defines upload and download settings for the media subsystem.
+// MediaConfig defines upload and download access settings for the media subsystem.
 type MediaConfig struct {
 	UploadURLTTL   time.Duration
 	DownloadURLTTL time.Duration
