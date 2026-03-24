@@ -214,6 +214,26 @@ func TestLoadUsesStorageProviderDefaults(t *testing.T) {
 	}
 }
 
+func TestLoadAllowsIndependentStorageInfraFlagsForGateway(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_POSTGRES_ENABLED", "true")
+	t.Setenv("ZVONILKA_POSTGRES_DSN", "postgres://localhost/app")
+	t.Setenv("ZVONILKA_OBJECT_STORAGE_ENABLED", "false")
+
+	cfg, err := Load("gateway")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if !cfg.Infrastructure.Postgres.Enabled {
+		t.Fatal("expected postgres to stay enabled")
+	}
+	if cfg.Infrastructure.ObjectStore.Enabled {
+		t.Fatal("expected object storage to stay disabled")
+	}
+}
+
 func TestLoadHonorsExplicitDisableForDerivedInfrastructureFlags(t *testing.T) {
 	resetConfigEnv(t)
 
@@ -225,6 +245,8 @@ func TestLoadHonorsExplicitDisableForDerivedInfrastructureFlags(t *testing.T) {
 	t.Setenv("ZVONILKA_OBJECT_STORAGE_ENDPOINT", "http://minio:9000")
 	t.Setenv("ZVONILKA_OBJECT_STORAGE_REGION", "eu-west-1")
 	t.Setenv("ZVONILKA_OBJECT_STORAGE_BUCKET", "zvonilka")
+	t.Setenv("ZVONILKA_OBJECT_STORAGE_ACCESS_KEY_ID", "test-access")
+	t.Setenv("ZVONILKA_OBJECT_STORAGE_SECRET_ACCESS_KEY", "test-secret")
 	t.Setenv("ZVONILKA_TELEMETRY_TRACING_ENABLED", "false")
 	t.Setenv("ZVONILKA_TELEMETRY_OTLP_ADDRESS", "otel:4317")
 
@@ -255,6 +277,8 @@ func TestLoadAutoEnablesDerivedInfrastructureFlagsWhenUnset(t *testing.T) {
 	t.Setenv("ZVONILKA_OBJECT_STORAGE_ENDPOINT", "http://minio:9000")
 	t.Setenv("ZVONILKA_OBJECT_STORAGE_REGION", "eu-west-1")
 	t.Setenv("ZVONILKA_OBJECT_STORAGE_BUCKET", "zvonilka")
+	t.Setenv("ZVONILKA_OBJECT_STORAGE_ACCESS_KEY_ID", "test-access")
+	t.Setenv("ZVONILKA_OBJECT_STORAGE_SECRET_ACCESS_KEY", "test-secret")
 	t.Setenv("ZVONILKA_TELEMETRY_OTLP_ADDRESS", "otel:4317")
 
 	cfg, err := Load("controlplane")

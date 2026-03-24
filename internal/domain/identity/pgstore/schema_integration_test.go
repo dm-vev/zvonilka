@@ -31,6 +31,7 @@ func TestIdentitySchemaHardening(t *testing.T) {
 		"0001.sql",
 		"0002_identity_hardening.sql",
 		"0003_identity_account_boundaries.sql",
+		"0004_identity_session_device_deferrable.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -270,6 +271,52 @@ func TestIdentitySchemaHardening(t *testing.T) {
 		}
 	})
 
+	t.Run("allows deferred session then device insert", func(t *testing.T) {
+		const reversedSessionID = "sess-reversed"
+		const reversedDeviceID = "dev-reversed"
+
+		err := store.WithinTx(ctx, func(tx identity.Store) error {
+			if _, err := tx.SaveSession(ctx, identity.Session{
+				ID:             reversedSessionID,
+				AccountID:      account.ID,
+				DeviceID:       reversedDeviceID,
+				DeviceName:     "Alice desktop",
+				DevicePlatform: identity.DevicePlatformDesktop,
+				Status:         identity.SessionStatusActive,
+				Current:        false,
+				CreatedAt:      now,
+				LastSeenAt:     now,
+			}); err != nil {
+				return err
+			}
+			if _, err := tx.SaveDevice(ctx, identity.Device{
+				ID:         reversedDeviceID,
+				AccountID:  account.ID,
+				SessionID:  reversedSessionID,
+				Name:       "Alice desktop",
+				Platform:   identity.DevicePlatformDesktop,
+				Status:     identity.DeviceStatusActive,
+				PublicKey:  "pk-reversed",
+				CreatedAt:  now,
+				LastSeenAt: now,
+			}); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("save reversed session/device pair: %v", err)
+		}
+
+		session, err := store.SessionByID(ctx, reversedSessionID)
+		if err != nil {
+			t.Fatalf("load reversed session: %v", err)
+		}
+		if session.DeviceID != reversedDeviceID {
+			t.Fatalf("expected device %q, got %q", reversedDeviceID, session.DeviceID)
+		}
+	})
+
 	t.Run("rejects invalid device session reference", func(t *testing.T) {
 		_, err := store.SaveDevice(ctx, identity.Device{
 			ID:         "dev-orphan",
@@ -354,8 +401,8 @@ func TestIdentitySchemaHardening(t *testing.T) {
 		if err != nil {
 			t.Fatalf("load devices after second attachment: %v", err)
 		}
-		if len(devices) != 2 {
-			t.Fatalf("expected two devices on the account, got %d", len(devices))
+		if len(devices) != 3 {
+			t.Fatalf("expected three devices on the account, got %d", len(devices))
 		}
 	})
 
@@ -931,20 +978,8 @@ func openDockerPostgres(t *testing.T) *sql.DB {
 	ctx, cancel := context.WithTimeout(context.Background(), postgresReadinessTimeout())
 	defer cancel()
 
-	cmd := exec.CommandContext(
-		ctx,
-		"docker",
-		"run",
-		"-d",
-		"--rm",
-		"-e",
-		"POSTGRES_PASSWORD=pass",
-		"-e",
-		"POSTGRES_DB=test",
-		"-p",
-		"127.0.0.1::5432",
-		"postgres:16-alpine",
-	)
+	cfg := postgresDockerConfigForGOOS(runtime.GOOS)
+	cmd := exec.CommandContext(ctx, "docker", cfg.runArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Skipf("docker postgres unavailable: %v: %s", err, strings.TrimSpace(string(output)))
@@ -959,17 +994,19 @@ func openDockerPostgres(t *testing.T) *sql.DB {
 		_ = exec.Command("docker", "rm", "-f", containerID).Run()
 	})
 
-	portOut, err := exec.CommandContext(ctx, "docker", "port", containerID, "5432/tcp").CombinedOutput()
-	if err != nil {
-		t.Skipf("lookup postgres port: %v: %s", err, strings.TrimSpace(string(portOut)))
+	dsn := cfg.dsn
+	if cfg.needsPortMapping {
+		portOut, err := exec.CommandContext(ctx, "docker", "port", containerID, "5432/tcp").CombinedOutput()
+		if err != nil {
+			t.Skipf("lookup postgres port: %v: %s", err, strings.TrimSpace(string(portOut)))
+		}
+		hostPort := strings.TrimSpace(string(portOut))
+		if hostPort == "" {
+			t.Skip("docker did not report a mapped port")
+		}
+		hostPort = hostPort[strings.LastIndex(hostPort, ":")+1:]
+		dsn = fmt.Sprintf(cfg.dsn, hostPort)
 	}
-	hostPort := strings.TrimSpace(string(portOut))
-	if hostPort == "" {
-		t.Skip("docker did not report a mapped port")
-	}
-	hostPort = hostPort[strings.LastIndex(hostPort, ":")+1:]
-
-	dsn := fmt.Sprintf("postgres://postgres:pass@127.0.0.1:%s/test?sslmode=disable", hostPort)
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		t.Fatalf("open postgres database: %v", err)
@@ -1001,6 +1038,49 @@ func postgresReadinessTimeout() time.Duration {
 	return 3 * time.Minute
 }
 
+type postgresDockerConfig struct {
+	runArgs          []string
+	dsn              string
+	needsPortMapping bool
+}
+
+func postgresDockerConfigForGOOS(goos string) postgresDockerConfig {
+	if goos == "linux" {
+		return postgresDockerConfig{
+			runArgs: []string{
+				"run",
+				"-d",
+				"--rm",
+				"--network",
+				"host",
+				"-e",
+				"POSTGRES_HOST_AUTH_METHOD=trust",
+				"-e",
+				"POSTGRES_DB=test",
+				"postgres:16-alpine",
+			},
+			dsn: "postgres://postgres@127.0.0.1:5432/test?sslmode=disable",
+		}
+	}
+
+	return postgresDockerConfig{
+		runArgs: []string{
+			"run",
+			"-d",
+			"--rm",
+			"-e",
+			"POSTGRES_PASSWORD=pass",
+			"-e",
+			"POSTGRES_DB=test",
+			"-p",
+			"127.0.0.1::5432",
+			"postgres:16-alpine",
+		},
+		dsn:              "postgres://postgres:pass@127.0.0.1:%s/test?sslmode=disable",
+		needsPortMapping: true,
+	}
+}
+
 func TestPostgresReadinessTimeout(t *testing.T) {
 	t.Run("uses default when unset", func(t *testing.T) {
 		t.Setenv("ZVONILKA_PGSTORE_READY_TIMEOUT", "")
@@ -1022,6 +1102,50 @@ func TestPostgresReadinessTimeout(t *testing.T) {
 			t.Fatalf("expected default timeout for invalid override, got %v", got)
 		}
 	})
+}
+
+func TestPostgresDockerConfigForGOOS(t *testing.T) {
+	t.Run("linux uses host network", func(t *testing.T) {
+		cfg := postgresDockerConfigForGOOS("linux")
+		if cfg.needsPortMapping {
+			t.Fatal("expected linux config to avoid port mapping")
+		}
+		if !containsAll(cfg.runArgs, "--network", "host", "POSTGRES_HOST_AUTH_METHOD=trust") {
+			t.Fatalf("expected linux config to use host network and trust auth, got %v", cfg.runArgs)
+		}
+		if cfg.dsn != "postgres://postgres@127.0.0.1:5432/test?sslmode=disable" {
+			t.Fatalf("unexpected linux DSN: %s", cfg.dsn)
+		}
+	})
+
+	t.Run("non-linux uses published port", func(t *testing.T) {
+		cfg := postgresDockerConfigForGOOS("darwin")
+		if !cfg.needsPortMapping {
+			t.Fatal("expected non-linux config to use port mapping")
+		}
+		if !containsAll(cfg.runArgs, "-p", "127.0.0.1::5432", "POSTGRES_PASSWORD=pass") {
+			t.Fatalf("expected non-linux config to publish a port, got %v", cfg.runArgs)
+		}
+		if cfg.dsn != "postgres://postgres:pass@127.0.0.1:%s/test?sslmode=disable" {
+			t.Fatalf("unexpected non-linux DSN: %s", cfg.dsn)
+		}
+	})
+}
+
+func containsAll(values []string, want ...string) bool {
+	for _, needle := range want {
+		found := false
+		for _, value := range values {
+			if value == needle {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 func repoMigrationsPath(t *testing.T, names ...string) string {

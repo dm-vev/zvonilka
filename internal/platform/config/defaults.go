@@ -30,6 +30,9 @@ var serviceListenDefaults = map[string]listenDefaults{
 const (
 	defaultEnvironment          = "production"
 	defaultShutdownTimeout      = 10 * time.Second
+	defaultMediaUploadURLTTL    = 15 * time.Minute
+	defaultMediaDownloadURLTTL  = 15 * time.Minute
+	defaultMediaMaxUploadSize   = 100 << 20
 	defaultReadHeaderTimeout    = 5 * time.Second
 	defaultReadTimeout          = 10 * time.Second
 	defaultWriteTimeout         = 10 * time.Second
@@ -69,6 +72,11 @@ func defaultConfiguration(serviceName string) Configuration {
 			RefreshTokenTTL: identityDefaults.RefreshTokenTTL,
 			LoginCodeLength: identityDefaults.LoginCodeLength,
 		},
+		Media: MediaConfig{
+			UploadURLTTL:   defaultMediaUploadURLTTL,
+			DownloadURLTTL: defaultMediaDownloadURLTTL,
+			MaxUploadSize:  defaultMediaMaxUploadSize,
+		},
 		Infrastructure: InfrastructureConfig{
 			Postgres: PostgresConfig{
 				MaxOpenConns:    defaultPostgresMaxOpen,
@@ -86,7 +94,7 @@ func defaultConfiguration(serviceName string) Configuration {
 			},
 			ObjectStore: ObjectStorageConfig{
 				UseSSL:         true,
-				ForcePathStyle: false,
+				ForcePathStyle: true,
 			},
 		},
 		Storage: StorageConfig{

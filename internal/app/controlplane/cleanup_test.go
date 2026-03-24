@@ -3,6 +3,7 @@ package controlplane
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -40,6 +41,36 @@ func TestFinalizeRunKeepsRunErrorWhenRuntimeContextCanceled(t *testing.T) {
 	require.ErrorIs(t, got, runErr)
 	require.False(t, provider.closeCtxWasCanceled)
 	require.True(t, provider.closed)
+}
+
+func TestCleanupContextUsesExplicitFallbackAfterCancellation(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	cancel()
+
+	cleanupCtx, cleanupCancel := cleanupContext(ctx, 5*time.Minute)
+	defer cleanupCancel()
+
+	deadline, ok := cleanupCtx.Deadline()
+	require.True(t, ok)
+	require.NoError(t, cleanupCtx.Err())
+	require.WithinDuration(t, time.Now().Add(5*time.Minute), deadline, 2*time.Second)
+}
+
+func TestCleanupContextUsesDefaultBudgetWhenFallbackMissing(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	cancel()
+
+	cleanupCtx, cleanupCancel := cleanupContext(ctx)
+	defer cleanupCancel()
+
+	deadline, ok := cleanupCtx.Deadline()
+	require.True(t, ok)
+	require.NoError(t, cleanupCtx.Err())
+	require.WithinDuration(t, time.Now().Add(30*time.Second), deadline, 2*time.Second)
 }
 
 type cancelAwareProvider struct {
