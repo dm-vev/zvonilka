@@ -61,21 +61,19 @@ func (s *Service) ListMedia(ctx context.Context, params ListParams) ([]MediaAsse
 		limit = 500
 	}
 
-	assets, err := s.store.MediaAssetsByOwner(ctx, params.OwnerAccountID, limit)
-	if err != nil {
-		return nil, fmt.Errorf("list media assets for account %s: %w", params.OwnerAccountID, err)
-	}
-
 	if params.IncludeDeleted {
+		assets, err := s.store.MediaAssetsByOwner(ctx, params.OwnerAccountID, limit)
+		if err != nil {
+			return nil, fmt.Errorf("list media assets for account %s: %w", params.OwnerAccountID, err)
+		}
+
 		return assets, nil
 	}
 
-	filtered := assets[:0]
-	for _, asset := range assets {
-		if asset.Status != MediaStatusDeleted {
-			filtered = append(filtered, asset)
-		}
+	assets, err := s.store.MediaActiveAssetsByOwner(ctx, params.OwnerAccountID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list active media assets for account %s: %w", params.OwnerAccountID, err)
 	}
 
-	return filtered, nil
+	return assets, nil
 }

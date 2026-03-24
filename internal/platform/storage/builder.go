@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
@@ -54,13 +55,17 @@ func (b *Builder) Build(ctx context.Context) (*domainstorage.Catalog, error) {
 		return nil, fmt.Errorf("build storage catalog: %w", err)
 	}
 
+	cleanup := func(cause error, providers []domainstorage.Provider) error {
+		cleanupCtx, cancel := cleanupContext(ctx, b.cfg.Runtime.ShutdownTimeout)
+		defer cancel()
+
+		return errors.Join(cause, closeProviders(cleanupCtx, providers))
+	}
+
 	providers := make([]domainstorage.Provider, 0, len(b.factories))
 	for _, factory := range b.factories {
 		if isNilFactory(factory) {
-			return nil, errors.Join(
-				fmt.Errorf("build storage provider: %w", domainstorage.ErrInvalidInput),
-				closeProviders(ctx, providers),
-			)
+			return nil, cleanup(fmt.Errorf("build storage provider: %w", domainstorage.ErrInvalidInput), providers)
 		}
 
 		provider, err := factory.Build(ctx, b.cfg)
@@ -70,13 +75,10 @@ func (b *Builder) Build(ctx context.Context) (*domainstorage.Catalog, error) {
 				cleanupProviders = append(cleanupProviders, provider)
 			}
 
-			return nil, errors.Join(fmt.Errorf("build storage provider: %w", err), closeProviders(ctx, cleanupProviders))
+			return nil, cleanup(fmt.Errorf("build storage provider: %w", err), cleanupProviders)
 		}
 		if isNilProvider(provider) {
-			return nil, errors.Join(
-				fmt.Errorf("build storage provider: %w", domainstorage.ErrInvalidInput),
-				closeProviders(ctx, providers),
-			)
+			return nil, cleanup(fmt.Errorf("build storage provider: %w", domainstorage.ErrInvalidInput), providers)
 		}
 
 		providers = append(providers, provider)
@@ -88,7 +90,7 @@ func (b *Builder) Build(ctx context.Context) (*domainstorage.Catalog, error) {
 	}
 
 	if err := b.validateBindings(catalog); err != nil {
-		return nil, errors.Join(err, closeProviders(ctx, providers))
+		return nil, cleanup(err, providers)
 	}
 
 	return catalog, nil
@@ -99,36 +101,42 @@ func (b *Builder) validateBindings(catalog *domainstorage.Catalog) error {
 	bindings := []struct {
 		logical  string
 		name     string
+		kind     domainstorage.Kind
 		purpose  domainstorage.Purpose
 		required domainstorage.Capability
 	}{
 		{
 			logical:  "primary",
 			name:     b.cfg.Storage.PrimaryProvider,
+			kind:     domainstorage.KindRelational,
 			purpose:  domainstorage.PurposePrimary,
 			required: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
 		},
 		{
 			logical:  "cache",
 			name:     b.cfg.Storage.CacheProvider,
+			kind:     domainstorage.KindCache,
 			purpose:  domainstorage.PurposeCache,
 			required: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityKeyValue,
 		},
 		{
 			logical:  "object",
 			name:     b.cfg.Storage.ObjectProvider,
+			kind:     domainstorage.KindObject,
 			purpose:  domainstorage.PurposeObject,
 			required: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityBlob | domainstorage.CapabilityListing,
 		},
 		{
 			logical:  "audit",
 			name:     b.cfg.Storage.AuditProvider,
+			kind:     domainstorage.KindIndex,
 			purpose:  domainstorage.PurposeAudit,
 			required: domainstorage.CapabilityWrite | domainstorage.CapabilityListing,
 		},
 		{
 			logical:  "search",
 			name:     b.cfg.Storage.SearchProvider,
+			kind:     domainstorage.KindIndex,
 			purpose:  domainstorage.PurposeSearch,
 			required: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityListing,
 		},
@@ -148,6 +156,15 @@ func (b *Builder) validateBindings(catalog *domainstorage.Catalog) error {
 				provider.Purpose(),
 			)
 		}
+		if provider.Kind() != binding.kind {
+			return fmt.Errorf(
+				"resolve %s storage binding %q: expected kind %q, got %q",
+				binding.logical,
+				binding.name,
+				binding.kind,
+				provider.Kind(),
+			)
+		}
 		if !provider.Capabilities().Has(binding.required) {
 			return fmt.Errorf(
 				"resolve %s storage binding %q: provider lacks required capabilities: required=%s actual=%s",
@@ -160,6 +177,22 @@ func (b *Builder) validateBindings(catalog *domainstorage.Catalog) error {
 	}
 
 	return nil
+}
+
+func cleanupContext(ctx context.Context, fallback time.Duration) (context.Context, context.CancelFunc) {
+	timeout := fallback
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	if ctx != nil {
+		if deadline, ok := ctx.Deadline(); ok {
+			if remaining := time.Until(deadline); remaining > 0 && remaining < timeout {
+				timeout = remaining
+			}
+		}
+	}
+
+	return context.WithTimeout(context.Background(), timeout)
 }
 
 // closeProviders closes already built providers when a later step fails.

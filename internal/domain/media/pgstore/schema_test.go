@@ -100,6 +100,55 @@ func TestMediaSchema(t *testing.T) {
 		}
 	})
 
+	t.Run("active listing", func(t *testing.T) {
+		active := media.MediaAsset{
+			ID:              "media_active",
+			OwnerAccountID:  "acc-owner",
+			Kind:            media.MediaKindFile,
+			Status:          media.MediaStatusReady,
+			StorageProvider: "object",
+			Bucket:          "media-bucket",
+			ObjectKey:       "media/acc-owner/media_active",
+			FileName:        "active.txt",
+			UploadExpiresAt: time.Date(2026, time.March, 24, 12, 15, 0, 0, time.UTC),
+			ReadyAt:         time.Date(2026, time.March, 24, 12, 5, 0, 0, time.UTC),
+			CreatedAt:       time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC),
+			UpdatedAt:       time.Date(2026, time.March, 24, 12, 5, 0, 0, time.UTC),
+		}
+		deleted := media.MediaAsset{
+			ID:              "media_deleted",
+			OwnerAccountID:  "acc-owner",
+			Kind:            media.MediaKindFile,
+			Status:          media.MediaStatusDeleted,
+			StorageProvider: "object",
+			Bucket:          "media-bucket",
+			ObjectKey:       "media/acc-owner/media_deleted",
+			FileName:        "deleted.txt",
+			UploadExpiresAt: time.Date(2026, time.March, 24, 12, 15, 0, 0, time.UTC),
+			DeletedAt:       time.Date(2026, time.March, 24, 12, 4, 0, 0, time.UTC),
+			CreatedAt:       time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC),
+			UpdatedAt:       time.Date(2026, time.March, 24, 12, 4, 0, 0, time.UTC),
+		}
+
+		if _, err := store.SaveMediaAsset(context.Background(), active); err != nil {
+			t.Fatalf("save active asset: %v", err)
+		}
+		if _, err := store.SaveMediaAsset(context.Background(), deleted); err != nil {
+			t.Fatalf("save deleted asset: %v", err)
+		}
+
+		assets, err := store.MediaActiveAssetsByOwner(context.Background(), "acc-owner", 1)
+		if err != nil {
+			t.Fatalf("list active media assets: %v", err)
+		}
+		if len(assets) != 1 {
+			t.Fatalf("expected one active asset, got %d", len(assets))
+		}
+		if assets[0].ID != active.ID {
+			t.Fatalf("expected active asset %s, got %s", active.ID, assets[0].ID)
+		}
+	})
+
 	t.Run("constraints", func(t *testing.T) {
 		cases := []struct {
 			name       string

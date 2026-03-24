@@ -8,7 +8,10 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 )
+
+const catalogCleanupTimeout = 30 * time.Second
 
 // Catalog stores and resolves named storage providers.
 type Catalog struct {
@@ -25,10 +28,13 @@ func NewCatalog(providers ...Provider) (*Catalog, error) {
 	for _, provider := range providers {
 		if err := catalog.Register(provider); err != nil {
 			var cleanupErr error
-			if err := closeRegisteredProvider(context.Background(), provider); err != nil {
+			cleanupCtx, cancel := catalogCleanupContext()
+			defer cancel()
+
+			if err := closeRegisteredProvider(cleanupCtx, provider); err != nil {
 				cleanupErr = err
 			}
-			if closeErr := catalog.Close(context.Background()); closeErr != nil {
+			if closeErr := catalog.Close(cleanupCtx); closeErr != nil {
 				cleanupErr = errors.Join(cleanupErr, fmt.Errorf("close partial storage catalog: %w", closeErr))
 			}
 			if cleanupErr != nil {
@@ -247,6 +253,10 @@ func closeRegisteredProvider(ctx context.Context, provider Provider) error {
 	}
 
 	return nil
+}
+
+func catalogCleanupContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), catalogCleanupTimeout)
 }
 
 func isNilProvider(provider Provider) bool {

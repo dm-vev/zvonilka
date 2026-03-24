@@ -239,6 +239,50 @@ LIMIT $2
 	return assets, nil
 }
 
+// MediaActiveAssetsByOwner lists non-deleted media assets for one account.
+func (s *Store) MediaActiveAssetsByOwner(ctx context.Context, ownerAccountID string, limit int) ([]media.MediaAsset, error) {
+	if err := s.requireStore(); err != nil {
+		return nil, err
+	}
+	if err := s.requireContext(ctx); err != nil {
+		return nil, err
+	}
+	ownerAccountID = strings.TrimSpace(ownerAccountID)
+	if ownerAccountID == "" {
+		return nil, media.ErrInvalidInput
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+
+	query := fmt.Sprintf(`
+SELECT %s FROM %s
+WHERE owner_account_id = $1
+	AND status <> 'deleted'
+ORDER BY updated_at DESC, id ASC
+LIMIT $2
+`, mediaColumnList, s.table("media_assets"))
+	rows, err := s.conn().QueryContext(ctx, query, ownerAccountID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list active media assets for owner %s: %w", ownerAccountID, err)
+	}
+	defer rows.Close()
+
+	assets := make([]media.MediaAsset, 0)
+	for rows.Next() {
+		asset, scanErr := scanAsset(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan active media asset for owner %s: %w", ownerAccountID, scanErr)
+		}
+		assets = append(assets, asset)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate active media assets for owner %s: %w", ownerAccountID, err)
+	}
+
+	return assets, nil
+}
+
 // MediaAssetByObjectKey resolves a media asset by object key.
 func (s *Store) MediaAssetByObjectKey(ctx context.Context, objectKey string) (media.MediaAsset, error) {
 	if err := s.requireStore(); err != nil {

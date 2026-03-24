@@ -112,6 +112,64 @@ func TestMediaLifecycle(t *testing.T) {
 	}
 }
 
+func TestDeleteMediaRetriesBlobCleanupAfterFailure(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := newMemoryStore()
+	blob := &flakyDeleteBlobStore{
+		memoryBlobStore: newMemoryBlobStore("media-bucket"),
+		deleteErrs: []error{
+			errors.New("temporary delete failure"),
+			nil,
+		},
+	}
+
+	svc, err := media.NewService(store, blob, media.WithSettings(media.Settings{
+		UploadURLTTL:   time.Minute,
+		DownloadURLTTL: time.Minute,
+		MaxUploadSize:  10 << 20,
+	}))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	asset, _, err := svc.ReserveUpload(ctx, media.ReserveUploadParams{
+		OwnerAccountID: "acc-owner",
+		Kind:           media.MediaKindFile,
+		FileName:       "archive.zip",
+		SizeBytes:      1024,
+	})
+	if err != nil {
+		t.Fatalf("reserve upload: %v", err)
+	}
+
+	_, err = svc.DeleteMedia(ctx, media.DeleteParams{
+		OwnerAccountID: "acc-owner",
+		MediaID:        asset.ID,
+	})
+	if err == nil {
+		t.Fatal("expected first delete to fail")
+	}
+	if blob.deleteCalls != 1 {
+		t.Fatalf("expected one delete attempt, got %d", blob.deleteCalls)
+	}
+
+	deleted, err := svc.DeleteMedia(ctx, media.DeleteParams{
+		OwnerAccountID: "acc-owner",
+		MediaID:        asset.ID,
+	})
+	if err != nil {
+		t.Fatalf("retry delete media: %v", err)
+	}
+	if deleted.Status != media.MediaStatusDeleted {
+		t.Fatalf("expected deleted asset, got %s", deleted.Status)
+	}
+	if blob.deleteCalls != 2 {
+		t.Fatalf("expected two delete attempts, got %d", blob.deleteCalls)
+	}
+}
+
 func TestReserveUploadRejectsOversize(t *testing.T) {
 	t.Parallel()
 
@@ -228,6 +286,145 @@ func TestFinalizeUploadRejectsSizeMismatch(t *testing.T) {
 	}
 }
 
+func TestFinalizeUploadRejectsExpiredReservation(t *testing.T) {
+	t.Parallel()
+
+	fixedNow := time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC)
+	store := newMemoryStore()
+	blob := newMemoryBlobStore("media-bucket")
+
+	svc, err := media.NewService(store, blob, media.WithNow(func() time.Time { return fixedNow }), media.WithSettings(media.Settings{
+		UploadURLTTL:   time.Minute,
+		DownloadURLTTL: time.Minute,
+		MaxUploadSize:  10 << 20,
+	}))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	asset, _, err := svc.ReserveUpload(context.Background(), media.ReserveUploadParams{
+		OwnerAccountID: "acc-owner",
+		Kind:           media.MediaKindFile,
+		FileName:       "archive.zip",
+		SizeBytes:      1024,
+		CreatedAt:      fixedNow,
+	})
+	if err != nil {
+		t.Fatalf("reserve upload: %v", err)
+	}
+
+	blob.seedObject(asset.ObjectKey, domainstorage.BlobObject{
+		Bucket:        "media-bucket",
+		Key:           asset.ObjectKey,
+		ContentLength: 1024,
+	}, nil)
+
+	_, err = svc.FinalizeUpload(context.Background(), media.FinalizeUploadParams{
+		OwnerAccountID: "acc-owner",
+		MediaID:        asset.ID,
+		CreatedAt:      asset.UploadExpiresAt,
+	})
+	if !errors.Is(err, media.ErrConflict) {
+		t.Fatalf("expected conflict for expired reservation boundary, got %v", err)
+	}
+}
+
+func TestListMediaSkipsDeletedRowsWithoutTruncatingActiveResults(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := newMemoryStore()
+	blob := newMemoryBlobStore("media-bucket")
+	fixedNow := time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC)
+
+	svc, err := media.NewService(store, blob, media.WithNow(func() time.Time { return fixedNow }), media.WithSettings(media.Settings{
+		UploadURLTTL:   time.Minute,
+		DownloadURLTTL: time.Minute,
+		MaxUploadSize:  10 << 20,
+	}))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	assets := []media.MediaAsset{
+		{
+			ID:              "media_deleted_1",
+			OwnerAccountID:  "acc-owner",
+			Kind:            media.MediaKindFile,
+			Status:          media.MediaStatusDeleted,
+			StorageProvider: "object",
+			Bucket:          "media-bucket",
+			ObjectKey:       "media/acc-owner/media_deleted_1",
+			FileName:        "deleted-1.txt",
+			UploadExpiresAt: fixedNow.Add(time.Minute),
+			CreatedAt:       fixedNow.Add(-5 * time.Minute),
+			UpdatedAt:       fixedNow.Add(-1 * time.Minute),
+			DeletedAt:       fixedNow.Add(-1 * time.Minute),
+		},
+		{
+			ID:              "media_deleted_2",
+			OwnerAccountID:  "acc-owner",
+			Kind:            media.MediaKindFile,
+			Status:          media.MediaStatusDeleted,
+			StorageProvider: "object",
+			Bucket:          "media-bucket",
+			ObjectKey:       "media/acc-owner/media_deleted_2",
+			FileName:        "deleted-2.txt",
+			UploadExpiresAt: fixedNow.Add(time.Minute),
+			CreatedAt:       fixedNow.Add(-6 * time.Minute),
+			UpdatedAt:       fixedNow.Add(-2 * time.Minute),
+			DeletedAt:       fixedNow.Add(-2 * time.Minute),
+		},
+		{
+			ID:              "media_ready_1",
+			OwnerAccountID:  "acc-owner",
+			Kind:            media.MediaKindFile,
+			Status:          media.MediaStatusReady,
+			StorageProvider: "object",
+			Bucket:          "media-bucket",
+			ObjectKey:       "media/acc-owner/media_ready_1",
+			FileName:        "ready-1.txt",
+			UploadExpiresAt: fixedNow.Add(time.Minute),
+			ReadyAt:         fixedNow.Add(-3 * time.Minute),
+			CreatedAt:       fixedNow.Add(-7 * time.Minute),
+			UpdatedAt:       fixedNow.Add(-3 * time.Minute),
+		},
+		{
+			ID:              "media_ready_2",
+			OwnerAccountID:  "acc-owner",
+			Kind:            media.MediaKindFile,
+			Status:          media.MediaStatusReady,
+			StorageProvider: "object",
+			Bucket:          "media-bucket",
+			ObjectKey:       "media/acc-owner/media_ready_2",
+			FileName:        "ready-2.txt",
+			UploadExpiresAt: fixedNow.Add(time.Minute),
+			ReadyAt:         fixedNow.Add(-4 * time.Minute),
+			CreatedAt:       fixedNow.Add(-8 * time.Minute),
+			UpdatedAt:       fixedNow.Add(-4 * time.Minute),
+		},
+	}
+	for _, asset := range assets {
+		if _, err := store.SaveMediaAsset(ctx, asset); err != nil {
+			t.Fatalf("save asset %s: %v", asset.ID, err)
+		}
+	}
+
+	listed, err := svc.ListMedia(ctx, media.ListParams{
+		OwnerAccountID: "acc-owner",
+		Limit:          1,
+	})
+	if err != nil {
+		t.Fatalf("list media: %v", err)
+	}
+	if len(listed) != 1 {
+		t.Fatalf("expected one active asset, got %d", len(listed))
+	}
+	if listed[0].Status != media.MediaStatusReady {
+		t.Fatalf("expected ready asset, got %s", listed[0].Status)
+	}
+}
+
 func newTestService(t *testing.T, settings media.Settings) *media.Service {
 	t.Helper()
 
@@ -318,6 +515,29 @@ func (s *memoryStore) MediaAssetsByOwner(ctx context.Context, ownerAccountID str
 	return assets, nil
 }
 
+func (s *memoryStore) MediaActiveAssetsByOwner(ctx context.Context, ownerAccountID string, limit int) ([]media.MediaAsset, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	assets := make([]media.MediaAsset, 0, len(s.assets))
+	for _, asset := range s.assets {
+		if asset.OwnerAccountID == ownerAccountID && asset.Status != media.MediaStatusDeleted {
+			assets = append(assets, cloneAsset(asset))
+		}
+	}
+	sort.Slice(assets, func(i, j int) bool {
+		if assets[i].UpdatedAt.Equal(assets[j].UpdatedAt) {
+			return assets[i].ID < assets[j].ID
+		}
+		return assets[i].UpdatedAt.After(assets[j].UpdatedAt)
+	})
+	if limit > 0 && len(assets) > limit {
+		assets = assets[:limit]
+	}
+
+	return assets, nil
+}
+
 func (s *memoryStore) MediaAssetByObjectKey(ctx context.Context, objectKey string) (media.MediaAsset, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -373,6 +593,21 @@ func newMemoryBlobStore(bucket string) *memoryBlobStore {
 		objects:  make(map[string]domainstorage.BlobObject),
 		payloads: make(map[string][]byte),
 	}
+}
+
+type flakyDeleteBlobStore struct {
+	*memoryBlobStore
+	deleteErrs  []error
+	deleteCalls int
+}
+
+func (s *flakyDeleteBlobStore) DeleteObject(ctx context.Context, key string) error {
+	s.deleteCalls++
+	if idx := s.deleteCalls - 1; idx < len(s.deleteErrs) && s.deleteErrs[idx] != nil {
+		return s.deleteErrs[idx]
+	}
+
+	return s.memoryBlobStore.DeleteObject(ctx, key)
 }
 
 func (s *memoryBlobStore) Name() string                   { return "object" }

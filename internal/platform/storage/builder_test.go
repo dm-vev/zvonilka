@@ -23,13 +23,28 @@ func (f testFactory) Build(context.Context, config.Configuration) (domainstorage
 	return f.provider, nil
 }
 
+type cancelingFactory struct {
+	cancel context.CancelFunc
+	err    error
+}
+
+func (f cancelingFactory) Build(context.Context, config.Configuration) (domainstorage.Provider, error) {
+	if f.cancel != nil {
+		f.cancel()
+	}
+
+	return nil, f.err
+}
+
 type testProvider struct {
-	name     string
-	kind     domainstorage.Kind
-	purpose  domainstorage.Purpose
-	caps     domainstorage.Capability
-	closed   *[]string
-	closeErr error
+	name              string
+	kind              domainstorage.Kind
+	purpose           domainstorage.Purpose
+	caps              domainstorage.Capability
+	closed            *[]string
+	closeCtxErrs      *[]error
+	closeCtxDeadlines *[]bool
+	closeErr          error
 }
 
 func (p testProvider) Name() string                   { return p.name }
@@ -38,9 +53,16 @@ func (p testProvider) Purpose() domainstorage.Purpose { return p.purpose }
 func (p testProvider) Capabilities() domainstorage.Capability {
 	return p.caps
 }
-func (p testProvider) Close(context.Context) error {
+func (p testProvider) Close(ctx context.Context) error {
 	if p.closed != nil {
 		*p.closed = append(*p.closed, p.name)
+	}
+	if p.closeCtxErrs != nil {
+		*p.closeCtxErrs = append(*p.closeCtxErrs, ctx.Err())
+	}
+	if p.closeCtxDeadlines != nil {
+		_, ok := ctx.Deadline()
+		*p.closeCtxDeadlines = append(*p.closeCtxDeadlines, ok)
 	}
 	return p.closeErr
 }
@@ -251,6 +273,55 @@ func TestBuilderCleansUpPartialProviderOnFactoryError(t *testing.T) {
 	}
 }
 
+func TestBuilderUsesBoundedCleanupContextOnFactoryFailure(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := config.Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	closeCtxErrs := make([]error, 0, 1)
+	closeCtxDeadlines := make([]bool, 0, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	builder, err := NewBuilder(
+		cfg,
+		testFactory{provider: testProvider{
+			name:              "primary",
+			kind:              domainstorage.KindRelational,
+			purpose:           domainstorage.PurposePrimary,
+			caps:              domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+			closeCtxErrs:      &closeCtxErrs,
+			closeCtxDeadlines: &closeCtxDeadlines,
+		}},
+		cancelingFactory{
+			cancel: cancel,
+			err:    errors.New("factory boom"),
+		},
+	)
+	if err != nil {
+		t.Fatalf("new builder: %v", err)
+	}
+
+	_, err = builder.Build(ctx)
+	if err == nil {
+		t.Fatal("expected build to fail")
+	}
+	if !strings.Contains(err.Error(), "factory boom") {
+		t.Fatalf("unexpected build error: %v", err)
+	}
+	if len(closeCtxErrs) != 1 {
+		t.Fatalf("expected one cleanup close, got %d", len(closeCtxErrs))
+	}
+	if closeCtxErrs[0] != nil {
+		t.Fatalf("expected cleanup context to ignore cancellation, got %v", closeCtxErrs[0])
+	}
+	if len(closeCtxDeadlines) != 1 || !closeCtxDeadlines[0] {
+		t.Fatalf("expected bounded cleanup deadline, got %v", closeCtxDeadlines)
+	}
+}
+
 func TestBuilderRejectsTypedNilProvider(t *testing.T) {
 	t.Parallel()
 
@@ -421,6 +492,60 @@ func TestBuilderRejectsWrongPurpose(t *testing.T) {
 		t.Fatal("expected build to fail")
 	}
 	if !strings.Contains(err.Error(), "expected purpose") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBuilderRejectsWrongKind(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := config.Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	builder, err := NewBuilder(
+		cfg,
+		testFactory{provider: testProvider{
+			name:    "primary",
+			kind:    domainstorage.KindObject,
+			purpose: domainstorage.PurposePrimary,
+			caps:    domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+		}},
+		testFactory{provider: testProvider{
+			name:    "cache",
+			kind:    domainstorage.KindCache,
+			purpose: domainstorage.PurposeCache,
+			caps:    domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityKeyValue,
+		}},
+		testFactory{provider: testProvider{
+			name:    "object",
+			kind:    domainstorage.KindObject,
+			purpose: domainstorage.PurposeObject,
+			caps:    domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityBlob | domainstorage.CapabilityListing,
+		}},
+		testFactory{provider: testProvider{
+			name:    "audit",
+			kind:    domainstorage.KindIndex,
+			purpose: domainstorage.PurposeAudit,
+			caps:    domainstorage.CapabilityWrite | domainstorage.CapabilityListing,
+		}},
+		testFactory{provider: testProvider{
+			name:    "search",
+			kind:    domainstorage.KindIndex,
+			purpose: domainstorage.PurposeSearch,
+			caps:    domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityListing,
+		}},
+	)
+	if err != nil {
+		t.Fatalf("new builder: %v", err)
+	}
+
+	_, err = builder.Build(context.Background())
+	if err == nil {
+		t.Fatal("expected build to fail")
+	}
+	if !strings.Contains(err.Error(), "expected kind") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

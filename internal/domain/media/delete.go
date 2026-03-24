@@ -25,24 +25,34 @@ func (s *Service) DeleteMedia(ctx context.Context, params DeleteParams) (MediaAs
 		now = s.currentTime()
 	}
 
-	asset, err := s.store.MediaAssetByID(ctx, params.MediaID)
-	if err != nil {
-		return MediaAsset{}, fmt.Errorf("load media asset %s: %w", params.MediaID, err)
-	}
-	if asset.OwnerAccountID != params.OwnerAccountID {
-		return MediaAsset{}, ErrForbidden
-	}
-	if asset.Status == MediaStatusDeleted {
-		return asset, nil
-	}
+	var saved MediaAsset
+	err := s.store.WithinTx(ctx, func(tx Store) error {
+		asset, loadErr := tx.MediaAssetByID(ctx, params.MediaID)
+		if loadErr != nil {
+			return fmt.Errorf("load media asset %s: %w", params.MediaID, loadErr)
+		}
+		if asset.OwnerAccountID != params.OwnerAccountID {
+			return ErrForbidden
+		}
+		if asset.Status == MediaStatusDeleted {
+			saved = asset
+			return nil
+		}
 
-	asset.Status = MediaStatusDeleted
-	asset.DeletedAt = now
-	asset.UpdatedAt = now
+		asset.Status = MediaStatusDeleted
+		asset.DeletedAt = now
+		asset.UpdatedAt = now
 
-	saved, err := s.store.SaveMediaAsset(ctx, asset)
+		savedAsset, saveErr := tx.SaveMediaAsset(ctx, asset)
+		if saveErr != nil {
+			return fmt.Errorf("save deleted media asset %s: %w", asset.ID, saveErr)
+		}
+
+		saved = savedAsset
+		return nil
+	})
 	if err != nil {
-		return MediaAsset{}, fmt.Errorf("save deleted media asset %s: %w", asset.ID, err)
+		return MediaAsset{}, err
 	}
 
 	if deleteErr := s.blob.DeleteObject(ctx, saved.ObjectKey); deleteErr != nil && !errors.Is(deleteErr, domainstorage.ErrNotFound) {

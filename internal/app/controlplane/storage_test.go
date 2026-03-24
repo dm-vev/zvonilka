@@ -42,24 +42,15 @@ func testStorageBindings() config.StorageConfig {
 	}
 }
 
-func TestBuildAppStorageReturnsNilWhenPostgresDisabled(t *testing.T) {
+func TestBuildAppStorageRejectsDisabledStorageStack(t *testing.T) {
 	t.Parallel()
 
-	catalog, service, conversationService, mediaService, err := buildAppStorage(context.Background(), config.Configuration{})
-	if err != nil {
-		t.Fatalf("build app storage: %v", err)
+	_, _, _, _, err := buildAppStorage(context.Background(), config.Configuration{})
+	if err == nil {
+		t.Fatal("expected disabled storage stack to fail")
 	}
-	if catalog != nil {
-		t.Fatalf("expected nil catalog, got %#v", catalog)
-	}
-	if service != nil {
-		t.Fatalf("expected nil identity service, got %#v", service)
-	}
-	if conversationService != nil {
-		t.Fatalf("expected nil conversation service, got %#v", conversationService)
-	}
-	if mediaService != nil {
-		t.Fatalf("expected nil media service, got %#v", mediaService)
+	if !strings.Contains(err.Error(), "postgres and object storage are required for controlplane") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

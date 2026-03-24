@@ -214,6 +214,26 @@ func TestLoadUsesStorageProviderDefaults(t *testing.T) {
 	}
 }
 
+func TestLoadAllowsIndependentStorageInfraFlagsForGateway(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_POSTGRES_ENABLED", "true")
+	t.Setenv("ZVONILKA_POSTGRES_DSN", "postgres://localhost/app")
+	t.Setenv("ZVONILKA_OBJECT_STORAGE_ENABLED", "false")
+
+	cfg, err := Load("gateway")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if !cfg.Infrastructure.Postgres.Enabled {
+		t.Fatal("expected postgres to stay enabled")
+	}
+	if cfg.Infrastructure.ObjectStore.Enabled {
+		t.Fatal("expected object storage to stay disabled")
+	}
+}
+
 func TestLoadHonorsExplicitDisableForDerivedInfrastructureFlags(t *testing.T) {
 	resetConfigEnv(t)
 

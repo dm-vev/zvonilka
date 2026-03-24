@@ -25,48 +25,61 @@ func (s *Service) FinalizeUpload(ctx context.Context, params FinalizeUploadParam
 		now = s.currentTime()
 	}
 
-	asset, err := s.store.MediaAssetByID(ctx, params.MediaID)
-	if err != nil {
-		return MediaAsset{}, fmt.Errorf("load media asset %s: %w", params.MediaID, err)
-	}
-	if asset.OwnerAccountID != params.OwnerAccountID {
-		return MediaAsset{}, ErrForbidden
-	}
-	switch asset.Status {
-	case MediaStatusReady:
-		return asset, nil
-	case MediaStatusDeleted:
-		return MediaAsset{}, ErrNotFound
-	case MediaStatusReserved, MediaStatusFailed:
-	default:
-		return MediaAsset{}, ErrConflict
-	}
-
-	head, err := s.blob.HeadObject(ctx, asset.ObjectKey)
-	if err != nil {
-		if errors.Is(err, domainstorage.ErrNotFound) {
-			return MediaAsset{}, ErrNotFound
+	var saved MediaAsset
+	err := s.store.WithinTx(ctx, func(tx Store) error {
+		asset, loadErr := tx.MediaAssetByID(ctx, params.MediaID)
+		if loadErr != nil {
+			return fmt.Errorf("load media asset %s: %w", params.MediaID, loadErr)
 		}
-		return MediaAsset{}, fmt.Errorf("head media object %s: %w", asset.ObjectKey, err)
-	}
-	if asset.SizeBytes > 0 && head.ContentLength != int64(asset.SizeBytes) {
-		return MediaAsset{}, ErrConflict
-	}
-	if asset.SHA256Hex != "" {
-		if head.Metadata == nil || head.Metadata["sha256"] != asset.SHA256Hex {
-			return MediaAsset{}, ErrConflict
+		if asset.OwnerAccountID != params.OwnerAccountID {
+			return ErrForbidden
 		}
-	}
+		switch asset.Status {
+		case MediaStatusReady:
+			saved = asset
+			return nil
+		case MediaStatusDeleted:
+			return ErrNotFound
+		case MediaStatusReserved, MediaStatusFailed:
+		default:
+			return ErrConflict
+		}
+		if !now.Before(asset.UploadExpiresAt) {
+			return ErrConflict
+		}
 
-	asset.Status = MediaStatusReady
-	asset.ContentType = firstNonEmpty(asset.ContentType, head.ContentType)
-	asset.Metadata = mergeMetadata(asset.Metadata, head.Metadata)
-	asset.UpdatedAt = now
-	asset.ReadyAt = now
+		head, headErr := s.blob.HeadObject(ctx, asset.ObjectKey)
+		if headErr != nil {
+			if errors.Is(headErr, domainstorage.ErrNotFound) {
+				return ErrNotFound
+			}
+			return fmt.Errorf("head media object %s: %w", asset.ObjectKey, headErr)
+		}
+		if asset.SizeBytes > 0 && head.ContentLength != int64(asset.SizeBytes) {
+			return ErrConflict
+		}
+		if asset.SHA256Hex != "" {
+			if head.Metadata == nil || head.Metadata["sha256"] != asset.SHA256Hex {
+				return ErrConflict
+			}
+		}
 
-	saved, err := s.store.SaveMediaAsset(ctx, asset)
+		asset.Status = MediaStatusReady
+		asset.ContentType = firstNonEmpty(asset.ContentType, head.ContentType)
+		asset.Metadata = mergeMetadata(asset.Metadata, head.Metadata)
+		asset.UpdatedAt = now
+		asset.ReadyAt = now
+
+		savedAsset, saveErr := tx.SaveMediaAsset(ctx, asset)
+		if saveErr != nil {
+			return fmt.Errorf("save media asset %s: %w", asset.ID, saveErr)
+		}
+
+		saved = savedAsset
+		return nil
+	})
 	if err != nil {
-		return MediaAsset{}, fmt.Errorf("save media asset %s: %w", asset.ID, err)
+		return MediaAsset{}, err
 	}
 
 	return saved, nil

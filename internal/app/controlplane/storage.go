@@ -66,11 +66,11 @@ func buildAppStorage(
 	ctx context.Context,
 	cfg config.Configuration,
 ) (*domainstorage.Catalog, *domainidentity.Service, *domainconversation.Service, *domainmedia.Service, error) {
-	if !cfg.Infrastructure.Postgres.Enabled {
-		return nil, nil, nil, nil, nil
-	}
-	if !cfg.Infrastructure.ObjectStore.Enabled {
-		return nil, nil, nil, nil, fmt.Errorf("object storage is required for media: %w", domainstorage.ErrInvalidInput)
+	if !cfg.Infrastructure.Postgres.Enabled || !cfg.Infrastructure.ObjectStore.Enabled {
+		return nil, nil, nil, nil, fmt.Errorf(
+			"postgres and object storage are required for controlplane: %w",
+			domainstorage.ErrInvalidInput,
+		)
 	}
 
 	postgresBootstrap := postgresplatform.NewBootstrap(cfg)
@@ -257,7 +257,10 @@ func closeStorageCatalog(ctx context.Context, catalog *domainstorage.Catalog) er
 		return nil
 	}
 
-	if err := catalog.Close(cleanupContext(ctx)); err != nil {
+	cleanupCtx, cancel := cleanupContext(ctx)
+	defer cancel()
+
+	if err := catalog.Close(cleanupCtx); err != nil {
 		return fmt.Errorf("close storage catalog: %w", err)
 	}
 

@@ -7,21 +7,30 @@ import (
 )
 
 type testProvider struct {
-	name         string
-	kind         Kind
-	purpose      Purpose
-	capabilities Capability
-	closed       *[]string
-	closeErr     error
+	name              string
+	kind              Kind
+	purpose           Purpose
+	capabilities      Capability
+	closed            *[]string
+	closeCtxErrs      *[]error
+	closeCtxDeadlines *[]bool
+	closeErr          error
 }
 
 func (p testProvider) Name() string             { return p.name }
 func (p testProvider) Kind() Kind               { return p.kind }
 func (p testProvider) Purpose() Purpose         { return p.purpose }
 func (p testProvider) Capabilities() Capability { return p.capabilities }
-func (p testProvider) Close(context.Context) error {
+func (p testProvider) Close(ctx context.Context) error {
 	if p.closed != nil {
 		*p.closed = append(*p.closed, p.name)
+	}
+	if p.closeCtxErrs != nil {
+		*p.closeCtxErrs = append(*p.closeCtxErrs, ctx.Err())
+	}
+	if p.closeCtxDeadlines != nil {
+		_, ok := ctx.Deadline()
+		*p.closeCtxDeadlines = append(*p.closeCtxDeadlines, ok)
 	}
 	return p.closeErr
 }
@@ -182,6 +191,48 @@ func TestNewCatalogClosesPartialProvidersOnRegistrationFailure(t *testing.T) {
 	}
 	if len(closed) != 2 || closed[0] != "primary" || closed[1] != "primary" {
 		t.Fatalf("expected failing provider and partial catalog to close, got %v", closed)
+	}
+}
+
+func TestNewCatalogUsesBoundedCleanupContextOnRegistrationFailure(t *testing.T) {
+	t.Parallel()
+
+	closeCtxErrs := make([]error, 0, 2)
+	closeCtxDeadlines := make([]bool, 0, 2)
+
+	_, err := NewCatalog(
+		testProvider{
+			name:              "primary",
+			kind:              KindRelational,
+			purpose:           PurposePrimary,
+			capabilities:      CapabilityRead | CapabilityWrite | CapabilityTransactions,
+			closeCtxErrs:      &closeCtxErrs,
+			closeCtxDeadlines: &closeCtxDeadlines,
+		},
+		testProvider{
+			name:              "primary",
+			kind:              KindCache,
+			purpose:           PurposeCache,
+			capabilities:      CapabilityRead | CapabilityWrite | CapabilityKeyValue,
+			closeCtxErrs:      &closeCtxErrs,
+			closeCtxDeadlines: &closeCtxDeadlines,
+		},
+	)
+	if err == nil {
+		t.Fatal("expected catalog construction to fail")
+	}
+	if len(closeCtxErrs) != 2 {
+		t.Fatalf("expected two cleanup calls, got %d", len(closeCtxErrs))
+	}
+	for i, closeErr := range closeCtxErrs {
+		if closeErr != nil {
+			t.Fatalf("expected cleanup context to ignore cancellation, got %v at %d", closeErr, i)
+		}
+	}
+	for i, hasDeadline := range closeCtxDeadlines {
+		if !hasDeadline {
+			t.Fatalf("expected bounded cleanup deadline at %d", i)
+		}
 	}
 }
 
