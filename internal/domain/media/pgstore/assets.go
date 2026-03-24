@@ -19,6 +19,9 @@ func (s *Store) SaveMediaAsset(ctx context.Context, asset media.MediaAsset) (med
 	if asset.ID == "" {
 		return media.MediaAsset{}, media.ErrInvalidInput
 	}
+	if err := validateMediaAssetForSave(asset); err != nil {
+		return media.MediaAsset{}, err
+	}
 
 	if s.tx != nil {
 		return s.saveMediaAsset(ctx, asset)
@@ -50,9 +53,6 @@ func (s *Store) saveMediaAsset(ctx context.Context, asset media.MediaAsset) (med
 		return media.MediaAsset{}, media.ErrInvalidInput
 	}
 	if asset.Kind == media.MediaKindUnspecified || asset.Status == media.MediaStatusUnspecified {
-		return media.MediaAsset{}, media.ErrInvalidInput
-	}
-	if asset.UploadExpiresAt.IsZero() {
 		return media.MediaAsset{}, media.ErrInvalidInput
 	}
 
@@ -127,6 +127,46 @@ RETURNING %s
 	return saved, nil
 }
 
+func validateMediaAssetForSave(asset media.MediaAsset) error {
+	if asset.CreatedAt.IsZero() || asset.UpdatedAt.IsZero() || asset.UploadExpiresAt.IsZero() {
+		return media.ErrInvalidInput
+	}
+	if asset.UpdatedAt.Before(asset.CreatedAt) || asset.UploadExpiresAt.Before(asset.CreatedAt) {
+		return media.ErrInvalidInput
+	}
+	if !asset.ReadyAt.IsZero() && asset.ReadyAt.Before(asset.CreatedAt) {
+		return media.ErrInvalidInput
+	}
+	if !asset.ReadyAt.IsZero() && asset.ReadyAt.After(asset.UpdatedAt) {
+		return media.ErrInvalidInput
+	}
+	if !asset.DeletedAt.IsZero() && asset.DeletedAt.Before(asset.CreatedAt) {
+		return media.ErrInvalidInput
+	}
+	if !asset.DeletedAt.IsZero() && asset.DeletedAt.After(asset.UpdatedAt) {
+		return media.ErrInvalidInput
+	}
+
+	switch asset.Status {
+	case media.MediaStatusReserved, media.MediaStatusFailed:
+		if !asset.ReadyAt.IsZero() || !asset.DeletedAt.IsZero() {
+			return media.ErrInvalidInput
+		}
+	case media.MediaStatusReady:
+		if asset.ReadyAt.IsZero() || !asset.DeletedAt.IsZero() {
+			return media.ErrInvalidInput
+		}
+	case media.MediaStatusDeleted:
+		if asset.DeletedAt.IsZero() {
+			return media.ErrInvalidInput
+		}
+	default:
+		return media.ErrInvalidInput
+	}
+
+	return nil
+}
+
 // MediaAssetByID resolves a media asset by primary key.
 func (s *Store) MediaAssetByID(ctx context.Context, mediaID string) (media.MediaAsset, error) {
 	if err := s.requireStore(); err != nil {
@@ -141,6 +181,9 @@ func (s *Store) MediaAssetByID(ctx context.Context, mediaID string) (media.Media
 	}
 
 	query := fmt.Sprintf(`SELECT %s FROM %s WHERE id = $1`, mediaColumnList, s.table("media_assets"))
+	if s.tx != nil {
+		query += " FOR UPDATE"
+	}
 	row := s.conn().QueryRowContext(ctx, query, mediaID)
 	asset, err := scanAsset(row)
 	if err != nil {
