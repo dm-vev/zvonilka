@@ -25,11 +25,11 @@ func (s *memoryStore) SaveMessage(ctx context.Context, message conversation.Mess
 	if message.Status == conversation.MessageStatusUnspecified {
 		return conversation.Message{}, conversation.ErrInvalidInput
 	}
-	if err := conversation.ValidateEncryptedPayload(message.Payload); err != nil {
+	if err := conversation.ValidateMessagePayload(message.Payload, false); err != nil {
 		return conversation.Message{}, err
 	}
 
-	conversation.SanitizeEncryptedMessage(&message)
+	conversation.StripMessageHints(&message)
 
 	s.messagesByID[message.ID] = cloneMessage(message)
 

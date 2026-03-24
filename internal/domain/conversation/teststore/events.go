@@ -45,6 +45,11 @@ func (s *memoryStore) SaveEvent(ctx context.Context, event conversation.EventEnv
 	if event.EventID == "" || event.ConversationID == "" || event.ActorAccountID == "" {
 		return conversation.EventEnvelope{}, conversation.ErrInvalidInput
 	}
+	if event.EventType == conversation.EventTypeMessageCreated || event.EventType == conversation.EventTypeMessageEdited {
+		if err := conversation.ValidateMessagePayload(event.Payload, false); err != nil {
+			return conversation.EventEnvelope{}, err
+		}
+	}
 
 	s.nextSequence++
 	event.Sequence = s.nextSequence

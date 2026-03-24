@@ -127,10 +127,6 @@ func (s *Service) EditMessage(ctx context.Context, params EditMessageParams) (Me
 	if params.Draft.Kind == MessageKindUnspecified {
 		return Message{}, EventEnvelope{}, ErrInvalidInput
 	}
-	if err := ValidateEncryptedPayload(params.Draft.Payload); err != nil {
-		return Message{}, EventEnvelope{}, err
-	}
-
 	now := params.EditedAt
 	if now.IsZero() {
 		now = s.currentTime()
@@ -152,12 +148,18 @@ func (s *Service) EditMessage(ctx context.Context, params EditMessageParams) (Me
 		if !state.message.DeletedAt.IsZero() || state.message.Status == MessageStatusDeleted {
 			return ErrConflict
 		}
+		if err := ValidateMessagePayload(
+			params.Draft.Payload,
+			state.conversation.Settings.RequireEncryptedMessages,
+		); err != nil {
+			return ErrInvalidInput
+		}
 
 		nextMessage := state.message
 		nextMessage.Kind = params.Draft.Kind
 		nextMessage.Payload = params.Draft.Payload
 		nextMessage.Attachments = append([]AttachmentRef(nil), params.Draft.Attachments...)
-		SanitizeEncryptedMessage(&nextMessage)
+		StripMessageHints(&nextMessage)
 		nextMessage.Silent = params.Draft.Silent
 		nextMessage.DisableLinkPreviews = params.Draft.DisableLinkPreviews
 		nextMessage.Metadata = trimMetadata(params.Draft.Metadata)

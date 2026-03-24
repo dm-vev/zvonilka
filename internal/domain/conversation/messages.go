@@ -74,9 +74,6 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 	if params.Draft.Kind == MessageKindUnspecified {
 		return Message{}, EventEnvelope{}, ErrInvalidInput
 	}
-	if err := ValidateEncryptedPayload(params.Draft.Payload); err != nil {
-		return Message{}, EventEnvelope{}, err
-	}
 
 	draft := params.Draft
 	draft.ReplyTo.Snippet = ""
@@ -108,6 +105,9 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 		}
 		if conversation.Settings.OnlyAdminsCanWrite && member.Role != MemberRoleOwner && member.Role != MemberRoleAdmin {
 			return ErrForbidden
+		}
+		if err := ValidateMessagePayload(draft.Payload, conversation.Settings.RequireEncryptedMessages); err != nil {
+			return ErrInvalidInput
 		}
 
 		topicID := draft.ThreadID

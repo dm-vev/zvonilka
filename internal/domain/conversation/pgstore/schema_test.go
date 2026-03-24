@@ -143,8 +143,8 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 	if loadedConversation.LastSequence != event.Sequence {
 		t.Fatalf("expected last sequence %d, got %d", event.Sequence, loadedConversation.LastSequence)
 	}
-	if !loadedConversation.Settings.RequireEncryptedMessages {
-		t.Fatal("expected encrypted message policy to persist")
+	if loadedConversation.Settings.RequireEncryptedMessages {
+		t.Fatal("expected encrypted message policy to remain opt-in by default")
 	}
 
 	loadedMessage, err := store.MessageByID(context.Background(), created.ID, message.ID)

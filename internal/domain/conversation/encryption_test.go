@@ -10,7 +10,7 @@ import (
 	teststore "github.com/dm-vev/zvonilka/internal/domain/conversation/teststore"
 )
 
-func TestEncryptedPayloadRequiredForMessagingKinds(t *testing.T) {
+func TestEncryptedPayloadPolicyIsOptIn(t *testing.T) {
 	t.Parallel()
 
 	type testCase struct {
@@ -63,24 +63,95 @@ func TestEncryptedPayloadRequiredForMessagingKinds(t *testing.T) {
 			if err != nil {
 				t.Fatalf("create conversation: %v", err)
 			}
-			if !created.Settings.RequireEncryptedMessages {
-				t.Fatal("expected encrypted message policy to default on")
+			if created.Settings.RequireEncryptedMessages {
+				t.Fatal("expected encryption policy to be opt-in by default")
 			}
 
-			_, _, err = svc.SendMessage(context.Background(), conversation.SendMessageParams{
+			message, _, err := svc.SendMessage(context.Background(), conversation.SendMessageParams{
 				ConversationID:  created.ID,
 				SenderAccountID: "acc-owner",
 				SenderDeviceID:  "dev-owner",
 				Draft: conversation.MessageDraft{
-					Kind:    conversation.MessageKindText,
-					Payload: conversation.EncryptedPayload{},
+					Kind: conversation.MessageKindText,
+					Payload: conversation.EncryptedPayload{
+						Ciphertext: []byte("plaintext-body"),
+					},
 				},
 				CreatedAt: fixedNow.Add(time.Minute),
 			})
-			if !errors.Is(err, conversation.ErrInvalidInput) {
-				t.Fatalf("expected invalid payload to fail, got %v", err)
+			if err != nil {
+				t.Fatalf("send message with optional encryption: %v", err)
+			}
+			if string(message.Payload.Ciphertext) != "plaintext-body" {
+				t.Fatalf("expected ciphertext body to round-trip, got %q", string(message.Payload.Ciphertext))
 			}
 		})
+	}
+}
+
+func TestEncryptedPayloadCanBeRequiredPerConversation(t *testing.T) {
+	t.Parallel()
+
+	store := teststore.NewMemoryStore()
+	fixedNow := time.Date(2026, time.March, 24, 17, 0, 0, 0, time.UTC)
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time { return fixedNow }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	created, _, err := svc.CreateConversation(context.Background(), conversation.CreateConversationParams{
+		OwnerAccountID: "acc-owner",
+		Kind:           conversation.ConversationKindGroup,
+		Title:          "Group",
+		Settings: conversation.ConversationSettings{
+			RequireEncryptedMessages: true,
+		},
+		CreatedAt: fixedNow,
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+	if !created.Settings.RequireEncryptedMessages {
+		t.Fatal("expected encrypted message policy to persist")
+	}
+
+	_, _, err = svc.SendMessage(context.Background(), conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "acc-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				Ciphertext: []byte("plaintext-body"),
+			},
+		},
+		CreatedAt: fixedNow.Add(time.Minute),
+	})
+	if !errors.Is(err, conversation.ErrInvalidInput) {
+		t.Fatalf("expected plaintext payload to be rejected for encrypted conversation, got %v", err)
+	}
+
+	message, _, err := svc.SendMessage(context.Background(), conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "acc-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-1",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		CreatedAt: fixedNow.Add(2 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("send encrypted message: %v", err)
+	}
+	if string(message.Payload.Ciphertext) != "ciphertext" {
+		t.Fatalf("expected encrypted ciphertext to round-trip, got %q", string(message.Payload.Ciphertext))
 	}
 }
 
@@ -88,7 +159,7 @@ func TestEncryptedHintsAreStrippedFromMessages(t *testing.T) {
 	t.Parallel()
 
 	store := teststore.NewMemoryStore()
-	fixedNow := time.Date(2026, time.March, 24, 17, 0, 0, 0, time.UTC)
+	fixedNow := time.Date(2026, time.March, 24, 18, 0, 0, 0, time.UTC)
 
 	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time { return fixedNow }))
 	if err != nil {
@@ -113,10 +184,7 @@ func TestEncryptedHintsAreStrippedFromMessages(t *testing.T) {
 		Draft: conversation.MessageDraft{
 			Kind: conversation.MessageKindText,
 			Payload: conversation.EncryptedPayload{
-				KeyID:      "key-root",
-				Algorithm:  "xchacha20poly1305",
-				Nonce:      []byte("nonce"),
-				Ciphertext: []byte("ciphertext"),
+				Ciphertext: []byte("root-body"),
 			},
 		},
 		CreatedAt: fixedNow.Add(time.Minute),
@@ -132,10 +200,7 @@ func TestEncryptedHintsAreStrippedFromMessages(t *testing.T) {
 		Draft: conversation.MessageDraft{
 			Kind: conversation.MessageKindText,
 			Payload: conversation.EncryptedPayload{
-				KeyID:      "key-reply",
-				Algorithm:  "xchacha20poly1305",
-				Nonce:      []byte("nonce"),
-				Ciphertext: []byte("ciphertext"),
+				Ciphertext: []byte("reply-body"),
 			},
 			ReplyTo: conversation.MessageReference{
 				MessageID: rootMessage.ID,

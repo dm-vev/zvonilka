@@ -175,7 +175,7 @@ type AttachmentRef struct {
 	Caption   string
 }
 
-// EncryptedPayload describes the opaque payload used by E2EE-capable messages.
+// EncryptedPayload describes the opaque payload carried by a conversation message.
 type EncryptedPayload struct {
 	KeyID      string
 	Algorithm  string

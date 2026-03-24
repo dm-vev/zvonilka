@@ -131,10 +131,7 @@ func TestEncryptedPayloadStripsPlaintextHints(t *testing.T) {
 		Draft: conversation.MessageDraft{
 			Kind: conversation.MessageKindText,
 			Payload: conversation.EncryptedPayload{
-				KeyID:      "key-root",
-				Algorithm:  "xchacha20poly1305",
-				Nonce:      []byte("nonce"),
-				Ciphertext: []byte("ciphertext"),
+				Ciphertext: []byte("root-body"),
 			},
 		},
 		CreatedAt: time.Date(2026, time.March, 24, 19, 1, 0, 0, time.UTC),
@@ -151,10 +148,7 @@ func TestEncryptedPayloadStripsPlaintextHints(t *testing.T) {
 		Kind:            conversation.MessageKindText,
 		Status:          conversation.MessageStatusSent,
 		Payload: conversation.EncryptedPayload{
-			KeyID:      "key-msg",
-			Algorithm:  "xchacha20poly1305",
-			Nonce:      []byte("nonce"),
-			Ciphertext: []byte("ciphertext"),
+			Ciphertext: []byte("reply-body"),
 		},
 		ReplyTo: conversation.MessageReference{
 			ConversationID:  created.ID,
