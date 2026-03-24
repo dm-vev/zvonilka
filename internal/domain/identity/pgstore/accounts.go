@@ -133,8 +133,8 @@ RETURNING %s
 		account.CustomBadgeEmoji,
 	))
 	if err != nil {
-		if isUniqueViolation(err) {
-			return identity.Account{}, identity.ErrConflict
+		if mappedErr := mapConstraintError(err, identity.ErrNotFound); mappedErr != nil {
+			return identity.Account{}, mappedErr
 		}
 		return identity.Account{}, fmt.Errorf("save account %s: %w", account.Username, err)
 	}

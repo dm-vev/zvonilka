@@ -99,8 +99,8 @@ RETURNING %s
 		joinRequest.ExpiresAt.UTC(),
 	))
 	if err != nil {
-		if isUniqueViolation(err) {
-			return identity.JoinRequest{}, identity.ErrConflict
+		if mappedErr := mapConstraintError(err, identity.ErrNotFound); mappedErr != nil {
+			return identity.JoinRequest{}, mappedErr
 		}
 		return identity.JoinRequest{}, fmt.Errorf("save join request %s: %w", joinRequest.ID, err)
 	}

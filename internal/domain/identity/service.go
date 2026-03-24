@@ -217,6 +217,11 @@ func (s *Service) issueSession(
 		}
 	}
 
+	if err = s.touchAccount(ctx, store, account); err != nil {
+		err = fmt.Errorf("update account %s before session issuance: %w", account.ID, err)
+		return
+	}
+
 	deviceID, err := newID("dev")
 	if err != nil {
 		err = fmt.Errorf("generate device ID: %w", err)

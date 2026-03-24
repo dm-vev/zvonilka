@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -15,6 +16,44 @@ import (
 
 	"github.com/dm-vev/zvonilka/internal/platform/config"
 )
+
+type migrationExpectation struct {
+	name   string
+	script string
+	err    error
+}
+
+func expectMigrationBootstrap(mock sqlmock.Sqlmock, schema string, migrations ...migrationExpectation) {
+	mock.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS " + qualifiedName("public", "schema_migrations"))).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	for _, migration := range migrations {
+		mock.ExpectBegin()
+		mock.ExpectExec(regexp.QuoteMeta("SELECT pg_advisory_xact_lock($1)")).
+			WithArgs(sqlmock.AnyArg()).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(
+			`SELECT 1 FROM %s WHERE schema_name = $1 AND migration_name = $2 LIMIT 1`,
+			qualifiedName("public", "schema_migrations"),
+		))).
+			WithArgs(schema, migration.name).
+			WillReturnError(sql.ErrNoRows)
+		execExpectation := mock.ExpectExec(regexp.QuoteMeta(strings.ReplaceAll(migration.script, "{{schema}}", quoteIdentifier(schema))))
+		if migration.err != nil {
+			execExpectation.WillReturnError(migration.err)
+			mock.ExpectRollback()
+			return
+		}
+		execExpectation.WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectExec(regexp.QuoteMeta(fmt.Sprintf(
+			`INSERT INTO %s (schema_name, migration_name, applied_at) VALUES ($1, $2, CURRENT_TIMESTAMP)`,
+			qualifiedName("public", "schema_migrations"),
+		))).
+			WithArgs(schema, migration.name).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectCommit()
+	}
+}
 
 func TestBootstrapOpenAppliesMigrationsAndCloses(t *testing.T) {
 	dir := t.TempDir()
@@ -51,12 +90,10 @@ func TestBootstrapOpenAppliesMigrationsAndCloses(t *testing.T) {
 	})
 
 	mock.ExpectPing()
-	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"tenant\".alpha (id INT PRIMARY KEY);")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectCommit()
-	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"tenant\".beta (id INT PRIMARY KEY);")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectCommit()
+	expectMigrationBootstrap(mock, "tenant",
+		migrationExpectation{name: "0001.sql", script: secondScript},
+		migrationExpectation{name: "0002.sql", script: firstScript},
+	)
 	mock.ExpectClose()
 
 	bootstrap := NewBootstrap(config.Configuration{
@@ -137,9 +174,9 @@ func TestBootstrapOpenRetriesAfterTransientFailure(t *testing.T) {
 	mock1.ExpectClose()
 
 	mock2.ExpectPing()
-	mock2.ExpectBegin()
-	mock2.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"tenant\".alpha (id INT PRIMARY KEY);")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock2.ExpectCommit()
+	expectMigrationBootstrap(mock2, "tenant",
+		migrationExpectation{name: "0001.sql", script: script},
+	)
 	mock2.ExpectClose()
 
 	bootstrap := NewBootstrap(config.Configuration{
@@ -222,17 +259,15 @@ func TestBootstrapOpenRetriesAfterMigrationFailure(t *testing.T) {
 	})
 
 	firstMock.ExpectPing()
-	firstMock.ExpectBegin()
-	firstMock.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"tenant\".alpha (id INT PRIMARY KEY);")).
-		WillReturnError(errors.New("migration failed"))
-	firstMock.ExpectRollback()
+	expectMigrationBootstrap(firstMock, "tenant",
+		migrationExpectation{name: "0001.sql", script: script, err: errors.New("migration failed")},
+	)
 	firstMock.ExpectClose()
 
 	secondMock.ExpectPing()
-	secondMock.ExpectBegin()
-	secondMock.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"tenant\".alpha (id INT PRIMARY KEY);")).
-		WillReturnResult(sqlmock.NewResult(0, 0))
-	secondMock.ExpectCommit()
+	expectMigrationBootstrap(secondMock, "tenant",
+		migrationExpectation{name: "0001.sql", script: script},
+	)
 	secondMock.ExpectClose()
 
 	bootstrap := NewBootstrap(config.Configuration{
@@ -305,10 +340,9 @@ func TestBootstrapOpenReportsCleanupErrorOnMigrationFailure(t *testing.T) {
 	})
 
 	mock.ExpectPing()
-	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"tenant\".alpha (id INT PRIMARY KEY);")).
-		WillReturnError(errors.New("migration failed"))
-	mock.ExpectRollback()
+	expectMigrationBootstrap(mock, "tenant",
+		migrationExpectation{name: "0001.sql", script: "CREATE TABLE IF NOT EXISTS {{schema}}.alpha (id INT PRIMARY KEY);", err: errors.New("migration failed")},
+	)
 	mock.ExpectClose().WillReturnError(errors.New("close failed"))
 
 	bootstrap := NewBootstrap(config.Configuration{
@@ -389,15 +423,15 @@ func TestBootstrapCloseAllowsReopen(t *testing.T) {
 	})
 
 	mock1.ExpectPing()
-	mock1.ExpectBegin()
-	mock1.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"tenant\".alpha (id INT PRIMARY KEY);")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock1.ExpectCommit()
+	expectMigrationBootstrap(mock1, "tenant",
+		migrationExpectation{name: "0001.sql", script: script},
+	)
 	mock1.ExpectClose()
 
 	mock2.ExpectPing()
-	mock2.ExpectBegin()
-	mock2.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"tenant\".alpha (id INT PRIMARY KEY);")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock2.ExpectCommit()
+	expectMigrationBootstrap(mock2, "tenant",
+		migrationExpectation{name: "0001.sql", script: script},
+	)
 	mock2.ExpectClose()
 
 	bootstrap := NewBootstrap(config.Configuration{
@@ -501,21 +535,17 @@ func TestBootstrapOpenClosesAfterMigrationFailure(t *testing.T) {
 	})
 
 	mock1.ExpectPing()
-	mock1.ExpectBegin()
-	mock1.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"tenant\".alpha (id INT PRIMARY KEY);")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock1.ExpectCommit()
-	mock1.ExpectBegin()
-	mock1.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"tenant\".beta (id INT PRIMARY KEY);")).WillReturnError(errors.New("migration failed"))
-	mock1.ExpectRollback()
+	expectMigrationBootstrap(mock1, "tenant",
+		migrationExpectation{name: "0001.sql", script: "CREATE TABLE IF NOT EXISTS {{schema}}.alpha (id INT PRIMARY KEY);"},
+		migrationExpectation{name: "0002.sql", script: "CREATE TABLE IF NOT EXISTS {{schema}}.beta (id INT PRIMARY KEY);", err: errors.New("migration failed")},
+	)
 	mock1.ExpectClose()
 
 	mock2.ExpectPing()
-	mock2.ExpectBegin()
-	mock2.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"tenant\".alpha (id INT PRIMARY KEY);")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock2.ExpectCommit()
-	mock2.ExpectBegin()
-	mock2.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"tenant\".beta (id INT PRIMARY KEY);")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock2.ExpectCommit()
+	expectMigrationBootstrap(mock2, "tenant",
+		migrationExpectation{name: "0001.sql", script: "CREATE TABLE IF NOT EXISTS {{schema}}.alpha (id INT PRIMARY KEY);"},
+		migrationExpectation{name: "0002.sql", script: "CREATE TABLE IF NOT EXISTS {{schema}}.beta (id INT PRIMARY KEY);"},
+	)
 	mock2.ExpectClose()
 
 	bootstrap := NewBootstrap(config.Configuration{
@@ -587,9 +617,9 @@ func TestBootstrapQuotesSchemaIdentifiers(t *testing.T) {
 	})
 
 	mock.ExpectPing()
-	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS \"ten\"\"ant\".alpha (id INT PRIMARY KEY);")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectCommit()
+	expectMigrationBootstrap(mock, `ten"ant`,
+		migrationExpectation{name: "0001.sql", script: script},
+	)
 	mock.ExpectClose()
 
 	bootstrap := NewBootstrap(config.Configuration{

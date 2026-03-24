@@ -22,6 +22,16 @@ func (s *Store) SaveDevice(ctx context.Context, device identity.Device) (identit
 		return identity.Device{}, identity.ErrInvalidInput
 	}
 
+	if strings.TrimSpace(device.SessionID) != "" {
+		session, err := s.SessionByID(ctx, device.SessionID)
+		if err != nil && !errors.Is(err, identity.ErrNotFound) {
+			return identity.Device{}, fmt.Errorf("load session %s for device %s: %w", device.SessionID, device.ID, err)
+		}
+		if err == nil && session.AccountID != device.AccountID {
+			return identity.Device{}, identity.ErrConflict
+		}
+	}
+
 	query := fmt.Sprintf(`
 INSERT INTO %s (
 	id, account_id, session_id, name, platform, status, public_key, push_token, created_at, last_seen_at, revoked_at, last_rotated_at
@@ -57,11 +67,8 @@ RETURNING %s
 		nullTime(device.LastRotatedAt),
 	))
 	if err != nil {
-		if isUniqueViolation(err) {
-			return identity.Device{}, identity.ErrConflict
-		}
-		if isForeignKeyViolation(err) {
-			return identity.Device{}, identity.ErrNotFound
+		if mappedErr := mapConstraintError(err, s.mapDeviceForeignKeyViolation(ctx, device)); mappedErr != nil {
+			return identity.Device{}, mappedErr
 		}
 		return identity.Device{}, fmt.Errorf("save device %s: %w", device.ID, err)
 	}
@@ -84,6 +91,9 @@ func (s *Store) DeleteDevice(ctx context.Context, deviceID string) error {
 	query := fmt.Sprintf(`DELETE FROM %s WHERE id = $1`, s.table("identity_devices"))
 	result, err := s.conn().ExecContext(ctx, query, deviceID)
 	if err != nil {
+		if isForeignKeyViolation(err) {
+			return identity.ErrConflict
+		}
 		return fmt.Errorf("delete device %s: %w", deviceID, err)
 	}
 

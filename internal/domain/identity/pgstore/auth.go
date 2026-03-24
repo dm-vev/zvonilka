@@ -58,11 +58,8 @@ RETURNING %s
 		challenge.Used,
 	))
 	if err != nil {
-		if isUniqueViolation(err) {
-			return identity.LoginChallenge{}, identity.ErrConflict
-		}
-		if isForeignKeyViolation(err) {
-			return identity.LoginChallenge{}, identity.ErrNotFound
+		if mappedErr := mapConstraintError(err, identity.ErrNotFound); mappedErr != nil {
+			return identity.LoginChallenge{}, mappedErr
 		}
 		return identity.LoginChallenge{}, fmt.Errorf("save login challenge %s: %w", challenge.ID, err)
 	}

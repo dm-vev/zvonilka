@@ -22,6 +22,16 @@ func (s *Store) SaveSession(ctx context.Context, session identity.Session) (iden
 		return identity.Session{}, identity.ErrInvalidInput
 	}
 
+	if strings.TrimSpace(session.DeviceID) != "" {
+		device, err := s.DeviceByID(ctx, session.DeviceID)
+		if err != nil && !errors.Is(err, identity.ErrNotFound) {
+			return identity.Session{}, fmt.Errorf("load device %s for session %s: %w", session.DeviceID, session.ID, err)
+		}
+		if err == nil && device.AccountID != session.AccountID {
+			return identity.Session{}, identity.ErrConflict
+		}
+	}
+
 	query := fmt.Sprintf(`
 INSERT INTO %s (
 	id, account_id, device_id, device_name, device_platform, ip_address, user_agent, status, current, created_at, last_seen_at, revoked_at
@@ -57,11 +67,8 @@ RETURNING %s
 		nullTime(session.RevokedAt),
 	))
 	if err != nil {
-		if isUniqueViolation(err) {
-			return identity.Session{}, identity.ErrConflict
-		}
-		if isForeignKeyViolation(err) {
-			return identity.Session{}, identity.ErrNotFound
+		if mappedErr := mapConstraintError(err, s.mapSessionForeignKeyViolation(ctx, session)); mappedErr != nil {
+			return identity.Session{}, mappedErr
 		}
 		return identity.Session{}, fmt.Errorf("save session %s: %w", session.ID, err)
 	}
@@ -84,6 +91,9 @@ func (s *Store) DeleteSession(ctx context.Context, sessionID string) error {
 	query := fmt.Sprintf(`DELETE FROM %s WHERE id = $1`, s.table("identity_sessions"))
 	result, err := s.conn().ExecContext(ctx, query, sessionID)
 	if err != nil {
+		if mappedErr := mapConstraintError(err, identity.ErrConflict); mappedErr != nil {
+			return mappedErr
+		}
 		return fmt.Errorf("delete session %s: %w", sessionID, err)
 	}
 
@@ -168,6 +178,16 @@ func (s *Store) UpdateSession(ctx context.Context, session identity.Session) (id
 		return identity.Session{}, identity.ErrInvalidInput
 	}
 
+	if strings.TrimSpace(session.DeviceID) != "" {
+		device, err := s.DeviceByID(ctx, session.DeviceID)
+		if err != nil && !errors.Is(err, identity.ErrNotFound) {
+			return identity.Session{}, fmt.Errorf("load device %s for session %s: %w", session.DeviceID, session.ID, err)
+		}
+		if err == nil && device.AccountID != session.AccountID {
+			return identity.Session{}, identity.ErrConflict
+		}
+	}
+
 	query := fmt.Sprintf(`
 UPDATE %s
 SET account_id = $2,
@@ -201,11 +221,8 @@ RETURNING %s
 		if errors.Is(err, sql.ErrNoRows) {
 			return identity.Session{}, identity.ErrNotFound
 		}
-		if isUniqueViolation(err) {
-			return identity.Session{}, identity.ErrConflict
-		}
-		if isForeignKeyViolation(err) {
-			return identity.Session{}, identity.ErrNotFound
+		if mappedErr := mapConstraintError(err, s.mapSessionForeignKeyViolation(ctx, session)); mappedErr != nil {
+			return identity.Session{}, mappedErr
 		}
 		return identity.Session{}, fmt.Errorf("update session %s: %w", session.ID, err)
 	}

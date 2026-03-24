@@ -82,6 +82,13 @@ func (s *Store) withTransaction(ctx context.Context, fn func(identity.Store) err
 	if err != nil {
 		if domainstorage.IsCommit(err) {
 			if commitErr := tx.Commit(); commitErr != nil {
+				if mappedErr := mapConstraintError(commitErr, identity.ErrConflict); mappedErr != nil {
+					return errors.Join(
+						domainstorage.UnwrapCommit(err),
+						fmt.Errorf("commit postgres transaction: %w", mappedErr),
+					)
+				}
+
 				return errors.Join(
 					domainstorage.UnwrapCommit(err),
 					fmt.Errorf("commit postgres transaction: %w", commitErr),
@@ -99,6 +106,9 @@ func (s *Store) withTransaction(ctx context.Context, fn func(identity.Store) err
 	}
 
 	if commitErr := tx.Commit(); commitErr != nil {
+		if mappedErr := mapConstraintError(commitErr, identity.ErrConflict); mappedErr != nil {
+			return fmt.Errorf("commit postgres transaction: %w", mappedErr)
+		}
 		return fmt.Errorf("commit postgres transaction: %w", commitErr)
 	}
 
@@ -225,6 +235,32 @@ func isForeignKeyViolation(err error) bool {
 	}
 
 	return false
+}
+
+func isCheckViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23514" {
+		return true
+	}
+
+	return false
+}
+
+// mapConstraintError maps PostgreSQL constraint failures to domain sentinels.
+func mapConstraintError(err error, foreignKeyErr error) error {
+	switch {
+	case isUniqueViolation(err):
+		return identity.ErrConflict
+	case isForeignKeyViolation(err):
+		if foreignKeyErr != nil {
+			return foreignKeyErr
+		}
+		return identity.ErrNotFound
+	case isCheckViolation(err):
+		return identity.ErrInvalidInput
+	default:
+		return nil
+	}
 }
 
 func notFound(err error) bool {
