@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 	"time"
 
@@ -30,26 +31,46 @@ type Provider struct {
 
 // Name returns the configured provider name.
 func (p *Provider) Name() string {
+	if p == nil {
+		return ""
+	}
+
 	return p.name
 }
 
 // Kind returns the logical provider kind.
 func (p *Provider) Kind() domainstorage.Kind {
+	if p == nil {
+		return domainstorage.KindUnspecified
+	}
+
 	return p.kind
 }
 
 // Purpose returns the logical provider purpose.
 func (p *Provider) Purpose() domainstorage.Purpose {
+	if p == nil {
+		return domainstorage.PurposeUnspecified
+	}
+
 	return p.purpose
 }
 
 // Capabilities returns the supported capabilities.
 func (p *Provider) Capabilities() domainstorage.Capability {
+	if p == nil {
+		return 0
+	}
+
 	return p.capabilities
 }
 
 // Bucket returns the backing bucket name.
 func (p *Provider) Bucket() string {
+	if p == nil {
+		return ""
+	}
+
 	return p.bucket
 }
 
@@ -66,7 +87,13 @@ func (p *Provider) PutObject(
 	size int64,
 	options domainstorage.PutObjectOptions,
 ) (domainstorage.BlobObject, error) {
+	if ctx == nil {
+		return domainstorage.BlobObject{}, domainstorage.ErrInvalidInput
+	}
 	if p == nil || p.client == nil {
+		return domainstorage.BlobObject{}, domainstorage.ErrInvalidInput
+	}
+	if body == nil {
 		return domainstorage.BlobObject{}, domainstorage.ErrInvalidInput
 	}
 	key = strings.TrimSpace(key)
@@ -105,6 +132,9 @@ func (p *Provider) PutObject(
 
 // GetObject downloads a blob from the configured bucket.
 func (p *Provider) GetObject(ctx context.Context, key string) (io.ReadCloser, domainstorage.BlobObject, error) {
+	if ctx == nil {
+		return nil, domainstorage.BlobObject{}, domainstorage.ErrInvalidInput
+	}
 	if p == nil || p.client == nil {
 		return nil, domainstorage.BlobObject{}, domainstorage.ErrInvalidInput
 	}
@@ -141,6 +171,9 @@ func (p *Provider) GetObject(ctx context.Context, key string) (io.ReadCloser, do
 
 // HeadObject resolves blob metadata without downloading the object.
 func (p *Provider) HeadObject(ctx context.Context, key string) (domainstorage.BlobObject, error) {
+	if ctx == nil {
+		return domainstorage.BlobObject{}, domainstorage.ErrInvalidInput
+	}
 	if p == nil || p.client == nil {
 		return domainstorage.BlobObject{}, domainstorage.ErrInvalidInput
 	}
@@ -177,6 +210,9 @@ func (p *Provider) HeadObject(ctx context.Context, key string) (domainstorage.Bl
 
 // DeleteObject deletes a blob from the configured bucket.
 func (p *Provider) DeleteObject(ctx context.Context, key string) error {
+	if ctx == nil {
+		return domainstorage.ErrInvalidInput
+	}
 	if p == nil || p.client == nil {
 		return domainstorage.ErrInvalidInput
 	}
@@ -203,6 +239,9 @@ func (p *Provider) PresignPutObject(
 	expires time.Duration,
 	options domainstorage.PutObjectOptions,
 ) (domainstorage.PresignedRequest, error) {
+	if ctx == nil {
+		return domainstorage.PresignedRequest{}, domainstorage.ErrInvalidInput
+	}
 	if p == nil || p.presign == nil {
 		return domainstorage.PresignedRequest{}, domainstorage.ErrInvalidInput
 	}
@@ -234,6 +273,9 @@ func (p *Provider) PresignGetObject(
 	key string,
 	expires time.Duration,
 ) (domainstorage.PresignedRequest, error) {
+	if ctx == nil {
+		return domainstorage.PresignedRequest{}, domainstorage.ErrInvalidInput
+	}
 	if p == nil || p.presign == nil {
 		return domainstorage.PresignedRequest{}, domainstorage.ErrInvalidInput
 	}
@@ -256,6 +298,14 @@ func (p *Provider) PresignGetObject(
 }
 
 func toPresignedRequest(request *v4.PresignedHTTPRequest, expires time.Duration, bucket string, key string) domainstorage.PresignedRequest {
+	if request == nil {
+		return domainstorage.PresignedRequest{
+			ExpiresAt: time.Now().UTC().Add(expires),
+			Bucket:    bucket,
+			ObjectKey: key,
+		}
+	}
+
 	headers := make(map[string]string, len(request.SignedHeader))
 	for key, values := range request.SignedHeader {
 		if len(values) == 0 {
@@ -268,10 +318,33 @@ func toPresignedRequest(request *v4.PresignedHTTPRequest, expires time.Duration,
 		URL:       request.URL,
 		Method:    request.Method,
 		Headers:   headers,
-		ExpiresAt: time.Now().UTC().Add(expires),
+		ExpiresAt: presignedExpiresAt(request, expires),
 		Bucket:    bucket,
 		ObjectKey: key,
 	}
+}
+
+func presignedExpiresAt(request *v4.PresignedHTTPRequest, expires time.Duration) time.Time {
+	if request == nil {
+		return time.Now().UTC().Add(expires)
+	}
+
+	parsedURL, err := url.Parse(request.URL)
+	if err != nil {
+		return time.Now().UTC().Add(expires)
+	}
+
+	signedAtRaw := parsedURL.Query().Get("X-Amz-Date")
+	if signedAtRaw == "" {
+		return time.Now().UTC().Add(expires)
+	}
+
+	signedAt, err := time.Parse("20060102T150405Z", signedAtRaw)
+	if err != nil {
+		return time.Now().UTC().Add(expires)
+	}
+
+	return signedAt.UTC().Add(expires)
 }
 
 func copyStringMap(values map[string]string) map[string]string {
@@ -292,19 +365,51 @@ func mapObjectError(err error) error {
 		return nil
 	}
 
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+
 	var apiErr smithy.APIError
 	if errors.As(err, &apiErr) {
 		switch apiErr.ErrorCode() {
 		case "NotFound", "NoSuchKey", "NoSuchBucket":
 			return domainstorage.ErrNotFound
+		case "AccessDenied", "Forbidden", "Unauthorized":
+			return domainstorage.ErrForbidden
 		}
 	}
 
 	return fmt.Errorf("s3 operation failed: %w", err)
 }
 
+type bucketClient interface {
+	HeadBucket(ctx context.Context, params *s3.HeadBucketInput, optFns ...func(*s3.Options)) (*s3.HeadBucketOutput, error)
+	CreateBucket(ctx context.Context, params *s3.CreateBucketInput, optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error)
+}
+
+func mapBucketCreateError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var owned *s3types.BucketAlreadyOwnedByYou
+	if errors.As(err, &owned) {
+		return nil
+	}
+
+	var exists *s3types.BucketAlreadyExists
+	if errors.As(err, &exists) {
+		return domainstorage.ErrConflict
+	}
+
+	return mapObjectError(err)
+}
+
 // ensureBucket creates the bucket when it does not already exist.
-func ensureBucket(ctx context.Context, client *s3.Client, bucket string, region string) error {
+func ensureBucket(ctx context.Context, client bucketClient, bucket string, region string) error {
+	if ctx == nil {
+		return domainstorage.ErrInvalidInput
+	}
 	if client == nil {
 		return domainstorage.ErrInvalidInput
 	}
@@ -327,15 +432,31 @@ func ensureBucket(ctx context.Context, client *s3.Client, bucket string, region 
 
 		if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(bucket)}); err == nil {
 			return nil
-		}
-
-		if _, err := client.CreateBucket(ctx, input); err != nil {
+		} else {
 			lastErr = err
 		}
 
-		if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(bucket)}); err == nil {
+		if _, err := client.CreateBucket(ctx, input); err != nil {
+			if mapped := mapBucketCreateError(err); mapped == nil {
+				if _, headErr := client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(bucket)}); headErr == nil {
+					return nil
+				} else {
+					lastErr = headErr
+				}
+			} else if errors.Is(mapped, domainstorage.ErrForbidden) {
+				return fmt.Errorf("ensure bucket %s: %w", bucket, mapped)
+			} else if errors.Is(mapped, domainstorage.ErrConflict) {
+				if _, headErr := client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(bucket)}); headErr == nil {
+					return nil
+				} else {
+					lastErr = mapped
+				}
+			} else {
+				lastErr = mapped
+			}
+		} else if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(bucket)}); err == nil {
 			return nil
-		} else if err != nil {
+		} else {
 			lastErr = err
 		}
 
