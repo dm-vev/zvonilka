@@ -33,6 +33,7 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 		"0005.sql",
 		"0006.sql",
 		"0009.sql",
+		"0010.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -179,6 +180,7 @@ func TestConversationSchemaConstraints(t *testing.T) {
 		"0005.sql",
 		"0006.sql",
 		"0009.sql",
+		"0010.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -231,6 +233,7 @@ func TestConversationTopicSchemaLifecycle(t *testing.T) {
 		"0005.sql",
 		"0006.sql",
 		"0009.sql",
+		"0010.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -254,10 +257,11 @@ func TestConversationTopicSchemaLifecycle(t *testing.T) {
 	}
 
 	created, _, err := svc.CreateConversation(context.Background(), conversation.CreateConversationParams{
-		OwnerAccountID: "id-owner",
-		Kind:           conversation.ConversationKindGroup,
-		Title:          "Group",
-		CreatedAt:      time.Date(2026, time.March, 24, 13, 0, 0, 0, time.UTC),
+		OwnerAccountID:   "id-owner",
+		Kind:             conversation.ConversationKindGroup,
+		Title:            "Group",
+		MemberAccountIDs: []string{"id-peer"},
+		CreatedAt:        time.Date(2026, time.March, 24, 13, 0, 0, 0, time.UTC),
 	})
 	if err != nil {
 		t.Fatalf("create conversation: %v", err)
@@ -419,6 +423,222 @@ func TestConversationTopicSchemaLifecycle(t *testing.T) {
 		UpdatedAt: time.Date(2026, time.March, 24, 13, 6, 0, 0, time.UTC),
 	}); err == nil {
 		t.Fatal("expected missing topic fk to fail")
+	}
+}
+
+func TestConversationMessageActionSchemaLifecycle(t *testing.T) {
+	db := openDockerPostgres(t)
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	migrationsPath := repoMigrationsPath(t,
+		"0001.sql",
+		"0002_identity_hardening.sql",
+		"0003_identity_account_boundaries.sql",
+		"0004_identity_session_device_deferrable.sql",
+		"0005.sql",
+		"0006.sql",
+		"0009.sql",
+		"0010.sql",
+	)
+	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	seedIdentity(t, db, "tenant",
+		"id-owner", "owner", "owner@example.com", "dev-owner", "sess-owner",
+		"id-peer", "peer", "peer@example.com", "dev-peer", "sess-peer",
+	)
+
+	store, err := New(db, "tenant")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time {
+		return time.Date(2026, time.March, 24, 14, 0, 0, 0, time.UTC)
+	}))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	created, _, err := svc.CreateConversation(context.Background(), conversation.CreateConversationParams{
+		OwnerAccountID:   "id-owner",
+		Kind:             conversation.ConversationKindGroup,
+		Title:            "Group",
+		MemberAccountIDs: []string{"id-peer"},
+		Settings: conversation.ConversationSettings{
+			AllowReactions:           true,
+			PinnedMessagesOnlyAdmins: true,
+		},
+		CreatedAt: time.Date(2026, time.March, 24, 14, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	rootMessage, _, err := svc.SendMessage(context.Background(), conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "id-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			ClientMessageID: "root-1",
+			Kind:            conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-root",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		CreatedAt: time.Date(2026, time.March, 24, 14, 1, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("send root message: %v", err)
+	}
+
+	replyMessage, _, err := svc.ReplyMessage(context.Background(), conversation.ReplyMessageParams{
+		ConversationID:   created.ID,
+		SenderAccountID:  "id-peer",
+		SenderDeviceID:   "dev-peer",
+		ReplyToMessageID: rootMessage.ID,
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-reply",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		CreatedAt: time.Date(2026, time.March, 24, 14, 2, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("reply message: %v", err)
+	}
+	if replyMessage.ReplyTo.MessageID != rootMessage.ID {
+		t.Fatalf("expected reply reference, got %+v", replyMessage.ReplyTo)
+	}
+
+	edited, _, err := svc.EditMessage(context.Background(), conversation.EditMessageParams{
+		ConversationID: created.ID,
+		MessageID:      replyMessage.ID,
+		ActorAccountID: "id-peer",
+		ActorDeviceID:  "dev-peer",
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-reply-2",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		EditedAt: time.Date(2026, time.March, 24, 14, 3, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("edit message: %v", err)
+	}
+	if edited.EditedAt.IsZero() {
+		t.Fatal("expected edited message timestamp")
+	}
+
+	replied, _, err := svc.AddMessageReaction(context.Background(), conversation.AddMessageReactionParams{
+		ConversationID: created.ID,
+		MessageID:      replyMessage.ID,
+		ActorAccountID: "id-owner",
+		ActorDeviceID:  "dev-owner",
+		Reaction:       "👍",
+		CreatedAt:      time.Date(2026, time.March, 24, 14, 4, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("add reaction: %v", err)
+	}
+	if len(replied.Reactions) != 1 {
+		t.Fatalf("expected one reaction, got %+v", replied.Reactions)
+	}
+
+	removed, _, err := svc.RemoveMessageReaction(context.Background(), conversation.RemoveMessageReactionParams{
+		ConversationID: created.ID,
+		MessageID:      replyMessage.ID,
+		ActorAccountID: "id-owner",
+		ActorDeviceID:  "dev-owner",
+		Reaction:       "👍",
+		RemovedAt:      time.Date(2026, time.March, 24, 14, 5, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("remove reaction: %v", err)
+	}
+	if len(removed.Reactions) != 0 {
+		t.Fatalf("expected reaction removal, got %+v", removed.Reactions)
+	}
+
+	_, _, err = svc.PinMessage(context.Background(), conversation.PinMessageParams{
+		ConversationID: created.ID,
+		MessageID:      replyMessage.ID,
+		ActorAccountID: "id-peer",
+		ActorDeviceID:  "dev-peer",
+		Pinned:         true,
+		UpdatedAt:      time.Date(2026, time.March, 24, 14, 6, 0, 0, time.UTC),
+	})
+	if err == nil {
+		t.Fatal("expected non-admin pin to fail")
+	}
+
+	pinned, _, err := svc.PinMessage(context.Background(), conversation.PinMessageParams{
+		ConversationID: created.ID,
+		MessageID:      replyMessage.ID,
+		ActorAccountID: "id-owner",
+		ActorDeviceID:  "dev-owner",
+		Pinned:         true,
+		UpdatedAt:      time.Date(2026, time.March, 24, 14, 7, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("pin message: %v", err)
+	}
+	if !pinned.Pinned {
+		t.Fatal("expected pinned message")
+	}
+
+	deleted, _, err := svc.DeleteMessage(context.Background(), conversation.DeleteMessageParams{
+		ConversationID: created.ID,
+		MessageID:      replyMessage.ID,
+		ActorAccountID: "id-peer",
+		ActorDeviceID:  "dev-peer",
+		DeletedAt:      time.Date(2026, time.March, 24, 14, 8, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("delete message: %v", err)
+	}
+	if deleted.Status != conversation.MessageStatusDeleted {
+		t.Fatalf("expected deleted message, got %+v", deleted)
+	}
+
+	messages, err := svc.ListMessages(context.Background(), conversation.ListMessagesParams{
+		AccountID:      "id-owner",
+		ConversationID: created.ID,
+	})
+	if err != nil {
+		t.Fatalf("list messages: %v", err)
+	}
+	if len(messages) != 1 || messages[0].ID != rootMessage.ID {
+		t.Fatalf("expected deleted message to be hidden, got %+v", messages)
+	}
+
+	_, err = db.ExecContext(context.Background(), `
+INSERT INTO tenant.conversation_message_reactions (
+	message_id, account_id, reaction, created_at, updated_at
+) VALUES ($1, $2, $3, $4, $5)
+`,
+		rootMessage.ID,
+		"id-owner",
+		"",
+		time.Date(2026, time.March, 24, 14, 9, 0, 0, time.UTC),
+		time.Date(2026, time.March, 24, 14, 9, 0, 0, time.UTC),
+	)
+	if err == nil {
+		t.Fatal("expected invalid reaction insert to fail")
 	}
 }
 

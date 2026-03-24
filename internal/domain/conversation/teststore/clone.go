@@ -54,6 +54,19 @@ func cloneMessages(src map[string]conversation.Message) map[string]conversation.
 	return dst
 }
 
+func cloneReactions(src map[string]conversation.MessageReaction) map[string]conversation.MessageReaction {
+	if len(src) == 0 {
+		return make(map[string]conversation.MessageReaction)
+	}
+
+	dst := make(map[string]conversation.MessageReaction, len(src))
+	for key, value := range src {
+		dst[key] = cloneReaction(value)
+	}
+
+	return dst
+}
+
 func cloneReadStates(src map[string]conversation.ReadState) map[string]conversation.ReadState {
 	if len(src) == 0 {
 		return make(map[string]conversation.ReadState)
@@ -107,6 +120,7 @@ func cloneMember(value conversation.ConversationMember) conversation.Conversatio
 
 func cloneMessage(value conversation.Message) conversation.Message {
 	value.Attachments = append([]conversation.AttachmentRef(nil), value.Attachments...)
+	value.Reactions = append([]conversation.MessageReaction(nil), value.Reactions...)
 	if len(value.Metadata) > 0 {
 		metadata := make(map[string]string, len(value.Metadata))
 		for key, entry := range value.Metadata {
@@ -129,6 +143,10 @@ func cloneSyncState(value conversation.SyncState) conversation.SyncState {
 		}
 		value.ConversationWatermarks = watermarks
 	}
+	return value
+}
+
+func cloneReaction(value conversation.MessageReaction) conversation.MessageReaction {
 	return value
 }
 

@@ -13,6 +13,7 @@ func NewMemoryStore() conversation.Store {
 		topicsByKey:        make(map[string]conversation.ConversationTopic),
 		membersByKey:       make(map[string]conversation.ConversationMember),
 		messagesByID:       make(map[string]conversation.Message),
+		reactionsByKey:     make(map[string]conversation.MessageReaction),
 		readStatesByKey:    make(map[string]conversation.ReadState),
 		syncStatesByDevice: make(map[string]conversation.SyncState),
 		eventsByID:         make(map[string]conversation.EventEnvelope),
@@ -26,6 +27,7 @@ type memoryStore struct {
 	topicsByKey        map[string]conversation.ConversationTopic
 	membersByKey       map[string]conversation.ConversationMember
 	messagesByID       map[string]conversation.Message
+	reactionsByKey     map[string]conversation.MessageReaction
 	readStatesByKey    map[string]conversation.ReadState
 	syncStatesByDevice map[string]conversation.SyncState
 	eventsByID         map[string]conversation.EventEnvelope
