@@ -84,7 +84,7 @@ func TestSaveDeviceRejectsCrossAccountSession(t *testing.T) {
 	}
 }
 
-func TestDeleteDeviceRejectsDeviceDeletionWhenSessionHasPeers(t *testing.T) {
+func TestDeleteDeviceDeletesAttachedSessionAndPreservesPeerSession(t *testing.T) {
 	db := openDockerPostgres(t)
 	t.Cleanup(func() {
 		_ = db.Close()
@@ -177,13 +177,20 @@ func TestDeleteDeviceRejectsDeviceDeletionWhenSessionHasPeers(t *testing.T) {
 		t.Fatalf("seed device/session graph: %v", err)
 	}
 
-	if err := store.DeleteDevice(ctx, primaryDeviceID); !errors.Is(err, identity.ErrConflict) {
-		t.Fatalf("expected conflict, got %v", err)
+	if err := store.DeleteDevice(ctx, primaryDeviceID); err != nil {
+		t.Fatalf("delete primary device: %v", err)
 	}
 
-	if err := store.WithinTx(ctx, func(tx identity.Store) error {
-		return tx.DeleteDevice(ctx, primaryDeviceID)
-	}); !errors.Is(err, identity.ErrConflict) {
-		t.Fatalf("expected transactional conflict, got %v", err)
+	if _, err := store.DeviceByID(ctx, primaryDeviceID); !errors.Is(err, identity.ErrNotFound) {
+		t.Fatalf("expected primary device to be gone, got %v", err)
+	}
+	if _, err := store.SessionByID(ctx, primarySessionID); !errors.Is(err, identity.ErrNotFound) {
+		t.Fatalf("expected primary session to be gone, got %v", err)
+	}
+	if _, err := store.DeviceByID(ctx, peerDeviceID); err != nil {
+		t.Fatalf("expected peer device to remain, got %v", err)
+	}
+	if _, err := store.SessionByID(ctx, peerSessionID); err != nil {
+		t.Fatalf("expected peer session to remain, got %v", err)
 	}
 }
