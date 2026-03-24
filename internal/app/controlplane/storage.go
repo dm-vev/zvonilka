@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	domainconversation "github.com/dm-vev/zvonilka/internal/domain/conversation"
+	postgresconversation "github.com/dm-vev/zvonilka/internal/domain/conversation/pgstore"
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
 	postgresdomain "github.com/dm-vev/zvonilka/internal/domain/identity/pgstore"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
@@ -37,9 +39,17 @@ var newIdentityService = func(
 	return domainidentity.NewService(store, sender, opts...)
 }
 
-func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstorage.Catalog, *domainidentity.Service, error) {
+var newConversationStore = func(db *sql.DB, schema string) (domainconversation.Store, error) {
+	return postgresconversation.New(db, schema)
+}
+
+var newConversationService = func(store domainconversation.Store, opts ...domainconversation.Option) (*domainconversation.Service, error) {
+	return domainconversation.NewService(store, opts...)
+}
+
+func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstorage.Catalog, *domainidentity.Service, *domainconversation.Service, error) {
 	if !cfg.Infrastructure.Postgres.Enabled {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	bootstrap := postgresplatform.NewBootstrap(cfg)
@@ -82,29 +92,29 @@ func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstor
 		),
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("configure storage builder: %w", err)
+		return nil, nil, nil, fmt.Errorf("configure storage builder: %w", err)
 	}
 	if builder == nil {
-		return nil, nil, fmt.Errorf("configure storage builder: %w", domainstorage.ErrInvalidInput)
+		return nil, nil, nil, fmt.Errorf("configure storage builder: %w", domainstorage.ErrInvalidInput)
 	}
 
 	catalog, err := builder.Build(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if catalog == nil {
-		return nil, nil, fmt.Errorf("build storage catalog: %w", domainstorage.ErrInvalidInput)
+		return nil, nil, nil, fmt.Errorf("build storage catalog: %w", domainstorage.ErrInvalidInput)
 	}
 
 	provider, err := catalog.Provider(cfg.Storage.PrimaryProvider)
 	if err != nil {
-		return nil, nil, joinStorageError(
+		return nil, nil, nil, joinStorageError(
 			fmt.Errorf("select primary storage provider %q: %w", cfg.Storage.PrimaryProvider, err),
 			closeStorageCatalog(ctx, catalog),
 		)
 	}
 	if provider == nil {
-		return nil, nil, joinStorageError(
+		return nil, nil, nil, joinStorageError(
 			fmt.Errorf("select primary storage provider: %w", domainstorage.ErrInvalidInput),
 			closeStorageCatalog(ctx, catalog),
 		)
@@ -112,7 +122,7 @@ func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstor
 
 	relational, ok := provider.(domainstorage.RelationalProvider)
 	if !ok {
-		return nil, nil, joinStorageError(
+		return nil, nil, nil, joinStorageError(
 			fmt.Errorf("select primary storage provider: expected relational provider"),
 			closeStorageCatalog(ctx, catalog),
 		)
@@ -120,13 +130,13 @@ func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstor
 
 	store, err := newIdentityStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
 	if err != nil {
-		return nil, nil, joinStorageError(
+		return nil, nil, nil, joinStorageError(
 			fmt.Errorf("construct postgres identity store: %w", err),
 			closeStorageCatalog(ctx, catalog),
 		)
 	}
 	if store == nil {
-		return nil, nil, joinStorageError(
+		return nil, nil, nil, joinStorageError(
 			fmt.Errorf("construct postgres identity store: %w", domainidentity.ErrInvalidInput),
 			closeStorageCatalog(ctx, catalog),
 		)
@@ -134,19 +144,47 @@ func buildAppStorage(ctx context.Context, cfg config.Configuration) (*domainstor
 
 	service, err := newIdentityService(store, domainidentity.NoopCodeSender{}, domainidentity.WithSettings(cfg.Identity.ToSettings()))
 	if err != nil {
-		return nil, nil, joinStorageError(
+		return nil, nil, nil, joinStorageError(
 			fmt.Errorf("construct identity service: %w", err),
 			closeStorageCatalog(ctx, catalog),
 		)
 	}
 	if service == nil {
-		return nil, nil, joinStorageError(
+		return nil, nil, nil, joinStorageError(
 			fmt.Errorf("construct identity service: %w", domainidentity.ErrInvalidInput),
 			closeStorageCatalog(ctx, catalog),
 		)
 	}
 
-	return catalog, service, nil
+	conversationStore, err := newConversationStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres conversation store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	if conversationStore == nil {
+		return nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres conversation store: %w", domainconversation.ErrInvalidInput),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+
+	conversationService, err := newConversationService(conversationStore)
+	if err != nil {
+		return nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct conversation service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	if conversationService == nil {
+		return nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct conversation service: %w", domainconversation.ErrInvalidInput),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+
+	return catalog, service, conversationService, nil
 }
 
 func closeStorageCatalog(ctx context.Context, catalog *domainstorage.Catalog) error {

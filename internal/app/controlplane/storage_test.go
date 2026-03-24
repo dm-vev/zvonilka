@@ -21,7 +21,7 @@ import (
 func TestBuildAppStorageReturnsNilWhenPostgresDisabled(t *testing.T) {
 	t.Parallel()
 
-	catalog, service, err := buildAppStorage(context.Background(), config.Configuration{})
+	catalog, service, conversationService, err := buildAppStorage(context.Background(), config.Configuration{})
 	if err != nil {
 		t.Fatalf("build app storage: %v", err)
 	}
@@ -30,6 +30,9 @@ func TestBuildAppStorageReturnsNilWhenPostgresDisabled(t *testing.T) {
 	}
 	if service != nil {
 		t.Fatalf("expected nil identity service, got %#v", service)
+	}
+	if conversationService != nil {
+		t.Fatalf("expected nil conversation service, got %#v", conversationService)
 	}
 }
 
@@ -54,7 +57,7 @@ func TestBuildAppStorageRejectsNilStorageBuilder(t *testing.T) {
 		},
 	}
 
-	_, _, err := buildAppStorage(context.Background(), cfg)
+	_, _, _, err := buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected storage builder error")
 	}
@@ -84,7 +87,7 @@ func TestBuildAppStorageRejectsNilCatalog(t *testing.T) {
 		},
 	}
 
-	_, _, err := buildAppStorage(context.Background(), cfg)
+	_, _, _, err := buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected catalog error")
 	}
@@ -135,7 +138,7 @@ func TestBuildAppStorageRejectsNilIdentityStore(t *testing.T) {
 		},
 	}
 
-	_, _, err = buildAppStorage(context.Background(), cfg)
+	_, _, _, err = buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected identity store error")
 	}
@@ -198,7 +201,7 @@ func TestBuildAppStorageRejectsNilIdentityService(t *testing.T) {
 		},
 	}
 
-	_, _, err = buildAppStorage(context.Background(), cfg)
+	_, _, _, err = buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected identity service error")
 	}
@@ -240,7 +243,7 @@ func TestBuildAppStorageRejectsMissingPrimaryProvider(t *testing.T) {
 		},
 	}
 
-	_, _, gotErr := buildAppStorage(context.Background(), cfg)
+	_, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
 		t.Fatal("expected provider selection error")
 	}
@@ -287,7 +290,7 @@ func TestBuildAppStorageRejectsNonRelationalPrimaryProvider(t *testing.T) {
 		},
 	}
 
-	_, _, gotErr := buildAppStorage(context.Background(), cfg)
+	_, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
 		t.Fatal("expected provider type error")
 	}
@@ -351,7 +354,7 @@ func TestBuildAppStorageJoinsCleanupErrorOnStartupFailure(t *testing.T) {
 		},
 	}
 
-	_, _, gotErr := buildAppStorage(context.Background(), cfg)
+	_, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
 		t.Fatal("expected startup error")
 	}
@@ -440,7 +443,7 @@ func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
 		},
 	}
 
-	createdCatalog, service, gotErr := buildAppStorage(context.Background(), cfg)
+	createdCatalog, service, conversationService, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr != nil {
 		t.Fatalf("build app storage: %v", gotErr)
 	}
@@ -449,6 +452,9 @@ func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
 	}
 	if service == nil {
 		t.Fatal("expected identity service")
+	}
+	if conversationService == nil {
+		t.Fatal("expected conversation service")
 	}
 	if err := closeStorageCatalog(context.Background(), createdCatalog); err != nil {
 		t.Fatalf("close storage catalog: %v", err)

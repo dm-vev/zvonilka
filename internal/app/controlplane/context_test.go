@@ -64,7 +64,7 @@ func TestBuildAppStorageCleansUpCatalogWithCanceledContext(t *testing.T) {
 		},
 	}
 
-	_, _, gotErr := buildAppStorage(ctx, cfg)
+	_, _, _, gotErr := buildAppStorage(ctx, cfg)
 	if gotErr == nil {
 		t.Fatal("expected startup error")
 	}

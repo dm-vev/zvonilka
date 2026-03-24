@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 	"github.com/dm-vev/zvonilka/internal/platform/buildinfo"
@@ -12,10 +13,11 @@ import (
 )
 
 type app struct {
-	health   *runtime.Health
-	handler  http.Handler
-	catalog  *domainstorage.Catalog
-	identity *identity.Service
+	health       *runtime.Health
+	handler      http.Handler
+	catalog      *domainstorage.Catalog
+	conversation *conversation.Service
+	identity     *identity.Service
 }
 
 func (a *app) close(ctx context.Context) error {
@@ -28,16 +30,17 @@ func (a *app) close(ctx context.Context) error {
 
 func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 	health := runtime.NewHealth(cfg.Service.Name, buildinfo.Version, buildinfo.Commit, buildinfo.Date)
-	storageCatalog, identityService, err := buildAppStorage(ctx, cfg)
+	storageCatalog, identityService, conversationService, err := buildAppStorage(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	return &app{
-		health:   health,
-		handler:  http.NotFoundHandler(),
-		catalog:  storageCatalog,
-		identity: identityService,
+		health:       health,
+		handler:      http.NotFoundHandler(),
+		catalog:      storageCatalog,
+		conversation: conversationService,
+		identity:     identityService,
 	}, nil
 }
 
