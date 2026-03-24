@@ -163,6 +163,71 @@ func TestFinalizeUploadRejectsMissingObject(t *testing.T) {
 	}
 }
 
+func TestFinalizeUploadRejectsSizeMismatch(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name         string
+		headLength   int64
+		expectedSize int64
+	}{
+		{
+			name:         "zero_length_head",
+			headLength:   0,
+			expectedSize: 1024,
+		},
+		{
+			name:         "positive_length_head",
+			headLength:   2048,
+			expectedSize: 1024,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			store := newMemoryStore()
+			blob := newMemoryBlobStore("media-bucket")
+
+			svc, err := media.NewService(store, blob, media.WithSettings(media.Settings{
+				UploadURLTTL:   time.Minute,
+				DownloadURLTTL: time.Minute,
+				MaxUploadSize:  10 << 20,
+			}))
+			if err != nil {
+				t.Fatalf("new service: %v", err)
+			}
+
+			asset, _, err := svc.ReserveUpload(ctx, media.ReserveUploadParams{
+				OwnerAccountID: "acc-owner",
+				Kind:           media.MediaKindFile,
+				FileName:       "archive.zip",
+				SizeBytes:      uint64(tc.expectedSize),
+			})
+			if err != nil {
+				t.Fatalf("reserve upload: %v", err)
+			}
+
+			blob.seedObject(asset.ObjectKey, domainstorage.BlobObject{
+				Bucket:        "media-bucket",
+				Key:           asset.ObjectKey,
+				ContentLength: tc.headLength,
+			}, nil)
+
+			_, err = svc.FinalizeUpload(ctx, media.FinalizeUploadParams{
+				OwnerAccountID: "acc-owner",
+				MediaID:        asset.ID,
+			})
+			if !errors.Is(err, media.ErrConflict) {
+				t.Fatalf("expected conflict for size mismatch, got %v", err)
+			}
+		})
+	}
+}
+
 func newTestService(t *testing.T, settings media.Settings) *media.Service {
 	t.Helper()
 

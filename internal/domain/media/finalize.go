@@ -49,7 +49,7 @@ func (s *Service) FinalizeUpload(ctx context.Context, params FinalizeUploadParam
 		}
 		return MediaAsset{}, fmt.Errorf("head media object %s: %w", asset.ObjectKey, err)
 	}
-	if asset.SizeBytes > 0 && head.ContentLength > 0 && head.ContentLength != int64(asset.SizeBytes) {
+	if asset.SizeBytes > 0 && head.ContentLength != int64(asset.SizeBytes) {
 		return MediaAsset{}, ErrConflict
 	}
 	if asset.SHA256Hex != "" {
