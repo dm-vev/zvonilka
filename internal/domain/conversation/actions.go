@@ -127,6 +127,9 @@ func (s *Service) EditMessage(ctx context.Context, params EditMessageParams) (Me
 	if params.Draft.Kind == MessageKindUnspecified {
 		return Message{}, EventEnvelope{}, ErrInvalidInput
 	}
+	if err := ValidateEncryptedPayload(params.Draft.Payload); err != nil {
+		return Message{}, EventEnvelope{}, err
+	}
 
 	now := params.EditedAt
 	if now.IsZero() {
@@ -154,6 +157,7 @@ func (s *Service) EditMessage(ctx context.Context, params EditMessageParams) (Me
 		nextMessage.Kind = params.Draft.Kind
 		nextMessage.Payload = params.Draft.Payload
 		nextMessage.Attachments = append([]AttachmentRef(nil), params.Draft.Attachments...)
+		SanitizeEncryptedMessage(&nextMessage)
 		nextMessage.Silent = params.Draft.Silent
 		nextMessage.DisableLinkPreviews = params.Draft.DisableLinkPreviews
 		nextMessage.Metadata = trimMetadata(params.Draft.Metadata)

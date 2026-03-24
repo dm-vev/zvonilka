@@ -19,6 +19,7 @@ message ConversationSettings {
   bool require_join_approval = 6;
   bool pinned_messages_only_admins = 7;
   google.protobuf.Duration slow_mode_interval = 8;
+  bool require_encrypted_messages = 9;
 }
 
 message Conversation {

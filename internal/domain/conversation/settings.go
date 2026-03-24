@@ -5,10 +5,11 @@ import "time"
 // DefaultConversationSettings returns a conservative write-policy baseline.
 func DefaultConversationSettings() ConversationSettings {
 	return ConversationSettings{
-		AllowReactions:   true,
-		AllowForwards:    true,
-		AllowThreads:     true,
-		SlowModeInterval: 0,
+		AllowReactions:           true,
+		AllowForwards:            true,
+		AllowThreads:             true,
+		RequireEncryptedMessages: true,
+		SlowModeInterval:         0,
 	}
 }
 
@@ -25,6 +26,7 @@ func normalizeConversationSettings(settings ConversationSettings) ConversationSe
 	if settings.SlowModeInterval < 0 {
 		settings.SlowModeInterval = 0
 	}
+	settings.RequireEncryptedMessages = true
 
 	return settings
 }
