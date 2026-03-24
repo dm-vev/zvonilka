@@ -75,6 +75,12 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 		return Message{}, EventEnvelope{}, ErrInvalidInput
 	}
 
+	draft := params.Draft
+	draft.ReplyTo.Snippet = ""
+	for idx := range draft.Attachments {
+		draft.Attachments[idx].Caption = ""
+	}
+
 	now := params.CreatedAt
 	if now.IsZero() {
 		now = s.currentTime()
@@ -100,8 +106,11 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 		if conversation.Settings.OnlyAdminsCanWrite && member.Role != MemberRoleOwner && member.Role != MemberRoleAdmin {
 			return ErrForbidden
 		}
+		if err := ValidateMessagePayload(draft.Payload, conversation.Settings.RequireEncryptedMessages); err != nil {
+			return ErrInvalidInput
+		}
 
-		topicID := params.Draft.ThreadID
+		topicID := draft.ThreadID
 		if topicID != "" {
 			if conversation.Kind != ConversationKindGroup || !conversation.Settings.AllowThreads {
 				return ErrForbidden
@@ -115,7 +124,7 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 			return ErrForbidden
 		}
 
-		replyTo := params.Draft.ReplyTo
+		replyTo := draft.ReplyTo
 		if replyTo.MessageID != "" {
 			replyTarget, replyErr := tx.MessageByID(ctx, conversation.ID, replyTo.MessageID)
 			if replyErr != nil {
@@ -149,17 +158,17 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 			ConversationID:      conversation.ID,
 			SenderAccountID:     params.SenderAccountID,
 			SenderDeviceID:      params.SenderDeviceID,
-			ClientMessageID:     strings.TrimSpace(params.Draft.ClientMessageID),
-			Kind:                params.Draft.Kind,
+			ClientMessageID:     strings.TrimSpace(draft.ClientMessageID),
+			Kind:                draft.Kind,
 			Status:              MessageStatusSent,
-			Payload:             params.Draft.Payload,
-			Attachments:         append([]AttachmentRef(nil), params.Draft.Attachments...),
+			Payload:             draft.Payload,
+			Attachments:         append([]AttachmentRef(nil), draft.Attachments...),
 			ReplyTo:             replyTo,
-			ThreadID:            strings.TrimSpace(params.Draft.ThreadID),
-			Silent:              params.Draft.Silent,
+			ThreadID:            strings.TrimSpace(draft.ThreadID),
+			Silent:              draft.Silent,
 			Pinned:              false,
-			DisableLinkPreviews: params.Draft.DisableLinkPreviews,
-			Metadata:            trimMetadata(params.Draft.Metadata),
+			DisableLinkPreviews: draft.DisableLinkPreviews,
+			Metadata:            trimMetadata(draft.Metadata),
 			CreatedAt:           now,
 			UpdatedAt:           now,
 		}
@@ -179,8 +188,8 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 			CorrelationID:  params.CorrelationID,
 			MessageID:      savedMessage.ID,
 			PayloadType:    "message",
-			Payload:        params.Draft.Payload,
-			Metadata:       messageEventMetadata(savedMessage.ID, params.Draft.ThreadID, replyTo, params.Draft.Metadata),
+			Payload:        draft.Payload,
+			Metadata:       messageEventMetadata(savedMessage.ID, draft.ThreadID, replyTo, draft.Metadata),
 			CreatedAt:      now,
 		}
 		savedEvent, err = tx.SaveEvent(ctx, event)

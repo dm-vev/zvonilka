@@ -2,13 +2,14 @@ package conversation
 
 import "time"
 
-// DefaultConversationSettings returns a conservative write-policy baseline.
+// DefaultConversationSettings returns a conservative write-policy baseline with opt-in encryption.
 func DefaultConversationSettings() ConversationSettings {
 	return ConversationSettings{
-		AllowReactions:   true,
-		AllowForwards:    true,
-		AllowThreads:     true,
-		SlowModeInterval: 0,
+		AllowReactions:           true,
+		AllowForwards:            true,
+		AllowThreads:             true,
+		RequireEncryptedMessages: false,
+		SlowModeInterval:         0,
 	}
 }
 

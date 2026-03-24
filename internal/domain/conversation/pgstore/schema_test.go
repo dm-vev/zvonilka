@@ -34,6 +34,7 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 		"0006.sql",
 		"0009.sql",
 		"0010.sql",
+		"0011.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -93,6 +94,7 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 					MimeType:  "image/jpeg",
 					SizeBytes: 1024,
 					SHA256Hex: "abc123",
+					Caption:   "plaintext caption",
 				},
 			},
 		},
@@ -141,6 +143,9 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 	if loadedConversation.LastSequence != event.Sequence {
 		t.Fatalf("expected last sequence %d, got %d", event.Sequence, loadedConversation.LastSequence)
 	}
+	if loadedConversation.Settings.RequireEncryptedMessages {
+		t.Fatal("expected encrypted message policy to remain opt-in by default")
+	}
 
 	loadedMessage, err := store.MessageByID(context.Background(), created.ID, message.ID)
 	if err != nil {
@@ -148,6 +153,9 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 	}
 	if len(loadedMessage.Attachments) != 1 {
 		t.Fatalf("expected loaded attachment, got %d", len(loadedMessage.Attachments))
+	}
+	if loadedMessage.Attachments[0].Caption != "" {
+		t.Fatalf("expected attachment caption to be stripped, got %q", loadedMessage.Attachments[0].Caption)
 	}
 
 	events, syncState, err := svc.PullEvents(context.Background(), conversation.PullEventsParams{
@@ -181,6 +189,7 @@ func TestConversationSchemaConstraints(t *testing.T) {
 		"0006.sql",
 		"0009.sql",
 		"0010.sql",
+		"0011.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -234,6 +243,7 @@ func TestConversationTopicSchemaLifecycle(t *testing.T) {
 		"0006.sql",
 		"0009.sql",
 		"0010.sql",
+		"0011.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -441,6 +451,7 @@ func TestConversationMessageActionSchemaLifecycle(t *testing.T) {
 		"0006.sql",
 		"0009.sql",
 		"0010.sql",
+		"0011.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)

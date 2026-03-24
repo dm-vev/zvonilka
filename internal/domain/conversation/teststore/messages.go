@@ -19,6 +19,17 @@ func (s *memoryStore) SaveMessage(ctx context.Context, message conversation.Mess
 	if message.ID == "" || message.ConversationID == "" || message.SenderAccountID == "" || message.SenderDeviceID == "" {
 		return conversation.Message{}, conversation.ErrInvalidInput
 	}
+	if message.Kind == conversation.MessageKindUnspecified {
+		return conversation.Message{}, conversation.ErrInvalidInput
+	}
+	if message.Status == conversation.MessageStatusUnspecified {
+		return conversation.Message{}, conversation.ErrInvalidInput
+	}
+	if err := conversation.ValidateMessagePayload(message.Payload, false); err != nil {
+		return conversation.Message{}, err
+	}
+
+	conversation.StripMessageHints(&message)
 
 	s.messagesByID[message.ID] = cloneMessage(message)
 

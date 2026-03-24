@@ -55,6 +55,11 @@ func (s *Store) saveMessage(ctx context.Context, message conversation.Message) (
 	if message.Status == conversation.MessageStatusUnspecified {
 		return conversation.Message{}, conversation.ErrInvalidInput
 	}
+	if err := conversation.ValidateMessagePayload(message.Payload, false); err != nil {
+		return conversation.Message{}, err
+	}
+
+	conversation.StripMessageHints(&message)
 
 	payloadKeyID, payloadAlgorithm, payloadNonce, payloadCiphertext, payloadAAD, payloadMetadata, err := encodePayload(message.Payload)
 	if err != nil {

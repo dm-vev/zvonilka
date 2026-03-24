@@ -98,13 +98,14 @@ const (
 	EventTypeTopicClosed            EventType = "topic.closed"
 )
 
-// ConversationSettings controls write and moderation behavior for a conversation.
+// ConversationSettings controls encryption, write, and moderation behavior for a conversation.
 type ConversationSettings struct {
 	OnlyAdminsCanWrite       bool
 	OnlyAdminsCanAddMembers  bool
 	AllowReactions           bool
 	AllowForwards            bool
 	AllowThreads             bool
+	RequireEncryptedMessages bool
 	RequireJoinApproval      bool
 	PinnedMessagesOnlyAdmins bool
 	SlowModeInterval         time.Duration
@@ -174,7 +175,7 @@ type AttachmentRef struct {
 	Caption   string
 }
 
-// EncryptedPayload describes the opaque payload used by E2EE-capable messages.
+// EncryptedPayload describes the opaque payload carried by a conversation message.
 type EncryptedPayload struct {
 	KeyID      string
 	Algorithm  string

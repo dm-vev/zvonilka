@@ -1,6 +1,6 @@
 package pgstore
 
-const conversationColumnList = `id, kind, title, description, avatar_media_id, owner_account_id, only_admins_can_write, only_admins_can_add_members, allow_reactions, allow_forwards, allow_threads, require_join_approval, pinned_messages_only_admins, slow_mode_interval_nanos, archived, muted, pinned, hidden, last_sequence, created_at, updated_at, last_message_at`
+const conversationColumnList = `id, kind, title, description, avatar_media_id, owner_account_id, only_admins_can_write, only_admins_can_add_members, allow_reactions, allow_forwards, allow_threads, require_encrypted_messages, require_join_approval, pinned_messages_only_admins, slow_mode_interval_nanos, archived, muted, pinned, hidden, last_sequence, created_at, updated_at, last_message_at`
 
 const topicColumnList = `conversation_id, id, title, created_by_account_id, is_general, archived, pinned, closed, last_sequence, message_count, created_at, updated_at, last_message_at, archived_at, closed_at`
 
