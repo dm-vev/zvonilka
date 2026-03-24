@@ -32,26 +32,26 @@ const (
 
 // MediaAsset describes a stored media record.
 type MediaAsset struct {
-	ID                 string
-	OwnerAccountID     string
-	Kind               MediaKind
-	Status             MediaStatus
-	StorageProvider    string
-	Bucket             string
-	ObjectKey          string
-	FileName           string
-	ContentType        string
-	SizeBytes          uint64
-	SHA256Hex          string
-	Width              uint32
-	Height             uint32
-	Duration           time.Duration
-	Metadata           map[string]string
-	UploadExpiresAt    time.Time
-	ReadyAt            time.Time
-	DeletedAt          time.Time
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID              string
+	OwnerAccountID  string
+	Kind            MediaKind
+	Status          MediaStatus
+	StorageProvider string
+	Bucket          string
+	ObjectKey       string
+	FileName        string
+	ContentType     string
+	SizeBytes       uint64
+	SHA256Hex       string
+	Width           uint32
+	Height          uint32
+	Duration        time.Duration
+	Metadata        map[string]string
+	UploadExpiresAt time.Time
+	ReadyAt         time.Time
+	DeletedAt       time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // UploadTarget describes a presigned upload request.
@@ -64,12 +64,10 @@ type UploadTarget struct {
 	Bucket    string
 }
 
-// DownloadTarget describes a presigned download request.
+// DownloadTarget describes an application-owned download target.
 type DownloadTarget struct {
 	URL       string
 	Method    string
 	Headers   map[string]string
 	ExpiresAt time.Time
-	ObjectKey string
-	Bucket    string
 }

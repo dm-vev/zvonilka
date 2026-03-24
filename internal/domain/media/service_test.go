@@ -87,8 +87,11 @@ func TestMediaLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get download url: %v", err)
 	}
-	if download.Method != http.MethodGet || download.URL == "" {
+	if download.Method != http.MethodGet || download.URL != "/media/"+asset.ID+"/download" {
 		t.Fatalf("unexpected download target: %+v", download)
+	}
+	if download.ExpiresAt.Before(fixedNow) {
+		t.Fatalf("expected future download expiry, got %v", download.ExpiresAt)
 	}
 
 	listed, err := svc.ListMedia(ctx, media.ListParams{OwnerAccountID: "acc-owner"})

@@ -2,7 +2,7 @@ package media
 
 import "time"
 
-// Settings controls upload and download lifecycle limits.
+// Settings controls upload and download access lifecycle limits.
 type Settings struct {
 	UploadURLTTL   time.Duration
 	DownloadURLTTL time.Duration
