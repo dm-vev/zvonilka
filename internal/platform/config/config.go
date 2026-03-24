@@ -11,6 +11,7 @@ type Configuration struct {
 	Logging        LoggingConfig
 	Runtime        RuntimeConfig
 	Identity       IdentityConfig
+	Media          MediaConfig
 	Infrastructure InfrastructureConfig
 	Storage        StorageConfig
 	Features       FeatureConfig

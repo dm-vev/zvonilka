@@ -109,6 +109,21 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Identity.LoginCodeLength = value
 	}
+	if value, ok, err := durationValue(serviceName, "MEDIA_UPLOAD_URL_TTL", cfg.Media.UploadURLTTL); err != nil {
+		return err
+	} else if ok {
+		cfg.Media.UploadURLTTL = value
+	}
+	if value, ok, err := durationValue(serviceName, "MEDIA_DOWNLOAD_URL_TTL", cfg.Media.DownloadURLTTL); err != nil {
+		return err
+	} else if ok {
+		cfg.Media.DownloadURLTTL = value
+	}
+	if value, ok, err := int64Value(serviceName, "MEDIA_MAX_UPLOAD_SIZE", cfg.Media.MaxUploadSize); err != nil {
+		return err
+	} else if ok {
+		cfg.Media.MaxUploadSize = value
+	}
 
 	postgresEnabledSet := false
 	if value, ok, err := boolValue(serviceName, "POSTGRES_ENABLED", cfg.Infrastructure.Postgres.Enabled); err != nil {
@@ -423,6 +438,20 @@ func intValue(serviceName string, key string, fallback int) (int, bool, error) {
 	}
 
 	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, false, fmt.Errorf("parse %s: %w", key, err)
+	}
+
+	return value, true, nil
+}
+
+func int64Value(serviceName string, key string, fallback int64) (int64, bool, error) {
+	raw, ok := lookupEnv(serviceName, key)
+	if !ok {
+		return fallback, false, nil
+	}
+
+	value, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil {
 		return 0, false, fmt.Errorf("parse %s: %w", key, err)
 	}

@@ -45,6 +45,15 @@ func (c Configuration) Validate() error {
 	if c.Identity.LoginCodeLength <= 0 {
 		errs = append(errs, errors.New("identity login code length must be positive"))
 	}
+	if c.Media.UploadURLTTL <= 0 {
+		errs = append(errs, errors.New("media upload URL TTL must be positive"))
+	}
+	if c.Media.DownloadURLTTL <= 0 {
+		errs = append(errs, errors.New("media download URL TTL must be positive"))
+	}
+	if c.Media.MaxUploadSize <= 0 {
+		errs = append(errs, errors.New("media max upload size must be positive"))
+	}
 	if c.Runtime.HTTP.ReadHeaderTimeout <= 0 {
 		errs = append(errs, errors.New("HTTP read header timeout must be positive"))
 	}
@@ -109,6 +118,12 @@ func (c Configuration) Validate() error {
 		}
 		if c.Infrastructure.ObjectStore.Bucket == "" {
 			errs = append(errs, errors.New("object storage bucket is required when object storage is enabled"))
+		}
+		if c.Infrastructure.ObjectStore.AccessKeyID == "" {
+			errs = append(errs, errors.New("object storage access key ID is required when object storage is enabled"))
+		}
+		if c.Infrastructure.ObjectStore.SecretAccessKey == "" {
+			errs = append(errs, errors.New("object storage secret access key is required when object storage is enabled"))
 		}
 	}
 

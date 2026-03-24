@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
@@ -18,10 +20,32 @@ import (
 	platformstorage "github.com/dm-vev/zvonilka/internal/platform/storage"
 )
 
+func testObjectStorageConfig() config.ObjectStorageConfig {
+	return config.ObjectStorageConfig{
+		Enabled:         true,
+		Endpoint:        "http://127.0.0.1:9000",
+		Region:          "us-east-1",
+		Bucket:          "zvonilka-media",
+		AccessKeyID:     "test-access",
+		SecretAccessKey: "test-secret",
+		ForcePathStyle:  true,
+	}
+}
+
+func testStorageBindings() config.StorageConfig {
+	return config.StorageConfig{
+		PrimaryProvider: "primary",
+		CacheProvider:   "cache",
+		ObjectProvider:  "object",
+		AuditProvider:   "audit",
+		SearchProvider:  "search",
+	}
+}
+
 func TestBuildAppStorageReturnsNilWhenPostgresDisabled(t *testing.T) {
 	t.Parallel()
 
-	catalog, service, conversationService, err := buildAppStorage(context.Background(), config.Configuration{})
+	catalog, service, conversationService, mediaService, err := buildAppStorage(context.Background(), config.Configuration{})
 	if err != nil {
 		t.Fatalf("build app storage: %v", err)
 	}
@@ -33,6 +57,9 @@ func TestBuildAppStorageReturnsNilWhenPostgresDisabled(t *testing.T) {
 	}
 	if conversationService != nil {
 		t.Fatalf("expected nil conversation service, got %#v", conversationService)
+	}
+	if mediaService != nil {
+		t.Fatalf("expected nil media service, got %#v", mediaService)
 	}
 }
 
@@ -52,12 +79,12 @@ func TestBuildAppStorageRejectsNilStorageBuilder(t *testing.T) {
 				Enabled: true,
 			},
 		},
-		Storage: config.StorageConfig{
-			PrimaryProvider: "primary",
-		},
+		Storage: testStorageBindings(),
 	}
 
-	_, _, _, err := buildAppStorage(context.Background(), cfg)
+	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+
+	_, _, _, _, err := buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected storage builder error")
 	}
@@ -82,12 +109,12 @@ func TestBuildAppStorageRejectsNilCatalog(t *testing.T) {
 				Enabled: true,
 			},
 		},
-		Storage: config.StorageConfig{
-			PrimaryProvider: "primary",
-		},
+		Storage: testStorageBindings(),
 	}
 
-	_, _, _, err := buildAppStorage(context.Background(), cfg)
+	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+
+	_, _, _, _, err := buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected catalog error")
 	}
@@ -133,12 +160,12 @@ func TestBuildAppStorageRejectsNilIdentityStore(t *testing.T) {
 				Enabled: true,
 			},
 		},
-		Storage: config.StorageConfig{
-			PrimaryProvider: "primary",
-		},
+		Storage: testStorageBindings(),
 	}
 
-	_, _, _, err = buildAppStorage(context.Background(), cfg)
+	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+
+	_, _, _, _, err = buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected identity store error")
 	}
@@ -196,12 +223,12 @@ func TestBuildAppStorageRejectsNilIdentityService(t *testing.T) {
 				Enabled: true,
 			},
 		},
-		Storage: config.StorageConfig{
-			PrimaryProvider: "primary",
-		},
+		Storage: testStorageBindings(),
 	}
 
-	_, _, _, err = buildAppStorage(context.Background(), cfg)
+	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+
+	_, _, _, _, err = buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected identity service error")
 	}
@@ -238,12 +265,12 @@ func TestBuildAppStorageRejectsMissingPrimaryProvider(t *testing.T) {
 				Enabled: true,
 			},
 		},
-		Storage: config.StorageConfig{
-			PrimaryProvider: "primary",
-		},
+		Storage: testStorageBindings(),
 	}
 
-	_, _, _, gotErr := buildAppStorage(context.Background(), cfg)
+	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+
+	_, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
 		t.Fatal("expected provider selection error")
 	}
@@ -285,12 +312,12 @@ func TestBuildAppStorageRejectsNonRelationalPrimaryProvider(t *testing.T) {
 				Enabled: true,
 			},
 		},
-		Storage: config.StorageConfig{
-			PrimaryProvider: "primary",
-		},
+		Storage: testStorageBindings(),
 	}
 
-	_, _, _, gotErr := buildAppStorage(context.Background(), cfg)
+	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+
+	_, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
 		t.Fatal("expected provider type error")
 	}
@@ -345,16 +372,12 @@ func TestBuildAppStorageJoinsCleanupErrorOnStartupFailure(t *testing.T) {
 				Enabled: true,
 			},
 		},
-		Storage: config.StorageConfig{
-			PrimaryProvider: "primary",
-			CacheProvider:   "cache",
-			ObjectProvider:  "object",
-			AuditProvider:   "audit",
-			SearchProvider:  "search",
-		},
+		Storage: testStorageBindings(),
 	}
 
-	_, _, _, gotErr := buildAppStorage(context.Background(), cfg)
+	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+
+	_, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
 		t.Fatal("expected startup error")
 	}
@@ -434,16 +457,12 @@ func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
 				Schema:  "tenant",
 			},
 		},
-		Storage: config.StorageConfig{
-			PrimaryProvider: "primary",
-			CacheProvider:   "cache",
-			ObjectProvider:  "object",
-			AuditProvider:   "audit",
-			SearchProvider:  "search",
-		},
+		Storage: testStorageBindings(),
 	}
 
-	createdCatalog, service, conversationService, gotErr := buildAppStorage(context.Background(), cfg)
+	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+
+	createdCatalog, service, conversationService, mediaService, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr != nil {
 		t.Fatalf("build app storage: %v", gotErr)
 	}
@@ -455,6 +474,9 @@ func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
 	}
 	if conversationService == nil {
 		t.Fatal("expected conversation service")
+	}
+	if mediaService == nil {
+		t.Fatal("expected media service")
 	}
 	if err := closeStorageCatalog(context.Background(), createdCatalog); err != nil {
 		t.Fatalf("close storage catalog: %v", err)
@@ -575,6 +597,7 @@ func TestFinalizeRunJoinsRunAndCloseErrors(t *testing.T) {
 
 type fakeProvider struct {
 	name         string
+	bucket       string
 	closeErr     error
 	order        *[]string
 	closeCtxErrs *[]error
@@ -598,6 +621,38 @@ func (p *fakeProvider) Capabilities() domainstorage.Capability {
 
 func (p *fakeProvider) Close(ctx context.Context) error {
 	return p.close(ctx)
+}
+
+func (p *fakeProvider) Bucket() string {
+	if p.bucket != "" {
+		return p.bucket
+	}
+
+	return p.name
+}
+
+func (p *fakeProvider) PutObject(context.Context, string, io.Reader, int64, domainstorage.PutObjectOptions) (domainstorage.BlobObject, error) {
+	return domainstorage.BlobObject{}, domainstorage.ErrInvalidInput
+}
+
+func (p *fakeProvider) GetObject(context.Context, string) (io.ReadCloser, domainstorage.BlobObject, error) {
+	return nil, domainstorage.BlobObject{}, domainstorage.ErrInvalidInput
+}
+
+func (p *fakeProvider) HeadObject(context.Context, string) (domainstorage.BlobObject, error) {
+	return domainstorage.BlobObject{}, domainstorage.ErrInvalidInput
+}
+
+func (p *fakeProvider) DeleteObject(context.Context, string) error {
+	return domainstorage.ErrInvalidInput
+}
+
+func (p *fakeProvider) PresignPutObject(context.Context, string, time.Duration, domainstorage.PutObjectOptions) (domainstorage.PresignedRequest, error) {
+	return domainstorage.PresignedRequest{}, domainstorage.ErrInvalidInput
+}
+
+func (p *fakeProvider) PresignGetObject(context.Context, string, time.Duration) (domainstorage.PresignedRequest, error) {
+	return domainstorage.PresignedRequest{}, domainstorage.ErrInvalidInput
 }
 
 func (p *fakeProvider) close(ctx context.Context) error {

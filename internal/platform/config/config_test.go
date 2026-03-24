@@ -225,6 +225,8 @@ func TestLoadHonorsExplicitDisableForDerivedInfrastructureFlags(t *testing.T) {
 	t.Setenv("ZVONILKA_OBJECT_STORAGE_ENDPOINT", "http://minio:9000")
 	t.Setenv("ZVONILKA_OBJECT_STORAGE_REGION", "eu-west-1")
 	t.Setenv("ZVONILKA_OBJECT_STORAGE_BUCKET", "zvonilka")
+	t.Setenv("ZVONILKA_OBJECT_STORAGE_ACCESS_KEY_ID", "test-access")
+	t.Setenv("ZVONILKA_OBJECT_STORAGE_SECRET_ACCESS_KEY", "test-secret")
 	t.Setenv("ZVONILKA_TELEMETRY_TRACING_ENABLED", "false")
 	t.Setenv("ZVONILKA_TELEMETRY_OTLP_ADDRESS", "otel:4317")
 
@@ -255,6 +257,8 @@ func TestLoadAutoEnablesDerivedInfrastructureFlagsWhenUnset(t *testing.T) {
 	t.Setenv("ZVONILKA_OBJECT_STORAGE_ENDPOINT", "http://minio:9000")
 	t.Setenv("ZVONILKA_OBJECT_STORAGE_REGION", "eu-west-1")
 	t.Setenv("ZVONILKA_OBJECT_STORAGE_BUCKET", "zvonilka")
+	t.Setenv("ZVONILKA_OBJECT_STORAGE_ACCESS_KEY_ID", "test-access")
+	t.Setenv("ZVONILKA_OBJECT_STORAGE_SECRET_ACCESS_KEY", "test-secret")
 	t.Setenv("ZVONILKA_TELEMETRY_OTLP_ADDRESS", "otel:4317")
 
 	cfg, err := Load("controlplane")

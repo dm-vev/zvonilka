@@ -54,17 +54,12 @@ func TestBuildAppStorageCleansUpCatalogWithCanceledContext(t *testing.T) {
 			Postgres: config.PostgresConfig{
 				Enabled: true,
 			},
+			ObjectStore: testObjectStorageConfig(),
 		},
-		Storage: config.StorageConfig{
-			PrimaryProvider: "primary",
-			CacheProvider:   "cache",
-			ObjectProvider:  "object",
-			AuditProvider:   "audit",
-			SearchProvider:  "search",
-		},
+		Storage: testStorageBindings(),
 	}
 
-	_, _, _, gotErr := buildAppStorage(ctx, cfg)
+	_, _, _, _, gotErr := buildAppStorage(ctx, cfg)
 	if gotErr == nil {
 		t.Fatal("expected startup error")
 	}

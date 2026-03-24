@@ -1,0 +1,81 @@
+package media
+
+import (
+	"context"
+	"fmt"
+	"strings"
+)
+
+// GetDownloadURL resolves a download target for a ready media asset.
+func (s *Service) GetDownloadURL(ctx context.Context, params GetDownloadParams) (MediaAsset, DownloadTarget, error) {
+	if err := s.validateContext(ctx, "get media download URL"); err != nil {
+		return MediaAsset{}, DownloadTarget{}, err
+	}
+	params.OwnerAccountID = strings.TrimSpace(params.OwnerAccountID)
+	params.MediaID = strings.TrimSpace(params.MediaID)
+	if params.OwnerAccountID == "" || params.MediaID == "" {
+		return MediaAsset{}, DownloadTarget{}, ErrInvalidInput
+	}
+
+	asset, err := s.store.MediaAssetByID(ctx, params.MediaID)
+	if err != nil {
+		return MediaAsset{}, DownloadTarget{}, fmt.Errorf("load media asset %s: %w", params.MediaID, err)
+	}
+	if asset.OwnerAccountID != params.OwnerAccountID {
+		return MediaAsset{}, DownloadTarget{}, ErrForbidden
+	}
+	if asset.Status != MediaStatusReady {
+		return MediaAsset{}, DownloadTarget{}, ErrNotFound
+	}
+
+	presignedDownload, err := s.blob.PresignGetObject(ctx, asset.ObjectKey, s.settings.DownloadURLTTL)
+	if err != nil {
+		return MediaAsset{}, DownloadTarget{}, fmt.Errorf("presign download for media %s: %w", asset.ID, err)
+	}
+
+	return asset, DownloadTarget{
+		URL:       presignedDownload.URL,
+		Method:    presignedDownload.Method,
+		Headers:   presignedDownload.Headers,
+		ExpiresAt: presignedDownload.ExpiresAt,
+		ObjectKey: asset.ObjectKey,
+		Bucket:    asset.Bucket,
+	}, nil
+}
+
+// ListMedia returns the assets created by one account.
+func (s *Service) ListMedia(ctx context.Context, params ListParams) ([]MediaAsset, error) {
+	if err := s.validateContext(ctx, "list media"); err != nil {
+		return nil, err
+	}
+	params.OwnerAccountID = strings.TrimSpace(params.OwnerAccountID)
+	if params.OwnerAccountID == "" {
+		return nil, ErrInvalidInput
+	}
+
+	limit := params.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	assets, err := s.store.MediaAssetsByOwner(ctx, params.OwnerAccountID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list media assets for account %s: %w", params.OwnerAccountID, err)
+	}
+
+	if params.IncludeDeleted {
+		return assets, nil
+	}
+
+	filtered := assets[:0]
+	for _, asset := range assets {
+		if asset.Status != MediaStatusDeleted {
+			filtered = append(filtered, asset)
+		}
+	}
+
+	return filtered, nil
+}

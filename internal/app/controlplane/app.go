@@ -6,6 +6,7 @@ import (
 
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
+	"github.com/dm-vev/zvonilka/internal/domain/media"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 	"github.com/dm-vev/zvonilka/internal/platform/buildinfo"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
@@ -18,6 +19,7 @@ type app struct {
 	catalog      *domainstorage.Catalog
 	conversation *conversation.Service
 	identity     *identity.Service
+	media        *media.Service
 }
 
 func (a *app) close(ctx context.Context) error {
@@ -30,7 +32,7 @@ func (a *app) close(ctx context.Context) error {
 
 func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 	health := runtime.NewHealth(cfg.Service.Name, buildinfo.Version, buildinfo.Commit, buildinfo.Date)
-	storageCatalog, identityService, conversationService, err := buildAppStorage(ctx, cfg)
+	storageCatalog, identityService, conversationService, mediaService, err := buildAppStorage(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -41,6 +43,7 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 		catalog:      storageCatalog,
 		conversation: conversationService,
 		identity:     identityService,
+		media:        mediaService,
 	}, nil
 }
 
