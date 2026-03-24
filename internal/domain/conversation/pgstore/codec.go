@@ -243,6 +243,24 @@ func scanAttachment(row rowScanner) (conversation.AttachmentRef, error) {
 	return attachment, nil
 }
 
+func scanReaction(row rowScanner) (conversation.MessageReaction, error) {
+	var reaction conversation.MessageReaction
+
+	if err := row.Scan(
+		&reaction.MessageID,
+		&reaction.AccountID,
+		&reaction.Reaction,
+		&reaction.CreatedAt,
+		&reaction.UpdatedAt,
+	); err != nil {
+		return conversation.MessageReaction{}, err
+	}
+
+	reaction.CreatedAt = reaction.CreatedAt.UTC()
+	reaction.UpdatedAt = reaction.UpdatedAt.UTC()
+	return reaction, nil
+}
+
 func scanMessage(row rowScanner) (conversation.Message, error) {
 	var (
 		message             conversation.Message

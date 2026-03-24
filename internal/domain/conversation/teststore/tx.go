@@ -42,6 +42,7 @@ func (s *memoryStore) cloneLocked() memoryStore {
 		topicsByKey:        cloneTopics(s.topicsByKey),
 		membersByKey:       cloneMembers(s.membersByKey),
 		messagesByID:       cloneMessages(s.messagesByID),
+		reactionsByKey:     cloneReactions(s.reactionsByKey),
 		readStatesByKey:    cloneReadStates(s.readStatesByKey),
 		syncStatesByDevice: cloneSyncStates(s.syncStatesByDevice),
 		eventsByID:         cloneEvents(s.eventsByID),
@@ -55,6 +56,7 @@ func (s *memoryStore) replaceLocked(tx *memoryStore) {
 	s.topicsByKey = cloneTopics(tx.topicsByKey)
 	s.membersByKey = cloneMembers(tx.membersByKey)
 	s.messagesByID = cloneMessages(tx.messagesByID)
+	s.reactionsByKey = cloneReactions(tx.reactionsByKey)
 	s.readStatesByKey = cloneReadStates(tx.readStatesByKey)
 	s.syncStatesByDevice = cloneSyncStates(tx.syncStatesByDevice)
 	s.eventsByID = cloneEvents(tx.eventsByID)

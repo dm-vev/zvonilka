@@ -115,6 +115,30 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 			return ErrForbidden
 		}
 
+		replyTo := params.Draft.ReplyTo
+		if replyTo.MessageID != "" {
+			replyTarget, replyErr := tx.MessageByID(ctx, conversation.ID, replyTo.MessageID)
+			if replyErr != nil {
+				return fmt.Errorf("load reply target %s in conversation %s: %w", replyTo.MessageID, conversation.ID, replyErr)
+			}
+			if !replyTarget.DeletedAt.IsZero() || replyTarget.Status == MessageStatusDeleted {
+				return ErrConflict
+			}
+			if strings.TrimSpace(replyTo.ConversationID) != "" && strings.TrimSpace(replyTo.ConversationID) != conversation.ID {
+				return ErrConflict
+			}
+			if strings.TrimSpace(replyTarget.ThreadID) != topic.ID {
+				return ErrConflict
+			}
+			replyTo = MessageReference{
+				ConversationID:  conversation.ID,
+				MessageID:       replyTarget.ID,
+				SenderAccountID: replyTarget.SenderAccountID,
+				MessageKind:     replyTarget.Kind,
+				Snippet:         strings.TrimSpace(replyTo.Snippet),
+			}
+		}
+
 		messageID, err := newID("msg")
 		if err != nil {
 			return fmt.Errorf("generate message id: %w", err)
@@ -130,7 +154,7 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 			Status:              MessageStatusSent,
 			Payload:             params.Draft.Payload,
 			Attachments:         append([]AttachmentRef(nil), params.Draft.Attachments...),
-			ReplyTo:             params.Draft.ReplyTo,
+			ReplyTo:             replyTo,
 			ThreadID:            strings.TrimSpace(params.Draft.ThreadID),
 			Silent:              params.Draft.Silent,
 			Pinned:              false,
@@ -156,7 +180,7 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 			MessageID:      savedMessage.ID,
 			PayloadType:    "message",
 			Payload:        params.Draft.Payload,
-			Metadata:       conversationEventMetadata(savedMessage.ID, params.Draft.ThreadID, params.Draft.Metadata),
+			Metadata:       messageEventMetadata(savedMessage.ID, params.Draft.ThreadID, replyTo, params.Draft.Metadata),
 			CreatedAt:      now,
 		}
 		savedEvent, err = tx.SaveEvent(ctx, event)

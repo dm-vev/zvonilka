@@ -77,21 +77,25 @@ type EventType string
 
 // Event types emitted by the messenger domain.
 const (
-	EventTypeUnspecified         EventType = ""
-	EventTypeConversationCreated EventType = "conversation.created"
-	EventTypeConversationUpdated EventType = "conversation.updated"
-	EventTypeConversationMembers EventType = "conversation.members_changed"
-	EventTypeMessageCreated      EventType = "message.created"
-	EventTypeMessageDelivered    EventType = "message.delivered"
-	EventTypeMessageRead         EventType = "message.read"
-	EventTypeMessageEdited       EventType = "message.edited"
-	EventTypeMessageDeleted      EventType = "message.deleted"
-	EventTypeSyncAcknowledged    EventType = "sync.acknowledged"
-	EventTypeTopicCreated        EventType = "topic.created"
-	EventTypeTopicUpdated        EventType = "topic.updated"
-	EventTypeTopicArchived       EventType = "topic.archived"
-	EventTypeTopicPinned         EventType = "topic.pinned"
-	EventTypeTopicClosed         EventType = "topic.closed"
+	EventTypeUnspecified            EventType = ""
+	EventTypeConversationCreated    EventType = "conversation.created"
+	EventTypeConversationUpdated    EventType = "conversation.updated"
+	EventTypeConversationMembers    EventType = "conversation.members_changed"
+	EventTypeMessageCreated         EventType = "message.created"
+	EventTypeMessageDelivered       EventType = "message.delivered"
+	EventTypeMessageRead            EventType = "message.read"
+	EventTypeMessageEdited          EventType = "message.edited"
+	EventTypeMessageDeleted         EventType = "message.deleted"
+	EventTypeMessagePinned          EventType = "message.pinned"
+	EventTypeMessageReactionAdded   EventType = "message.reaction_added"
+	EventTypeMessageReactionUpdated EventType = "message.reaction_updated"
+	EventTypeMessageReactionRemoved EventType = "message.reaction_removed"
+	EventTypeSyncAcknowledged       EventType = "sync.acknowledged"
+	EventTypeTopicCreated           EventType = "topic.created"
+	EventTypeTopicUpdated           EventType = "topic.updated"
+	EventTypeTopicArchived          EventType = "topic.archived"
+	EventTypeTopicPinned            EventType = "topic.pinned"
+	EventTypeTopicClosed            EventType = "topic.closed"
 )
 
 // ConversationSettings controls write and moderation behavior for a conversation.
@@ -189,6 +193,15 @@ type MessageReference struct {
 	Snippet         string
 }
 
+// MessageReaction describes a reaction applied by one account to a message.
+type MessageReaction struct {
+	MessageID string
+	AccountID string
+	Reaction  string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 // MessageDraft captures client-supplied message content before persistence.
 type MessageDraft struct {
 	ClientMessageID     string
@@ -222,6 +235,7 @@ type Message struct {
 	DisableLinkPreviews bool
 	ViewCount           uint64
 	Metadata            map[string]string
+	Reactions           []MessageReaction
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 	EditedAt            time.Time

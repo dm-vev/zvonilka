@@ -10,6 +10,8 @@ const messageColumnList = `id, conversation_id, sender_account_id, sender_device
 
 const attachmentColumnList = `message_id, attachment_index, media_id, kind, file_name, mime_type, size_bytes, sha256_hex, width, height, duration_seconds, caption`
 
+const reactionColumnList = `message_id, account_id, reaction, created_at, updated_at`
+
 const readStateColumnList = `conversation_id, account_id, device_id, last_read_sequence, last_delivered_sequence, last_acked_sequence, updated_at`
 
 const syncStateColumnList = `device_id, account_id, last_applied_sequence, last_acked_sequence, conversation_watermarks, server_time, updated_at`

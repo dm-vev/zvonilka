@@ -124,6 +124,33 @@ func conversationEventMetadata(messageID string, threadID string, extra map[stri
 	return metadata
 }
 
+func messageEventMetadata(
+	messageID string,
+	threadID string,
+	replyTo MessageReference,
+	extra map[string]string,
+) map[string]string {
+	metadata := conversationEventMetadata(messageID, threadID, extra)
+	if replyTo.MessageID == "" {
+		return metadata
+	}
+	if metadata == nil {
+		metadata = make(map[string]string, 4)
+	}
+	metadata["reply_message_id"] = replyTo.MessageID
+	if replyTo.ConversationID != "" {
+		metadata["reply_conversation_id"] = replyTo.ConversationID
+	}
+	if replyTo.SenderAccountID != "" {
+		metadata["reply_sender_account_id"] = replyTo.SenderAccountID
+	}
+	if replyTo.MessageKind != MessageKindUnspecified {
+		metadata["reply_kind"] = string(replyTo.MessageKind)
+	}
+
+	return metadata
+}
+
 func ensureMemberIDs(ownerID string, memberIDs []string) ([]string, error) {
 	ids := uniqueIDs(memberIDs)
 	for _, memberID := range ids {

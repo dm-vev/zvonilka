@@ -49,6 +49,67 @@ type SendMessageParams struct {
 	CreatedAt       time.Time
 }
 
+// ReplyMessageParams describes a reply send request.
+type ReplyMessageParams struct {
+	ConversationID   string
+	SenderAccountID  string
+	SenderDeviceID   string
+	ReplyToMessageID string
+	Draft            MessageDraft
+	CausationID      string
+	CorrelationID    string
+	CreatedAt        time.Time
+}
+
+// EditMessageParams describes a message edit request.
+type EditMessageParams struct {
+	ConversationID string
+	MessageID      string
+	ActorAccountID string
+	ActorDeviceID  string
+	Draft          MessageDraft
+	EditedAt       time.Time
+}
+
+// DeleteMessageParams describes a message deletion request.
+type DeleteMessageParams struct {
+	ConversationID string
+	MessageID      string
+	ActorAccountID string
+	ActorDeviceID  string
+	DeletedAt      time.Time
+}
+
+// PinMessageParams pins or unpins a message.
+type PinMessageParams struct {
+	ConversationID string
+	MessageID      string
+	ActorAccountID string
+	ActorDeviceID  string
+	Pinned         bool
+	UpdatedAt      time.Time
+}
+
+// AddMessageReactionParams stores a reaction for a message.
+type AddMessageReactionParams struct {
+	ConversationID string
+	MessageID      string
+	ActorAccountID string
+	ActorDeviceID  string
+	Reaction       string
+	CreatedAt      time.Time
+}
+
+// RemoveMessageReactionParams removes a reaction from a message.
+type RemoveMessageReactionParams struct {
+	ConversationID string
+	MessageID      string
+	ActorAccountID string
+	ActorDeviceID  string
+	Reaction       string
+	RemovedAt      time.Time
+}
+
 // RecordDeliveryParams captures a delivery watermark update.
 type RecordDeliveryParams struct {
 	ConversationID           string

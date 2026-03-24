@@ -169,6 +169,12 @@ RETURNING %s
 		saved.Attachments = append([]conversation.AttachmentRef(nil), message.Attachments...)
 	}
 
+	reactions, err := s.reactionsByMessageIDs(ctx, []string{saved.ID})
+	if err != nil {
+		return conversation.Message{}, err
+	}
+	saved.Reactions = reactions[saved.ID]
+
 	return saved, nil
 }
 
@@ -240,6 +246,12 @@ func (s *Store) MessageByID(ctx context.Context, conversationID string, messageI
 	}
 	message.Attachments = attachments[message.ID]
 
+	reactions, err := s.reactionsByMessageIDs(ctx, []string{message.ID})
+	if err != nil {
+		return conversation.Message{}, err
+	}
+	message.Reactions = reactions[message.ID]
+
 	return message, nil
 }
 
@@ -290,6 +302,14 @@ LIMIT $4
 	}
 	for idx := range messages {
 		messages[idx].Attachments = attachments[messages[idx].ID]
+	}
+
+	reactions, err := s.reactionsByMessageIDs(ctx, messageIDs)
+	if err != nil {
+		return nil, err
+	}
+	for idx := range messages {
+		messages[idx].Reactions = reactions[messages[idx].ID]
 	}
 
 	return messages, nil

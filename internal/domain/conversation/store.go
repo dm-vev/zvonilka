@@ -21,6 +21,8 @@ type Store interface {
 	SaveMessage(ctx context.Context, message Message) (Message, error)
 	MessageByID(ctx context.Context, conversationID string, messageID string) (Message, error)
 	MessagesByConversationID(ctx context.Context, conversationID string, threadID string, fromSequence uint64, limit int) ([]Message, error)
+	SaveMessageReaction(ctx context.Context, reaction MessageReaction) (MessageReaction, error)
+	DeleteMessageReaction(ctx context.Context, messageID string, accountID string) error
 
 	SaveReadState(ctx context.Context, state ReadState) (ReadState, error)
 	ReadStateByConversationAndDevice(ctx context.Context, conversationID string, deviceID string) (ReadState, error)

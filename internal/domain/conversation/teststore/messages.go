@@ -21,7 +21,10 @@ func (s *memoryStore) SaveMessage(ctx context.Context, message conversation.Mess
 	}
 
 	s.messagesByID[message.ID] = cloneMessage(message)
-	return cloneMessage(message), nil
+
+	saved := cloneMessage(message)
+	saved.Reactions = s.reactionsByMessageIDs([]string{saved.ID})[saved.ID]
+	return saved, nil
 }
 
 func (s *memoryStore) MessageByID(ctx context.Context, conversationID string, messageID string) (conversation.Message, error) {
@@ -35,7 +38,9 @@ func (s *memoryStore) MessageByID(ctx context.Context, conversationID string, me
 		return conversation.Message{}, conversation.ErrNotFound
 	}
 
-	return cloneMessage(message), nil
+	saved := cloneMessage(message)
+	saved.Reactions = s.reactionsByMessageIDs([]string{saved.ID})[saved.ID]
+	return saved, nil
 }
 
 func (s *memoryStore) MessagesByConversationID(ctx context.Context, conversationID string, threadID string, fromSequence uint64, limit int) ([]conversation.Message, error) {
@@ -75,6 +80,17 @@ func (s *memoryStore) MessagesByConversationID(ctx context.Context, conversation
 		if limit > 0 && len(filtered) >= limit {
 			break
 		}
+	}
+
+	reactions := s.reactionsByMessageIDs(func() []string {
+		ids := make([]string, 0, len(filtered))
+		for _, message := range filtered {
+			ids = append(ids, message.ID)
+		}
+		return ids
+	}())
+	for idx := range filtered {
+		filtered[idx].Reactions = reactions[filtered[idx].ID]
 	}
 
 	return filtered, nil

@@ -245,6 +245,236 @@ func TestTopicLifecycleRequiresThreadsEnabled(t *testing.T) {
 	}
 }
 
+func TestMessageActionsLifecycle(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	fixedNow := time.Date(2026, time.March, 24, 15, 0, 0, 0, time.UTC)
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time { return fixedNow }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	created, _, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-owner",
+		Kind:             conversation.ConversationKindGroup,
+		Title:            "Group",
+		MemberAccountIDs: []string{"acc-peer"},
+		Settings: conversation.ConversationSettings{
+			AllowReactions:           true,
+			PinnedMessagesOnlyAdmins: true,
+		},
+		CreatedAt: fixedNow,
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	rootMessage, _, err := svc.SendMessage(ctx, conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "acc-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-root",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		CreatedAt: fixedNow.Add(time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("send root message: %v", err)
+	}
+
+	replyMessage, replyEvent, err := svc.ReplyMessage(ctx, conversation.ReplyMessageParams{
+		ConversationID:   created.ID,
+		SenderAccountID:  "acc-peer",
+		SenderDeviceID:   "dev-peer",
+		ReplyToMessageID: rootMessage.ID,
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-reply",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		CreatedAt: fixedNow.Add(2 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("reply message: %v", err)
+	}
+	if replyEvent.EventType != conversation.EventTypeMessageCreated {
+		t.Fatalf("expected reply creation event, got %s", replyEvent.EventType)
+	}
+	if replyMessage.ReplyTo.MessageID != rootMessage.ID {
+		t.Fatalf("expected reply target %s, got %+v", rootMessage.ID, replyMessage.ReplyTo)
+	}
+
+	edited, editEvent, err := svc.EditMessage(ctx, conversation.EditMessageParams{
+		ConversationID: created.ID,
+		MessageID:      replyMessage.ID,
+		ActorAccountID: "acc-peer",
+		ActorDeviceID:  "dev-peer",
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-reply-2",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		EditedAt: fixedNow.Add(3 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("edit message: %v", err)
+	}
+	if editEvent.EventType != conversation.EventTypeMessageEdited {
+		t.Fatalf("expected edit event, got %s", editEvent.EventType)
+	}
+	if edited.EditedAt.IsZero() {
+		t.Fatal("expected edited timestamp")
+	}
+
+	reacted, reactionEvent, err := svc.AddMessageReaction(ctx, conversation.AddMessageReactionParams{
+		ConversationID: created.ID,
+		MessageID:      replyMessage.ID,
+		ActorAccountID: "acc-owner",
+		ActorDeviceID:  "dev-owner",
+		Reaction:       "👍",
+		CreatedAt:      fixedNow.Add(4 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("add reaction: %v", err)
+	}
+	if reactionEvent.EventType != conversation.EventTypeMessageReactionAdded {
+		t.Fatalf("expected reaction added event, got %s", reactionEvent.EventType)
+	}
+	if len(reacted.Reactions) != 1 || reacted.Reactions[0].Reaction != "👍" {
+		t.Fatalf("expected first reaction, got %+v", reacted.Reactions)
+	}
+
+	reacted, reactionEvent, err = svc.AddMessageReaction(ctx, conversation.AddMessageReactionParams{
+		ConversationID: created.ID,
+		MessageID:      replyMessage.ID,
+		ActorAccountID: "acc-owner",
+		ActorDeviceID:  "dev-owner",
+		Reaction:       "❤️",
+		CreatedAt:      fixedNow.Add(5 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("update reaction: %v", err)
+	}
+	if reactionEvent.EventType != conversation.EventTypeMessageReactionUpdated {
+		t.Fatalf("expected reaction updated event, got %s", reactionEvent.EventType)
+	}
+	if len(reacted.Reactions) != 1 || reacted.Reactions[0].Reaction != "❤️" {
+		t.Fatalf("expected updated reaction, got %+v", reacted.Reactions)
+	}
+
+	reacted, reactionEvent, err = svc.RemoveMessageReaction(ctx, conversation.RemoveMessageReactionParams{
+		ConversationID: created.ID,
+		MessageID:      replyMessage.ID,
+		ActorAccountID: "acc-owner",
+		ActorDeviceID:  "dev-owner",
+		RemovedAt:      fixedNow.Add(6 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("remove reaction: %v", err)
+	}
+	if reactionEvent.EventType != conversation.EventTypeMessageReactionRemoved {
+		t.Fatalf("expected reaction removed event, got %s", reactionEvent.EventType)
+	}
+	if len(reacted.Reactions) != 0 {
+		t.Fatalf("expected no reactions, got %+v", reacted.Reactions)
+	}
+
+	pinned, pinEvent, err := svc.PinMessage(ctx, conversation.PinMessageParams{
+		ConversationID: created.ID,
+		MessageID:      replyMessage.ID,
+		ActorAccountID: "acc-peer",
+		ActorDeviceID:  "dev-peer",
+		Pinned:         true,
+		UpdatedAt:      fixedNow.Add(7 * time.Minute),
+	})
+	if !errors.Is(err, conversation.ErrForbidden) {
+		t.Fatalf("expected non-admin pin to fail, got %v", err)
+	}
+
+	pinned, pinEvent, err = svc.PinMessage(ctx, conversation.PinMessageParams{
+		ConversationID: created.ID,
+		MessageID:      replyMessage.ID,
+		ActorAccountID: "acc-owner",
+		ActorDeviceID:  "dev-owner",
+		Pinned:         true,
+		UpdatedAt:      fixedNow.Add(8 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("pin message: %v", err)
+	}
+	if pinEvent.EventType != conversation.EventTypeMessagePinned {
+		t.Fatalf("expected pin event, got %s", pinEvent.EventType)
+	}
+	if !pinned.Pinned {
+		t.Fatal("expected pinned message")
+	}
+
+	deleted, deleteEvent, err := svc.DeleteMessage(ctx, conversation.DeleteMessageParams{
+		ConversationID: created.ID,
+		MessageID:      replyMessage.ID,
+		ActorAccountID: "acc-peer",
+		ActorDeviceID:  "dev-peer",
+		DeletedAt:      fixedNow.Add(9 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("delete message: %v", err)
+	}
+	if deleteEvent.EventType != conversation.EventTypeMessageDeleted {
+		t.Fatalf("expected delete event, got %s", deleteEvent.EventType)
+	}
+	if deleted.Status != conversation.MessageStatusDeleted {
+		t.Fatalf("expected deleted message, got %+v", deleted)
+	}
+
+	_, _, err = svc.EditMessage(ctx, conversation.EditMessageParams{
+		ConversationID: created.ID,
+		MessageID:      replyMessage.ID,
+		ActorAccountID: "acc-peer",
+		ActorDeviceID:  "dev-peer",
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-reply-3",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+			},
+		},
+		EditedAt: fixedNow.Add(10 * time.Minute),
+	})
+	if !errors.Is(err, conversation.ErrConflict) {
+		t.Fatalf("expected deleted message edit to fail, got %v", err)
+	}
+
+	messages, err := svc.ListMessages(ctx, conversation.ListMessagesParams{
+		AccountID:      "acc-owner",
+		ConversationID: created.ID,
+	})
+	if err != nil {
+		t.Fatalf("list messages: %v", err)
+	}
+	if len(messages) != 1 || messages[0].ID != rootMessage.ID {
+		t.Fatalf("expected deleted reply to be hidden, got %+v", messages)
+	}
+}
+
 func TestTopicLifecycle(t *testing.T) {
 	t.Parallel()
 
