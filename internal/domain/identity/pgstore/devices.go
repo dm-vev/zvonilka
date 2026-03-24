@@ -57,11 +57,8 @@ RETURNING %s
 		nullTime(device.LastRotatedAt),
 	))
 	if err != nil {
-		if isUniqueViolation(err) {
-			return identity.Device{}, identity.ErrConflict
-		}
-		if isForeignKeyViolation(err) {
-			return identity.Device{}, identity.ErrNotFound
+		if mappedErr := mapConstraintError(err, s.mapDeviceForeignKeyViolation(ctx, device)); mappedErr != nil {
+			return identity.Device{}, mappedErr
 		}
 		return identity.Device{}, fmt.Errorf("save device %s: %w", device.ID, err)
 	}
@@ -84,6 +81,9 @@ func (s *Store) DeleteDevice(ctx context.Context, deviceID string) error {
 	query := fmt.Sprintf(`DELETE FROM %s WHERE id = $1`, s.table("identity_devices"))
 	result, err := s.conn().ExecContext(ctx, query, deviceID)
 	if err != nil {
+		if isForeignKeyViolation(err) {
+			return identity.ErrConflict
+		}
 		return fmt.Errorf("delete device %s: %w", deviceID, err)
 	}
 

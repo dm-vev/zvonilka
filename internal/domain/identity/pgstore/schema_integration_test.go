@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -25,7 +26,11 @@ func TestIdentitySchemaHardening(t *testing.T) {
 		_ = db.Close()
 	})
 
-	migrationsPath := repoMigrationsPath(t)
+	migrationsPath := repoMigrationsPath(t,
+		"0001.sql",
+		"0002_identity_hardening.sql",
+		"0003_identity_device_session_unique.sql",
+	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
 	}
@@ -61,7 +66,7 @@ func TestIdentitySchemaHardening(t *testing.T) {
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		})
-		requirePgCode(t, err, "23514")
+		requireInvalidInput(t, err)
 	})
 
 	t.Run("rejects bot without token hash", func(t *testing.T) {
@@ -74,7 +79,21 @@ func TestIdentitySchemaHardening(t *testing.T) {
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		})
-		requirePgCode(t, err, "23514")
+		requireInvalidInput(t, err)
+	})
+
+	t.Run("rejects user with bot token hash", func(t *testing.T) {
+		_, err := store.SaveAccount(ctx, identity.Account{
+			ID:           "acc-user-token",
+			Kind:         identity.AccountKindUser,
+			Username:     "user-token",
+			DisplayName:  "User Token",
+			Status:       identity.AccountStatusActive,
+			BotTokenHash: "token-hash",
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		})
+		requireInvalidInput(t, err)
 	})
 
 	t.Run("rejects invalid account status", func(t *testing.T) {
@@ -87,7 +106,7 @@ func TestIdentitySchemaHardening(t *testing.T) {
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		})
-		requirePgCode(t, err, "23514")
+		requireInvalidInput(t, err)
 	})
 
 	t.Run("rejects invalid join request status", func(t *testing.T) {
@@ -99,7 +118,7 @@ func TestIdentitySchemaHardening(t *testing.T) {
 			RequestedAt: now,
 			ExpiresAt:   now.Add(time.Hour),
 		})
-		requirePgCode(t, err, "23514")
+		requireInvalidInput(t, err)
 	})
 
 	t.Run("rejects invalid login challenge delivery channel", func(t *testing.T) {
@@ -112,7 +131,20 @@ func TestIdentitySchemaHardening(t *testing.T) {
 			ExpiresAt:       now.Add(time.Hour),
 			CreatedAt:       now,
 		})
-		requirePgCode(t, err, "23514")
+		requireInvalidInput(t, err)
+	})
+
+	t.Run("rejects invalid login challenge account kind", func(t *testing.T) {
+		_, err := store.SaveLoginChallenge(ctx, identity.LoginChallenge{
+			ID:              "chal-kind",
+			AccountID:       account.ID,
+			AccountKind:     identity.AccountKind("alien"),
+			CodeHash:        "hash",
+			DeliveryChannel: identity.LoginDeliveryChannelEmail,
+			ExpiresAt:       now.Add(time.Hour),
+			CreatedAt:       now,
+		})
+		requireInvalidInput(t, err)
 	})
 
 	t.Run("rejects mismatched login challenge used pair", func(t *testing.T) {
@@ -126,11 +158,27 @@ func TestIdentitySchemaHardening(t *testing.T) {
 			CreatedAt:       now,
 			Used:            true,
 		})
-		requirePgCode(t, err, "23514")
+		requireInvalidInput(t, err)
+	})
+
+	t.Run("rejects login challenge used_at without used flag", func(t *testing.T) {
+		_, err := store.SaveLoginChallenge(ctx, identity.LoginChallenge{
+			ID:              "chal-3",
+			AccountID:       account.ID,
+			AccountKind:     identity.AccountKindUser,
+			CodeHash:        "hash",
+			DeliveryChannel: identity.LoginDeliveryChannelEmail,
+			ExpiresAt:       now.Add(time.Hour),
+			CreatedAt:       now,
+			UsedAt:          now,
+		})
+		requireInvalidInput(t, err)
 	})
 
 	const sessionID = "sess-1"
 	const primaryDeviceID = "dev-1"
+	const peerSessionID = "sess-2"
+	const peerDeviceID = "dev-2"
 
 	t.Run("allows deferred device then session insert", func(t *testing.T) {
 		err := store.WithinTx(ctx, func(tx identity.Store) error {
@@ -204,7 +252,7 @@ func TestIdentitySchemaHardening(t *testing.T) {
 			CreatedAt:  now,
 			LastSeenAt: now,
 		})
-		requirePgCode(t, err, "23514")
+		requireInvalidInput(t, err)
 	})
 
 	t.Run("rejects invalid device status", func(t *testing.T) {
@@ -219,7 +267,67 @@ func TestIdentitySchemaHardening(t *testing.T) {
 			CreatedAt:  now,
 			LastSeenAt: now,
 		})
-		requirePgCode(t, err, "23514")
+		requireInvalidInput(t, err)
+	})
+
+	t.Run("allows multiple devices on the same session", func(t *testing.T) {
+		_, err := store.SaveDevice(ctx, identity.Device{
+			ID:         "dev-dup",
+			AccountID:  account.ID,
+			SessionID:  sessionID,
+			Name:       "Alice phone",
+			Platform:   identity.DevicePlatformWeb,
+			Status:     identity.DeviceStatusActive,
+			PublicKey:  "pk-dup",
+			CreatedAt:  now,
+			LastSeenAt: now,
+		})
+		if err != nil {
+			t.Fatalf("save second device for same session: %v", err)
+		}
+
+		devices, err := store.DevicesByAccountID(ctx, account.ID)
+		if err != nil {
+			t.Fatalf("load devices after second attachment: %v", err)
+		}
+		if len(devices) != 2 {
+			t.Fatalf("expected two devices on the account, got %d", len(devices))
+		}
+	})
+
+	t.Run("allows a second device on a different session", func(t *testing.T) {
+		err := store.WithinTx(ctx, func(tx identity.Store) error {
+			if _, err := tx.SaveDevice(ctx, identity.Device{
+				ID:         peerDeviceID,
+				AccountID:  account.ID,
+				SessionID:  peerSessionID,
+				Name:       "Alice phone",
+				Platform:   identity.DevicePlatformWeb,
+				Status:     identity.DeviceStatusActive,
+				PublicKey:  "pk-2",
+				CreatedAt:  now,
+				LastSeenAt: now,
+			}); err != nil {
+				return err
+			}
+			if _, err := tx.SaveSession(ctx, identity.Session{
+				ID:             peerSessionID,
+				AccountID:      account.ID,
+				DeviceID:       peerDeviceID,
+				DeviceName:     "Alice phone",
+				DevicePlatform: identity.DevicePlatformWeb,
+				Status:         identity.SessionStatusActive,
+				Current:        false,
+				CreatedAt:      now,
+				LastSeenAt:     now,
+			}); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("save peer device/session pair: %v", err)
+		}
 	})
 
 	t.Run("rejects invalid session status", func(t *testing.T) {
@@ -229,27 +337,100 @@ func TestIdentitySchemaHardening(t *testing.T) {
 		}
 		session.Status = identity.SessionStatus("ghost")
 		_, err = store.UpdateSession(ctx, session)
-		requirePgCode(t, err, "23514")
+		requireInvalidInput(t, err)
+	})
+
+	t.Run("rejects session update to an already attached device", func(t *testing.T) {
+		session, err := store.SessionByID(ctx, sessionID)
+		if err != nil {
+			t.Fatalf("load valid session: %v", err)
+		}
+		session.DeviceID = peerDeviceID
+		_, err = store.UpdateSession(ctx, session)
+		if !errors.Is(err, identity.ErrConflict) {
+			t.Fatalf("expected conflict, got %v", err)
+		}
+	})
+
+	t.Run("rejects deferred device session fk on tx commit", func(t *testing.T) {
+		err := store.WithinTx(ctx, func(tx identity.Store) error {
+			_, saveErr := tx.SaveDevice(ctx, identity.Device{
+				ID:         "dev-deferred",
+				AccountID:  account.ID,
+				SessionID:  "sess-missing-tx",
+				Name:       "Deferred",
+				Platform:   identity.DevicePlatformWeb,
+				Status:     identity.DeviceStatusActive,
+				PublicKey:  "pk-deferred",
+				CreatedAt:  now,
+				LastSeenAt: now,
+			})
+			return saveErr
+		})
+		if !errors.Is(err, identity.ErrConflict) {
+			t.Fatalf("expected conflict, got %v", err)
+		}
 	})
 
 	t.Run("rejects session deletion when attached devices remain", func(t *testing.T) {
-		_, err := store.SaveDevice(ctx, identity.Device{
-			ID:         "dev-extra",
-			AccountID:  account.ID,
-			SessionID:  sessionID,
-			Name:       "Alice tablet",
-			Platform:   identity.DevicePlatformWeb,
-			Status:     identity.DeviceStatusActive,
-			PublicKey:  "pk-extra",
-			CreatedAt:  now,
-			LastSeenAt: now,
-		})
-		if err != nil {
-			t.Fatalf("save extra device: %v", err)
-		}
-
 		if err := store.DeleteSession(ctx, sessionID); !errors.Is(err, identity.ErrConflict) {
 			t.Fatalf("expected conflict, got %v", err)
+		}
+	})
+
+	t.Run("rejects transactional session deletion when attached devices remain", func(t *testing.T) {
+		err := store.WithinTx(ctx, func(tx identity.Store) error {
+			return tx.DeleteSession(ctx, sessionID)
+		})
+		if !errors.Is(err, identity.ErrConflict) {
+			t.Fatalf("expected conflict, got %v", err)
+		}
+	})
+
+	t.Run("allows device deletion when no peer devices remain", func(t *testing.T) {
+		const deviceID = "dev-cascade"
+		const attachedSessionID = "sess-cascade"
+
+		err := store.WithinTx(ctx, func(tx identity.Store) error {
+			if _, err := tx.SaveDevice(ctx, identity.Device{
+				ID:         deviceID,
+				AccountID:  account.ID,
+				SessionID:  attachedSessionID,
+				Name:       "Cascade device",
+				Platform:   identity.DevicePlatformWeb,
+				Status:     identity.DeviceStatusActive,
+				PublicKey:  "pk-cascade",
+				CreatedAt:  now,
+				LastSeenAt: now,
+			}); err != nil {
+				return err
+			}
+			_, err := tx.SaveSession(ctx, identity.Session{
+				ID:             attachedSessionID,
+				AccountID:      account.ID,
+				DeviceID:       deviceID,
+				DeviceName:     "Cascade device",
+				DevicePlatform: identity.DevicePlatformWeb,
+				Status:         identity.SessionStatusActive,
+				Current:        true,
+				CreatedAt:      now,
+				LastSeenAt:     now,
+			})
+			return err
+		})
+		if err != nil {
+			t.Fatalf("save cascade device/session pair: %v", err)
+		}
+
+		if err := store.DeleteDevice(ctx, deviceID); err != nil {
+			t.Fatalf("delete device with attached session: %v", err)
+		}
+
+		if _, err := store.DeviceByID(ctx, deviceID); !errors.Is(err, identity.ErrNotFound) {
+			t.Fatalf("expected deleted device to be gone, got %v", err)
+		}
+		if _, err := store.SessionByID(ctx, attachedSessionID); !errors.Is(err, identity.ErrNotFound) {
+			t.Fatalf("expected cascaded session to be gone, got %v", err)
 		}
 	})
 
@@ -260,6 +441,32 @@ func TestIdentitySchemaHardening(t *testing.T) {
 		}
 		if !indexName.Valid || indexName.String == "" {
 			t.Fatal("expected pending expiry index to exist")
+		}
+	})
+
+	t.Run("exposes device session index", func(t *testing.T) {
+		var indexName sql.NullString
+		if err := db.QueryRowContext(ctx, `SELECT to_regclass($1)`, qualifiedName("tenant", "identity_devices_session_id_idx")).Scan(&indexName); err != nil {
+			t.Fatalf("load device session index: %v", err)
+		}
+		if !indexName.Valid || indexName.String == "" {
+			t.Fatal("expected device session index to exist")
+		}
+	})
+
+	t.Run("deletes account with linked session and device", func(t *testing.T) {
+		if err := store.DeleteAccount(ctx, account.ID); err != nil {
+			t.Fatalf("delete account: %v", err)
+		}
+
+		if _, err := store.AccountByID(ctx, account.ID); !errors.Is(err, identity.ErrNotFound) {
+			t.Fatalf("expected deleted account to be gone, got %v", err)
+		}
+		if _, err := store.SessionByID(ctx, sessionID); !errors.Is(err, identity.ErrNotFound) {
+			t.Fatalf("expected deleted session to be gone, got %v", err)
+		}
+		if _, err := store.DeviceByID(ctx, primaryDeviceID); !errors.Is(err, identity.ErrNotFound) {
+			t.Fatalf("expected deleted device to be gone, got %v", err)
 		}
 	})
 }
@@ -332,7 +539,7 @@ func openDockerPostgres(t *testing.T) *sql.DB {
 	return nil
 }
 
-func repoMigrationsPath(t *testing.T) string {
+func repoMigrationsPath(t *testing.T, names ...string) string {
 	t.Helper()
 
 	_, file, _, ok := runtime.Caller(0)
@@ -340,7 +547,23 @@ func repoMigrationsPath(t *testing.T) string {
 		t.Fatal("runtime caller unavailable")
 	}
 
-	return filepath.Join(filepath.Dir(file), "..", "..", "..", "..", "deploy", "migrations", "postgres")
+	sourceDir := filepath.Join(filepath.Dir(file), "..", "..", "..", "..", "deploy", "migrations", "postgres")
+	if len(names) == 0 {
+		return sourceDir
+	}
+
+	dir := t.TempDir()
+	for _, name := range names {
+		source, err := os.ReadFile(filepath.Join(sourceDir, name))
+		if err != nil {
+			t.Fatalf("read migration %s: %v", name, err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, name), source, 0o600); err != nil {
+			t.Fatalf("copy migration %s: %v", name, err)
+		}
+	}
+
+	return dir
 }
 
 func requirePgCode(t *testing.T, err error, code string) {
@@ -356,5 +579,13 @@ func requirePgCode(t *testing.T, err error, code string) {
 	}
 	if pgErr.Code != code {
 		t.Fatalf("expected postgres error code %s, got %s (%v)", code, pgErr.Code, err)
+	}
+}
+
+func requireInvalidInput(t *testing.T, err error) {
+	t.Helper()
+
+	if !errors.Is(err, identity.ErrInvalidInput) {
+		t.Fatalf("expected invalid input, got %v", err)
 	}
 }

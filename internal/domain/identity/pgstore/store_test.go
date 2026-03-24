@@ -11,6 +11,7 @@ import (
 	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
@@ -79,6 +80,48 @@ func TestWithinTxRollsBackOnError(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestWithinTxMapsCommitConstraintViolations(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  error
+		want error
+	}{
+		{
+			name: "foreign key",
+			err:  &pgconn.PgError{Code: "23503"},
+			want: identity.ErrConflict,
+		},
+		{
+			name: "check",
+			err:  &pgconn.PgError{Code: "23514"},
+			want: identity.ErrInvalidInput,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			store, mock, _ := newMockStore(t)
+			mock.ExpectBegin()
+			mock.ExpectCommit().WillReturnError(tt.err)
+
+			err := store.WithinTx(context.Background(), func(identity.Store) error {
+				return nil
+			})
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatalf("expectations: %v", err)
+			}
+		})
 	}
 }
 
@@ -186,6 +229,61 @@ RETURNING %s
 	}
 	if account.ID != "acc-1" || account.Username != "alice" {
 		t.Fatalf("unexpected saved account: %+v", account)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestSaveLoginChallengeReturnsInvalidInputOnCheckViolation(t *testing.T) {
+	t.Parallel()
+
+	store, mock, _ := newMockStore(t)
+	now := time.Date(2026, time.March, 23, 22, 30, 0, 0, time.UTC)
+
+	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(`
+INSERT INTO %s (
+	id, account_id, account_kind, code_hash, delivery_channel, targets, expires_at, created_at, used_at, used
+) VALUES (
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+)
+ON CONFLICT (id) DO UPDATE SET
+	account_id = EXCLUDED.account_id,
+	account_kind = EXCLUDED.account_kind,
+	code_hash = EXCLUDED.code_hash,
+	delivery_channel = EXCLUDED.delivery_channel,
+	targets = EXCLUDED.targets,
+	expires_at = EXCLUDED.expires_at,
+	used_at = EXCLUDED.used_at,
+	used = EXCLUDED.used
+RETURNING %s
+`, qualifiedName("tenant", "identity_login_challenges"), loginChallengeColumnList))).
+		WithArgs(
+			"chal-1",
+			"acc-1",
+			identity.AccountKindUser,
+			"hash",
+			identity.LoginDeliveryChannel("fax"),
+			"[]",
+			now.Add(time.Hour),
+			now,
+			nil,
+			false,
+		).
+		WillReturnError(&pgconn.PgError{Code: "23514"})
+
+	_, err := store.SaveLoginChallenge(context.Background(), identity.LoginChallenge{
+		ID:              "chal-1",
+		AccountID:       "acc-1",
+		AccountKind:     identity.AccountKindUser,
+		CodeHash:        "hash",
+		DeliveryChannel: identity.LoginDeliveryChannel("fax"),
+		ExpiresAt:       now.Add(time.Hour),
+		CreatedAt:       now,
+	})
+	if !errors.Is(err, identity.ErrInvalidInput) {
+		t.Fatalf("expected invalid input, got %v", err)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
