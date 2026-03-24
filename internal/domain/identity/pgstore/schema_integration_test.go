@@ -564,202 +564,6 @@ INSERT INTO %s (
 		}
 	})
 
-	t.Run("allows raw same-account device/session pair on commit", func(t *testing.T) {
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			t.Fatalf("begin tx: %v", err)
-		}
-		defer func() {
-			_ = tx.Rollback()
-		}()
-
-		_, err = tx.ExecContext(ctx, fmt.Sprintf(`
-INSERT INTO %s (
-	id,
-	account_id,
-	session_id,
-	name,
-	platform,
-	status,
-	public_key,
-	push_token,
-	created_at,
-	last_seen_at,
-	revoked_at,
-	last_rotated_at
-) VALUES (
-	$1,
-	$2,
-	$3,
-	$4,
-	$5,
-	$6,
-	$7,
-	'',
-	$8,
-	$9,
-	NULL,
-	NULL
-)
-`, qualifiedName("tenant", "identity_devices")),
-			"dev-raw-valid",
-			account.ID,
-			"sess-raw-valid",
-			"Raw valid device",
-			identity.DevicePlatformWeb,
-			identity.DeviceStatusActive,
-			"pk-raw-valid",
-			now,
-			now,
-		)
-		if err != nil {
-			t.Fatalf("insert valid device: %v", err)
-		}
-
-		_, err = tx.ExecContext(ctx, fmt.Sprintf(`
-INSERT INTO %s (
-	id,
-	account_id,
-	device_id,
-	device_name,
-	device_platform,
-	ip_address,
-	user_agent,
-	status,
-	current,
-	created_at,
-	last_seen_at,
-	revoked_at
-) VALUES (
-	$1,
-	$2,
-	$3,
-	$4,
-	$5,
-	'',
-	'',
-	$6,
-	TRUE,
-	$7,
-	$8,
-	NULL
-)
-`, qualifiedName("tenant", "identity_sessions")),
-			"sess-raw-valid",
-			account.ID,
-			"dev-raw-valid",
-			"Raw valid session",
-			identity.DevicePlatformWeb,
-			identity.SessionStatusActive,
-			now,
-			now,
-		)
-		if err != nil {
-			t.Fatalf("insert valid session: %v", err)
-		}
-
-		if err := tx.Commit(); err != nil {
-			t.Fatalf("commit valid device/session pair: %v", err)
-		}
-	})
-
-	t.Run("rejects raw cross-account device/session pair on commit", func(t *testing.T) {
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			t.Fatalf("begin tx: %v", err)
-		}
-		defer func() {
-			_ = tx.Rollback()
-		}()
-
-		_, err = tx.ExecContext(ctx, fmt.Sprintf(`
-INSERT INTO %s (
-	id,
-	account_id,
-	session_id,
-	name,
-	platform,
-	status,
-	public_key,
-	push_token,
-	created_at,
-	last_seen_at,
-	revoked_at,
-	last_rotated_at
-) VALUES (
-	$1,
-	$2,
-	$3,
-	$4,
-	$5,
-	$6,
-	$7,
-	'',
-	$8,
-	$9,
-	NULL,
-	NULL
-)
-`, qualifiedName("tenant", "identity_devices")),
-			"dev-raw-cross",
-			peerAccount.ID,
-			"sess-raw-cross",
-			"Raw cross device",
-			identity.DevicePlatformWeb,
-			identity.DeviceStatusActive,
-			"pk-raw-cross",
-			now,
-			now,
-		)
-		if err != nil {
-			t.Fatalf("insert cross-account device: %v", err)
-		}
-
-		_, err = tx.ExecContext(ctx, fmt.Sprintf(`
-INSERT INTO %s (
-	id,
-	account_id,
-	device_id,
-	device_name,
-	device_platform,
-	ip_address,
-	user_agent,
-	status,
-	current,
-	created_at,
-	last_seen_at,
-	revoked_at
-) VALUES (
-	$1,
-	$2,
-	$3,
-	$4,
-	$5,
-	'',
-	'',
-	$6,
-	TRUE,
-	$7,
-	$8,
-	NULL
-)
-`, qualifiedName("tenant", "identity_sessions")),
-			"sess-raw-cross",
-			account.ID,
-			"dev-raw-cross",
-			"Raw cross session",
-			identity.DevicePlatformWeb,
-			identity.SessionStatusActive,
-			now,
-			now,
-		)
-		if err != nil {
-			t.Fatalf("insert cross-account session: %v", err)
-		}
-
-		requirePgCode(t, tx.Commit(), "23503")
-	})
-
 	t.Run("rejects session deletion when attached devices remain", func(t *testing.T) {
 		if err := store.DeleteSession(ctx, sessionID); !errors.Is(err, identity.ErrConflict) {
 			t.Fatalf("expected conflict, got %v", err)
@@ -866,6 +670,251 @@ INSERT INTO %s (
 		if _, err := store.DeviceByID(ctx, primaryDeviceID); !errors.Is(err, identity.ErrNotFound) {
 			t.Fatalf("expected deleted device to be gone, got %v", err)
 		}
+	})
+}
+
+func TestIdentityAccountBoundaryConstraints(t *testing.T) {
+	db := openDockerPostgres(t)
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	migrationsPath := repoMigrationsPath(t,
+		"0001.sql",
+		"0002_identity_hardening.sql",
+		"0003_identity_account_boundaries.sql",
+	)
+	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	store, err := New(db, "tenant")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	ctx := context.Background()
+	now := time.Date(2026, time.March, 24, 0, 15, 0, 0, time.UTC)
+
+	account, err := store.SaveAccount(ctx, identity.Account{
+		ID:          "acc-1",
+		Kind:        identity.AccountKindUser,
+		Username:    "alice",
+		DisplayName: "Alice",
+		Status:      identity.AccountStatusActive,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	})
+	if err != nil {
+		t.Fatalf("save account: %v", err)
+	}
+	peerAccount, err := store.SaveAccount(ctx, identity.Account{
+		ID:          "acc-2",
+		Kind:        identity.AccountKindUser,
+		Username:    "bob",
+		DisplayName: "Bob",
+		Status:      identity.AccountStatusActive,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	})
+	if err != nil {
+		t.Fatalf("save peer account: %v", err)
+	}
+
+	t.Run("allows direct same-account device/session pair on commit", func(t *testing.T) {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatalf("begin tx: %v", err)
+		}
+		defer func() {
+			_ = tx.Rollback()
+		}()
+
+		_, err = tx.ExecContext(ctx, fmt.Sprintf(`
+INSERT INTO %s (
+	id,
+	account_id,
+	session_id,
+	name,
+	platform,
+	status,
+	public_key,
+	push_token,
+	created_at,
+	last_seen_at,
+	revoked_at,
+	last_rotated_at
+) VALUES (
+	$1,
+	$2,
+	$3,
+	$4,
+	$5,
+	$6,
+	$7,
+	'',
+	$8,
+	$9,
+	NULL,
+	NULL
+)
+`, qualifiedName("tenant", "identity_devices")),
+			"dev-raw-valid",
+			account.ID,
+			"sess-raw-valid",
+			"Raw valid device",
+			identity.DevicePlatformWeb,
+			identity.DeviceStatusActive,
+			"pk-raw-valid",
+			now,
+			now,
+		)
+		if err != nil {
+			t.Fatalf("insert valid device: %v", err)
+		}
+
+		_, err = tx.ExecContext(ctx, fmt.Sprintf(`
+INSERT INTO %s (
+	id,
+	account_id,
+	device_id,
+	device_name,
+	device_platform,
+	ip_address,
+	user_agent,
+	status,
+	current,
+	created_at,
+	last_seen_at,
+	revoked_at
+) VALUES (
+	$1,
+	$2,
+	$3,
+	$4,
+	$5,
+	'',
+	'',
+	$6,
+	TRUE,
+	$7,
+	$8,
+	NULL
+)
+`, qualifiedName("tenant", "identity_sessions")),
+			"sess-raw-valid",
+			account.ID,
+			"dev-raw-valid",
+			"Raw valid session",
+			identity.DevicePlatformWeb,
+			identity.SessionStatusActive,
+			now,
+			now,
+		)
+		if err != nil {
+			t.Fatalf("insert valid session: %v", err)
+		}
+
+		if err := tx.Commit(); err != nil {
+			t.Fatalf("commit valid device/session pair: %v", err)
+		}
+	})
+
+	t.Run("rejects direct cross-account device/session pair on commit", func(t *testing.T) {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatalf("begin tx: %v", err)
+		}
+		defer func() {
+			_ = tx.Rollback()
+		}()
+
+		_, err = tx.ExecContext(ctx, fmt.Sprintf(`
+INSERT INTO %s (
+	id,
+	account_id,
+	session_id,
+	name,
+	platform,
+	status,
+	public_key,
+	push_token,
+	created_at,
+	last_seen_at,
+	revoked_at,
+	last_rotated_at
+) VALUES (
+	$1,
+	$2,
+	$3,
+	$4,
+	$5,
+	$6,
+	$7,
+	'',
+	$8,
+	$9,
+	NULL,
+	NULL
+)
+`, qualifiedName("tenant", "identity_devices")),
+			"dev-raw-cross",
+			peerAccount.ID,
+			"sess-raw-cross",
+			"Raw cross device",
+			identity.DevicePlatformWeb,
+			identity.DeviceStatusActive,
+			"pk-raw-cross",
+			now,
+			now,
+		)
+		if err != nil {
+			t.Fatalf("insert cross-account device: %v", err)
+		}
+
+		_, err = tx.ExecContext(ctx, fmt.Sprintf(`
+INSERT INTO %s (
+	id,
+	account_id,
+	device_id,
+	device_name,
+	device_platform,
+	ip_address,
+	user_agent,
+	status,
+	current,
+	created_at,
+	last_seen_at,
+	revoked_at
+) VALUES (
+	$1,
+	$2,
+	$3,
+	$4,
+	$5,
+	'',
+	'',
+	$6,
+	TRUE,
+	$7,
+	$8,
+	NULL
+)
+`, qualifiedName("tenant", "identity_sessions")),
+			"sess-raw-cross",
+			account.ID,
+			"dev-raw-cross",
+			"Raw cross session",
+			identity.DevicePlatformWeb,
+			identity.SessionStatusActive,
+			now,
+			now,
+		)
+		if err != nil {
+			t.Fatalf("insert cross-account session: %v", err)
+		}
+
+		requirePgCode(t, tx.Commit(), "23503")
 	})
 }
 
