@@ -511,7 +511,7 @@ func seedNotificationReferences(t *testing.T, db *sql.DB, schema string) {
 
 	now := time.Date(2026, time.March, 25, 11, 59, 0, 0, time.UTC)
 	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
-INSERT INTO %s.identity_accounts (
+		INSERT INTO %s (
 	id, kind, username, display_name, bio, email, phone, roles, status, bot_token_hash,
 	created_by, created_at, updated_at, disabled_at, last_auth_at, custom_badge_emoji
 ) VALUES ($1, 'user', $2, $3, '', $4, '', '[]', 'active', '', 'seed', $5, $5, NULL, NULL, '')
@@ -527,7 +527,7 @@ ON CONFLICT (id) DO NOTHING
 	}
 
 	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
-INSERT INTO %s.identity_devices (
+		INSERT INTO %s (
 	id, account_id, session_id, name, platform, status, public_key, push_token,
 	created_at, last_seen_at, revoked_at, last_rotated_at
 ) VALUES ($1, $2, $3, $4, 'web', 'active', $5, '', $6, $6, NULL, NULL)
@@ -544,7 +544,7 @@ ON CONFLICT (id) DO NOTHING
 	}
 
 	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
-INSERT INTO %s.identity_sessions (
+		INSERT INTO %s (
 	id, account_id, device_id, device_name, device_platform, ip_address, user_agent, status, current,
 	created_at, last_seen_at, revoked_at
 ) VALUES ($1, $2, $3, $4, 'web', '', '', 'active', true, $5, $5, NULL)
@@ -560,7 +560,7 @@ ON CONFLICT (id) DO NOTHING
 	}
 
 	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
-INSERT INTO %s.conversation_conversations (
+		INSERT INTO %s (
 	id, kind, title, description, avatar_media_id, owner_account_id,
 	only_admins_can_write, only_admins_can_add_members, allow_reactions, allow_forwards,
 	allow_threads, require_join_approval, pinned_messages_only_admins, slow_mode_interval_nanos,
@@ -582,15 +582,36 @@ ON CONFLICT (id) DO NOTHING
 	}
 
 	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
-INSERT INTO %s.conversation_messages (
-	id, conversation_id, sender_account_id, sender_device_id, kind, status, created_at, updated_at
-) VALUES ($1, $2, $3, $4, 'text', 'sent', $5, $5)
+	INSERT INTO %s (
+	conversation_id, id, title, created_by_account_id, is_general, archived, pinned, closed,
+	last_sequence, message_count, created_at, updated_at, last_message_at, archived_at, closed_at
+) VALUES (
+	$1, '', 'General', $2, TRUE, FALSE, FALSE, FALSE,
+	0, 0, $3, $3, NULL, NULL, NULL
+)
+ON CONFLICT (conversation_id, id) DO NOTHING
+`, qualifiedName(schema, "conversation_topics")),
+		"conv-1",
+		"acc-1",
+		now,
+	); err != nil {
+		t.Fatalf("seed general topic: %v", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
+	INSERT INTO %s (
+	id, conversation_id, sender_account_id, sender_device_id, kind, status,
+	payload_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_aad,
+	created_at, updated_at
+) VALUES ($1, $2, $3, $4, 'text', 'sent', $5, 'xchacha20poly1305', decode('01', 'hex'),
+	decode('02', 'hex'), decode('03', 'hex'), $6, $6)
 ON CONFLICT (id) DO NOTHING
 `, qualifiedName(schema, "conversation_messages")),
 		"msg-1",
 		"conv-1",
 		"acc-1",
 		"dev-1",
+		"key-1",
 		now,
 	); err != nil {
 		t.Fatalf("seed message: %v", err)
@@ -630,19 +651,11 @@ func openDockerPostgres(t *testing.T) *sql.DB {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
+	cfg := postgresDockerConfigForGOOS(runtime.GOOS)
 	cmd := exec.CommandContext(
 		ctx,
 		"docker",
-		"run",
-		"-d",
-		"--rm",
-		"-e",
-		"POSTGRES_PASSWORD=pass",
-		"-e",
-		"POSTGRES_DB=test",
-		"-p",
-		"127.0.0.1::5432",
-		"postgres:16-alpine",
+		cfg.runArgs...,
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -658,17 +671,19 @@ func openDockerPostgres(t *testing.T) *sql.DB {
 		_ = exec.Command("docker", "rm", "-f", containerID).Run()
 	})
 
-	portOut, err := exec.CommandContext(ctx, "docker", "port", containerID, "5432/tcp").CombinedOutput()
-	if err != nil {
-		t.Skipf("lookup postgres port: %v: %s", err, strings.TrimSpace(string(portOut)))
+	dsn := cfg.dsn
+	if cfg.needsPortMapping {
+		portOut, err := exec.CommandContext(ctx, "docker", "port", containerID, "5432/tcp").CombinedOutput()
+		if err != nil {
+			t.Skipf("lookup postgres port: %v: %s", err, strings.TrimSpace(string(portOut)))
+		}
+		hostPort := strings.TrimSpace(string(portOut))
+		if hostPort == "" {
+			t.Skip("docker did not report a mapped port")
+		}
+		hostPort = hostPort[strings.LastIndex(hostPort, ":")+1:]
+		dsn = fmt.Sprintf(cfg.dsn, hostPort)
 	}
-	hostPort := strings.TrimSpace(string(portOut))
-	if hostPort == "" {
-		t.Skip("docker did not report a mapped port")
-	}
-	hostPort = hostPort[strings.LastIndex(hostPort, ":")+1:]
-
-	dsn := fmt.Sprintf("postgres://postgres:pass@127.0.0.1:%s/test?sslmode=disable", hostPort)
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		t.Fatalf("open postgres database: %v", err)
@@ -686,6 +701,49 @@ func openDockerPostgres(t *testing.T) *sql.DB {
 	_ = db.Close()
 	t.Skip("postgres container did not become ready")
 	return nil
+}
+
+type postgresDockerConfig struct {
+	runArgs          []string
+	dsn              string
+	needsPortMapping bool
+}
+
+func postgresDockerConfigForGOOS(goos string) postgresDockerConfig {
+	if goos == "linux" {
+		return postgresDockerConfig{
+			runArgs: []string{
+				"run",
+				"-d",
+				"--rm",
+				"--network",
+				"host",
+				"-e",
+				"POSTGRES_HOST_AUTH_METHOD=trust",
+				"-e",
+				"POSTGRES_DB=test",
+				"postgres:16-alpine",
+			},
+			dsn: "postgres://postgres@127.0.0.1:5432/test?sslmode=disable",
+		}
+	}
+
+	return postgresDockerConfig{
+		runArgs: []string{
+			"run",
+			"-d",
+			"--rm",
+			"-e",
+			"POSTGRES_PASSWORD=pass",
+			"-e",
+			"POSTGRES_DB=test",
+			"-p",
+			"127.0.0.1::5432",
+			"postgres:16-alpine",
+		},
+		dsn:              "postgres://postgres:pass@127.0.0.1:%s/test?sslmode=disable",
+		needsPortMapping: true,
+	}
 }
 
 func repoMigrationsPath(t *testing.T) string {
