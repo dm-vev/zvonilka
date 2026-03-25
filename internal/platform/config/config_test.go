@@ -6,6 +6,7 @@ import (
 	"time"
 
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
+	domainnotification "github.com/dm-vev/zvonilka/internal/domain/notification"
 	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
 )
 
@@ -40,6 +41,13 @@ func TestFromEnvUsesDistinctServiceDefaults(t *testing.T) {
 			want: expected{
 				http: ":8082",
 				grpc: ":9092",
+			},
+		},
+		{
+			service: "notificationworker",
+			want: expected{
+				http: ":8083",
+				grpc: ":9093",
 			},
 		},
 	}
@@ -125,6 +133,65 @@ func TestLoadRejectsUnsupportedServiceName(t *testing.T) {
 		t.Fatal("expected load to fail")
 	}
 	if !strings.Contains(err.Error(), "unsupported service name") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadNotificationDefaultsMatchDomainSettings(t *testing.T) {
+	resetConfigEnv(t)
+
+	cfg, err := Load("notificationworker")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if got, want := cfg.Notification.ToSettings(), domainnotification.DefaultSettings(); got != want {
+		t.Fatalf("notification settings mismatch: got %+v, want %+v", got, want)
+	}
+}
+
+func TestLoadAppliesNotificationOverrides(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_NOTIFICATION_WORKER_POLL_INTERVAL", "750ms")
+	t.Setenv("ZVONILKA_NOTIFICATION_RETRY_INITIAL_BACKOFF", "2s")
+	t.Setenv("ZVONILKA_NOTIFICATION_RETRY_MAX_BACKOFF", "30s")
+	t.Setenv("ZVONILKA_NOTIFICATION_MAX_ATTEMPTS", "9")
+	t.Setenv("ZVONILKA_NOTIFICATION_BATCH_SIZE", "42")
+
+	cfg, err := Load("notificationworker")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.Notification.WorkerPollInterval != 750*time.Millisecond {
+		t.Fatalf("worker poll interval: got %s, want 750ms", cfg.Notification.WorkerPollInterval)
+	}
+	if cfg.Notification.RetryInitialBackoff != 2*time.Second {
+		t.Fatalf("retry initial backoff: got %s, want 2s", cfg.Notification.RetryInitialBackoff)
+	}
+	if cfg.Notification.RetryMaxBackoff != 30*time.Second {
+		t.Fatalf("retry max backoff: got %s, want 30s", cfg.Notification.RetryMaxBackoff)
+	}
+	if cfg.Notification.MaxAttempts != 9 {
+		t.Fatalf("max attempts: got %d, want 9", cfg.Notification.MaxAttempts)
+	}
+	if cfg.Notification.BatchSize != 42 {
+		t.Fatalf("batch size: got %d, want 42", cfg.Notification.BatchSize)
+	}
+}
+
+func TestLoadRejectsInvalidNotificationRetryWindow(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_NOTIFICATION_RETRY_INITIAL_BACKOFF", "10s")
+	t.Setenv("ZVONILKA_NOTIFICATION_RETRY_MAX_BACKOFF", "5s")
+
+	_, err := Load("notificationworker")
+	if err == nil {
+		t.Fatal("expected load to fail")
+	}
+	if !strings.Contains(err.Error(), "notification retry max backoff must be greater than or equal to the initial backoff") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -490,6 +557,20 @@ func resetConfigEnv(t *testing.T) {
 		"ZVONILKA_BOTAPI_HTTP_ADDR",
 		"ZVONILKA_BOTAPI_GRPC_ADDR",
 		"ZVONILKA_BOTAPI_SHUTDOWN_TIMEOUT",
+		"ZVONILKA_NOTIFICATIONWORKER_ENV",
+		"ZVONILKA_NOTIFICATIONWORKER_HTTP_ADDR",
+		"ZVONILKA_NOTIFICATIONWORKER_GRPC_ADDR",
+		"ZVONILKA_NOTIFICATIONWORKER_SHUTDOWN_TIMEOUT",
+		"ZVONILKA_NOTIFICATION_WORKER_POLL_INTERVAL",
+		"ZVONILKA_NOTIFICATION_RETRY_INITIAL_BACKOFF",
+		"ZVONILKA_NOTIFICATION_RETRY_MAX_BACKOFF",
+		"ZVONILKA_NOTIFICATION_MAX_ATTEMPTS",
+		"ZVONILKA_NOTIFICATION_BATCH_SIZE",
+		"ZVONILKA_NOTIFICATIONWORKER_NOTIFICATION_WORKER_POLL_INTERVAL",
+		"ZVONILKA_NOTIFICATIONWORKER_NOTIFICATION_RETRY_INITIAL_BACKOFF",
+		"ZVONILKA_NOTIFICATIONWORKER_NOTIFICATION_RETRY_MAX_BACKOFF",
+		"ZVONILKA_NOTIFICATIONWORKER_NOTIFICATION_MAX_ATTEMPTS",
+		"ZVONILKA_NOTIFICATIONWORKER_NOTIFICATION_BATCH_SIZE",
 		"ZVONILKA_CONTROLPLANE_STORAGE_PRIMARY_PROVIDER",
 		"ZVONILKA_CONTROLPLANE_STORAGE_CACHE_PROVIDER",
 		"ZVONILKA_CONTROLPLANE_STORAGE_OBJECT_PROVIDER",
@@ -505,6 +586,11 @@ func resetConfigEnv(t *testing.T) {
 		"ZVONILKA_BOTAPI_STORAGE_OBJECT_PROVIDER",
 		"ZVONILKA_BOTAPI_STORAGE_AUDIT_PROVIDER",
 		"ZVONILKA_BOTAPI_STORAGE_SEARCH_PROVIDER",
+		"ZVONILKA_NOTIFICATIONWORKER_STORAGE_PRIMARY_PROVIDER",
+		"ZVONILKA_NOTIFICATIONWORKER_STORAGE_CACHE_PROVIDER",
+		"ZVONILKA_NOTIFICATIONWORKER_STORAGE_OBJECT_PROVIDER",
+		"ZVONILKA_NOTIFICATIONWORKER_STORAGE_AUDIT_PROVIDER",
+		"ZVONILKA_NOTIFICATIONWORKER_STORAGE_SEARCH_PROVIDER",
 		"ZVONILKA_STORAGE_PRIMARY_PROVIDER",
 		"ZVONILKA_STORAGE_CACHE_PROVIDER",
 		"ZVONILKA_STORAGE_OBJECT_PROVIDER",

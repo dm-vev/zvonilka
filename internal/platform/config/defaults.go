@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
+	domainnotification "github.com/dm-vev/zvonilka/internal/domain/notification"
 	"github.com/dm-vev/zvonilka/internal/domain/presence"
 )
 
@@ -25,6 +26,10 @@ var serviceListenDefaults = map[string]listenDefaults{
 	"botapi": {
 		http: ":8082",
 		grpc: ":9092",
+	},
+	"notificationworker": {
+		http: ":8083",
+		grpc: ":9093",
 	},
 }
 
@@ -55,6 +60,7 @@ func defaultConfiguration(serviceName string) Configuration {
 	runtimeDefaults := defaultRuntime(serviceName, environment)
 	identityDefaults := identity.DefaultSettings()
 	presenceDefaults := presence.DefaultSettings()
+	notificationDefaults := domainnotification.DefaultSettings()
 
 	cfg := Configuration{
 		Service: ServiceConfig{
@@ -81,6 +87,13 @@ func defaultConfiguration(serviceName string) Configuration {
 		},
 		Presence: PresenceConfig{
 			OnlineWindow: presenceDefaults.OnlineWindow,
+		},
+		Notification: NotificationConfig{
+			WorkerPollInterval:  notificationDefaults.WorkerPollInterval,
+			RetryInitialBackoff: notificationDefaults.RetryInitialBackoff,
+			RetryMaxBackoff:     notificationDefaults.RetryMaxBackoff,
+			MaxAttempts:         notificationDefaults.MaxAttempts,
+			BatchSize:           notificationDefaults.BatchSize,
 		},
 		Infrastructure: InfrastructureConfig{
 			Postgres: PostgresConfig{

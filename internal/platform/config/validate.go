@@ -57,6 +57,24 @@ func (c Configuration) Validate() error {
 	if c.Presence.OnlineWindow <= 0 {
 		errs = append(errs, errors.New("presence online window must be positive"))
 	}
+	if c.Notification.WorkerPollInterval <= 0 {
+		errs = append(errs, errors.New("notification worker poll interval must be positive"))
+	}
+	if c.Notification.RetryInitialBackoff <= 0 {
+		errs = append(errs, errors.New("notification retry initial backoff must be positive"))
+	}
+	if c.Notification.RetryMaxBackoff <= 0 {
+		errs = append(errs, errors.New("notification retry max backoff must be positive"))
+	}
+	if c.Notification.RetryMaxBackoff < c.Notification.RetryInitialBackoff {
+		errs = append(errs, errors.New("notification retry max backoff must be greater than or equal to the initial backoff"))
+	}
+	if c.Notification.MaxAttempts <= 0 {
+		errs = append(errs, errors.New("notification max attempts must be positive"))
+	}
+	if c.Notification.BatchSize <= 0 {
+		errs = append(errs, errors.New("notification batch size must be positive"))
+	}
 	if c.Runtime.HTTP.ReadHeaderTimeout <= 0 {
 		errs = append(errs, errors.New("HTTP read header timeout must be positive"))
 	}
@@ -180,7 +198,7 @@ func validateLogFormat(format string) error {
 func validateServiceName(serviceName string) error {
 	serviceName = strings.ToLower(strings.TrimSpace(serviceName))
 	switch serviceName {
-	case "controlplane", "gateway", "botapi":
+	case "controlplane", "gateway", "botapi", "notificationworker":
 		return nil
 	case "":
 		return errors.New("service name is required")

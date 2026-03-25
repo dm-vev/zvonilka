@@ -13,6 +13,7 @@ type Configuration struct {
 	Identity       IdentityConfig
 	Media          MediaConfig
 	Presence       PresenceConfig
+	Notification   NotificationConfig
 	Infrastructure InfrastructureConfig
 	Storage        StorageConfig
 	Features       FeatureConfig
