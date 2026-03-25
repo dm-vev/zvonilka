@@ -12,6 +12,7 @@ type Configuration struct {
 	Runtime        RuntimeConfig
 	Identity       IdentityConfig
 	Media          MediaConfig
+	Presence       PresenceConfig
 	Infrastructure InfrastructureConfig
 	Storage        StorageConfig
 	Features       FeatureConfig

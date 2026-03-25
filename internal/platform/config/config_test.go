@@ -3,8 +3,10 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
 
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
+	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
 )
 
 func TestFromEnvUsesDistinctServiceDefaults(t *testing.T) {
@@ -211,6 +213,48 @@ func TestLoadUsesStorageProviderDefaults(t *testing.T) {
 	}
 	if cfg.Storage.SearchProvider != "search" {
 		t.Fatalf("storage search provider: got %s, want search", cfg.Storage.SearchProvider)
+	}
+}
+
+func TestLoadPresenceDefaultsMatchDomainSettings(t *testing.T) {
+	resetConfigEnv(t)
+
+	cfg, err := Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if got, want := cfg.Presence.ToSettings(), domainpresence.DefaultSettings(); got != want {
+		t.Fatalf("presence settings mismatch: got %+v, want %+v", got, want)
+	}
+}
+
+func TestLoadAppliesPresenceOnlineWindowOverride(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_PRESENCE_ONLINE_WINDOW", "12m")
+
+	cfg, err := Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.Presence.OnlineWindow != 12*time.Minute {
+		t.Fatalf("presence online window: got %s, want 12m", cfg.Presence.OnlineWindow)
+	}
+}
+
+func TestLoadRejectsInvalidPresenceOnlineWindow(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_PRESENCE_ONLINE_WINDOW", "0s")
+
+	_, err := Load("controlplane")
+	if err == nil {
+		t.Fatal("expected load to fail")
+	}
+	if !strings.Contains(err.Error(), "presence online window must be positive") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -466,6 +510,10 @@ func resetConfigEnv(t *testing.T) {
 		"ZVONILKA_STORAGE_OBJECT_PROVIDER",
 		"ZVONILKA_STORAGE_AUDIT_PROVIDER",
 		"ZVONILKA_STORAGE_SEARCH_PROVIDER",
+		"ZVONILKA_PRESENCE_ONLINE_WINDOW",
+		"ZVONILKA_CONTROLPLANE_PRESENCE_ONLINE_WINDOW",
+		"ZVONILKA_GATEWAY_PRESENCE_ONLINE_WINDOW",
+		"ZVONILKA_BOTAPI_PRESENCE_ONLINE_WINDOW",
 	}
 
 	for _, key := range keys {

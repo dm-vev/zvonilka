@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
+	"github.com/dm-vev/zvonilka/internal/domain/presence"
 )
 
 type listenDefaults struct {
@@ -53,6 +54,7 @@ func defaultConfiguration(serviceName string) Configuration {
 	environment := defaultEnvironment
 	runtimeDefaults := defaultRuntime(serviceName, environment)
 	identityDefaults := identity.DefaultSettings()
+	presenceDefaults := presence.DefaultSettings()
 
 	cfg := Configuration{
 		Service: ServiceConfig{
@@ -76,6 +78,9 @@ func defaultConfiguration(serviceName string) Configuration {
 			UploadURLTTL:   defaultMediaUploadURLTTL,
 			DownloadURLTTL: defaultMediaDownloadURLTTL,
 			MaxUploadSize:  defaultMediaMaxUploadSize,
+		},
+		Presence: PresenceConfig{
+			OnlineWindow: presenceDefaults.OnlineWindow,
 		},
 		Infrastructure: InfrastructureConfig{
 			Postgres: PostgresConfig{

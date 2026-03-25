@@ -124,6 +124,11 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Media.MaxUploadSize = value
 	}
+	if value, ok, err := durationValue(serviceName, "PRESENCE_ONLINE_WINDOW", cfg.Presence.OnlineWindow); err != nil {
+		return err
+	} else if ok {
+		cfg.Presence.OnlineWindow = value
+	}
 
 	postgresEnabledSet := false
 	if value, ok, err := boolValue(serviceName, "POSTGRES_ENABLED", cfg.Infrastructure.Postgres.Enabled); err != nil {
