@@ -14,6 +14,8 @@ import (
 	postgresmedia "github.com/dm-vev/zvonilka/internal/domain/media/pgstore"
 	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
 	postgrespresence "github.com/dm-vev/zvonilka/internal/domain/presence/pgstore"
+	domainsearch "github.com/dm-vev/zvonilka/internal/domain/search"
+	postgressearch "github.com/dm-vev/zvonilka/internal/domain/search/pgstore"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
 	platformstorage "github.com/dm-vev/zvonilka/internal/platform/storage"
@@ -54,6 +56,10 @@ var newConversationService = func(store domainconversation.Store, opts ...domain
 
 var newMediaStore = func(db *sql.DB, schema string) (domainmedia.Store, error) {
 	return postgresmedia.New(db, schema)
+}
+
+var newSearchStore = func(db *sql.DB, schema string) (domainsearch.Store, error) {
+	return postgressearch.New(db, schema)
 }
 
 var newPresenceStore = func(db *sql.DB, schema string) (domainpresence.Store, error) {
@@ -171,6 +177,49 @@ func buildAppStorage(
 		)
 	}
 
+	searchProvider, err := catalog.Provider(cfg.Storage.SearchProvider)
+	if err != nil {
+		return nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("select search storage provider %q: %w", cfg.Storage.SearchProvider, err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	searchRelational, ok := searchProvider.(domainstorage.RelationalProvider)
+	if !ok {
+		return nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("select search storage provider: expected relational provider"),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+
+	searchStore, err := newSearchStore(searchRelational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres search store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	if searchStore == nil {
+		return nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres search store: %w", domainsearch.ErrInvalidInput),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+
+	searchService, err := domainsearch.NewService(searchStore, domainsearch.WithSettings(cfg.Search.ToSettings()))
+	if err != nil {
+		return nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct search service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	if searchService == nil {
+		return nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct search service: %w", domainsearch.ErrInvalidInput),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+
 	store, err := newIdentityStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
 	if err != nil {
 		return nil, nil, nil, nil, nil, joinStorageError(
@@ -185,7 +234,11 @@ func buildAppStorage(
 		)
 	}
 
-	identityService, err := newIdentityService(store, domainidentity.NoopCodeSender{}, domainidentity.WithSettings(cfg.Identity.ToSettings()))
+	var identityService *domainidentity.Service
+	identityService, err = newIdentityService(store, domainidentity.NoopCodeSender{},
+		domainidentity.WithSettings(cfg.Identity.ToSettings()),
+		domainidentity.WithIndexer(searchService),
+	)
 	if err != nil {
 		return nil, nil, nil, nil, nil, joinStorageError(
 			fmt.Errorf("construct identity service: %w", err),
@@ -213,7 +266,7 @@ func buildAppStorage(
 		)
 	}
 
-	conversationService, err := newConversationService(conversationStore)
+	conversationService, err := newConversationService(conversationStore, domainconversation.WithIndexer(searchService))
 	if err != nil {
 		return nil, nil, nil, nil, nil, joinStorageError(
 			fmt.Errorf("construct conversation service: %w", err),
@@ -288,7 +341,12 @@ func buildAppStorage(
 		)
 	}
 
-	mediaService, err := newMediaService(mediaStore, blobStore, domainmedia.WithSettings(cfg.Media.ToSettings()))
+	mediaService, err := newMediaService(
+		mediaStore,
+		blobStore,
+		domainmedia.WithSettings(cfg.Media.ToSettings()),
+		domainmedia.WithIndexer(searchService),
+	)
 	if err != nil {
 		return nil, nil, nil, nil, nil, joinStorageError(
 			fmt.Errorf("construct media service: %w", err),

@@ -7,6 +7,7 @@ import (
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	domainnotification "github.com/dm-vev/zvonilka/internal/domain/notification"
 	"github.com/dm-vev/zvonilka/internal/domain/presence"
+	domainsearch "github.com/dm-vev/zvonilka/internal/domain/search"
 )
 
 type listenDefaults struct {
@@ -61,6 +62,7 @@ func defaultConfiguration(serviceName string) Configuration {
 	identityDefaults := identity.DefaultSettings()
 	presenceDefaults := presence.DefaultSettings()
 	notificationDefaults := domainnotification.DefaultSettings()
+	searchDefaults := domainsearch.DefaultSettings()
 
 	cfg := Configuration{
 		Service: ServiceConfig{
@@ -94,6 +96,12 @@ func defaultConfiguration(serviceName string) Configuration {
 			RetryMaxBackoff:     notificationDefaults.RetryMaxBackoff,
 			MaxAttempts:         notificationDefaults.MaxAttempts,
 			BatchSize:           notificationDefaults.BatchSize,
+		},
+		Search: SearchConfig{
+			DefaultLimit:   searchDefaults.DefaultLimit,
+			MaxLimit:       searchDefaults.MaxLimit,
+			MinQueryLength: searchDefaults.MinQueryLength,
+			SnippetLength:  searchDefaults.SnippetLength,
 		},
 		Infrastructure: InfrastructureConfig{
 			Postgres: PostgresConfig{

@@ -78,6 +78,21 @@ func (c Configuration) Validate() error {
 	if c.Notification.BatchSize <= 0 {
 		errs = append(errs, errors.New("notification batch size must be positive"))
 	}
+	if c.Search.DefaultLimit <= 0 {
+		errs = append(errs, errors.New("search default limit must be positive"))
+	}
+	if c.Search.MaxLimit <= 0 {
+		errs = append(errs, errors.New("search max limit must be positive"))
+	}
+	if c.Search.MaxLimit < c.Search.DefaultLimit {
+		errs = append(errs, errors.New("search max limit must be greater than or equal to the default limit"))
+	}
+	if c.Search.MinQueryLength <= 0 {
+		errs = append(errs, errors.New("search minimum query length must be positive"))
+	}
+	if c.Search.SnippetLength <= 0 {
+		errs = append(errs, errors.New("search snippet length must be positive"))
+	}
 	if c.Runtime.HTTP.ReadHeaderTimeout <= 0 {
 		errs = append(errs, errors.New("HTTP read header timeout must be positive"))
 	}

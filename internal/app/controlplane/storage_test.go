@@ -35,6 +35,15 @@ func testObjectStorageConfig() config.ObjectStorageConfig {
 	}
 }
 
+func testSearchConfig() config.SearchConfig {
+	return config.SearchConfig{
+		DefaultLimit:   25,
+		MaxLimit:       100,
+		MinQueryLength: 2,
+		SnippetLength:  160,
+	}
+}
+
 func testStorageBindings() config.StorageConfig {
 	return config.StorageConfig{
 		PrimaryProvider: "primary",
@@ -78,6 +87,7 @@ func TestBuildAppStorageRejectsNilStorageBuilder(t *testing.T) {
 	}
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+	cfg.Search = testSearchConfig()
 
 	_, _, _, _, _, err := buildAppStorage(context.Background(), cfg)
 	if err == nil {
@@ -108,6 +118,7 @@ func TestBuildAppStorageRejectsNilCatalog(t *testing.T) {
 	}
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+	cfg.Search = testSearchConfig()
 
 	_, _, _, _, _, err := buildAppStorage(context.Background(), cfg)
 	if err == nil {
@@ -128,10 +139,23 @@ func TestBuildAppStorageRejectsNilIdentityStore(t *testing.T) {
 		newIdentityService = originalService
 	})
 
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
 	catalog, err := domainstorage.NewCatalog(
 		&fakeRelationalProvider{
 			name:         "primary",
 			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+		},
+		&fakeRelationalProvider{
+			name:         "search",
+			db:           db,
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityListing,
 		},
 	)
 	if err != nil {
@@ -160,6 +184,7 @@ func TestBuildAppStorageRejectsNilIdentityStore(t *testing.T) {
 	}
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+	cfg.Search = testSearchConfig()
 
 	_, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
 	if err == nil {
@@ -199,6 +224,11 @@ func TestBuildAppStorageRejectsNilIdentityService(t *testing.T) {
 			db:           db,
 			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
 		},
+		&fakeRelationalProvider{
+			name:         "search",
+			db:           db,
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityListing,
+		},
 	)
 	if err != nil {
 		t.Fatalf("new catalog: %v", err)
@@ -225,6 +255,7 @@ func TestBuildAppStorageRejectsNilIdentityService(t *testing.T) {
 	}
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+	cfg.Search = testSearchConfig()
 
 	_, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
 	if err == nil {
@@ -267,6 +298,7 @@ func TestBuildAppStorageRejectsMissingPrimaryProvider(t *testing.T) {
 	}
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+	cfg.Search = testSearchConfig()
 
 	_, _, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
@@ -314,6 +346,7 @@ func TestBuildAppStorageRejectsNonRelationalPrimaryProvider(t *testing.T) {
 	}
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+	cfg.Search = testSearchConfig()
 
 	_, _, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
@@ -340,13 +373,27 @@ func TestBuildAppStorageJoinsCleanupErrorOnStartupFailure(t *testing.T) {
 		newIdentityService = originalIdentityService
 	})
 
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
 	startupErr := errors.New("identity store failed")
 	closeErr := errors.New("catalog close failed")
 	catalog, err := domainstorage.NewCatalog(
 		&fakeRelationalProvider{
 			name:         "primary",
+			db:           db,
 			closeErr:     closeErr,
 			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+		},
+		&fakeRelationalProvider{
+			name:         "search",
+			db:           db,
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityListing,
 		},
 	)
 	if err != nil {
@@ -374,6 +421,7 @@ func TestBuildAppStorageJoinsCleanupErrorOnStartupFailure(t *testing.T) {
 	}
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+	cfg.Search = testSearchConfig()
 
 	_, _, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
@@ -416,7 +464,11 @@ func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
 		&fakeProvider{name: "cache"},
 		&fakeProvider{name: "object"},
 		&fakeProvider{name: "audit"},
-		&fakeProvider{name: "search"},
+		&fakeRelationalProvider{
+			name:         "search",
+			db:           correctDB,
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityListing,
+		},
 	)
 	if err != nil {
 		t.Fatalf("new catalog: %v", err)
@@ -459,6 +511,7 @@ func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
 	}
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+	cfg.Search = testSearchConfig()
 
 	createdCatalog, service, conversationService, mediaService, presenceService, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr != nil {
@@ -508,10 +561,14 @@ func TestBuildAppStorageRejectsNilPresenceStore(t *testing.T) {
 			db:           db,
 			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
 		},
+		&fakeRelationalProvider{
+			name:         "search",
+			db:           db,
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityListing,
+		},
 		&fakeProvider{name: "cache"},
 		&fakeProvider{name: "object"},
 		&fakeProvider{name: "audit"},
-		&fakeProvider{name: "search"},
 	)
 	if err != nil {
 		t.Fatalf("new catalog: %v", err)
@@ -537,6 +594,7 @@ func TestBuildAppStorageRejectsNilPresenceStore(t *testing.T) {
 			ObjectStore: testObjectStorageConfig(),
 		},
 		Storage: testStorageBindings(),
+		Search:  testSearchConfig(),
 	}
 
 	_, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
@@ -572,10 +630,14 @@ func TestBuildAppStorageRejectsNilPresenceService(t *testing.T) {
 			db:           db,
 			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
 		},
+		&fakeRelationalProvider{
+			name:         "search",
+			db:           db,
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityListing,
+		},
 		&fakeProvider{name: "cache"},
 		&fakeProvider{name: "object"},
 		&fakeProvider{name: "audit"},
-		&fakeProvider{name: "search"},
 	)
 	if err != nil {
 		t.Fatalf("new catalog: %v", err)
@@ -600,6 +662,7 @@ func TestBuildAppStorageRejectsNilPresenceService(t *testing.T) {
 			ObjectStore: testObjectStorageConfig(),
 		},
 		Storage: testStorageBindings(),
+		Search:  testSearchConfig(),
 	}
 
 	_, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
@@ -651,10 +714,14 @@ func TestBuildAppStorageUsesConfiguredPresenceSettings(t *testing.T) {
 			db:           db,
 			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
 		},
+		&fakeRelationalProvider{
+			name:         "search",
+			db:           db,
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityListing,
+		},
 		&fakeProvider{name: "cache"},
 		&fakeProvider{name: "object"},
 		&fakeProvider{name: "audit"},
-		&fakeProvider{name: "search"},
 	)
 	if err != nil {
 		t.Fatalf("new catalog: %v", err)
@@ -697,6 +764,7 @@ func TestBuildAppStorageUsesConfiguredPresenceSettings(t *testing.T) {
 		},
 	}
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+	cfg.Search = testSearchConfig()
 
 	_, _, _, _, presenceService, err := buildAppStorage(context.Background(), cfg)
 	if err != nil {

@@ -167,12 +167,12 @@ func (s *Store) ConversationsByAccountID(ctx context.Context, accountID string) 
 	}
 
 	query := fmt.Sprintf(`
-SELECT c.%s
+SELECT %s
 FROM %s AS c
 INNER JOIN %s AS m ON m.conversation_id = c.id
 WHERE m.account_id = $1 AND m.left_at IS NULL AND NOT m.banned
 ORDER BY c.last_sequence DESC, c.updated_at DESC, c.id ASC
-`, conversationColumnList, s.table("conversation_conversations"), s.table("conversation_members"))
+`, qualifyColumns("c", conversationColumnList), s.table("conversation_conversations"), s.table("conversation_members"))
 
 	rows, err := s.conn().QueryContext(ctx, query, accountID)
 	if err != nil {

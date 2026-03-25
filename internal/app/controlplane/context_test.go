@@ -6,6 +6,8 @@ import (
 	"errors"
 	"testing"
 
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
+
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
@@ -18,11 +20,24 @@ func TestBuildAppStorageCleansUpCatalogWithCanceledContext(t *testing.T) {
 
 	startupErr := errors.New("identity store failed")
 	closeCtxErrs := make([]error, 0, 1)
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
 	catalog, err := domainstorage.NewCatalog(
 		&fakeRelationalProvider{
 			name:         "primary",
+			db:           db,
 			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
 			closeCtxErrs: &closeCtxErrs,
+		},
+		&fakeRelationalProvider{
+			name:         "search",
+			db:           db,
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityListing,
 		},
 	)
 	if err != nil {
@@ -57,6 +72,7 @@ func TestBuildAppStorageCleansUpCatalogWithCanceledContext(t *testing.T) {
 			ObjectStore: testObjectStorageConfig(),
 		},
 		Storage: testStorageBindings(),
+		Search:  testSearchConfig(),
 	}
 
 	_, _, _, _, _, gotErr := buildAppStorage(ctx, cfg)

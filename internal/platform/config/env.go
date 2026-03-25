@@ -159,6 +159,26 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Notification.BatchSize = value
 	}
+	if value, ok, err := intValue(serviceName, "SEARCH_DEFAULT_LIMIT", cfg.Search.DefaultLimit); err != nil {
+		return err
+	} else if ok {
+		cfg.Search.DefaultLimit = value
+	}
+	if value, ok, err := intValue(serviceName, "SEARCH_MAX_LIMIT", cfg.Search.MaxLimit); err != nil {
+		return err
+	} else if ok {
+		cfg.Search.MaxLimit = value
+	}
+	if value, ok, err := intValue(serviceName, "SEARCH_MIN_QUERY_LENGTH", cfg.Search.MinQueryLength); err != nil {
+		return err
+	} else if ok {
+		cfg.Search.MinQueryLength = value
+	}
+	if value, ok, err := intValue(serviceName, "SEARCH_SNIPPET_LENGTH", cfg.Search.SnippetLength); err != nil {
+		return err
+	} else if ok {
+		cfg.Search.SnippetLength = value
+	}
 
 	postgresEnabledSet := false
 	if value, ok, err := boolValue(serviceName, "POSTGRES_ENABLED", cfg.Infrastructure.Postgres.Enabled); err != nil {

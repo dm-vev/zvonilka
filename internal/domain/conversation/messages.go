@@ -259,5 +259,8 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 		return Message{}, EventEnvelope{}, err
 	}
 
+	s.indexMessage(ctx, savedMessage)
+	s.indexConversationByID(ctx, savedMessage.ConversationID)
+
 	return savedMessage, savedEvent, nil
 }

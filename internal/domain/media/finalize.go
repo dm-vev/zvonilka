@@ -82,6 +82,8 @@ func (s *Service) FinalizeUpload(ctx context.Context, params FinalizeUploadParam
 		return MediaAsset{}, err
 	}
 
+	s.indexMedia(ctx, saved)
+
 	return saved, nil
 }
 

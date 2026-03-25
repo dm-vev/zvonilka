@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	domainsearch "github.com/dm-vev/zvonilka/internal/domain/search"
 )
 
 // Service coordinates account lifecycle, login, and session management.
@@ -18,6 +20,7 @@ type Service struct {
 	accessTokenTTL  time.Duration
 	refreshTokenTTL time.Duration
 	loginCodeLength int
+	indexer         domainsearch.Indexer
 }
 
 // NewService constructs a service backed by the provided store and sender.

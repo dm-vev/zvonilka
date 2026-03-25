@@ -80,6 +80,8 @@ func (s *Service) ReserveUpload(ctx context.Context, params ReserveUploadParams)
 		return MediaAsset{}, UploadTarget{}, err
 	}
 
+	s.indexMedia(ctx, saved)
+
 	return saved, UploadTarget{
 		URL:       presignedUpload.URL,
 		Method:    presignedUpload.Method,

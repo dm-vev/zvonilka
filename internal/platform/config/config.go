@@ -14,6 +14,7 @@ type Configuration struct {
 	Media          MediaConfig
 	Presence       PresenceConfig
 	Notification   NotificationConfig
+	Search         SearchConfig
 	Infrastructure InfrastructureConfig
 	Storage        StorageConfig
 	Features       FeatureConfig

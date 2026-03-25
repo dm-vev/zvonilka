@@ -219,31 +219,6 @@ func scanConversationMember(row rowScanner) (conversation.ConversationMember, er
 	return member, nil
 }
 
-func scanAttachment(row rowScanner) (conversation.AttachmentRef, error) {
-	var (
-		attachment conversation.AttachmentRef
-		duration   sql.NullInt64
-	)
-
-	if err := row.Scan(
-		&attachment.MediaID,
-		&attachment.Kind,
-		&attachment.FileName,
-		&attachment.MimeType,
-		&attachment.SizeBytes,
-		&attachment.SHA256Hex,
-		&attachment.Width,
-		&attachment.Height,
-		&duration,
-		&attachment.Caption,
-	); err != nil {
-		return conversation.AttachmentRef{}, err
-	}
-
-	attachment.Duration = decodeAttachmentDuration(duration.Int64)
-	return attachment, nil
-}
-
 func scanReaction(row rowScanner) (conversation.MessageReaction, error) {
 	var reaction conversation.MessageReaction
 
@@ -395,6 +370,7 @@ func scanEvent(row rowScanner) (conversation.EventEnvelope, error) {
 	var (
 		event              conversation.EventEnvelope
 		actorDeviceID      sql.NullString
+		messageID          sql.NullString
 		keyID              string
 		algorithm          string
 		nonce              []byte
@@ -413,7 +389,7 @@ func scanEvent(row rowScanner) (conversation.EventEnvelope, error) {
 		&actorDeviceID,
 		&event.CausationID,
 		&event.CorrelationID,
-		&event.MessageID,
+		&messageID,
 		&event.PayloadType,
 		&keyID,
 		&algorithm,
@@ -429,6 +405,7 @@ func scanEvent(row rowScanner) (conversation.EventEnvelope, error) {
 	}
 
 	event.ActorDeviceID = actorDeviceID.String
+	event.MessageID = messageID.String
 	payload, err := decodePayload(keyID, algorithm, nonce, ciphertext, aad, rawPayloadMetadata)
 	if err != nil {
 		return conversation.EventEnvelope{}, err
