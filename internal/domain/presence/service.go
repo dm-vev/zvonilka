@@ -86,6 +86,22 @@ func (s *Service) validateContext(ctx context.Context, operation string) error {
 	return nil
 }
 
+func (s *Service) activeAccount(ctx context.Context, accountID string) (identity.Account, error) {
+	account, err := s.identity.AccountByID(ctx, accountID)
+	if err != nil {
+		if errors.Is(err, identity.ErrNotFound) {
+			return identity.Account{}, ErrNotFound
+		}
+
+		return identity.Account{}, fmt.Errorf("load account %s: %w", accountID, err)
+	}
+	if account.Status != identity.AccountStatusActive {
+		return identity.Account{}, ErrNotFound
+	}
+
+	return account, nil
+}
+
 // SetPresence persists explicit presence state for an account.
 func (s *Service) SetPresence(ctx context.Context, params SetParams) (Presence, error) {
 	if err := s.validateContext(ctx, "set presence"); err != nil {
@@ -101,13 +117,9 @@ func (s *Service) SetPresence(ctx context.Context, params SetParams) (Presence, 
 		return Presence{}, ErrInvalidInput
 	}
 
-	_, err := s.identity.AccountByID(ctx, params.AccountID)
+	_, err := s.activeAccount(ctx, params.AccountID)
 	if err != nil {
-		if errors.Is(err, identity.ErrNotFound) {
-			return Presence{}, ErrNotFound
-		}
-
-		return Presence{}, fmt.Errorf("load account %s: %w", params.AccountID, err)
+		return Presence{}, err
 	}
 
 	existing, err := s.store.PresenceByAccountID(ctx, params.AccountID)
@@ -162,13 +174,9 @@ func (s *Service) GetPresence(ctx context.Context, params GetParams) (Snapshot, 
 		return Snapshot{}, ErrInvalidInput
 	}
 
-	account, err := s.identity.AccountByID(ctx, params.AccountID)
+	account, err := s.activeAccount(ctx, params.AccountID)
 	if err != nil {
-		if errors.Is(err, identity.ErrNotFound) {
-			return Snapshot{}, ErrNotFound
-		}
-
-		return Snapshot{}, fmt.Errorf("load account %s: %w", params.AccountID, err)
+		return Snapshot{}, err
 	}
 
 	record, err := s.store.PresenceByAccountID(ctx, params.AccountID)

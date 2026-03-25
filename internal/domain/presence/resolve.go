@@ -2,6 +2,7 @@ package presence
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
@@ -15,6 +16,9 @@ func (s *Service) lastSeenAt(ctx context.Context, account identity.Account) (tim
 		return time.Time{}, err
 	}
 	for _, session := range sessions {
+		if session.Status != identity.SessionStatusActive {
+			continue
+		}
 		if session.LastSeenAt.After(lastSeen) {
 			lastSeen = session.LastSeenAt.UTC()
 		}
@@ -25,6 +29,9 @@ func (s *Service) lastSeenAt(ctx context.Context, account identity.Account) (tim
 		return time.Time{}, err
 	}
 	for _, device := range devices {
+		if device.Status != identity.DeviceStatusActive {
+			continue
+		}
 		if device.LastSeenAt.After(lastSeen) {
 			lastSeen = device.LastSeenAt.UTC()
 		}
@@ -35,9 +42,7 @@ func (s *Service) lastSeenAt(ctx context.Context, account identity.Account) (tim
 
 func (s *Service) snapshot(viewerAccountID string, record Presence, lastSeenAt time.Time) Snapshot {
 	state := record.State
-	if state == PresenceStateUnspecified {
-		state = PresenceStateOffline
-	}
+	hasExplicitRecord := strings.TrimSpace(record.AccountID) != ""
 
 	now := s.currentTime()
 	online := !lastSeenAt.IsZero() && now.Sub(lastSeenAt) <= s.settings.OnlineWindow
@@ -47,9 +52,13 @@ func (s *Service) snapshot(viewerAccountID string, record Presence, lastSeenAt t
 		if viewerAccountID != record.AccountID {
 			state = PresenceStateOffline
 		}
-	case PresenceStateOnline, PresenceStateAway, PresenceStateBusy:
+	case PresenceStateOffline, PresenceStateOnline, PresenceStateAway, PresenceStateBusy:
 		// Keep the explicit state as-is.
 	default:
+		if hasExplicitRecord {
+			state = PresenceStateOffline
+			break
+		}
 		if online {
 			state = PresenceStateOnline
 		} else {
