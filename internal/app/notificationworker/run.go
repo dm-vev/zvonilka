@@ -84,7 +84,7 @@ func finalizeRun(ctx context.Context, app *app, runErr error) error {
 		return runErr
 	}
 
-	closeErr := app.bootstrap.Close(ctx)
+	closeErr := closeBootstrap(ctx, app.bootstrap, app.cleanupTimeout)
 	if closeErr == nil {
 		return runErr
 	}
