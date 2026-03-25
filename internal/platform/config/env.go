@@ -134,6 +134,31 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Presence.OnlineWindow = value
 	}
+	if value, ok, err := durationValue(serviceName, "NOTIFICATION_WORKER_POLL_INTERVAL", cfg.Notification.WorkerPollInterval); err != nil {
+		return err
+	} else if ok {
+		cfg.Notification.WorkerPollInterval = value
+	}
+	if value, ok, err := durationValue(serviceName, "NOTIFICATION_RETRY_INITIAL_BACKOFF", cfg.Notification.RetryInitialBackoff); err != nil {
+		return err
+	} else if ok {
+		cfg.Notification.RetryInitialBackoff = value
+	}
+	if value, ok, err := durationValue(serviceName, "NOTIFICATION_RETRY_MAX_BACKOFF", cfg.Notification.RetryMaxBackoff); err != nil {
+		return err
+	} else if ok {
+		cfg.Notification.RetryMaxBackoff = value
+	}
+	if value, ok, err := intValue(serviceName, "NOTIFICATION_MAX_ATTEMPTS", cfg.Notification.MaxAttempts); err != nil {
+		return err
+	} else if ok {
+		cfg.Notification.MaxAttempts = value
+	}
+	if value, ok, err := intValue(serviceName, "NOTIFICATION_BATCH_SIZE", cfg.Notification.BatchSize); err != nil {
+		return err
+	} else if ok {
+		cfg.Notification.BatchSize = value
+	}
 
 	postgresEnabledSet := false
 	if value, ok, err := boolValue(serviceName, "POSTGRES_ENABLED", cfg.Infrastructure.Postgres.Enabled); err != nil {
