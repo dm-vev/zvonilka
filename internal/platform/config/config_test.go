@@ -229,19 +229,6 @@ func TestLoadUsesStorageProviderDefaults(t *testing.T) {
 	}
 }
 
-func TestLoadPresenceDefaultsMatchDomainSettings(t *testing.T) {
-	resetConfigEnv(t)
-
-	cfg, err := Load("controlplane")
-	if err != nil {
-		t.Fatalf("load config: %v", err)
-	}
-
-	if got, want := cfg.Presence.ToSettings(), domainpresence.DefaultSettings(); got != want {
-		t.Fatalf("presence settings mismatch: got %+v, want %+v", got, want)
-	}
-}
-
 func TestLoadAppliesPresenceOnlineWindowOverride(t *testing.T) {
 	resetConfigEnv(t)
 

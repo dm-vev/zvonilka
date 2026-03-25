@@ -274,38 +274,6 @@ func buildAppStorage(
 		)
 	}
 
-	presenceStore, err := newPresenceStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
-	if err != nil {
-		return nil, nil, nil, nil, nil, joinStorageError(
-			fmt.Errorf("construct postgres presence store: %w", err),
-			closeStorageCatalog(ctx, catalog),
-		)
-	}
-	if presenceStore == nil {
-		return nil, nil, nil, nil, nil, joinStorageError(
-			fmt.Errorf("construct postgres presence store: %w", domainpresence.ErrInvalidInput),
-			closeStorageCatalog(ctx, catalog),
-		)
-	}
-
-	presenceService, err := newPresenceService(
-		presenceStore,
-		store,
-		domainpresence.WithSettings(cfg.Presence.ToSettings()),
-	)
-	if err != nil {
-		return nil, nil, nil, nil, nil, joinStorageError(
-			fmt.Errorf("construct presence service: %w", err),
-			closeStorageCatalog(ctx, catalog),
-		)
-	}
-	if presenceService == nil {
-		return nil, nil, nil, nil, nil, joinStorageError(
-			fmt.Errorf("construct presence service: %w", domainpresence.ErrInvalidInput),
-			closeStorageCatalog(ctx, catalog),
-		)
-	}
-
 	mediaStore, err := newMediaStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
 	if err != nil {
 		return nil, nil, nil, nil, nil, joinStorageError(

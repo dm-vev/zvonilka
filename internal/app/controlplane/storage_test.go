@@ -484,6 +484,133 @@ func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
 	}
 }
 
+func TestBuildAppStorageRejectsNilPresenceStore(t *testing.T) {
+	originalBuilder := newStorageBuilder
+	originalPresenceStore := newPresenceStore
+	originalPresenceService := newPresenceService
+	t.Cleanup(func() {
+		newStorageBuilder = originalBuilder
+		newPresenceStore = originalPresenceStore
+		newPresenceService = originalPresenceService
+	})
+
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	catalog, err := domainstorage.NewCatalog(
+		&fakeRelationalProvider{
+			name:         "primary",
+			db:           db,
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+		},
+		&fakeProvider{name: "cache"},
+		&fakeProvider{name: "object"},
+		&fakeProvider{name: "audit"},
+		&fakeProvider{name: "search"},
+	)
+	if err != nil {
+		t.Fatalf("new catalog: %v", err)
+	}
+
+	newStorageBuilder = func(config.Configuration, ...platformstorage.Factory) (storageBuilder, error) {
+		return &fakeBuilder{catalog: catalog}, nil
+	}
+	newPresenceStore = func(*sql.DB, string) (domainpresence.Store, error) {
+		return nil, nil
+	}
+	newPresenceService = func(domainpresence.Store, domainidentity.Store, ...domainpresence.Option) (*domainpresence.Service, error) {
+		t.Fatal("presence service constructor should not be called")
+		return nil, nil
+	}
+
+	cfg := config.Configuration{
+		Infrastructure: config.InfrastructureConfig{
+			Postgres: config.PostgresConfig{
+				Enabled: true,
+				Schema:  "tenant",
+			},
+			ObjectStore: testObjectStorageConfig(),
+		},
+		Storage: testStorageBindings(),
+	}
+
+	_, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("expected presence store error")
+	}
+	if !strings.Contains(err.Error(), "construct postgres presence store") {
+		t.Fatalf("expected presence store error, got %v", err)
+	}
+}
+
+func TestBuildAppStorageRejectsNilPresenceService(t *testing.T) {
+	originalBuilder := newStorageBuilder
+	originalPresenceStore := newPresenceStore
+	originalPresenceService := newPresenceService
+	t.Cleanup(func() {
+		newStorageBuilder = originalBuilder
+		newPresenceStore = originalPresenceStore
+		newPresenceService = originalPresenceService
+	})
+
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	catalog, err := domainstorage.NewCatalog(
+		&fakeRelationalProvider{
+			name:         "primary",
+			db:           db,
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+		},
+		&fakeProvider{name: "cache"},
+		&fakeProvider{name: "object"},
+		&fakeProvider{name: "audit"},
+		&fakeProvider{name: "search"},
+	)
+	if err != nil {
+		t.Fatalf("new catalog: %v", err)
+	}
+
+	newStorageBuilder = func(config.Configuration, ...platformstorage.Factory) (storageBuilder, error) {
+		return &fakeBuilder{catalog: catalog}, nil
+	}
+	newPresenceStore = func(*sql.DB, string) (domainpresence.Store, error) {
+		return presenceteststore.NewMemoryStore(), nil
+	}
+	newPresenceService = func(domainpresence.Store, domainidentity.Store, ...domainpresence.Option) (*domainpresence.Service, error) {
+		return nil, nil
+	}
+
+	cfg := config.Configuration{
+		Infrastructure: config.InfrastructureConfig{
+			Postgres: config.PostgresConfig{
+				Enabled: true,
+				Schema:  "tenant",
+			},
+			ObjectStore: testObjectStorageConfig(),
+		},
+		Storage: testStorageBindings(),
+	}
+
+	_, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("expected presence service error")
+	}
+	if !strings.Contains(err.Error(), "construct presence service") {
+		t.Fatalf("expected presence service error, got %v", err)
+	}
+}
+
 func TestBuildAppStorageUsesConfiguredPresenceSettings(t *testing.T) {
 	originalBuilder := newStorageBuilder
 	originalStore := newIdentityStore
@@ -510,6 +637,7 @@ func TestBuildAppStorageUsesConfiguredPresenceSettings(t *testing.T) {
 	now := time.Date(2026, time.March, 25, 12, 0, 0, 0, time.UTC)
 	if _, err := identityStore.SaveAccount(context.Background(), domainidentity.Account{
 		ID:         "acc-1",
+		Kind:       domainidentity.AccountKindUser,
 		Username:   "alice",
 		Status:     domainidentity.AccountStatusActive,
 		LastAuthAt: now.Add(-20 * time.Minute),
