@@ -45,6 +45,9 @@ func (c Configuration) Validate() error {
 	if c.Identity.LoginCodeLength <= 0 {
 		errs = append(errs, errors.New("identity login code length must be positive"))
 	}
+	if c.Presence.OnlineWindow <= 0 {
+		errs = append(errs, errors.New("presence online window must be positive"))
+	}
 	if c.Media.UploadURLTTL <= 0 {
 		errs = append(errs, errors.New("media upload URL TTL must be positive"))
 	}

@@ -15,6 +15,9 @@ import (
 
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
 	postgresdomain "github.com/dm-vev/zvonilka/internal/domain/identity/pgstore"
+	identityteststore "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
+	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
+	presenceteststore "github.com/dm-vev/zvonilka/internal/domain/presence/teststore"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
 	platformstorage "github.com/dm-vev/zvonilka/internal/platform/storage"
@@ -45,7 +48,7 @@ func testStorageBindings() config.StorageConfig {
 func TestBuildAppStorageRejectsDisabledStorageStack(t *testing.T) {
 	t.Parallel()
 
-	_, _, _, _, err := buildAppStorage(context.Background(), config.Configuration{})
+	_, _, _, _, _, err := buildAppStorage(context.Background(), config.Configuration{})
 	if err == nil {
 		t.Fatal("expected disabled storage stack to fail")
 	}
@@ -68,6 +71,7 @@ func TestBuildAppStorageRejectsNilStorageBuilder(t *testing.T) {
 		Infrastructure: config.InfrastructureConfig{
 			Postgres: config.PostgresConfig{
 				Enabled: true,
+				Schema:  "tenant",
 			},
 		},
 		Storage: testStorageBindings(),
@@ -75,7 +79,7 @@ func TestBuildAppStorageRejectsNilStorageBuilder(t *testing.T) {
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 
-	_, _, _, _, err := buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, err := buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected storage builder error")
 	}
@@ -105,7 +109,7 @@ func TestBuildAppStorageRejectsNilCatalog(t *testing.T) {
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 
-	_, _, _, _, err := buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, err := buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected catalog error")
 	}
@@ -149,6 +153,7 @@ func TestBuildAppStorageRejectsNilIdentityStore(t *testing.T) {
 		Infrastructure: config.InfrastructureConfig{
 			Postgres: config.PostgresConfig{
 				Enabled: true,
+				Schema:  "tenant",
 			},
 		},
 		Storage: testStorageBindings(),
@@ -156,7 +161,7 @@ func TestBuildAppStorageRejectsNilIdentityStore(t *testing.T) {
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 
-	_, _, _, _, err = buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected identity store error")
 	}
@@ -191,6 +196,7 @@ func TestBuildAppStorageRejectsNilIdentityService(t *testing.T) {
 	catalog, err := domainstorage.NewCatalog(
 		&fakeRelationalProvider{
 			name:         "primary",
+			db:           db,
 			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
 		},
 	)
@@ -212,6 +218,7 @@ func TestBuildAppStorageRejectsNilIdentityService(t *testing.T) {
 		Infrastructure: config.InfrastructureConfig{
 			Postgres: config.PostgresConfig{
 				Enabled: true,
+				Schema:  "tenant",
 			},
 		},
 		Storage: testStorageBindings(),
@@ -219,7 +226,7 @@ func TestBuildAppStorageRejectsNilIdentityService(t *testing.T) {
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 
-	_, _, _, _, err = buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected identity service error")
 	}
@@ -261,7 +268,7 @@ func TestBuildAppStorageRejectsMissingPrimaryProvider(t *testing.T) {
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 
-	_, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
 		t.Fatal("expected provider selection error")
 	}
@@ -308,7 +315,7 @@ func TestBuildAppStorageRejectsNonRelationalPrimaryProvider(t *testing.T) {
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 
-	_, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
 		t.Fatal("expected provider type error")
 	}
@@ -368,7 +375,7 @@ func TestBuildAppStorageJoinsCleanupErrorOnStartupFailure(t *testing.T) {
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 
-	_, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
 		t.Fatal("expected startup error")
 	}
@@ -453,7 +460,7 @@ func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
 
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 
-	createdCatalog, service, conversationService, mediaService, gotErr := buildAppStorage(context.Background(), cfg)
+	createdCatalog, service, conversationService, mediaService, presenceService, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr != nil {
 		t.Fatalf("build app storage: %v", gotErr)
 	}
@@ -469,8 +476,114 @@ func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
 	if mediaService == nil {
 		t.Fatal("expected media service")
 	}
+	if presenceService == nil {
+		t.Fatal("expected presence service")
+	}
 	if err := closeStorageCatalog(context.Background(), createdCatalog); err != nil {
 		t.Fatalf("close storage catalog: %v", err)
+	}
+}
+
+func TestBuildAppStorageUsesConfiguredPresenceSettings(t *testing.T) {
+	originalBuilder := newStorageBuilder
+	originalStore := newIdentityStore
+	originalService := newIdentityService
+	originalPresenceStore := newPresenceStore
+	originalPresenceService := newPresenceService
+	t.Cleanup(func() {
+		newStorageBuilder = originalBuilder
+		newIdentityStore = originalStore
+		newIdentityService = originalService
+		newPresenceStore = originalPresenceStore
+		newPresenceService = originalPresenceService
+	})
+
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	identityStore := identityteststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 25, 12, 0, 0, 0, time.UTC)
+	if _, err := identityStore.SaveAccount(context.Background(), domainidentity.Account{
+		ID:         "acc-1",
+		Username:   "alice",
+		Status:     domainidentity.AccountStatusActive,
+		LastAuthAt: now.Add(-20 * time.Minute),
+	}); err != nil {
+		t.Fatalf("seed account: %v", err)
+	}
+
+	catalog, err := domainstorage.NewCatalog(
+		&fakeRelationalProvider{
+			name:         "primary",
+			db:           db,
+			capabilities: domainstorage.CapabilityRead | domainstorage.CapabilityWrite | domainstorage.CapabilityTransactions,
+		},
+		&fakeProvider{name: "cache"},
+		&fakeProvider{name: "object"},
+		&fakeProvider{name: "audit"},
+		&fakeProvider{name: "search"},
+	)
+	if err != nil {
+		t.Fatalf("new catalog: %v", err)
+	}
+
+	newStorageBuilder = func(config.Configuration, ...platformstorage.Factory) (storageBuilder, error) {
+		return &fakeBuilder{catalog: catalog}, nil
+	}
+	newIdentityStore = func(*sql.DB, string) (domainidentity.Store, error) {
+		return identityStore, nil
+	}
+	newIdentityService = func(domainidentity.Store, domainidentity.CodeSender, ...domainidentity.Option) (*domainidentity.Service, error) {
+		return &domainidentity.Service{}, nil
+	}
+	newPresenceStore = func(*sql.DB, string) (domainpresence.Store, error) {
+		return presenceteststore.NewMemoryStore(), nil
+	}
+	newPresenceService = func(
+		store domainpresence.Store,
+		identityStore domainidentity.Store,
+		opts ...domainpresence.Option,
+	) (*domainpresence.Service, error) {
+		return domainpresence.NewService(
+			store,
+			identityStore,
+			append(opts, domainpresence.WithNow(func() time.Time { return now }))...,
+		)
+	}
+
+	cfg := config.Configuration{
+		Infrastructure: config.InfrastructureConfig{
+			Postgres: config.PostgresConfig{
+				Enabled: true,
+				Schema:  "tenant",
+			},
+		},
+		Storage: testStorageBindings(),
+		Presence: config.PresenceConfig{
+			OnlineWindow: 30 * time.Minute,
+		},
+	}
+	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
+
+	_, _, _, _, presenceService, err := buildAppStorage(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("build app storage: %v", err)
+	}
+	if presenceService == nil {
+		t.Fatal("expected presence service")
+	}
+
+	snapshot, err := presenceService.GetPresence(context.Background(), domainpresence.GetParams{AccountID: "acc-1"})
+	if err != nil {
+		t.Fatalf("get presence: %v", err)
+	}
+	if snapshot.State != domainpresence.PresenceStateOnline {
+		t.Fatalf("expected configured online window to keep account online, got %s", snapshot.State)
 	}
 }
 

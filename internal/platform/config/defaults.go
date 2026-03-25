@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
+	"github.com/dm-vev/zvonilka/internal/domain/presence"
 )
 
 type listenDefaults struct {
@@ -53,6 +54,7 @@ func defaultConfiguration(serviceName string) Configuration {
 	environment := defaultEnvironment
 	runtimeDefaults := defaultRuntime(serviceName, environment)
 	identityDefaults := identity.DefaultSettings()
+	presenceDefaults := presence.DefaultSettings()
 
 	cfg := Configuration{
 		Service: ServiceConfig{
@@ -71,6 +73,9 @@ func defaultConfiguration(serviceName string) Configuration {
 			AccessTokenTTL:  identityDefaults.AccessTokenTTL,
 			RefreshTokenTTL: identityDefaults.RefreshTokenTTL,
 			LoginCodeLength: identityDefaults.LoginCodeLength,
+		},
+		Presence: PresenceConfig{
+			OnlineWindow: presenceDefaults.OnlineWindow,
 		},
 		Media: MediaConfig{
 			UploadURLTTL:   defaultMediaUploadURLTTL,

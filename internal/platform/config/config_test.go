@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
+	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
 )
 
 func TestFromEnvUsesDistinctServiceDefaults(t *testing.T) {
@@ -137,6 +138,19 @@ func TestLoadIdentityDefaultsMatchDomainSettings(t *testing.T) {
 
 	if got, want := cfg.Identity.ToSettings(), domainidentity.DefaultSettings(); got != want {
 		t.Fatalf("identity settings mismatch: got %+v, want %+v", got, want)
+	}
+}
+
+func TestLoadPresenceDefaultsMatchDomainSettings(t *testing.T) {
+	resetConfigEnv(t)
+
+	cfg, err := Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if got, want := cfg.Presence.ToSettings(), domainpresence.DefaultSettings(); got != want {
+		t.Fatalf("presence settings mismatch: got %+v, want %+v", got, want)
 	}
 }
 
@@ -412,6 +426,21 @@ func TestLoadNormalizesServiceAndEnvironmentCase(t *testing.T) {
 	}
 }
 
+func TestLoadAcceptsPresenceOnlineWindowOverride(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_PRESENCE_ONLINE_WINDOW", "9m")
+
+	cfg, err := Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.Presence.OnlineWindow.String() != "9m0s" {
+		t.Fatalf("presence online window: got %s, want 9m0s", cfg.Presence.OnlineWindow)
+	}
+}
+
 func TestValidateNormalizesStorageProviderBindingsBeforeDistinctnessCheck(t *testing.T) {
 	cfg := defaultConfiguration("controlplane")
 	cfg.Storage.PrimaryProvider = " Primary "
@@ -422,6 +451,19 @@ func TestValidateNormalizesStorageProviderBindingsBeforeDistinctnessCheck(t *tes
 		t.Fatal("expected validate to fail")
 	}
 	if !strings.Contains(err.Error(), "storage provider bindings must be distinct") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateRejectsExplicitZeroPresenceWindow(t *testing.T) {
+	cfg := defaultConfiguration("controlplane")
+	cfg.Presence.OnlineWindow = 0
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected validate to fail")
+	}
+	if !strings.Contains(err.Error(), "presence online window must be positive") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -466,6 +508,10 @@ func resetConfigEnv(t *testing.T) {
 		"ZVONILKA_STORAGE_OBJECT_PROVIDER",
 		"ZVONILKA_STORAGE_AUDIT_PROVIDER",
 		"ZVONILKA_STORAGE_SEARCH_PROVIDER",
+		"ZVONILKA_PRESENCE_ONLINE_WINDOW",
+		"ZVONILKA_CONTROLPLANE_PRESENCE_ONLINE_WINDOW",
+		"ZVONILKA_GATEWAY_PRESENCE_ONLINE_WINDOW",
+		"ZVONILKA_BOTAPI_PRESENCE_ONLINE_WINDOW",
 	}
 
 	for _, key := range keys {
