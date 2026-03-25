@@ -113,21 +113,23 @@ type ConversationSettings struct {
 
 // Conversation describes a chat, channel, or saved-message space.
 type Conversation struct {
-	ID             string
-	Kind           ConversationKind
-	Title          string
-	Description    string
-	AvatarMediaID  string
-	OwnerAccountID string
-	Settings       ConversationSettings
-	Archived       bool
-	Muted          bool
-	Pinned         bool
-	Hidden         bool
-	LastSequence   uint64
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	LastMessageAt  time.Time
+	ID                 string
+	Kind               ConversationKind
+	Title              string
+	Description        string
+	AvatarMediaID      string
+	OwnerAccountID     string
+	Settings           ConversationSettings
+	Archived           bool
+	Muted              bool
+	Pinned             bool
+	Hidden             bool
+	LastSequence       uint64
+	UnreadCount        uint64
+	UnreadMentionCount uint64
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	LastMessageAt      time.Time
 }
 
 // ConversationTopic describes a conversation topic or the general thread root.
@@ -209,6 +211,7 @@ type MessageDraft struct {
 	Kind                MessageKind
 	Payload             EncryptedPayload
 	Attachments         []AttachmentRef
+	MentionAccountIDs   []string
 	ReplyTo             MessageReference
 	ThreadID            string
 	DeliverAt           time.Time
@@ -229,6 +232,7 @@ type Message struct {
 	Status              MessageStatus
 	Payload             EncryptedPayload
 	Attachments         []AttachmentRef
+	MentionAccountIDs   []string
 	ReplyTo             MessageReference
 	ThreadID            string
 	Silent              bool
@@ -262,6 +266,13 @@ type SyncState struct {
 	LastAckedSequence      uint64
 	ServerTime             time.Time
 	ConversationWatermarks map[string]uint64
+}
+
+// ConversationCounters describes derived unread badge counts for a conversation.
+type ConversationCounters struct {
+	ConversationID     string
+	UnreadCount        uint64
+	UnreadMentionCount uint64
 }
 
 // EventEnvelope describes an emitted sync event.

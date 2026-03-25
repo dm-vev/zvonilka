@@ -358,6 +358,12 @@ func (s *Service) GetConversation(ctx context.Context, params GetConversationPar
 		}
 	}
 
+	decorated, err := s.decorateConversationCounters(ctx, params.AccountID, []Conversation{conversation})
+	if err != nil {
+		return Conversation{}, nil, err
+	}
+	conversation = decorated[0]
+
 	return conversation, members, nil
 }
 
@@ -408,6 +414,11 @@ func (s *Service) ListConversations(ctx context.Context, params ListConversation
 			return 0
 		}
 	})
+
+	filtered, err = s.decorateConversationCounters(ctx, params.AccountID, filtered)
+	if err != nil {
+		return nil, err
+	}
 
 	return filtered, nil
 }

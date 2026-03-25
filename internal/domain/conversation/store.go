@@ -27,6 +27,7 @@ type Store interface {
 	SaveReadState(ctx context.Context, state ReadState) (ReadState, error)
 	ReadStateByConversationAndDevice(ctx context.Context, conversationID string, deviceID string) (ReadState, error)
 	ReadStatesByDevice(ctx context.Context, deviceID string) ([]ReadState, error)
+	ConversationCountersByAccount(ctx context.Context, accountID string, conversationIDs []string) (map[string]ConversationCounters, error)
 
 	SaveSyncState(ctx context.Context, state SyncState) (SyncState, error)
 	SyncStateByDevice(ctx context.Context, deviceID string) (SyncState, error)

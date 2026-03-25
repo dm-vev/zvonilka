@@ -109,6 +109,15 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 		if err := ValidateMessagePayload(draft.Payload, conversation.Settings.RequireEncryptedMessages); err != nil {
 			return ErrInvalidInput
 		}
+		if len(draft.MentionAccountIDs) > 0 {
+			members, loadErr := tx.ConversationMembersByConversationID(ctx, conversation.ID)
+			if loadErr != nil {
+				return fmt.Errorf("load members for conversation %s: %w", conversation.ID, loadErr)
+			}
+			if err := validateMentionTargets(members, draft.MentionAccountIDs); err != nil {
+				return err
+			}
+		}
 
 		topicID := draft.ThreadID
 		if topicID != "" {
@@ -163,6 +172,7 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 			Status:              MessageStatusSent,
 			Payload:             draft.Payload,
 			Attachments:         append([]AttachmentRef(nil), draft.Attachments...),
+			MentionAccountIDs:   append([]string(nil), draft.MentionAccountIDs...),
 			ReplyTo:             replyTo,
 			ThreadID:            strings.TrimSpace(draft.ThreadID),
 			Silent:              draft.Silent,
