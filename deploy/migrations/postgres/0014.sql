@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS {{schema}}.notification_preferences (
 	FOREIGN KEY (account_id) REFERENCES {{schema}}.identity_accounts (id) ON DELETE CASCADE,
 	CHECK (quiet_hours_start_minute >= 0 AND quiet_hours_start_minute < 24 * 60),
 	CHECK (quiet_hours_end_minute >= 0 AND quiet_hours_end_minute < 24 * 60),
+	CHECK (account_id <> ''),
 	CHECK (
 		NOT quiet_hours_enabled
 		OR quiet_hours_timezone <> ''
@@ -30,7 +31,9 @@ CREATE TABLE IF NOT EXISTS {{schema}}.notification_conversation_overrides (
 	updated_at TIMESTAMPTZ NOT NULL,
 	PRIMARY KEY (conversation_id, account_id),
 	FOREIGN KEY (conversation_id) REFERENCES {{schema}}.conversation_conversations (id) ON DELETE CASCADE,
-	FOREIGN KEY (account_id) REFERENCES {{schema}}.identity_accounts (id) ON DELETE CASCADE
+	FOREIGN KEY (account_id) REFERENCES {{schema}}.identity_accounts (id) ON DELETE CASCADE,
+	CHECK (conversation_id <> ''),
+	CHECK (account_id <> '')
 );
 
 CREATE TABLE IF NOT EXISTS {{schema}}.notification_push_tokens (
@@ -48,6 +51,12 @@ CREATE TABLE IF NOT EXISTS {{schema}}.notification_push_tokens (
 	UNIQUE (device_id),
 	UNIQUE (token),
 	CHECK (platform IN ('ios', 'android', 'web', 'desktop', 'server')),
+	CHECK (id <> ''),
+	CHECK (account_id <> ''),
+	CHECK (device_id <> ''),
+	CHECK (provider <> ''),
+	CHECK (provider = lower(provider)),
+	CHECK (token <> ''),
 	CHECK (
 		(enabled AND revoked_at IS NULL)
 		OR (NOT enabled AND revoked_at IS NOT NULL)
@@ -84,8 +93,16 @@ CREATE TABLE IF NOT EXISTS {{schema}}.notification_deliveries (
 	CHECK (kind IN ('direct', 'group', 'channel', 'mention', 'reply')),
 	CHECK (mode IN ('in_app', 'push')),
 	CHECK (state IN ('queued', 'suppressed', 'delivered', 'failed')),
+	CHECK (id <> ''),
+	CHECK (dedup_key <> ''),
+	CHECK (event_id <> ''),
+	CHECK (conversation_id <> ''),
+	CHECK (message_id <> ''),
+	CHECK (account_id <> ''),
+	CHECK (reason <> ''),
 	CHECK (priority >= 0),
-	CHECK (attempts >= 0)
+	CHECK (attempts >= 0),
+	CHECK (mode <> 'push' OR (device_id <> '' AND push_token_id <> ''))
 );
 
 CREATE INDEX IF NOT EXISTS notification_deliveries_due_idx
@@ -98,5 +115,8 @@ CREATE INDEX IF NOT EXISTS notification_deliveries_account_idx
 CREATE TABLE IF NOT EXISTS {{schema}}.notification_worker_cursors (
 	name TEXT PRIMARY KEY,
 	last_sequence BIGINT NOT NULL DEFAULT 0,
-	updated_at TIMESTAMPTZ NOT NULL
+	updated_at TIMESTAMPTZ NOT NULL,
+	CHECK (last_sequence >= 0),
+	CHECK (name <> ''),
+	CHECK (name = lower(name))
 );

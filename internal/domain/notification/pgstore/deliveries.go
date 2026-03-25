@@ -44,7 +44,7 @@ func (s *Store) saveDelivery(ctx context.Context, delivery notification.Delivery
 	}
 
 	query := fmt.Sprintf(`
-INSERT INTO %s (
+INSERT INTO %s AS existing (
 	id,
 	dedup_key,
 	event_id,
@@ -68,57 +68,70 @@ INSERT INTO %s (
 	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
 )
 ON CONFLICT (dedup_key) DO UPDATE SET
-	event_id = EXCLUDED.event_id,
-	conversation_id = EXCLUDED.conversation_id,
-	message_id = EXCLUDED.message_id,
-	account_id = EXCLUDED.account_id,
-	device_id = EXCLUDED.device_id,
-	push_token_id = EXCLUDED.push_token_id,
-	kind = EXCLUDED.kind,
-	reason = EXCLUDED.reason,
-	mode = EXCLUDED.mode,
+	event_id = CASE
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.event_id
+		ELSE existing.event_id
+	END,
+	conversation_id = CASE
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.conversation_id
+		ELSE existing.conversation_id
+	END,
+	message_id = CASE
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.message_id
+		ELSE existing.message_id
+	END,
+	account_id = CASE
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.account_id
+		ELSE existing.account_id
+	END,
+	device_id = CASE
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.device_id
+		ELSE existing.device_id
+	END,
+	push_token_id = CASE
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.push_token_id
+		ELSE existing.push_token_id
+	END,
+	kind = CASE
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.kind
+		ELSE existing.kind
+	END,
+	reason = CASE
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.reason
+		ELSE existing.reason
+	END,
+	mode = CASE
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.mode
+		ELSE existing.mode
+	END,
 	state = CASE
-		WHEN EXCLUDED.attempts > %s.attempts THEN EXCLUDED.state
-		ELSE %s.state
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.state
+		ELSE existing.state
 	END,
 	priority = CASE
-		WHEN EXCLUDED.attempts > %s.attempts THEN EXCLUDED.priority
-		ELSE %s.priority
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.priority
+		ELSE existing.priority
 	END,
-	attempts = GREATEST(%s.attempts, EXCLUDED.attempts),
+	attempts = GREATEST(existing.attempts, EXCLUDED.attempts),
 	next_attempt_at = CASE
-		WHEN EXCLUDED.attempts > %s.attempts THEN EXCLUDED.next_attempt_at
-		ELSE %s.next_attempt_at
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.next_attempt_at
+		ELSE existing.next_attempt_at
 	END,
 	last_attempt_at = CASE
-		WHEN EXCLUDED.attempts > %s.attempts THEN EXCLUDED.last_attempt_at
-		ELSE %s.last_attempt_at
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.last_attempt_at
+		ELSE existing.last_attempt_at
 	END,
 	last_error = CASE
-		WHEN EXCLUDED.attempts > %s.attempts THEN EXCLUDED.last_error
-		ELSE %s.last_error
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.last_error
+		ELSE existing.last_error
 	END,
 	updated_at = CASE
-		WHEN EXCLUDED.attempts > %s.attempts THEN EXCLUDED.updated_at
-		ELSE %s.updated_at
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.updated_at
+		ELSE existing.updated_at
 	END
 RETURNING id, dedup_key, event_id, conversation_id, message_id, account_id, device_id, push_token_id,
 	kind, reason, mode, state, priority, attempts, next_attempt_at, last_attempt_at, last_error, created_at, updated_at
-`, s.table("notification_deliveries"),
-		s.table("notification_deliveries"),
-		s.table("notification_deliveries"),
-		s.table("notification_deliveries"),
-		s.table("notification_deliveries"),
-		s.table("notification_deliveries"),
-		s.table("notification_deliveries"),
-		s.table("notification_deliveries"),
-		s.table("notification_deliveries"),
-		s.table("notification_deliveries"),
-		s.table("notification_deliveries"),
-		s.table("notification_deliveries"),
-		s.table("notification_deliveries"),
-		s.table("notification_deliveries"),
-	)
+`, s.table("notification_deliveries"))
 
 	row := s.conn().QueryRowContext(
 		ctx,
@@ -247,22 +260,60 @@ func (s *Store) RetryDelivery(ctx context.Context, params notification.RetryDeli
 		return notification.Delivery{}, notification.ErrInvalidInput
 	}
 
-	delivery, err := s.DeliveryByID(ctx, params.DeliveryID)
+	var saved notification.Delivery
+	err := s.WithinTx(ctx, func(tx notification.Store) error {
+		txStore := tx.(*Store)
+		delivery, loadErr := txStore.deliveryByIDForUpdate(ctx, params.DeliveryID)
+		if loadErr != nil {
+			return loadErr
+		}
+
+		switch delivery.State {
+		case notification.DeliveryStateDelivered, notification.DeliveryStateSuppressed:
+			return notification.ErrConflict
+		}
+
+		now := time.Now().UTC()
+		delivery.Attempts++
+		delivery.LastError = params.LastError
+		delivery.LastAttemptAt = now
+		if params.RetryAt.IsZero() {
+			delivery.NextAttemptAt = now
+		} else {
+			delivery.NextAttemptAt = params.RetryAt.UTC()
+		}
+		delivery.State = notification.DeliveryStateQueued
+		delivery.UpdatedAt = now
+
+		var saveErr error
+		saved, saveErr = txStore.saveDelivery(ctx, delivery)
+		return saveErr
+	})
 	if err != nil {
 		return notification.Delivery{}, err
 	}
 
-	now := time.Now().UTC()
-	delivery.Attempts++
-	delivery.LastError = params.LastError
-	delivery.LastAttemptAt = now
-	if params.RetryAt.IsZero() {
-		delivery.NextAttemptAt = now
-	} else {
-		delivery.NextAttemptAt = params.RetryAt.UTC()
-	}
-	delivery.State = notification.DeliveryStateQueued
-	delivery.UpdatedAt = now
+	return saved, nil
+}
 
-	return s.saveDelivery(ctx, delivery)
+func (s *Store) deliveryByIDForUpdate(ctx context.Context, deliveryID string) (notification.Delivery, error) {
+	query := fmt.Sprintf(`
+SELECT id, dedup_key, event_id, conversation_id, message_id, account_id, device_id, push_token_id,
+	kind, reason, mode, state, priority, attempts, next_attempt_at, last_attempt_at, last_error, created_at, updated_at
+FROM %s
+WHERE id = $1
+FOR UPDATE
+`, s.table("notification_deliveries"))
+
+	row := s.conn().QueryRowContext(ctx, query, deliveryID)
+	delivery, err := scanDelivery(row)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return notification.Delivery{}, notification.ErrNotFound
+		}
+
+		return notification.Delivery{}, fmt.Errorf("load delivery %s for update: %w", deliveryID, err)
+	}
+
+	return delivery, nil
 }

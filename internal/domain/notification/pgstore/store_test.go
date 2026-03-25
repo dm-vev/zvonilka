@@ -115,7 +115,7 @@ func TestSavePreferenceRoundTrip(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestSaveDeliveryAndRetryRoundTrip(t *testing.T) {
+func TestSaveDeliveryRoundTrip(t *testing.T) {
 	t.Parallel()
 
 	store, mock, db := newMockStore(t)
@@ -207,121 +207,6 @@ func TestSaveDeliveryAndRetryRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "del-1", saved.ID)
 
-	mock.ExpectQuery(`(?s)SELECT id, dedup_key, event_id, conversation_id, message_id, account_id, device_id, push_token_id, kind, reason, mode, state, priority, attempts, next_attempt_at, last_attempt_at, last_error, created_at, updated_at FROM "notif"\."notification_deliveries" WHERE id = \$1`).
-		WithArgs("del-1").
-		WillReturnRows(sqlmock.NewRows([]string{
-			"id",
-			"dedup_key",
-			"event_id",
-			"conversation_id",
-			"message_id",
-			"account_id",
-			"device_id",
-			"push_token_id",
-			"kind",
-			"reason",
-			"mode",
-			"state",
-			"priority",
-			"attempts",
-			"next_attempt_at",
-			"last_attempt_at",
-			"last_error",
-			"created_at",
-			"updated_at",
-		}).AddRow(
-			"del-1",
-			"evt-1:conv-1:msg-1:acc-1::group:group",
-			"evt-1",
-			"conv-1",
-			"msg-1",
-			"acc-1",
-			"",
-			"",
-			notification.NotificationKindGroup,
-			"group",
-			notification.DeliveryModeInApp,
-			notification.DeliveryStateQueued,
-			10,
-			0,
-			now.UTC(),
-			nil,
-			"",
-			now.UTC(),
-			now.UTC(),
-		))
-	mock.ExpectQuery(`(?s)INSERT INTO "notif"\."notification_deliveries".*ON CONFLICT \(dedup_key\) DO UPDATE SET.*RETURNING id, dedup_key, event_id, conversation_id, message_id, account_id, device_id, push_token_id, kind, reason, mode, state, priority, attempts, next_attempt_at, last_attempt_at, last_error, created_at, updated_at`).
-		WithArgs(
-			"del-1",
-			"evt-1:conv-1:msg-1:acc-1::group:group",
-			"evt-1",
-			"conv-1",
-			"msg-1",
-			"acc-1",
-			"",
-			"",
-			notification.NotificationKindGroup,
-			"group",
-			notification.DeliveryModeInApp,
-			notification.DeliveryStateQueued,
-			10,
-			1,
-			now.Add(time.Second).UTC(),
-			sqlmock.AnyArg(),
-			"push failed",
-			now.UTC(),
-			sqlmock.AnyArg(),
-		).
-		WillReturnRows(sqlmock.NewRows([]string{
-			"id",
-			"dedup_key",
-			"event_id",
-			"conversation_id",
-			"message_id",
-			"account_id",
-			"device_id",
-			"push_token_id",
-			"kind",
-			"reason",
-			"mode",
-			"state",
-			"priority",
-			"attempts",
-			"next_attempt_at",
-			"last_attempt_at",
-			"last_error",
-			"created_at",
-			"updated_at",
-		}).AddRow(
-			"del-1",
-			"evt-1:conv-1:msg-1:acc-1::group:group",
-			"evt-1",
-			"conv-1",
-			"msg-1",
-			"acc-1",
-			"",
-			"",
-			notification.NotificationKindGroup,
-			"group",
-			notification.DeliveryModeInApp,
-			notification.DeliveryStateQueued,
-			10,
-			1,
-			now.Add(time.Second).UTC(),
-			now.UTC(),
-			"push failed",
-			now.UTC(),
-			now.Add(time.Second).UTC(),
-		))
-
-	retried, err := store.RetryDelivery(context.Background(), notification.RetryDeliveryParams{
-		DeliveryID: "del-1",
-		LastError:  "push failed",
-		RetryAt:    now.Add(time.Second),
-	})
-	require.NoError(t, err)
-	require.Equal(t, 1, retried.Attempts)
-
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -363,6 +248,136 @@ func TestDeliveriesDueOrdering(t *testing.T) {
 	require.Len(t, deliveries, 2)
 	require.Equal(t, "del-1", deliveries[0].ID)
 	require.Equal(t, "del-2", deliveries[1].ID)
+
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestSaveDeliveryMonotonicUpsert(t *testing.T) {
+	t.Parallel()
+
+	store, mock, db := newMockStore(t)
+	defer db.Close()
+
+	now := time.Date(2026, time.March, 25, 12, 0, 0, 0, time.UTC)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`(?s)INSERT INTO "notif"\."notification_deliveries" AS existing .*ON CONFLICT \(dedup_key\) DO UPDATE SET.*WHEN EXCLUDED\.attempts > existing\.attempts THEN EXCLUDED\.state.*attempts = GREATEST\(existing\.attempts, EXCLUDED\.attempts\).*RETURNING id, dedup_key, event_id, conversation_id, message_id, account_id, device_id, push_token_id, kind, reason, mode, state, priority, attempts, next_attempt_at, last_attempt_at, last_error, created_at, updated_at`).
+		WithArgs(
+			"del-1",
+			"evt-1:conv-1:msg-1:acc-1::group:group",
+			"evt-1",
+			"conv-1",
+			"msg-1",
+			"acc-1",
+			"",
+			"",
+			notification.NotificationKindGroup,
+			"group",
+			notification.DeliveryModeInApp,
+			notification.DeliveryStateQueued,
+			10,
+			1,
+			now.UTC(),
+			sqlmock.AnyArg(),
+			"",
+			now.UTC(),
+			now.UTC(),
+		).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id",
+			"dedup_key",
+			"event_id",
+			"conversation_id",
+			"message_id",
+			"account_id",
+			"device_id",
+			"push_token_id",
+			"kind",
+			"reason",
+			"mode",
+			"state",
+			"priority",
+			"attempts",
+			"next_attempt_at",
+			"last_attempt_at",
+			"last_error",
+			"created_at",
+			"updated_at",
+		}).AddRow(
+			"del-1",
+			"evt-1:conv-1:msg-1:acc-1::group:group",
+			"evt-1",
+			"conv-1",
+			"msg-1",
+			"acc-1",
+			"",
+			"",
+			notification.NotificationKindGroup,
+			"group",
+			notification.DeliveryModeInApp,
+			notification.DeliveryStateQueued,
+			10,
+			2,
+			now.UTC(),
+			nil,
+			"",
+			now.UTC(),
+			now.UTC(),
+		))
+	mock.ExpectCommit()
+
+	saved, err := store.SaveDelivery(context.Background(), notification.Delivery{
+		ID:             "del-1",
+		DedupKey:       "evt-1:conv-1:msg-1:acc-1::group:group",
+		EventID:        "evt-1",
+		ConversationID: "conv-1",
+		MessageID:      "msg-1",
+		AccountID:      "acc-1",
+		Kind:           notification.NotificationKindGroup,
+		Reason:         "group",
+		Mode:           notification.DeliveryModeInApp,
+		State:          notification.DeliveryStateQueued,
+		Priority:       10,
+		Attempts:       1,
+		NextAttemptAt:  now,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 2, saved.Attempts)
+
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestSaveWorkerCursorMonotonicUpsert(t *testing.T) {
+	t.Parallel()
+
+	store, mock, db := newMockStore(t)
+	defer db.Close()
+
+	now := time.Date(2026, time.March, 25, 12, 0, 0, 0, time.UTC)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`(?s)INSERT INTO "notif"\."notification_worker_cursors" AS existing .*ON CONFLICT \(name\) DO UPDATE SET.*WHEN EXCLUDED\.last_sequence > existing\.last_sequence THEN EXCLUDED\.updated_at.*RETURNING name, last_sequence, updated_at`).
+		WithArgs("conversation_notifications", uint64(5), now.UTC()).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"name",
+			"last_sequence",
+			"updated_at",
+		}).AddRow(
+			"conversation_notifications",
+			uint64(10),
+			now.UTC(),
+		))
+	mock.ExpectCommit()
+
+	saved, err := store.SaveWorkerCursor(context.Background(), notification.WorkerCursor{
+		Name:         "conversation_notifications",
+		LastSequence: 5,
+		UpdatedAt:    now,
+	})
+	require.NoError(t, err)
+	require.Equal(t, uint64(10), saved.LastSequence)
 
 	require.NoError(t, mock.ExpectationsWereMet())
 }

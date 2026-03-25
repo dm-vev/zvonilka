@@ -44,7 +44,7 @@ func (s *Store) saveWorkerCursor(ctx context.Context, cursor notification.Worker
 	}
 
 	query := fmt.Sprintf(`
-INSERT INTO %s (
+INSERT INTO %s AS existing (
 	name,
 	last_sequence,
 	updated_at
@@ -52,8 +52,11 @@ INSERT INTO %s (
 	$1, $2, $3
 )
 ON CONFLICT (name) DO UPDATE SET
-	last_sequence = EXCLUDED.last_sequence,
-	updated_at = EXCLUDED.updated_at
+	last_sequence = GREATEST(existing.last_sequence, EXCLUDED.last_sequence),
+	updated_at = CASE
+		WHEN EXCLUDED.last_sequence > existing.last_sequence THEN EXCLUDED.updated_at
+		ELSE existing.updated_at
+	END
 RETURNING name, last_sequence, updated_at
 `, s.table("notification_worker_cursors"))
 

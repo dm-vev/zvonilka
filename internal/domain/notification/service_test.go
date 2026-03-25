@@ -223,6 +223,33 @@ func TestDeliveriesDueOrderingAndLimit(t *testing.T) {
 	require.Equal(t, first.ID, all[0].ID)
 }
 
+func TestQueueDeliveryRejectsPushWithoutRoutingFields(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	now := time.Date(2026, time.March, 25, 12, 0, 0, 0, time.UTC)
+	identityStore := identitytest.NewMemoryStore()
+	seedActiveAccount(t, identityStore, "acc-1")
+
+	svc := mustNotificationService(t, notificationtest.NewMemoryStore(), identityStore, notification.WithNow(func() time.Time {
+		return now
+	}))
+
+	_, err := svc.QueueDelivery(ctx, notification.QueueDeliveryParams{
+		DedupKey:       "evt-1:conv-1:msg-1:acc-1::group:group",
+		EventID:        "evt-1",
+		ConversationID: "conv-1",
+		MessageID:      "msg-1",
+		AccountID:      "acc-1",
+		Kind:           notification.NotificationKindGroup,
+		Reason:         "group",
+		Mode:           notification.DeliveryModePush,
+		State:          notification.DeliveryStateQueued,
+		Priority:       10,
+	})
+	require.ErrorIs(t, err, notification.ErrInvalidInput)
+}
+
 func mustNotificationService(t *testing.T, store notification.Store, identityStore identity.Store, opts ...notification.Option) *notification.Service {
 	t.Helper()
 

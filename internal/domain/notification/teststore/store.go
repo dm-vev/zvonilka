@@ -217,10 +217,10 @@ func (s *memoryStore) SaveDelivery(_ context.Context, delivery notification.Deli
 
 	if existingID, ok := s.deliveryIDsByDedup[delivery.DedupKey]; ok && existingID != "" {
 		if existing, ok := s.deliveriesByID[existingID]; ok {
-			delivery.ID = existing.ID
-			if delivery.Attempts < existing.Attempts {
-				delivery.Attempts = existing.Attempts
+			if delivery.Attempts <= existing.Attempts {
+				return cloneDelivery(existing), nil
 			}
+			delivery.ID = existing.ID
 		}
 	} else if previous, ok := s.deliveriesByID[delivery.ID]; ok {
 		delete(s.deliveryIDsByDedup, previous.DedupKey)
@@ -312,6 +312,10 @@ func (s *memoryStore) SaveWorkerCursor(_ context.Context, cursor notification.Wo
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if existing, ok := s.workerCursorsByName[cursor.Name]; ok && cursor.LastSequence <= existing.LastSequence {
+		return cloneCursor(existing), nil
+	}
 
 	s.workerCursorsByName[cursor.Name] = cloneCursor(cursor)
 	return cloneCursor(cursor), nil

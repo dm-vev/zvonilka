@@ -224,6 +224,9 @@ func (d Delivery) normalize(now time.Time) (Delivery, error) {
 	if d.Kind == NotificationKindUnspecified || d.Mode == DeliveryModeUnspecified {
 		return Delivery{}, ErrInvalidInput
 	}
+	if d.Mode == DeliveryModePush && (d.DeviceID == "" || d.PushTokenID == "") {
+		return Delivery{}, ErrInvalidInput
+	}
 	if d.State == DeliveryStateUnspecified {
 		d.State = DeliveryStateQueued
 	}
