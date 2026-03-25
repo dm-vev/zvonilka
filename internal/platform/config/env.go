@@ -109,6 +109,11 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Identity.LoginCodeLength = value
 	}
+	if value, ok, err := durationValue(serviceName, "PRESENCE_ONLINE_WINDOW", cfg.Presence.OnlineWindow); err != nil {
+		return err
+	} else if ok {
+		cfg.Presence.OnlineWindow = value
+	}
 	if value, ok, err := durationValue(serviceName, "MEDIA_UPLOAD_URL_TTL", cfg.Media.UploadURLTTL); err != nil {
 		return err
 	} else if ok {
@@ -123,6 +128,11 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 		return err
 	} else if ok {
 		cfg.Media.MaxUploadSize = value
+	}
+	if value, ok, err := durationValue(serviceName, "PRESENCE_ONLINE_WINDOW", cfg.Presence.OnlineWindow); err != nil {
+		return err
+	} else if ok {
+		cfg.Presence.OnlineWindow = value
 	}
 
 	postgresEnabledSet := false
