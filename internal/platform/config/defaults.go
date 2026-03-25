@@ -82,6 +82,9 @@ func defaultConfiguration(serviceName string) Configuration {
 			DownloadURLTTL: defaultMediaDownloadURLTTL,
 			MaxUploadSize:  defaultMediaMaxUploadSize,
 		},
+		Presence: PresenceConfig{
+			OnlineWindow: presenceDefaults.OnlineWindow,
+		},
 		Infrastructure: InfrastructureConfig{
 			Postgres: PostgresConfig{
 				MaxOpenConns:    defaultPostgresMaxOpen,

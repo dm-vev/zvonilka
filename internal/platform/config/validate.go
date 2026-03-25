@@ -57,6 +57,9 @@ func (c Configuration) Validate() error {
 	if c.Media.MaxUploadSize <= 0 {
 		errs = append(errs, errors.New("media max upload size must be positive"))
 	}
+	if c.Presence.OnlineWindow <= 0 {
+		errs = append(errs, errors.New("presence online window must be positive"))
+	}
 	if c.Runtime.HTTP.ReadHeaderTimeout <= 0 {
 		errs = append(errs, errors.New("HTTP read header timeout must be positive"))
 	}

@@ -10,7 +10,8 @@ import (
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 )
 
-type identityReader interface {
+// IdentityReader exposes the identity reads needed for presence resolution.
+type IdentityReader interface {
 	AccountByID(ctx context.Context, accountID string) (identity.Account, error)
 	SessionsByAccountID(ctx context.Context, accountID string) ([]identity.Session, error)
 	DevicesByAccountID(ctx context.Context, accountID string) ([]identity.Device, error)
@@ -19,7 +20,7 @@ type identityReader interface {
 // Service resolves explicit presence and derived last-seen values.
 type Service struct {
 	store    Store
-	identity identityReader
+	identity IdentityReader
 	now      func() time.Time
 	settings Settings
 }
@@ -28,7 +29,7 @@ type Service struct {
 type Option func(*Service)
 
 // NewService constructs a presence service.
-func NewService(store Store, identityStore identityReader, opts ...Option) (*Service, error) {
+func NewService(store Store, identityStore IdentityReader, opts ...Option) (*Service, error) {
 	if store == nil || identityStore == nil {
 		return nil, ErrInvalidInput
 	}
