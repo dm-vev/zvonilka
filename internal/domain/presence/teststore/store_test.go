@@ -103,3 +103,18 @@ func TestPresenceByAccountIDReturnsIsolatedCopy(t *testing.T) {
 		t.Fatalf("expected isolated stored status, got %q", second.CustomStatus)
 	}
 }
+
+func TestSavePresenceRejectsZeroUpdatedAt(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := NewMemoryStore()
+
+	_, err := store.SavePresence(ctx, presence.Presence{
+		AccountID: "acc-1",
+		State:     presence.PresenceStateOnline,
+	})
+	if !errors.Is(err, presence.ErrInvalidInput) {
+		t.Fatalf("expected invalid input, got %v", err)
+	}
+}

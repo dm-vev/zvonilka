@@ -212,6 +212,9 @@ func (s *Service) ListPresence(ctx context.Context, accountIDs []string, viewerA
 			ViewerAccountID: viewerAccountID,
 		})
 		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				continue
+			}
 			return nil, fmt.Errorf("resolve presence for account %s: %w", accountID, err)
 		}
 		snapshots[accountID] = snapshot

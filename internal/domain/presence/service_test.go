@@ -363,3 +363,80 @@ func TestGetPresenceIgnoresInactiveSessionAndDeviceActivity(t *testing.T) {
 		t.Fatalf("expected only active activity to count, got %v", snapshot.LastSeenAt)
 	}
 }
+
+func TestPresenceRejectsSuspendedAccount(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identityteststore.NewMemoryStore()
+	if _, err := identityStore.SaveAccount(ctx, identity.Account{
+		ID:       "acc-1",
+		Username: "alice",
+		Status:   identity.AccountStatusSuspended,
+	}); err != nil {
+		t.Fatalf("save account: %v", err)
+	}
+
+	svc, err := presence.NewService(teststore.NewMemoryStore(), identityStore)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	_, err = svc.GetPresence(ctx, presence.GetParams{AccountID: "acc-1"})
+	if !errors.Is(err, presence.ErrNotFound) {
+		t.Fatalf("expected not found for suspended account, got %v", err)
+	}
+
+	_, err = svc.SetPresence(ctx, presence.SetParams{
+		AccountID:  "acc-1",
+		State:      presence.PresenceStateOnline,
+		RecordedAt: time.Now().UTC(),
+	})
+	if !errors.Is(err, presence.ErrNotFound) {
+		t.Fatalf("expected not found on update for suspended account, got %v", err)
+	}
+}
+
+func TestListPresenceSkipsInactiveAccounts(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	now := time.Date(2026, time.March, 24, 17, 0, 0, 0, time.UTC)
+	identityStore := identityteststore.NewMemoryStore()
+	for _, account := range []identity.Account{
+		{
+			ID:         "acc-active",
+			Username:   "alice",
+			Status:     identity.AccountStatusActive,
+			LastAuthAt: now.Add(-2 * time.Minute),
+		},
+		{
+			ID:       "acc-suspended",
+			Username: "bob",
+			Status:   identity.AccountStatusSuspended,
+		},
+	} {
+		if _, err := identityStore.SaveAccount(ctx, account); err != nil {
+			t.Fatalf("save account %s: %v", account.ID, err)
+		}
+	}
+
+	svc, err := presence.NewService(teststore.NewMemoryStore(), identityStore, presence.WithNow(func() time.Time { return now }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	snapshots, err := svc.ListPresence(ctx, []string{"acc-active", "acc-suspended"}, "viewer")
+	if err != nil {
+		t.Fatalf("list presence: %v", err)
+	}
+	if len(snapshots) != 1 {
+		t.Fatalf("expected only active account to remain, got %d", len(snapshots))
+	}
+	if _, ok := snapshots["acc-active"]; !ok {
+		t.Fatal("expected active account snapshot")
+	}
+	if _, ok := snapshots["acc-suspended"]; ok {
+		t.Fatal("did not expect suspended account snapshot")
+	}
+}

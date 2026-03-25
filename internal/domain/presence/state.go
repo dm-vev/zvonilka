@@ -83,6 +83,9 @@ func normalizePresence(p Presence) (Presence, error) {
 	if p.AccountID == "" {
 		return Presence{}, ErrInvalidInput
 	}
+	if p.UpdatedAt.IsZero() {
+		return Presence{}, ErrInvalidInput
+	}
 	if p.HiddenUntil.Before(time.Time{}) {
 		p.HiddenUntil = time.Time{}
 	}

@@ -163,6 +163,73 @@ INSERT INTO tenant.user_presence (
 	}
 }
 
+func TestSavePresenceRejectsMissingAccount(t *testing.T) {
+	db := openDockerPostgres(t)
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	migrationsPath := repoMigrationsPath(t,
+		"0001.sql",
+		"0002_identity_hardening.sql",
+		"0003_identity_account_boundaries.sql",
+		"0004_identity_session_device_deferrable.sql",
+		"0013.sql",
+	)
+	if err := applyMigrations(db, migrationsPath); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	store, err := New(db, "tenant")
+	if err != nil {
+		t.Fatalf("new presence store: %v", err)
+	}
+
+	_, err = store.SavePresence(context.Background(), presence.Presence{
+		AccountID: "missing",
+		State:     presence.PresenceStateOnline,
+		UpdatedAt: time.Date(2026, time.March, 24, 18, 20, 0, 0, time.UTC),
+	})
+	if !errors.Is(err, presence.ErrNotFound) {
+		t.Fatalf("expected not found, got %v", err)
+	}
+}
+
+func TestSavePresenceRejectsZeroUpdatedAt(t *testing.T) {
+	db := openDockerPostgres(t)
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	migrationsPath := repoMigrationsPath(t,
+		"0001.sql",
+		"0002_identity_hardening.sql",
+		"0003_identity_account_boundaries.sql",
+		"0004_identity_session_device_deferrable.sql",
+		"0013.sql",
+	)
+	if err := applyMigrations(db, migrationsPath); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	seedIdentity(t, db, "tenant",
+		"id-owner", "owner", "owner@example.com", "dev-owner", "sess-owner",
+	)
+
+	store, err := New(db, "tenant")
+	if err != nil {
+		t.Fatalf("new presence store: %v", err)
+	}
+
+	_, err = store.SavePresence(context.Background(), presence.Presence{
+		AccountID: "id-owner",
+		State:     presence.PresenceStateOnline,
+	})
+	if !errors.Is(err, presence.ErrInvalidInput) {
+		t.Fatalf("expected invalid input, got %v", err)
+	}
+}
+
 func seedIdentity(t *testing.T, db *sql.DB, schema string, ownerID, ownerUsername, ownerEmail, ownerDeviceID, ownerSessionID string) {
 	t.Helper()
 
