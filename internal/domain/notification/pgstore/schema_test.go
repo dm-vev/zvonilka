@@ -674,7 +674,7 @@ func openDockerPostgres(t *testing.T) *sql.DB {
 		t.Fatalf("open postgres database: %v", err)
 	}
 
-	pingCtx, pingCancel := context.WithTimeout(context.Background(), 90*time.Second)
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer pingCancel()
 	for pingCtx.Err() == nil {
 		if err := db.PingContext(pingCtx); err == nil {
