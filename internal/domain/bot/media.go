@@ -1,0 +1,363 @@
+package bot
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/dm-vev/zvonilka/internal/domain/conversation"
+	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
+)
+
+const (
+	metadataCaptionKey = "bot.caption"
+	metadataMediaIDKey = "bot.media_id"
+	metadataShapeKey   = "bot.shape"
+	metadataJSONKey    = "bot.json"
+)
+
+type sendMediaParams struct {
+	BotToken            string
+	ChatID              string
+	MessageThreadID     string
+	MediaID             string
+	Caption             string
+	ReplyToMessageID    string
+	ReplyMarkup         *InlineKeyboardMarkup
+	DisableNotification bool
+	Method              conversation.MessageKind
+	Shape               string
+}
+
+// SendPhoto sends one image message as the authenticated bot.
+func (s *Service) SendPhoto(ctx context.Context, params SendPhotoParams) (Message, error) {
+	return s.sendMedia(ctx, sendMediaParams{
+		BotToken:            params.BotToken,
+		ChatID:              params.ChatID,
+		MessageThreadID:     params.MessageThreadID,
+		MediaID:             params.MediaID,
+		Caption:             params.Caption,
+		ReplyToMessageID:    params.ReplyToMessageID,
+		ReplyMarkup:         params.ReplyMarkup,
+		DisableNotification: params.DisableNotification,
+		Method:              conversation.MessageKindImage,
+		Shape:               "photo",
+	})
+}
+
+// SendDocument sends one document message as the authenticated bot.
+func (s *Service) SendDocument(ctx context.Context, params SendDocumentParams) (Message, error) {
+	return s.sendMedia(ctx, sendMediaParams{
+		BotToken:            params.BotToken,
+		ChatID:              params.ChatID,
+		MessageThreadID:     params.MessageThreadID,
+		MediaID:             params.MediaID,
+		Caption:             params.Caption,
+		ReplyToMessageID:    params.ReplyToMessageID,
+		ReplyMarkup:         params.ReplyMarkup,
+		DisableNotification: params.DisableNotification,
+		Method:              conversation.MessageKindDocument,
+		Shape:               "document",
+	})
+}
+
+// SendVideo sends one video message as the authenticated bot.
+func (s *Service) SendVideo(ctx context.Context, params SendVideoParams) (Message, error) {
+	return s.sendMedia(ctx, sendMediaParams{
+		BotToken:            params.BotToken,
+		ChatID:              params.ChatID,
+		MessageThreadID:     params.MessageThreadID,
+		MediaID:             params.MediaID,
+		Caption:             params.Caption,
+		ReplyToMessageID:    params.ReplyToMessageID,
+		ReplyMarkup:         params.ReplyMarkup,
+		DisableNotification: params.DisableNotification,
+		Method:              conversation.MessageKindVideo,
+		Shape:               "video",
+	})
+}
+
+// SendVoice sends one voice message as the authenticated bot.
+func (s *Service) SendVoice(ctx context.Context, params SendVoiceParams) (Message, error) {
+	return s.sendMedia(ctx, sendMediaParams{
+		BotToken:            params.BotToken,
+		ChatID:              params.ChatID,
+		MessageThreadID:     params.MessageThreadID,
+		MediaID:             params.MediaID,
+		Caption:             params.Caption,
+		ReplyToMessageID:    params.ReplyToMessageID,
+		ReplyMarkup:         params.ReplyMarkup,
+		DisableNotification: params.DisableNotification,
+		Method:              conversation.MessageKindVoice,
+		Shape:               "voice",
+	})
+}
+
+// SendSticker sends one sticker message as the authenticated bot.
+func (s *Service) SendSticker(ctx context.Context, params SendStickerParams) (Message, error) {
+	return s.sendMedia(ctx, sendMediaParams{
+		BotToken:            params.BotToken,
+		ChatID:              params.ChatID,
+		MessageThreadID:     params.MessageThreadID,
+		MediaID:             params.MediaID,
+		ReplyToMessageID:    params.ReplyToMessageID,
+		ReplyMarkup:         params.ReplyMarkup,
+		DisableNotification: params.DisableNotification,
+		Method:              conversation.MessageKindSticker,
+		Shape:               "sticker",
+	})
+}
+
+// SendAnimation sends one animation message as the authenticated bot.
+func (s *Service) SendAnimation(ctx context.Context, params SendAnimationParams) (Message, error) {
+	return s.sendMedia(ctx, sendMediaParams{
+		BotToken:            params.BotToken,
+		ChatID:              params.ChatID,
+		MessageThreadID:     params.MessageThreadID,
+		MediaID:             params.MediaID,
+		Caption:             params.Caption,
+		ReplyToMessageID:    params.ReplyToMessageID,
+		ReplyMarkup:         params.ReplyMarkup,
+		DisableNotification: params.DisableNotification,
+		Method:              conversation.MessageKindGIF,
+		Shape:               "animation",
+	})
+}
+
+// SendAudio sends one audio message as the authenticated bot.
+func (s *Service) SendAudio(ctx context.Context, params SendAudioParams) (Message, error) {
+	return s.sendMedia(ctx, sendMediaParams{
+		BotToken:            params.BotToken,
+		ChatID:              params.ChatID,
+		MessageThreadID:     params.MessageThreadID,
+		MediaID:             params.MediaID,
+		Caption:             params.Caption,
+		ReplyToMessageID:    params.ReplyToMessageID,
+		ReplyMarkup:         params.ReplyMarkup,
+		DisableNotification: params.DisableNotification,
+		Method:              conversation.MessageKindDocument,
+		Shape:               "audio",
+	})
+}
+
+// SendVideoNote sends one video-note message as the authenticated bot.
+func (s *Service) SendVideoNote(ctx context.Context, params SendVideoNoteParams) (Message, error) {
+	return s.sendMedia(ctx, sendMediaParams{
+		BotToken:            params.BotToken,
+		ChatID:              params.ChatID,
+		MessageThreadID:     params.MessageThreadID,
+		MediaID:             params.MediaID,
+		ReplyToMessageID:    params.ReplyToMessageID,
+		ReplyMarkup:         params.ReplyMarkup,
+		DisableNotification: params.DisableNotification,
+		Method:              conversation.MessageKindVideo,
+		Shape:               "video_note",
+	})
+}
+
+func (s *Service) sendMedia(ctx context.Context, params sendMediaParams) (Message, error) {
+	account, err := s.botAccount(ctx, params.BotToken)
+	if err != nil {
+		return Message{}, err
+	}
+
+	params.ChatID = strings.TrimSpace(params.ChatID)
+	params.MessageThreadID = strings.TrimSpace(params.MessageThreadID)
+	params.MediaID = strings.TrimSpace(params.MediaID)
+	params.Caption = strings.TrimSpace(params.Caption)
+	params.ReplyToMessageID = strings.TrimSpace(params.ReplyToMessageID)
+	params.Shape = strings.TrimSpace(params.Shape)
+	if params.ChatID == "" || params.MediaID == "" || params.Method == conversation.MessageKindUnspecified || params.Shape == "" {
+		return Message{}, ErrInvalidInput
+	}
+	metadata, err := markupMetadata(mediaMetadata(params.Caption, params.MediaID, params.Shape), params.ReplyMarkup)
+	if err != nil {
+		return Message{}, err
+	}
+
+	asset, err := s.media.MediaAssetByID(ctx, params.MediaID)
+	if err != nil {
+		return Message{}, fmt.Errorf("load bot media %s: %w", params.MediaID, mapMediaError(err))
+	}
+	if asset.OwnerAccountID != account.ID {
+		return Message{}, ErrForbidden
+	}
+	if asset.Status != domainmedia.MediaStatusReady {
+		return Message{}, ErrConflict
+	}
+	if !mediaMatchesMethod(asset.Kind, params.Method, params.Shape) {
+		return Message{}, ErrInvalidInput
+	}
+
+	draft := conversation.MessageDraft{
+		Kind:     params.Method,
+		ThreadID: params.MessageThreadID,
+		Silent:   params.DisableNotification,
+		Payload:  mediaPayload(params.Method, params.Caption, params.MediaID),
+		Metadata: metadata,
+		Attachments: []conversation.AttachmentRef{{
+			MediaID:   asset.ID,
+			Kind:      attachmentKindFromMedia(asset.Kind),
+			FileName:  asset.FileName,
+			MimeType:  asset.ContentType,
+			SizeBytes: asset.SizeBytes,
+			SHA256Hex: asset.SHA256Hex,
+			Width:     asset.Width,
+			Height:    asset.Height,
+			Duration:  asset.Duration,
+		}},
+	}
+
+	var message conversation.Message
+	if params.ReplyToMessageID != "" {
+		message, _, err = s.conversations.ReplyMessage(ctx, conversation.ReplyMessageParams{
+			ConversationID:   params.ChatID,
+			SenderAccountID:  account.ID,
+			SenderDeviceID:   botDeviceID,
+			ReplyToMessageID: params.ReplyToMessageID,
+			Draft:            draft,
+		})
+	} else {
+		message, _, err = s.conversations.SendMessage(ctx, conversation.SendMessageParams{
+			ConversationID:  params.ChatID,
+			SenderAccountID: account.ID,
+			SenderDeviceID:  botDeviceID,
+			Draft:           draft,
+		})
+	}
+	if err != nil {
+		return Message{}, fmt.Errorf("send bot media: %w", mapConversationError(err))
+	}
+
+	return s.GetMessage(ctx, GetMessageParams{
+		BotToken:  params.BotToken,
+		ChatID:    params.ChatID,
+		MessageID: message.ID,
+	})
+}
+
+func mediaMatchesMethod(kind domainmedia.MediaKind, messageKind conversation.MessageKind, shape string) bool {
+	switch messageKind {
+	case conversation.MessageKindImage:
+		return kind == domainmedia.MediaKindImage || kind == domainmedia.MediaKindAvatar
+	case conversation.MessageKindDocument:
+		if shape == "audio" {
+			return kind == domainmedia.MediaKindFile || kind == domainmedia.MediaKindDocument || kind == domainmedia.MediaKindVoice
+		}
+		return kind == domainmedia.MediaKindDocument || kind == domainmedia.MediaKindFile
+	case conversation.MessageKindVideo:
+		if shape == "video_note" {
+			return kind == domainmedia.MediaKindVideo
+		}
+		return kind == domainmedia.MediaKindVideo
+	case conversation.MessageKindVoice:
+		return kind == domainmedia.MediaKindVoice
+	case conversation.MessageKindSticker:
+		return kind == domainmedia.MediaKindSticker
+	case conversation.MessageKindGIF:
+		return kind == domainmedia.MediaKindGIF || kind == domainmedia.MediaKindVideo
+	default:
+		return false
+	}
+}
+
+func mediaMethod(shape string) (conversation.MessageKind, bool) {
+	switch strings.TrimSpace(shape) {
+	case "photo":
+		return conversation.MessageKindImage, true
+	case "document":
+		return conversation.MessageKindDocument, true
+	case "video":
+		return conversation.MessageKindVideo, true
+	case "animation":
+		return conversation.MessageKindGIF, true
+	case "audio":
+		return conversation.MessageKindDocument, true
+	case "voice":
+		return conversation.MessageKindVoice, true
+	case "sticker":
+		return conversation.MessageKindSticker, true
+	case "video_note":
+		return conversation.MessageKindVideo, true
+	default:
+		return conversation.MessageKindUnspecified, false
+	}
+}
+
+func editableMediaMethod(shape string) (conversation.MessageKind, bool) {
+	switch strings.TrimSpace(shape) {
+	case "photo", "document", "video", "animation", "audio":
+		return mediaMethod(shape)
+	default:
+		return conversation.MessageKindUnspecified, false
+	}
+}
+
+func editableMessage(message conversation.Message) bool {
+	_, ok := editableMediaMethod(messageShape(message))
+	return ok
+}
+
+func attachmentKindFromMedia(kind domainmedia.MediaKind) conversation.AttachmentKind {
+	switch kind {
+	case domainmedia.MediaKindImage:
+		return conversation.AttachmentKindImage
+	case domainmedia.MediaKindVideo:
+		return conversation.AttachmentKindVideo
+	case domainmedia.MediaKindDocument:
+		return conversation.AttachmentKindDocument
+	case domainmedia.MediaKindVoice:
+		return conversation.AttachmentKindVoice
+	case domainmedia.MediaKindSticker:
+		return conversation.AttachmentKindSticker
+	case domainmedia.MediaKindGIF:
+		return conversation.AttachmentKindGIF
+	case domainmedia.MediaKindAvatar:
+		return conversation.AttachmentKindAvatar
+	case domainmedia.MediaKindFile:
+		return conversation.AttachmentKindFile
+	default:
+		return conversation.AttachmentKindUnspecified
+	}
+}
+
+func mediaPayload(kind conversation.MessageKind, caption string, mediaID string) conversation.EncryptedPayload {
+	body := caption
+	if body == "" {
+		body = string(kind) + ":" + mediaID
+	}
+
+	return conversation.EncryptedPayload{
+		Ciphertext: []byte(body),
+	}
+}
+
+func mediaMetadata(caption string, mediaID string, shape string) map[string]string {
+	metadata := map[string]string{
+		metadataMediaIDKey: strings.TrimSpace(mediaID),
+		metadataShapeKey:   strings.TrimSpace(shape),
+	}
+	if strings.TrimSpace(caption) != "" {
+		metadata[metadataCaptionKey] = strings.TrimSpace(caption)
+	}
+
+	return metadata
+}
+
+func mapMediaError(err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, domainmedia.ErrNotFound):
+		return ErrNotFound
+	case errors.Is(err, domainmedia.ErrForbidden):
+		return ErrForbidden
+	case errors.Is(err, domainmedia.ErrConflict):
+		return ErrConflict
+	case errors.Is(err, domainmedia.ErrInvalidInput):
+		return ErrInvalidInput
+	default:
+		return err
+	}
+}

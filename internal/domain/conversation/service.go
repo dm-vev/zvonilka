@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -148,6 +149,21 @@ func messageEventMetadata(
 	}
 	if replyTo.MessageKind != MessageKindUnspecified {
 		metadata["reply_kind"] = string(replyTo.MessageKind)
+	}
+
+	return metadata
+}
+
+func messageSnapshotMetadata(message Message, extra map[string]string) map[string]string {
+	metadata := trimMetadata(message.Metadata)
+	if metadata == nil {
+		metadata = make(map[string]string, 2)
+	}
+	metadata["message_kind"] = string(message.Kind)
+	metadata["disable_link_previews"] = strconv.FormatBool(message.DisableLinkPreviews)
+
+	for key, value := range trimMetadata(extra) {
+		metadata[key] = value
 	}
 
 	return metadata

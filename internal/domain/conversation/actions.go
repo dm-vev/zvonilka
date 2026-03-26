@@ -190,9 +190,14 @@ func (s *Service) EditMessage(ctx context.Context, params EditMessageParams) (Me
 			MessageID:      savedMessage.ID,
 			PayloadType:    "message",
 			Payload:        params.Draft.Payload,
-			Metadata: messageEventMetadata(savedMessage.ID, savedMessage.ThreadID, savedMessage.ReplyTo, map[string]string{
-				"action": "edit",
-			}),
+			Metadata: messageEventMetadata(
+				savedMessage.ID,
+				savedMessage.ThreadID,
+				savedMessage.ReplyTo,
+				messageSnapshotMetadata(savedMessage, map[string]string{
+					"action": "edit",
+				}),
+			),
 			CreatedAt: now,
 		})
 		if err != nil {

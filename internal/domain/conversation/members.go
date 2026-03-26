@@ -89,9 +89,19 @@ func (s *Service) AddMembers(ctx context.Context, params AddMembersParams) ([]Co
 		if !changed {
 			return nil
 		}
-		if _, _, err := s.appendConversationEvent(ctx, tx, conversationRow, params.ActorAccountID, "", EventTypeConversationMembers, "members", map[string]string{
+		eventMetadata := map[string]string{
 			"change":       "added",
 			"member_count": fmt.Sprintf("%d", len(savedMembers)),
+		}
+		if len(savedMembers) == 1 {
+			eventMetadata["target_account_id"] = savedMembers[0].AccountID
+		}
+		eventMetadata["target_account_ids"] = joinMemberAccountIDs(savedMembers)
+		if _, _, err := s.appendConversationEvent(ctx, tx, conversationRow, params.ActorAccountID, "", EventTypeConversationMembers, "members", map[string]string{
+			"change":             eventMetadata["change"],
+			"member_count":       eventMetadata["member_count"],
+			"target_account_id":  eventMetadata["target_account_id"],
+			"target_account_ids": eventMetadata["target_account_ids"],
 		}, createdAt); err != nil {
 			return err
 		}
@@ -161,9 +171,23 @@ func (s *Service) RemoveMembers(ctx context.Context, params RemoveMembersParams)
 		if removed == 0 {
 			return nil
 		}
-		if _, _, err := s.appendConversationEvent(ctx, tx, conversationRow, params.ActorAccountID, "", EventTypeConversationMembers, "members", map[string]string{
+		targetIDs := make([]string, 0, len(params.AccountIDs))
+		for _, accountID := range params.AccountIDs {
+			targetIDs = append(targetIDs, accountID)
+		}
+		eventMetadata := map[string]string{
 			"change":       "removed",
 			"member_count": fmt.Sprintf("%d", removed),
+		}
+		if len(targetIDs) == 1 {
+			eventMetadata["target_account_id"] = targetIDs[0]
+		}
+		eventMetadata["target_account_ids"] = strings.Join(targetIDs, ",")
+		if _, _, err := s.appendConversationEvent(ctx, tx, conversationRow, params.ActorAccountID, "", EventTypeConversationMembers, "members", map[string]string{
+			"change":             eventMetadata["change"],
+			"member_count":       eventMetadata["member_count"],
+			"target_account_id":  eventMetadata["target_account_id"],
+			"target_account_ids": eventMetadata["target_account_ids"],
 		}, removedAt); err != nil {
 			return err
 		}
@@ -225,6 +249,7 @@ func (s *Service) UpdateMemberRole(ctx context.Context, params UpdateMemberRoleP
 			return nil
 		}
 
+		previousRole := targetMember.Role
 		targetMember.Role = params.Role
 		saved, err = tx.SaveConversationMember(ctx, targetMember)
 		if err != nil {
@@ -234,6 +259,7 @@ func (s *Service) UpdateMemberRole(ctx context.Context, params UpdateMemberRoleP
 			"change":            "role_updated",
 			"target_account_id": params.TargetAccountID,
 			"role":              string(params.Role),
+			"previous_role":     string(previousRole),
 		}, updatedAt); err != nil {
 			return err
 		}
@@ -245,6 +271,19 @@ func (s *Service) UpdateMemberRole(ctx context.Context, params UpdateMemberRoleP
 	}
 
 	return saved, nil
+}
+
+func joinMemberAccountIDs(members []ConversationMember) string {
+	values := make([]string, 0, len(members))
+	for _, member := range members {
+		accountID := strings.TrimSpace(member.AccountID)
+		if accountID == "" {
+			continue
+		}
+		values = append(values, accountID)
+	}
+
+	return strings.Join(values, ",")
 }
 
 func normalizeMemberRole(role MemberRole) MemberRole {
