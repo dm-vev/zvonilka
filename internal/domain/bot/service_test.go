@@ -287,6 +287,122 @@ func TestBotSendPhoto(t *testing.T) {
 	require.Empty(t, message.Text)
 }
 
+func TestBotSendAnimationAudioAndVideoNote(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+
+	userAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "maya",
+		DisplayName: "Maya",
+		AccountKind: identity.AccountKindUser,
+		Email:       "maya@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "mediabot",
+		DisplayName: "Media Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	chat, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   userAccount.ID,
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{botAccount.ID},
+	})
+	require.NoError(t, err)
+
+	service, err := domainbot.NewService(
+		bottest.NewMemoryStore(),
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaFixture{
+			assets: map[string]domainmedia.MediaAsset{
+				"media-animation": {
+					ID:             "media-animation",
+					OwnerAccountID: botAccount.ID,
+					Kind:           domainmedia.MediaKindGIF,
+					Status:         domainmedia.MediaStatusReady,
+					FileName:       "clip.gif",
+					ContentType:    "image/gif",
+					SizeBytes:      4096,
+					Width:          320,
+					Height:         240,
+					Duration:       3 * time.Second,
+				},
+				"media-audio": {
+					ID:             "media-audio",
+					OwnerAccountID: botAccount.ID,
+					Kind:           domainmedia.MediaKindFile,
+					Status:         domainmedia.MediaStatusReady,
+					FileName:       "track.mp3",
+					ContentType:    "audio/mpeg",
+					SizeBytes:      8192,
+					Duration:       12 * time.Second,
+				},
+				"media-video-note": {
+					ID:             "media-video-note",
+					OwnerAccountID: botAccount.ID,
+					Kind:           domainmedia.MediaKindVideo,
+					Status:         domainmedia.MediaStatusReady,
+					FileName:       "note.mp4",
+					ContentType:    "video/mp4",
+					SizeBytes:      6144,
+					Width:          240,
+					Height:         240,
+					Duration:       7 * time.Second,
+				},
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	animation, err := service.SendAnimation(ctx, domainbot.SendAnimationParams{
+		BotToken: botToken,
+		ChatID:   chat.ID,
+		MediaID:  "media-animation",
+		Caption:  "loop",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, animation.Animation)
+	require.Equal(t, "media-animation", animation.Animation.FileID)
+	require.Equal(t, "loop", animation.Caption)
+	require.Nil(t, animation.Video)
+
+	audio, err := service.SendAudio(ctx, domainbot.SendAudioParams{
+		BotToken: botToken,
+		ChatID:   chat.ID,
+		MediaID:  "media-audio",
+		Caption:  "track",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, audio.Audio)
+	require.Equal(t, "media-audio", audio.Audio.FileID)
+	require.Equal(t, "track", audio.Caption)
+	require.NotZero(t, audio.Audio.Duration)
+	require.Nil(t, audio.Document)
+
+	videoNote, err := service.SendVideoNote(ctx, domainbot.SendVideoNoteParams{
+		BotToken: botToken,
+		ChatID:   chat.ID,
+		MediaID:  "media-video-note",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, videoNote.VideoNote)
+	require.Equal(t, "media-video-note", videoNote.VideoNote.FileID)
+	require.Equal(t, uint32(240), videoNote.VideoNote.Length)
+	require.Nil(t, videoNote.Video)
+}
+
 func TestBotCallbackQueryLifecycle(t *testing.T) {
 	t.Parallel()
 

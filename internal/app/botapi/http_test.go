@@ -300,6 +300,179 @@ func TestHTTPSendPhotoMultipartUpload(t *testing.T) {
 	require.Equal(t, "photo.jpg", uploader.last.FileName)
 }
 
+func TestHTTPSendAnimationAndAudio(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+
+	userAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "helen",
+		DisplayName: "Helen",
+		AccountKind: identity.AccountKindUser,
+		Email:       "helen@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "mediashapebot",
+		DisplayName: "Media Shape Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	conv, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   userAccount.ID,
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{botAccount.ID},
+	})
+	require.NoError(t, err)
+
+	botService, err := domainbot.NewService(
+		bottest.NewMemoryStore(),
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaFixture{
+			assets: map[string]domainmedia.MediaAsset{
+				"media-animation": {
+					ID:             "media-animation",
+					OwnerAccountID: botAccount.ID,
+					Kind:           domainmedia.MediaKindGIF,
+					Status:         domainmedia.MediaStatusReady,
+					FileName:       "clip.gif",
+					ContentType:    "image/gif",
+					SizeBytes:      4096,
+					Width:          320,
+					Height:         200,
+					Duration:       2,
+				},
+				"media-audio": {
+					ID:             "media-audio",
+					OwnerAccountID: botAccount.ID,
+					Kind:           domainmedia.MediaKindFile,
+					Status:         domainmedia.MediaStatusReady,
+					FileName:       "track.mp3",
+					ContentType:    "audio/mpeg",
+					SizeBytes:      8192,
+					Duration:       14,
+				},
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	boundary := &api{bot: botService}
+
+	animationRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/bot"+botToken+"/sendAnimation",
+		strings.NewReader("chat_id="+conv.ID+"&animation=media-animation&caption=loop"),
+	)
+	animationRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	animationRecorder := httptest.NewRecorder()
+	boundary.routes().ServeHTTP(animationRecorder, animationRequest)
+	require.Equal(t, http.StatusOK, animationRecorder.Code)
+	require.Contains(t, animationRecorder.Body.String(), `"animation"`)
+	require.Contains(t, animationRecorder.Body.String(), `"file_id":"media-animation"`)
+	require.Contains(t, animationRecorder.Body.String(), `"caption":"loop"`)
+
+	audioRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/bot"+botToken+"/sendAudio",
+		strings.NewReader(`{"chat_id":"`+conv.ID+`","audio":"media-audio","caption":"track"}`),
+	)
+	audioRequest.Header.Set("Content-Type", "application/json")
+	audioRecorder := httptest.NewRecorder()
+	boundary.routes().ServeHTTP(audioRecorder, audioRequest)
+	require.Equal(t, http.StatusOK, audioRecorder.Code)
+	require.Contains(t, audioRecorder.Body.String(), `"audio"`)
+	require.Contains(t, audioRecorder.Body.String(), `"file_id":"media-audio"`)
+	require.Contains(t, audioRecorder.Body.String(), `"caption":"track"`)
+}
+
+func TestHTTPSendVideoNoteMultipartUpload(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+
+	userAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "ian",
+		DisplayName: "Ian",
+		AccountKind: identity.AccountKindUser,
+		Email:       "ian@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "videonotebot",
+		DisplayName: "Video Note Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	conv, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   userAccount.ID,
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{botAccount.ID},
+	})
+	require.NoError(t, err)
+
+	uploader := &uploadFixture{asset: domainmedia.MediaAsset{
+		ID:             "media-video-note",
+		OwnerAccountID: botAccount.ID,
+		Kind:           domainmedia.MediaKindVideo,
+		Status:         domainmedia.MediaStatusReady,
+		FileName:       "note.mp4",
+		ContentType:    "video/mp4",
+		SizeBytes:      9,
+		Width:          240,
+		Height:         240,
+		Duration:       4,
+	}}
+	botService, err := domainbot.NewService(
+		bottest.NewMemoryStore(),
+		identityService,
+		conversationService,
+		conversationStore,
+		uploader,
+	)
+	require.NoError(t, err)
+	boundary := &api{bot: botService, media: uploader, uploadLimit: 1024}
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	require.NoError(t, writer.WriteField("chat_id", conv.ID))
+	require.NoError(t, writer.WriteField("video_note", "attach://clip"))
+	part, err := writer.CreateFormFile("clip", "note.mp4")
+	require.NoError(t, err)
+	_, err = io.Copy(part, strings.NewReader("video-note"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	request := httptest.NewRequest(http.MethodPost, "/bot"+botToken+"/sendVideoNote", body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	recorder := httptest.NewRecorder()
+	boundary.routes().ServeHTTP(recorder, request)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Contains(t, recorder.Body.String(), `"video_note"`)
+	require.Contains(t, recorder.Body.String(), `"file_id":"media-video-note"`)
+	require.NotNil(t, uploader.last)
+	require.Equal(t, botAccount.ID, uploader.last.OwnerAccountID)
+	require.Equal(t, domainmedia.MediaKindVideo, uploader.last.Kind)
+	require.Equal(t, "note.mp4", uploader.last.FileName)
+}
+
 type mediaFixture struct {
 	assets map[string]domainmedia.MediaAsset
 }

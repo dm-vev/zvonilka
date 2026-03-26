@@ -13,6 +13,7 @@ import (
 const (
 	metadataCaptionKey = "bot.caption"
 	metadataMediaIDKey = "bot.media_id"
+	metadataShapeKey   = "bot.shape"
 )
 
 type sendMediaParams struct {
@@ -25,6 +26,7 @@ type sendMediaParams struct {
 	ReplyMarkup         *InlineKeyboardMarkup
 	DisableNotification bool
 	Method              conversation.MessageKind
+	Shape               string
 }
 
 // SendPhoto sends one image message as the authenticated bot.
@@ -39,6 +41,7 @@ func (s *Service) SendPhoto(ctx context.Context, params SendPhotoParams) (Messag
 		ReplyMarkup:         params.ReplyMarkup,
 		DisableNotification: params.DisableNotification,
 		Method:              conversation.MessageKindImage,
+		Shape:               "photo",
 	})
 }
 
@@ -54,6 +57,7 @@ func (s *Service) SendDocument(ctx context.Context, params SendDocumentParams) (
 		ReplyMarkup:         params.ReplyMarkup,
 		DisableNotification: params.DisableNotification,
 		Method:              conversation.MessageKindDocument,
+		Shape:               "document",
 	})
 }
 
@@ -69,6 +73,7 @@ func (s *Service) SendVideo(ctx context.Context, params SendVideoParams) (Messag
 		ReplyMarkup:         params.ReplyMarkup,
 		DisableNotification: params.DisableNotification,
 		Method:              conversation.MessageKindVideo,
+		Shape:               "video",
 	})
 }
 
@@ -84,6 +89,7 @@ func (s *Service) SendVoice(ctx context.Context, params SendVoiceParams) (Messag
 		ReplyMarkup:         params.ReplyMarkup,
 		DisableNotification: params.DisableNotification,
 		Method:              conversation.MessageKindVoice,
+		Shape:               "voice",
 	})
 }
 
@@ -98,6 +104,54 @@ func (s *Service) SendSticker(ctx context.Context, params SendStickerParams) (Me
 		ReplyMarkup:         params.ReplyMarkup,
 		DisableNotification: params.DisableNotification,
 		Method:              conversation.MessageKindSticker,
+		Shape:               "sticker",
+	})
+}
+
+// SendAnimation sends one animation message as the authenticated bot.
+func (s *Service) SendAnimation(ctx context.Context, params SendAnimationParams) (Message, error) {
+	return s.sendMedia(ctx, sendMediaParams{
+		BotToken:            params.BotToken,
+		ChatID:              params.ChatID,
+		MessageThreadID:     params.MessageThreadID,
+		MediaID:             params.MediaID,
+		Caption:             params.Caption,
+		ReplyToMessageID:    params.ReplyToMessageID,
+		ReplyMarkup:         params.ReplyMarkup,
+		DisableNotification: params.DisableNotification,
+		Method:              conversation.MessageKindGIF,
+		Shape:               "animation",
+	})
+}
+
+// SendAudio sends one audio message as the authenticated bot.
+func (s *Service) SendAudio(ctx context.Context, params SendAudioParams) (Message, error) {
+	return s.sendMedia(ctx, sendMediaParams{
+		BotToken:            params.BotToken,
+		ChatID:              params.ChatID,
+		MessageThreadID:     params.MessageThreadID,
+		MediaID:             params.MediaID,
+		Caption:             params.Caption,
+		ReplyToMessageID:    params.ReplyToMessageID,
+		ReplyMarkup:         params.ReplyMarkup,
+		DisableNotification: params.DisableNotification,
+		Method:              conversation.MessageKindDocument,
+		Shape:               "audio",
+	})
+}
+
+// SendVideoNote sends one video-note message as the authenticated bot.
+func (s *Service) SendVideoNote(ctx context.Context, params SendVideoNoteParams) (Message, error) {
+	return s.sendMedia(ctx, sendMediaParams{
+		BotToken:            params.BotToken,
+		ChatID:              params.ChatID,
+		MessageThreadID:     params.MessageThreadID,
+		MediaID:             params.MediaID,
+		ReplyToMessageID:    params.ReplyToMessageID,
+		ReplyMarkup:         params.ReplyMarkup,
+		DisableNotification: params.DisableNotification,
+		Method:              conversation.MessageKindVideo,
+		Shape:               "video_note",
 	})
 }
 
@@ -112,10 +166,11 @@ func (s *Service) sendMedia(ctx context.Context, params sendMediaParams) (Messag
 	params.MediaID = strings.TrimSpace(params.MediaID)
 	params.Caption = strings.TrimSpace(params.Caption)
 	params.ReplyToMessageID = strings.TrimSpace(params.ReplyToMessageID)
-	if params.ChatID == "" || params.MediaID == "" || params.Method == conversation.MessageKindUnspecified {
+	params.Shape = strings.TrimSpace(params.Shape)
+	if params.ChatID == "" || params.MediaID == "" || params.Method == conversation.MessageKindUnspecified || params.Shape == "" {
 		return Message{}, ErrInvalidInput
 	}
-	metadata, err := markupMetadata(mediaMetadata(params.Caption, params.MediaID), params.ReplyMarkup)
+	metadata, err := markupMetadata(mediaMetadata(params.Caption, params.MediaID, params.Shape), params.ReplyMarkup)
 	if err != nil {
 		return Message{}, err
 	}
@@ -130,7 +185,7 @@ func (s *Service) sendMedia(ctx context.Context, params sendMediaParams) (Messag
 	if asset.Status != domainmedia.MediaStatusReady {
 		return Message{}, ErrConflict
 	}
-	if !mediaMatchesMethod(asset.Kind, params.Method) {
+	if !mediaMatchesMethod(asset.Kind, params.Method, params.Shape) {
 		return Message{}, ErrInvalidInput
 	}
 
@@ -181,18 +236,26 @@ func (s *Service) sendMedia(ctx context.Context, params sendMediaParams) (Messag
 	})
 }
 
-func mediaMatchesMethod(kind domainmedia.MediaKind, messageKind conversation.MessageKind) bool {
+func mediaMatchesMethod(kind domainmedia.MediaKind, messageKind conversation.MessageKind, shape string) bool {
 	switch messageKind {
 	case conversation.MessageKindImage:
 		return kind == domainmedia.MediaKindImage || kind == domainmedia.MediaKindAvatar
 	case conversation.MessageKindDocument:
+		if shape == "audio" {
+			return kind == domainmedia.MediaKindFile || kind == domainmedia.MediaKindDocument || kind == domainmedia.MediaKindVoice
+		}
 		return kind == domainmedia.MediaKindDocument || kind == domainmedia.MediaKindFile
 	case conversation.MessageKindVideo:
+		if shape == "video_note" {
+			return kind == domainmedia.MediaKindVideo
+		}
 		return kind == domainmedia.MediaKindVideo
 	case conversation.MessageKindVoice:
 		return kind == domainmedia.MediaKindVoice
 	case conversation.MessageKindSticker:
 		return kind == domainmedia.MediaKindSticker
+	case conversation.MessageKindGIF:
+		return kind == domainmedia.MediaKindGIF || kind == domainmedia.MediaKindVideo
 	default:
 		return false
 	}
@@ -232,9 +295,10 @@ func mediaPayload(kind conversation.MessageKind, caption string, mediaID string)
 	}
 }
 
-func mediaMetadata(caption string, mediaID string) map[string]string {
+func mediaMetadata(caption string, mediaID string, shape string) map[string]string {
 	metadata := map[string]string{
 		metadataMediaIDKey: strings.TrimSpace(mediaID),
+		metadataShapeKey:   strings.TrimSpace(shape),
 	}
 	if strings.TrimSpace(caption) != "" {
 		metadata[metadataCaptionKey] = strings.TrimSpace(caption)

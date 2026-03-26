@@ -48,6 +48,12 @@ func (a *api) serve(writer http.ResponseWriter, request *http.Request) {
 		a.sendDocument(writer, request, token)
 	case "sendVideo":
 		a.sendVideo(writer, request, token)
+	case "sendAnimation":
+		a.sendAnimation(writer, request, token)
+	case "sendAudio":
+		a.sendAudio(writer, request, token)
+	case "sendVideoNote":
+		a.sendVideoNote(writer, request, token)
 	case "sendVoice":
 		a.sendVoice(writer, request, token)
 	case "sendSticker":

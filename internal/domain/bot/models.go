@@ -112,6 +112,31 @@ type Video struct {
 	MimeType string `json:"mime_type,omitempty"`
 }
 
+// Animation describes one Telegram-shaped animation projection.
+type Animation struct {
+	File
+	Width    uint32 `json:"width,omitempty"`
+	Height   uint32 `json:"height,omitempty"`
+	Duration int    `json:"duration,omitempty"`
+	FileName string `json:"file_name,omitempty"`
+	MimeType string `json:"mime_type,omitempty"`
+}
+
+// Audio describes one Telegram-shaped audio projection.
+type Audio struct {
+	File
+	Duration int    `json:"duration,omitempty"`
+	FileName string `json:"file_name,omitempty"`
+	MimeType string `json:"mime_type,omitempty"`
+}
+
+// VideoNote describes one Telegram-shaped video note projection.
+type VideoNote struct {
+	File
+	Length   uint32 `json:"length,omitempty"`
+	Duration int    `json:"duration,omitempty"`
+}
+
 // Voice describes one Telegram-shaped voice projection.
 type Voice struct {
 	File
@@ -142,6 +167,9 @@ type Message struct {
 	Photo           []PhotoSize           `json:"photo,omitempty"`
 	Document        *Document             `json:"document,omitempty"`
 	Video           *Video                `json:"video,omitempty"`
+	Animation       *Animation            `json:"animation,omitempty"`
+	Audio           *Audio                `json:"audio,omitempty"`
+	VideoNote       *VideoNote            `json:"video_note,omitempty"`
 	Voice           *Voice                `json:"voice,omitempty"`
 	Sticker         *Sticker              `json:"sticker,omitempty"`
 	ReplyMarkup     *InlineKeyboardMarkup `json:"reply_markup,omitempty"`

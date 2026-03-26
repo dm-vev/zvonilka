@@ -103,6 +103,41 @@ type SendStickerParams struct {
 	DisableNotification bool
 }
 
+// SendAnimationParams describes one sendAnimation request.
+type SendAnimationParams struct {
+	BotToken            string
+	ChatID              string
+	MessageThreadID     string
+	MediaID             string
+	Caption             string
+	ReplyToMessageID    string
+	ReplyMarkup         *InlineKeyboardMarkup
+	DisableNotification bool
+}
+
+// SendAudioParams describes one sendAudio request.
+type SendAudioParams struct {
+	BotToken            string
+	ChatID              string
+	MessageThreadID     string
+	MediaID             string
+	Caption             string
+	ReplyToMessageID    string
+	ReplyMarkup         *InlineKeyboardMarkup
+	DisableNotification bool
+}
+
+// SendVideoNoteParams describes one sendVideoNote request.
+type SendVideoNoteParams struct {
+	BotToken            string
+	ChatID              string
+	MessageThreadID     string
+	MediaID             string
+	ReplyToMessageID    string
+	ReplyMarkup         *InlineKeyboardMarkup
+	DisableNotification bool
+}
+
 // EditMessageTextParams describes one editMessageText request.
 type EditMessageTextParams struct {
 	BotToken              string

@@ -122,6 +122,82 @@ func (a *api) sendVideo(writer http.ResponseWriter, request *http.Request, token
 	}, token, "video", domainmedia.MediaKindVideo)
 }
 
+func (a *api) sendAnimation(writer http.ResponseWriter, request *http.Request, token string) {
+	var payload sendAnimationRequest
+	a.sendMedia(writer, request, &payload, func() normalizedMediaRequest {
+		return normalizedMediaRequest{
+			ChatID:              payload.ChatID,
+			MessageThreadID:     payload.MessageThreadID,
+			MediaID:             payload.Animation,
+			Caption:             payload.Caption,
+			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyMarkup:         payload.ReplyMarkup,
+			DisableNotification: payload.DisableNotification,
+		}
+	}, func(payload normalizedMediaRequest) (domainbot.Message, error) {
+		return a.bot.SendAnimation(request.Context(), domainbot.SendAnimationParams{
+			BotToken:            token,
+			ChatID:              string(payload.ChatID),
+			MessageThreadID:     string(payload.MessageThreadID),
+			MediaID:             payload.MediaID,
+			Caption:             payload.Caption,
+			ReplyToMessageID:    string(payload.ReplyToMessageID),
+			ReplyMarkup:         payload.ReplyMarkup,
+			DisableNotification: payload.DisableNotification,
+		})
+	}, token, "animation", domainmedia.MediaKindGIF)
+}
+
+func (a *api) sendAudio(writer http.ResponseWriter, request *http.Request, token string) {
+	var payload sendAudioRequest
+	a.sendMedia(writer, request, &payload, func() normalizedMediaRequest {
+		return normalizedMediaRequest{
+			ChatID:              payload.ChatID,
+			MessageThreadID:     payload.MessageThreadID,
+			MediaID:             payload.Audio,
+			Caption:             payload.Caption,
+			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyMarkup:         payload.ReplyMarkup,
+			DisableNotification: payload.DisableNotification,
+		}
+	}, func(payload normalizedMediaRequest) (domainbot.Message, error) {
+		return a.bot.SendAudio(request.Context(), domainbot.SendAudioParams{
+			BotToken:            token,
+			ChatID:              string(payload.ChatID),
+			MessageThreadID:     string(payload.MessageThreadID),
+			MediaID:             payload.MediaID,
+			Caption:             payload.Caption,
+			ReplyToMessageID:    string(payload.ReplyToMessageID),
+			ReplyMarkup:         payload.ReplyMarkup,
+			DisableNotification: payload.DisableNotification,
+		})
+	}, token, "audio", domainmedia.MediaKindFile)
+}
+
+func (a *api) sendVideoNote(writer http.ResponseWriter, request *http.Request, token string) {
+	var payload sendVideoNoteRequest
+	a.sendMedia(writer, request, &payload, func() normalizedMediaRequest {
+		return normalizedMediaRequest{
+			ChatID:              payload.ChatID,
+			MessageThreadID:     payload.MessageThreadID,
+			MediaID:             payload.VideoNote,
+			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyMarkup:         payload.ReplyMarkup,
+			DisableNotification: payload.DisableNotification,
+		}
+	}, func(payload normalizedMediaRequest) (domainbot.Message, error) {
+		return a.bot.SendVideoNote(request.Context(), domainbot.SendVideoNoteParams{
+			BotToken:            token,
+			ChatID:              string(payload.ChatID),
+			MessageThreadID:     string(payload.MessageThreadID),
+			MediaID:             payload.MediaID,
+			ReplyToMessageID:    string(payload.ReplyToMessageID),
+			ReplyMarkup:         payload.ReplyMarkup,
+			DisableNotification: payload.DisableNotification,
+		})
+	}, token, "video_note", domainmedia.MediaKindVideo)
+}
+
 func (a *api) sendVoice(writer http.ResponseWriter, request *http.Request, token string) {
 	var payload sendVoiceRequest
 	a.sendMedia(writer, request, &payload, func() normalizedMediaRequest {

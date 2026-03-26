@@ -79,9 +79,33 @@ func messageMediaID(message conversation.Message) string {
 	return strings.TrimSpace(message.Attachments[0].MediaID)
 }
 
-func messageMedia(message conversation.Message) ([]PhotoSize, *Document, *Video, *Voice, *Sticker) {
+func messageShape(message conversation.Message) string {
+	shape := strings.TrimSpace(message.Metadata[metadataShapeKey])
+	if shape != "" {
+		return shape
+	}
+
+	switch message.Kind {
+	case conversation.MessageKindImage:
+		return "photo"
+	case conversation.MessageKindDocument:
+		return "document"
+	case conversation.MessageKindVideo:
+		return "video"
+	case conversation.MessageKindVoice:
+		return "voice"
+	case conversation.MessageKindSticker:
+		return "sticker"
+	case conversation.MessageKindGIF:
+		return "animation"
+	default:
+		return ""
+	}
+}
+
+func messageMedia(message conversation.Message) ([]PhotoSize, *Document, *Video, *Animation, *Audio, *VideoNote, *Voice, *Sticker) {
 	if len(message.Attachments) == 0 {
-		return nil, nil, nil, nil, nil
+		return nil, nil, nil, nil, nil, nil, nil, nil
 	}
 
 	attachment := message.Attachments[0]
@@ -91,42 +115,68 @@ func messageMedia(message conversation.Message) ([]PhotoSize, *Document, *Video,
 		FileSize:     attachment.SizeBytes,
 	}
 
-	switch message.Kind {
-	case conversation.MessageKindImage:
+	switch messageShape(message) {
+	case "photo":
 		return []PhotoSize{{
 			File:   file,
 			Width:  attachment.Width,
 			Height: attachment.Height,
-		}}, nil, nil, nil, nil
-	case conversation.MessageKindDocument:
+		}}, nil, nil, nil, nil, nil, nil, nil
+	case "document":
 		return nil, &Document{
 			File:     file,
 			FileName: attachment.FileName,
 			MimeType: attachment.MimeType,
-		}, nil, nil, nil
-	case conversation.MessageKindVideo:
+		}, nil, nil, nil, nil, nil, nil
+	case "video":
 		return nil, nil, &Video{
 			File:     file,
 			Width:    attachment.Width,
 			Height:   attachment.Height,
 			Duration: int(attachment.Duration.Seconds()),
 			MimeType: attachment.MimeType,
+		}, nil, nil, nil, nil, nil
+	case "animation":
+		return nil, nil, nil, &Animation{
+			File:     file,
+			Width:    attachment.Width,
+			Height:   attachment.Height,
+			Duration: int(attachment.Duration.Seconds()),
+			FileName: attachment.FileName,
+			MimeType: attachment.MimeType,
+		}, nil, nil, nil, nil
+	case "audio":
+		return nil, nil, nil, nil, &Audio{
+			File:     file,
+			Duration: int(attachment.Duration.Seconds()),
+			FileName: attachment.FileName,
+			MimeType: attachment.MimeType,
+		}, nil, nil, nil
+	case "video_note":
+		length := attachment.Width
+		if attachment.Height > length {
+			length = attachment.Height
+		}
+		return nil, nil, nil, nil, nil, &VideoNote{
+			File:     file,
+			Length:   length,
+			Duration: int(attachment.Duration.Seconds()),
 		}, nil, nil
-	case conversation.MessageKindVoice:
-		return nil, nil, nil, &Voice{
+	case "voice":
+		return nil, nil, nil, nil, nil, nil, &Voice{
 			File:     file,
 			Duration: int(attachment.Duration.Seconds()),
 			MimeType: attachment.MimeType,
 		}, nil
-	case conversation.MessageKindSticker:
-		return nil, nil, nil, nil, &Sticker{
+	case "sticker":
+		return nil, nil, nil, nil, nil, nil, nil, &Sticker{
 			File:     file,
 			Width:    attachment.Width,
 			Height:   attachment.Height,
 			MimeType: attachment.MimeType,
 		}
 	default:
-		return nil, nil, nil, nil, nil
+		return nil, nil, nil, nil, nil, nil, nil, nil
 	}
 }
 
@@ -218,7 +268,7 @@ func (s *Service) messageForConversation(
 	if !msg.EditedAt.IsZero() {
 		result.EditDate = msg.EditedAt.UTC().Unix()
 	}
-	result.Photo, result.Document, result.Video, result.Voice, result.Sticker = messageMedia(msg)
+	result.Photo, result.Document, result.Video, result.Animation, result.Audio, result.VideoNote, result.Voice, result.Sticker = messageMedia(msg)
 	if !includeReply || msg.ReplyTo.MessageID == "" {
 		return result, nil
 	}

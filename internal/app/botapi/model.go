@@ -108,6 +108,35 @@ type sendStickerRequest struct {
 	DisableNotification bool                            `json:"disable_notification"`
 }
 
+type sendAnimationRequest struct {
+	ChatID              textID                          `json:"chat_id"`
+	MessageThreadID     textID                          `json:"message_thread_id"`
+	Animation           string                          `json:"animation"`
+	Caption             string                          `json:"caption"`
+	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+	DisableNotification bool                            `json:"disable_notification"`
+}
+
+type sendAudioRequest struct {
+	ChatID              textID                          `json:"chat_id"`
+	MessageThreadID     textID                          `json:"message_thread_id"`
+	Audio               string                          `json:"audio"`
+	Caption             string                          `json:"caption"`
+	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+	DisableNotification bool                            `json:"disable_notification"`
+}
+
+type sendVideoNoteRequest struct {
+	ChatID              textID                          `json:"chat_id"`
+	MessageThreadID     textID                          `json:"message_thread_id"`
+	VideoNote           string                          `json:"video_note"`
+	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+	DisableNotification bool                            `json:"disable_notification"`
+}
+
 type editMessageTextRequest struct {
 	ChatID                textID                          `json:"chat_id"`
 	MessageID             textID                          `json:"message_id"`
