@@ -184,6 +184,17 @@ type SendPollParams struct {
 	DisableNotification   bool
 }
 
+// EditMediaParams describes one editMessageMedia request.
+type EditMediaParams struct {
+	BotToken    string
+	ChatID      string
+	MessageID   string
+	MediaID     string
+	Shape       string
+	Caption     *string
+	ReplyMarkup *InlineKeyboardMarkup
+}
+
 // EditMessageTextParams describes one editMessageText request.
 type EditMessageTextParams struct {
 	BotToken              string
@@ -192,6 +203,27 @@ type EditMessageTextParams struct {
 	Text                  string
 	ReplyMarkup           *InlineKeyboardMarkup
 	DisableWebPagePreview bool
+}
+
+// ForwardMessagesParams describes one forwardMessages request.
+type ForwardMessagesParams struct {
+	BotToken            string
+	ChatID              string
+	MessageThreadID     string
+	FromChatID          string
+	MessageIDs          []string
+	DisableNotification bool
+}
+
+// CopyMessagesParams describes one copyMessages request.
+type CopyMessagesParams struct {
+	BotToken            string
+	ChatID              string
+	MessageThreadID     string
+	FromChatID          string
+	MessageIDs          []string
+	DisableNotification bool
+	RemoveCaption       bool
 }
 
 // DeleteMessageParams describes one deleteMessage request.

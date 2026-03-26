@@ -190,6 +190,23 @@ type sendPollRequest struct {
 	DisableNotification   bool                            `json:"disable_notification"`
 }
 
+type forwardMessagesRequest struct {
+	ChatID              textID   `json:"chat_id"`
+	MessageThreadID     textID   `json:"message_thread_id"`
+	FromChatID          textID   `json:"from_chat_id"`
+	MessageIDs          []textID `json:"message_ids"`
+	DisableNotification bool     `json:"disable_notification"`
+}
+
+type copyMessagesRequest struct {
+	ChatID              textID   `json:"chat_id"`
+	MessageThreadID     textID   `json:"message_thread_id"`
+	FromChatID          textID   `json:"from_chat_id"`
+	MessageIDs          []textID `json:"message_ids"`
+	DisableNotification bool     `json:"disable_notification"`
+	RemoveCaption       bool     `json:"remove_caption"`
+}
+
 type editMessageTextRequest struct {
 	ChatID                textID                          `json:"chat_id"`
 	MessageID             textID                          `json:"message_id"`
@@ -197,6 +214,19 @@ type editMessageTextRequest struct {
 	ReplyMarkup           *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableWebPagePreview bool                            `json:"disable_web_page_preview"`
 	LinkPreviewOptions    *previewData                    `json:"link_preview_options"`
+}
+
+type editMediaData struct {
+	Type    string  `json:"type"`
+	Media   string  `json:"media"`
+	Caption *string `json:"caption"`
+}
+
+type editMessageMediaRequest struct {
+	ChatID      textID                          `json:"chat_id"`
+	MessageID   textID                          `json:"message_id"`
+	Media       editMediaData                   `json:"media"`
+	ReplyMarkup *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 }
 
 type answerCallbackQueryRequest struct {

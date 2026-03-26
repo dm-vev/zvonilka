@@ -1,6 +1,7 @@
 package botapi
 
 import (
+	"context"
 	"net/http"
 
 	domainbot "github.com/dm-vev/zvonilka/internal/domain/bot"
@@ -43,6 +44,62 @@ func (a *api) forwardMessage(writer http.ResponseWriter, request *http.Request, 
 	}
 
 	result, err := a.telegramMessage(request.Context(), message)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, result)
+}
+
+func (a *api) forwardMessages(writer http.ResponseWriter, request *http.Request, token string) {
+	var payload forwardMessagesRequest
+	if err := decodeRequest(request, &payload); err != nil {
+		writeError(writer, http.StatusBadRequest, "Bad Request")
+		return
+	}
+
+	chatID, err := a.internalChatID(request.Context(), payload.ChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	threadID, err := a.internalTopicID(request.Context(), payload.MessageThreadID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	fromChatID, err := a.internalChatID(request.Context(), payload.FromChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	messageIDs, err := a.internalMessageIDs(request.Context(), payload.MessageIDs)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	forwardedIDs, err := a.bot.ForwardMessages(request.Context(), domainbot.ForwardMessagesParams{
+		BotToken:            token,
+		ChatID:              chatID,
+		MessageThreadID:     threadID,
+		FromChatID:          fromChatID,
+		MessageIDs:          messageIDs,
+		DisableNotification: payload.DisableNotification,
+	})
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	result, err := a.telegramMessageIDs(request.Context(), forwardedIDs)
 	if err != nil {
 		code, description := botError(err)
 		writeError(writer, code, description)
@@ -109,6 +166,63 @@ func (a *api) copyMessage(writer http.ResponseWriter, request *http.Request, tok
 	writeResult(writer, tgmodels.MessageID{ID: int(publicID)})
 }
 
+func (a *api) copyMessages(writer http.ResponseWriter, request *http.Request, token string) {
+	var payload copyMessagesRequest
+	if err := decodeRequest(request, &payload); err != nil {
+		writeError(writer, http.StatusBadRequest, "Bad Request")
+		return
+	}
+
+	chatID, err := a.internalChatID(request.Context(), payload.ChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	threadID, err := a.internalTopicID(request.Context(), payload.MessageThreadID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	fromChatID, err := a.internalChatID(request.Context(), payload.FromChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	messageIDs, err := a.internalMessageIDs(request.Context(), payload.MessageIDs)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	copiedIDs, err := a.bot.CopyMessages(request.Context(), domainbot.CopyMessagesParams{
+		BotToken:            token,
+		ChatID:              chatID,
+		MessageThreadID:     threadID,
+		FromChatID:          fromChatID,
+		MessageIDs:          messageIDs,
+		DisableNotification: payload.DisableNotification,
+		RemoveCaption:       payload.RemoveCaption,
+	})
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	result, err := a.telegramMessageIDs(request.Context(), copiedIDs)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, result)
+}
+
 func (a *api) resolveRelayIDs(
 	request *http.Request,
 	chatID textID,
@@ -134,4 +248,37 @@ func (a *api) resolveRelayIDs(
 	}
 
 	return resolvedChatID, resolvedFromChatID, resolvedMessageID, resolvedThreadID, nil
+}
+
+func (a *api) internalMessageIDs(ctx context.Context, values []textID) ([]string, error) {
+	if len(values) == 0 {
+		return nil, domainbot.ErrInvalidInput
+	}
+
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		resolved, err := a.internalMessageID(ctx, value)
+		if err != nil {
+			return nil, err
+		}
+		if resolved == "" {
+			return nil, domainbot.ErrInvalidInput
+		}
+		result = append(result, resolved)
+	}
+
+	return result, nil
+}
+
+func (a *api) telegramMessageIDs(ctx context.Context, values []string) ([]tgmodels.MessageID, error) {
+	result := make([]tgmodels.MessageID, 0, len(values))
+	for _, value := range values {
+		publicID, err := a.bot.PublicMessageID(ctx, value)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, tgmodels.MessageID{ID: int(publicID)})
+	}
+
+	return result, nil
 }

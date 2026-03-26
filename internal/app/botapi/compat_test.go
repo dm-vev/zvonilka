@@ -140,6 +140,89 @@ func TestGoTelegramClientUtilitySuite(t *testing.T) {
 	require.Equal(t, "copy caption", copiedMessage.Caption)
 	require.NotNil(t, copiedMessage.ReplyMarkup)
 	require.Equal(t, "Copy", copiedMessage.ReplyMarkup.InlineKeyboard[0][0].Text)
+
+	editedMedia, err := client.EditMessageMedia(ctx, &telegrambot.EditMessageMediaParams{
+		ChatID:    directChatID,
+		MessageID: photo.ID,
+		Media: &tgmodels.InputMediaDocument{
+			Media:   "media-document",
+			Caption: "edited media caption",
+		},
+		ReplyMarkup: &tgmodels.InlineKeyboardMarkup{
+			InlineKeyboard: [][]tgmodels.InlineKeyboardButton{{
+				{Text: "Edited", CallbackData: "edited"},
+			}},
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, editedMedia.Document)
+	require.Equal(t, "media-document", editedMedia.Document.FileID)
+	require.Equal(t, "edited media caption", editedMedia.Caption)
+	require.NotNil(t, editedMedia.ReplyMarkup)
+	require.Equal(t, "Edited", editedMedia.ReplyMarkup.InlineKeyboard[0][0].Text)
+
+	batchFirst, err := client.SendMessage(ctx, &telegrambot.SendMessageParams{
+		ChatID: directChatID,
+		Text:   "batch one",
+	})
+	require.NoError(t, err)
+	batchSecond, err := client.SendMessage(ctx, &telegrambot.SendMessageParams{
+		ChatID: directChatID,
+		Text:   "batch two",
+	})
+	require.NoError(t, err)
+
+	forwardedBatch, err := client.ForwardMessages(ctx, &telegrambot.ForwardMessagesParams{
+		ChatID:     groupChatID,
+		FromChatID: directChatID,
+		MessageIDs: []int{batchFirst.ID, batchSecond.ID},
+	})
+	require.NoError(t, err)
+	require.Len(t, forwardedBatch, 2)
+	require.NotZero(t, forwardedBatch[0].ID)
+	require.NotZero(t, forwardedBatch[1].ID)
+
+	internalForwardedID, err := world.bot.ResolveMessageID(ctx, strconv.Itoa(forwardedBatch[0].ID))
+	require.NoError(t, err)
+	forwardedMessage, err := world.bot.GetMessage(ctx, domainbot.GetMessageParams{
+		BotToken:  world.botToken,
+		ChatID:    world.groupID,
+		MessageID: internalForwardedID,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "batch one", forwardedMessage.Text)
+
+	firstMediaCopy, err := client.SendPhoto(ctx, &telegrambot.SendPhotoParams{
+		ChatID:  directChatID,
+		Photo:   &tgmodels.InputFileString{Data: "media-photo"},
+		Caption: "first caption",
+	})
+	require.NoError(t, err)
+	secondMediaCopy, err := client.SendDocument(ctx, &telegrambot.SendDocumentParams{
+		ChatID:   directChatID,
+		Document: &tgmodels.InputFileString{Data: "media-document"},
+		Caption:  "second caption",
+	})
+	require.NoError(t, err)
+
+	copiedBatch, err := client.CopyMessages(ctx, &telegrambot.CopyMessagesParams{
+		ChatID:        groupChatID,
+		FromChatID:    directChatID,
+		MessageIDs:    []int{firstMediaCopy.ID, secondMediaCopy.ID},
+		RemoveCaption: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, copiedBatch, 2)
+
+	internalBatchCopyID, err := world.bot.ResolveMessageID(ctx, strconv.Itoa(copiedBatch[0].ID))
+	require.NoError(t, err)
+	copiedBatchMessage, err := world.bot.GetMessage(ctx, domainbot.GetMessageParams{
+		BotToken:  world.botToken,
+		ChatID:    world.groupID,
+		MessageID: internalBatchCopyID,
+	})
+	require.NoError(t, err)
+	require.Empty(t, copiedBatchMessage.Caption)
 }
 
 func TestGoTelegramClientCommandAndMenuSuite(t *testing.T) {

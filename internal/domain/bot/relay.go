@@ -74,6 +74,10 @@ func (s *Service) ForwardMessage(ctx context.Context, params ForwardMessageParam
 
 // CopyMessage copies one visible message into the destination chat.
 func (s *Service) CopyMessage(ctx context.Context, params CopyMessageParams) (string, error) {
+	return s.copyMessage(ctx, params, false)
+}
+
+func (s *Service) copyMessage(ctx context.Context, params CopyMessageParams, removeCaption bool) (string, error) {
 	account, err := s.botAccount(ctx, params.BotToken)
 	if err != nil {
 		return "", err
@@ -102,7 +106,7 @@ func (s *Service) CopyMessage(ctx context.Context, params CopyMessageParams) (st
 		replyMarkup = messageReplyMarkup(source.Metadata)
 	}
 	caption := strings.TrimSpace(params.Caption)
-	if caption == "" {
+	if caption == "" && !removeCaption {
 		caption = strings.TrimSpace(source.Metadata[metadataCaptionKey])
 	}
 	metadata, err := markupMetadata(withCaption(withoutMarkup(source.Metadata), params.Caption), replyMarkup)
@@ -135,4 +139,70 @@ func (s *Service) CopyMessage(ctx context.Context, params CopyMessageParams) (st
 	}
 
 	return message.ID, nil
+}
+
+// ForwardMessages re-sends multiple visible messages into the destination chat.
+func (s *Service) ForwardMessages(ctx context.Context, params ForwardMessagesParams) ([]string, error) {
+	params.ChatID = strings.TrimSpace(params.ChatID)
+	params.MessageThreadID = strings.TrimSpace(params.MessageThreadID)
+	params.FromChatID = strings.TrimSpace(params.FromChatID)
+	if params.ChatID == "" || params.FromChatID == "" || len(params.MessageIDs) == 0 {
+		return nil, ErrInvalidInput
+	}
+
+	result := make([]string, 0, len(params.MessageIDs))
+	for _, messageID := range params.MessageIDs {
+		messageID = strings.TrimSpace(messageID)
+		if messageID == "" {
+			return nil, ErrInvalidInput
+		}
+
+		message, err := s.ForwardMessage(ctx, ForwardMessageParams{
+			BotToken:            params.BotToken,
+			ChatID:              params.ChatID,
+			MessageThreadID:     params.MessageThreadID,
+			FromChatID:          params.FromChatID,
+			MessageID:           messageID,
+			DisableNotification: params.DisableNotification,
+		})
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, message.MessageID)
+	}
+
+	return result, nil
+}
+
+// CopyMessages copies multiple visible messages into the destination chat.
+func (s *Service) CopyMessages(ctx context.Context, params CopyMessagesParams) ([]string, error) {
+	params.ChatID = strings.TrimSpace(params.ChatID)
+	params.MessageThreadID = strings.TrimSpace(params.MessageThreadID)
+	params.FromChatID = strings.TrimSpace(params.FromChatID)
+	if params.ChatID == "" || params.FromChatID == "" || len(params.MessageIDs) == 0 {
+		return nil, ErrInvalidInput
+	}
+
+	result := make([]string, 0, len(params.MessageIDs))
+	for _, messageID := range params.MessageIDs {
+		messageID = strings.TrimSpace(messageID)
+		if messageID == "" {
+			return nil, ErrInvalidInput
+		}
+
+		copiedID, err := s.copyMessage(ctx, CopyMessageParams{
+			BotToken:            params.BotToken,
+			ChatID:              params.ChatID,
+			MessageThreadID:     params.MessageThreadID,
+			FromChatID:          params.FromChatID,
+			MessageID:           messageID,
+			DisableNotification: params.DisableNotification,
+		}, params.RemoveCaption)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, copiedID)
+	}
+
+	return result, nil
 }

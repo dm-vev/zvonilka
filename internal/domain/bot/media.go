@@ -262,6 +262,43 @@ func mediaMatchesMethod(kind domainmedia.MediaKind, messageKind conversation.Mes
 	}
 }
 
+func mediaMethod(shape string) (conversation.MessageKind, bool) {
+	switch strings.TrimSpace(shape) {
+	case "photo":
+		return conversation.MessageKindImage, true
+	case "document":
+		return conversation.MessageKindDocument, true
+	case "video":
+		return conversation.MessageKindVideo, true
+	case "animation":
+		return conversation.MessageKindGIF, true
+	case "audio":
+		return conversation.MessageKindDocument, true
+	case "voice":
+		return conversation.MessageKindVoice, true
+	case "sticker":
+		return conversation.MessageKindSticker, true
+	case "video_note":
+		return conversation.MessageKindVideo, true
+	default:
+		return conversation.MessageKindUnspecified, false
+	}
+}
+
+func editableMediaMethod(shape string) (conversation.MessageKind, bool) {
+	switch strings.TrimSpace(shape) {
+	case "photo", "document", "video", "animation", "audio":
+		return mediaMethod(shape)
+	default:
+		return conversation.MessageKindUnspecified, false
+	}
+}
+
+func editableMessage(message conversation.Message) bool {
+	_, ok := editableMediaMethod(messageShape(message))
+	return ok
+}
+
 func attachmentKindFromMedia(kind domainmedia.MediaKind) conversation.AttachmentKind {
 	switch kind {
 	case domainmedia.MediaKindImage:

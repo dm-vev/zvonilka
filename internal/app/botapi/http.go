@@ -70,12 +70,18 @@ func (a *api) serve(writer http.ResponseWriter, request *http.Request) {
 		a.sendSticker(writer, request, token)
 	case "forwardMessage":
 		a.forwardMessage(writer, request, token)
+	case "forwardMessages":
+		a.forwardMessages(writer, request, token)
 	case "copyMessage":
 		a.copyMessage(writer, request, token)
+	case "copyMessages":
+		a.copyMessages(writer, request, token)
 	case "editMessageText":
 		a.editMessageText(writer, request, token)
 	case "editMessageCaption":
 		a.editMessageCaption(writer, request, token)
+	case "editMessageMedia":
+		a.editMessageMedia(writer, request, token)
 	case "editMessageReplyMarkup":
 		a.editMessageReplyMarkup(writer, request, token)
 	case "deleteMessage":
