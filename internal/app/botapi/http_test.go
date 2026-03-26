@@ -1,8 +1,11 @@
 package botapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -221,6 +224,82 @@ func TestHTTPAnswerCallbackQuery(t *testing.T) {
 	require.Contains(t, recorder.Body.String(), `"result":true`)
 }
 
+func TestHTTPSendPhotoMultipartUpload(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+
+	userAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "gina",
+		DisplayName: "Gina",
+		AccountKind: identity.AccountKindUser,
+		Email:       "gina@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "uploadbot",
+		DisplayName: "Upload Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	conv, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   userAccount.ID,
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{botAccount.ID},
+	})
+	require.NoError(t, err)
+
+	uploader := &uploadFixture{asset: domainmedia.MediaAsset{
+		ID:             "media-uploaded",
+		OwnerAccountID: botAccount.ID,
+		Kind:           domainmedia.MediaKindImage,
+		Status:         domainmedia.MediaStatusReady,
+		FileName:       "photo.jpg",
+		ContentType:    "image/jpeg",
+		SizeBytes:      5,
+		Width:          32,
+		Height:         24,
+	}}
+	botService, err := domainbot.NewService(
+		bottest.NewMemoryStore(),
+		identityService,
+		conversationService,
+		conversationStore,
+		uploader,
+	)
+	require.NoError(t, err)
+	boundary := &api{bot: botService, media: uploader, uploadLimit: 1024}
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	require.NoError(t, writer.WriteField("chat_id", conv.ID))
+	part, err := writer.CreateFormFile("photo", "photo.jpg")
+	require.NoError(t, err)
+	_, err = io.Copy(part, strings.NewReader("photo"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	request := httptest.NewRequest(http.MethodPost, "/bot"+botToken+"/sendPhoto", body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	recorder := httptest.NewRecorder()
+	boundary.routes().ServeHTTP(recorder, request)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Contains(t, recorder.Body.String(), `"photo"`)
+	require.Contains(t, recorder.Body.String(), `"file_id":"media-uploaded"`)
+	require.NotNil(t, uploader.last)
+	require.Equal(t, botAccount.ID, uploader.last.OwnerAccountID)
+	require.Equal(t, domainmedia.MediaKindImage, uploader.last.Kind)
+	require.Equal(t, "photo.jpg", uploader.last.FileName)
+}
+
 type mediaFixture struct {
 	assets map[string]domainmedia.MediaAsset
 }
@@ -228,6 +307,26 @@ type mediaFixture struct {
 func (f mediaFixture) MediaAssetByID(_ context.Context, mediaID string) (domainmedia.MediaAsset, error) {
 	if asset, ok := f.assets[mediaID]; ok {
 		return asset, nil
+	}
+
+	return domainmedia.MediaAsset{}, domainmedia.ErrNotFound
+}
+
+type uploadFixture struct {
+	last  *domainmedia.UploadParams
+	asset domainmedia.MediaAsset
+}
+
+func (f *uploadFixture) Upload(_ context.Context, params domainmedia.UploadParams) (domainmedia.MediaAsset, error) {
+	copyParams := params
+	f.last = &copyParams
+
+	return f.asset, nil
+}
+
+func (f *uploadFixture) MediaAssetByID(_ context.Context, mediaID string) (domainmedia.MediaAsset, error) {
+	if f.asset.ID == mediaID {
+		return f.asset, nil
 	}
 
 	return domainmedia.MediaAsset{}, domainmedia.ErrNotFound

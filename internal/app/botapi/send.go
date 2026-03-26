@@ -2,8 +2,10 @@ package botapi
 
 import (
 	"net/http"
+	"strings"
 
 	domainbot "github.com/dm-vev/zvonilka/internal/domain/bot"
+	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
 )
 
 type normalizedMediaRequest struct {
@@ -65,7 +67,7 @@ func (a *api) sendPhoto(writer http.ResponseWriter, request *http.Request, token
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		})
-	})
+	}, token, "photo", domainmedia.MediaKindImage)
 }
 
 func (a *api) sendDocument(writer http.ResponseWriter, request *http.Request, token string) {
@@ -91,7 +93,7 @@ func (a *api) sendDocument(writer http.ResponseWriter, request *http.Request, to
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		})
-	})
+	}, token, "document", domainmedia.MediaKindDocument)
 }
 
 func (a *api) sendVideo(writer http.ResponseWriter, request *http.Request, token string) {
@@ -117,7 +119,7 @@ func (a *api) sendVideo(writer http.ResponseWriter, request *http.Request, token
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		})
-	})
+	}, token, "video", domainmedia.MediaKindVideo)
 }
 
 func (a *api) sendVoice(writer http.ResponseWriter, request *http.Request, token string) {
@@ -143,7 +145,7 @@ func (a *api) sendVoice(writer http.ResponseWriter, request *http.Request, token
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		})
-	})
+	}, token, "voice", domainmedia.MediaKindVoice)
 }
 
 func (a *api) sendSticker(writer http.ResponseWriter, request *http.Request, token string) {
@@ -167,7 +169,7 @@ func (a *api) sendSticker(writer http.ResponseWriter, request *http.Request, tok
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		})
-	})
+	}, token, "sticker", domainmedia.MediaKindSticker)
 }
 
 func (a *api) sendMedia(
@@ -176,13 +178,35 @@ func (a *api) sendMedia(
 	target any,
 	normalize func() normalizedMediaRequest,
 	call func(normalizedMediaRequest) (domainbot.Message, error),
+	token string,
+	field string,
+	kind domainmedia.MediaKind,
 ) {
+	if strings.HasPrefix(request.Header.Get("Content-Type"), "multipart/form-data") {
+		memoryLimit := int64(defaultMultipartMemory)
+		if a.uploadLimit > 0 && a.uploadLimit < memoryLimit {
+			memoryLimit = a.uploadLimit
+		}
+		if err := request.ParseMultipartForm(memoryLimit); err != nil {
+			writeError(writer, http.StatusBadRequest, "Bad Request")
+			return
+		}
+	}
 	if err := decodeRequest(request, target); err != nil {
 		writeError(writer, http.StatusBadRequest, "Bad Request")
 		return
 	}
 
-	result, err := call(normalize())
+	payload := normalize()
+	mediaID, err := a.resolveMediaID(request.Context(), request, token, field, kind, payload.MediaID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	payload.MediaID = mediaID
+
+	result, err := call(payload)
 	if err != nil {
 		code, description := botError(err)
 		writeError(writer, code, description)

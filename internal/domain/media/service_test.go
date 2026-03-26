@@ -115,6 +115,44 @@ func TestMediaLifecycle(t *testing.T) {
 	}
 }
 
+func TestServerSideUpload(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := newMemoryStore()
+	blob := newMemoryBlobStore("media-bucket")
+
+	svc, err := media.NewService(store, blob, media.WithSettings(media.Settings{
+		UploadURLTTL:   time.Minute,
+		DownloadURLTTL: time.Minute,
+		MaxUploadSize:  10 << 20,
+	}))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	asset, err := svc.Upload(ctx, media.UploadParams{
+		OwnerAccountID: "acc-owner",
+		Kind:           media.MediaKindVoice,
+		FileName:       "voice.ogg",
+		ContentType:    "audio/ogg",
+		SizeBytes:      uint64(len([]byte("voice"))),
+		Body:           bytes.NewReader([]byte("voice")),
+	})
+	if err != nil {
+		t.Fatalf("upload media: %v", err)
+	}
+	if asset.Status != media.MediaStatusReady {
+		t.Fatalf("expected ready media, got %s", asset.Status)
+	}
+	if asset.ObjectKey == "" {
+		t.Fatal("expected object key to be set")
+	}
+	if _, err := store.MediaAssetByID(ctx, asset.ID); err != nil {
+		t.Fatalf("load uploaded asset: %v", err)
+	}
+}
+
 func TestDeleteMediaRetriesBlobCleanupAfterFailure(t *testing.T) {
 	t.Parallel()
 

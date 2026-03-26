@@ -1,6 +1,9 @@
 package media
 
-import "time"
+import (
+	"io"
+	"time"
+)
 
 // ReserveUploadParams describes a new media upload reservation.
 type ReserveUploadParams struct {
@@ -21,6 +24,22 @@ type ReserveUploadParams struct {
 type FinalizeUploadParams struct {
 	OwnerAccountID string
 	MediaID        string
+	CreatedAt      time.Time
+}
+
+// UploadParams describes one server-side media upload.
+type UploadParams struct {
+	OwnerAccountID string
+	Kind           MediaKind
+	FileName       string
+	ContentType    string
+	SizeBytes      uint64
+	SHA256Hex      string
+	Width          uint32
+	Height         uint32
+	Duration       time.Duration
+	Metadata       map[string]string
+	Body           io.Reader
 	CreatedAt      time.Time
 }
 

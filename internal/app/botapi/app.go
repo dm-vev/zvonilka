@@ -6,6 +6,7 @@ import (
 	"time"
 
 	domainbot "github.com/dm-vev/zvonilka/internal/domain/bot"
+	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 	"github.com/dm-vev/zvonilka/internal/platform/buildinfo"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
@@ -22,16 +23,22 @@ type app struct {
 }
 
 type api struct {
-	bot *domainbot.Service
+	bot         *domainbot.Service
+	media       mediaUploader
+	uploadLimit int64
+}
+
+type mediaUploader interface {
+	Upload(ctx context.Context, params domainmedia.UploadParams) (domainmedia.MediaAsset, error)
 }
 
 func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
-	catalog, bootstrap, service, worker, err := buildAppStorage(ctx, cfg)
+	catalog, bootstrap, service, mediaService, worker, err := buildAppStorage(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	boundary := &api{bot: service}
+	boundary := &api{bot: service, media: mediaService, uploadLimit: cfg.Media.MaxUploadSize}
 	return &app{
 		bootstrap:      bootstrap,
 		catalog:        catalog,
