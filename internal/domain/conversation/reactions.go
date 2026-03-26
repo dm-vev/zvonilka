@@ -72,7 +72,7 @@ func (s *Service) AddMessageReaction(ctx context.Context, params AddMessageReact
 		checkPolicy.AntiSpamWindow = 0
 		checkPolicy.AntiSpamBurstLimit = 0
 		targetKind, targetID := moderationTarget(state.conversation, state.topic.ID)
-		decision, err := s.CheckModerationWrite(ctx, CheckModerationWriteParams{
+		decision, err := s.checkModerationWrite(ctx, tx, CheckModerationWriteParams{
 			TargetKind:     targetKind,
 			TargetID:       targetID,
 			ActorAccountID: params.ActorAccountID,
@@ -197,7 +197,7 @@ func (s *Service) RemoveMessageReaction(ctx context.Context, params RemoveMessag
 		checkPolicy.AntiSpamWindow = 0
 		checkPolicy.AntiSpamBurstLimit = 0
 		targetKind, targetID := moderationTarget(state.conversation, state.topic.ID)
-		decision, err := s.CheckModerationWrite(ctx, CheckModerationWriteParams{
+		decision, err := s.checkModerationWrite(ctx, tx, CheckModerationWriteParams{
 			TargetKind:     targetKind,
 			TargetID:       targetID,
 			ActorAccountID: params.ActorAccountID,

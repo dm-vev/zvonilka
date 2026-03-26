@@ -19,10 +19,19 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	UserService_GetMyProfile_FullMethodName = "/zvonilka.users.v1.UserService/GetMyProfile"
-	UserService_SetPresence_FullMethodName  = "/zvonilka.users.v1.UserService/SetPresence"
-	UserService_GetUser_FullMethodName      = "/zvonilka.users.v1.UserService/GetUser"
-	UserService_SearchUsers_FullMethodName  = "/zvonilka.users.v1.UserService/SearchUsers"
+	UserService_GetMyProfile_FullMethodName          = "/zvonilka.users.v1.UserService/GetMyProfile"
+	UserService_UpdateMyProfile_FullMethodName       = "/zvonilka.users.v1.UserService/UpdateMyProfile"
+	UserService_UpdatePrivacySettings_FullMethodName = "/zvonilka.users.v1.UserService/UpdatePrivacySettings"
+	UserService_SetPresence_FullMethodName           = "/zvonilka.users.v1.UserService/SetPresence"
+	UserService_GetUser_FullMethodName               = "/zvonilka.users.v1.UserService/GetUser"
+	UserService_SearchUsers_FullMethodName           = "/zvonilka.users.v1.UserService/SearchUsers"
+	UserService_ListContacts_FullMethodName          = "/zvonilka.users.v1.UserService/ListContacts"
+	UserService_SyncContacts_FullMethodName          = "/zvonilka.users.v1.UserService/SyncContacts"
+	UserService_AddContact_FullMethodName            = "/zvonilka.users.v1.UserService/AddContact"
+	UserService_RemoveContact_FullMethodName         = "/zvonilka.users.v1.UserService/RemoveContact"
+	UserService_BlockUser_FullMethodName             = "/zvonilka.users.v1.UserService/BlockUser"
+	UserService_UnblockUser_FullMethodName           = "/zvonilka.users.v1.UserService/UnblockUser"
+	UserService_ListBlockedUsers_FullMethodName      = "/zvonilka.users.v1.UserService/ListBlockedUsers"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -30,9 +39,18 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type UserServiceClient interface {
 	GetMyProfile(ctx context.Context, in *GetMyProfileRequest, opts ...grpc.CallOption) (*GetMyProfileResponse, error)
+	UpdateMyProfile(ctx context.Context, in *UpdateMyProfileRequest, opts ...grpc.CallOption) (*UpdateMyProfileResponse, error)
+	UpdatePrivacySettings(ctx context.Context, in *UpdatePrivacySettingsRequest, opts ...grpc.CallOption) (*UpdatePrivacySettingsResponse, error)
 	SetPresence(ctx context.Context, in *SetPresenceRequest, opts ...grpc.CallOption) (*SetPresenceResponse, error)
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
 	SearchUsers(ctx context.Context, in *SearchUsersRequest, opts ...grpc.CallOption) (*SearchUsersResponse, error)
+	ListContacts(ctx context.Context, in *ListContactsRequest, opts ...grpc.CallOption) (*ListContactsResponse, error)
+	SyncContacts(ctx context.Context, in *SyncContactsRequest, opts ...grpc.CallOption) (*SyncContactsResponse, error)
+	AddContact(ctx context.Context, in *AddContactRequest, opts ...grpc.CallOption) (*AddContactResponse, error)
+	RemoveContact(ctx context.Context, in *RemoveContactRequest, opts ...grpc.CallOption) (*RemoveContactResponse, error)
+	BlockUser(ctx context.Context, in *BlockUserRequest, opts ...grpc.CallOption) (*BlockUserResponse, error)
+	UnblockUser(ctx context.Context, in *UnblockUserRequest, opts ...grpc.CallOption) (*UnblockUserResponse, error)
+	ListBlockedUsers(ctx context.Context, in *ListBlockedUsersRequest, opts ...grpc.CallOption) (*ListBlockedUsersResponse, error)
 }
 
 type userServiceClient struct {
@@ -46,6 +64,24 @@ func NewUserServiceClient(cc grpc.ClientConnInterface) UserServiceClient {
 func (c *userServiceClient) GetMyProfile(ctx context.Context, in *GetMyProfileRequest, opts ...grpc.CallOption) (*GetMyProfileResponse, error) {
 	out := new(GetMyProfileResponse)
 	err := c.cc.Invoke(ctx, UserService_GetMyProfile_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) UpdateMyProfile(ctx context.Context, in *UpdateMyProfileRequest, opts ...grpc.CallOption) (*UpdateMyProfileResponse, error) {
+	out := new(UpdateMyProfileResponse)
+	err := c.cc.Invoke(ctx, UserService_UpdateMyProfile_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) UpdatePrivacySettings(ctx context.Context, in *UpdatePrivacySettingsRequest, opts ...grpc.CallOption) (*UpdatePrivacySettingsResponse, error) {
+	out := new(UpdatePrivacySettingsResponse)
+	err := c.cc.Invoke(ctx, UserService_UpdatePrivacySettings_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -79,14 +115,86 @@ func (c *userServiceClient) SearchUsers(ctx context.Context, in *SearchUsersRequ
 	return out, nil
 }
 
+func (c *userServiceClient) ListContacts(ctx context.Context, in *ListContactsRequest, opts ...grpc.CallOption) (*ListContactsResponse, error) {
+	out := new(ListContactsResponse)
+	err := c.cc.Invoke(ctx, UserService_ListContacts_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) SyncContacts(ctx context.Context, in *SyncContactsRequest, opts ...grpc.CallOption) (*SyncContactsResponse, error) {
+	out := new(SyncContactsResponse)
+	err := c.cc.Invoke(ctx, UserService_SyncContacts_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) AddContact(ctx context.Context, in *AddContactRequest, opts ...grpc.CallOption) (*AddContactResponse, error) {
+	out := new(AddContactResponse)
+	err := c.cc.Invoke(ctx, UserService_AddContact_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) RemoveContact(ctx context.Context, in *RemoveContactRequest, opts ...grpc.CallOption) (*RemoveContactResponse, error) {
+	out := new(RemoveContactResponse)
+	err := c.cc.Invoke(ctx, UserService_RemoveContact_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) BlockUser(ctx context.Context, in *BlockUserRequest, opts ...grpc.CallOption) (*BlockUserResponse, error) {
+	out := new(BlockUserResponse)
+	err := c.cc.Invoke(ctx, UserService_BlockUser_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) UnblockUser(ctx context.Context, in *UnblockUserRequest, opts ...grpc.CallOption) (*UnblockUserResponse, error) {
+	out := new(UnblockUserResponse)
+	err := c.cc.Invoke(ctx, UserService_UnblockUser_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) ListBlockedUsers(ctx context.Context, in *ListBlockedUsersRequest, opts ...grpc.CallOption) (*ListBlockedUsersResponse, error) {
+	out := new(ListBlockedUsersResponse)
+	err := c.cc.Invoke(ctx, UserService_ListBlockedUsers_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility
 type UserServiceServer interface {
 	GetMyProfile(context.Context, *GetMyProfileRequest) (*GetMyProfileResponse, error)
+	UpdateMyProfile(context.Context, *UpdateMyProfileRequest) (*UpdateMyProfileResponse, error)
+	UpdatePrivacySettings(context.Context, *UpdatePrivacySettingsRequest) (*UpdatePrivacySettingsResponse, error)
 	SetPresence(context.Context, *SetPresenceRequest) (*SetPresenceResponse, error)
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
 	SearchUsers(context.Context, *SearchUsersRequest) (*SearchUsersResponse, error)
+	ListContacts(context.Context, *ListContactsRequest) (*ListContactsResponse, error)
+	SyncContacts(context.Context, *SyncContactsRequest) (*SyncContactsResponse, error)
+	AddContact(context.Context, *AddContactRequest) (*AddContactResponse, error)
+	RemoveContact(context.Context, *RemoveContactRequest) (*RemoveContactResponse, error)
+	BlockUser(context.Context, *BlockUserRequest) (*BlockUserResponse, error)
+	UnblockUser(context.Context, *UnblockUserRequest) (*UnblockUserResponse, error)
+	ListBlockedUsers(context.Context, *ListBlockedUsersRequest) (*ListBlockedUsersResponse, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -97,6 +205,12 @@ type UnimplementedUserServiceServer struct {
 func (UnimplementedUserServiceServer) GetMyProfile(context.Context, *GetMyProfileRequest) (*GetMyProfileResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMyProfile not implemented")
 }
+func (UnimplementedUserServiceServer) UpdateMyProfile(context.Context, *UpdateMyProfileRequest) (*UpdateMyProfileResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateMyProfile not implemented")
+}
+func (UnimplementedUserServiceServer) UpdatePrivacySettings(context.Context, *UpdatePrivacySettingsRequest) (*UpdatePrivacySettingsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdatePrivacySettings not implemented")
+}
 func (UnimplementedUserServiceServer) SetPresence(context.Context, *SetPresenceRequest) (*SetPresenceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetPresence not implemented")
 }
@@ -105,6 +219,27 @@ func (UnimplementedUserServiceServer) GetUser(context.Context, *GetUserRequest) 
 }
 func (UnimplementedUserServiceServer) SearchUsers(context.Context, *SearchUsersRequest) (*SearchUsersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SearchUsers not implemented")
+}
+func (UnimplementedUserServiceServer) ListContacts(context.Context, *ListContactsRequest) (*ListContactsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListContacts not implemented")
+}
+func (UnimplementedUserServiceServer) SyncContacts(context.Context, *SyncContactsRequest) (*SyncContactsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncContacts not implemented")
+}
+func (UnimplementedUserServiceServer) AddContact(context.Context, *AddContactRequest) (*AddContactResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddContact not implemented")
+}
+func (UnimplementedUserServiceServer) RemoveContact(context.Context, *RemoveContactRequest) (*RemoveContactResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveContact not implemented")
+}
+func (UnimplementedUserServiceServer) BlockUser(context.Context, *BlockUserRequest) (*BlockUserResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BlockUser not implemented")
+}
+func (UnimplementedUserServiceServer) UnblockUser(context.Context, *UnblockUserRequest) (*UnblockUserResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UnblockUser not implemented")
+}
+func (UnimplementedUserServiceServer) ListBlockedUsers(context.Context, *ListBlockedUsersRequest) (*ListBlockedUsersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListBlockedUsers not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 
@@ -133,6 +268,42 @@ func _UserService_GetMyProfile_Handler(srv interface{}, ctx context.Context, dec
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(UserServiceServer).GetMyProfile(ctx, req.(*GetMyProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_UpdateMyProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateMyProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).UpdateMyProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_UpdateMyProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).UpdateMyProfile(ctx, req.(*UpdateMyProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_UpdatePrivacySettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdatePrivacySettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).UpdatePrivacySettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_UpdatePrivacySettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).UpdatePrivacySettings(ctx, req.(*UpdatePrivacySettingsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -191,6 +362,132 @@ func _UserService_SearchUsers_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_ListContacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListContactsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).ListContacts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_ListContacts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).ListContacts(ctx, req.(*ListContactsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_SyncContacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncContactsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).SyncContacts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_SyncContacts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).SyncContacts(ctx, req.(*SyncContactsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_AddContact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddContactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).AddContact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_AddContact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).AddContact(ctx, req.(*AddContactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_RemoveContact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveContactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).RemoveContact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_RemoveContact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).RemoveContact(ctx, req.(*RemoveContactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_BlockUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlockUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).BlockUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_BlockUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).BlockUser(ctx, req.(*BlockUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_UnblockUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnblockUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).UnblockUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_UnblockUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).UnblockUser(ctx, req.(*UnblockUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_ListBlockedUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListBlockedUsersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).ListBlockedUsers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_ListBlockedUsers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).ListBlockedUsers(ctx, req.(*ListBlockedUsersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -203,6 +500,14 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _UserService_GetMyProfile_Handler,
 		},
 		{
+			MethodName: "UpdateMyProfile",
+			Handler:    _UserService_UpdateMyProfile_Handler,
+		},
+		{
+			MethodName: "UpdatePrivacySettings",
+			Handler:    _UserService_UpdatePrivacySettings_Handler,
+		},
+		{
 			MethodName: "SetPresence",
 			Handler:    _UserService_SetPresence_Handler,
 		},
@@ -213,6 +518,34 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SearchUsers",
 			Handler:    _UserService_SearchUsers_Handler,
+		},
+		{
+			MethodName: "ListContacts",
+			Handler:    _UserService_ListContacts_Handler,
+		},
+		{
+			MethodName: "SyncContacts",
+			Handler:    _UserService_SyncContacts_Handler,
+		},
+		{
+			MethodName: "AddContact",
+			Handler:    _UserService_AddContact_Handler,
+		},
+		{
+			MethodName: "RemoveContact",
+			Handler:    _UserService_RemoveContact_Handler,
+		},
+		{
+			MethodName: "BlockUser",
+			Handler:    _UserService_BlockUser_Handler,
+		},
+		{
+			MethodName: "UnblockUser",
+			Handler:    _UserService_UnblockUser_Handler,
+		},
+		{
+			MethodName: "ListBlockedUsers",
+			Handler:    _UserService_ListBlockedUsers_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -33,6 +33,7 @@ func (a *api) CreateConversation(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.notifySyncSubscribers()
 
 	return &conversationv1.CreateConversationResponse{
 		Conversation: conversationProto(conversationRow),
@@ -255,6 +256,7 @@ func (a *api) GetMessage(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.notifySyncSubscribers()
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
@@ -287,6 +289,7 @@ func (a *api) SendMessage(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.notifySyncSubscribers()
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
@@ -319,6 +322,7 @@ func (a *api) EditMessage(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.notifySyncSubscribers()
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
@@ -349,6 +353,7 @@ func (a *api) DeleteMessage(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.notifySyncSubscribers()
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
@@ -380,6 +385,7 @@ func (a *api) AddReaction(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.notifySyncSubscribers()
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
@@ -411,6 +417,7 @@ func (a *api) RemoveReaction(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.notifySyncSubscribers()
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
@@ -442,6 +449,7 @@ func (a *api) PinMessage(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.notifySyncSubscribers()
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
@@ -489,6 +497,7 @@ func (a *api) MarkRead(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.notifySyncSubscribers()
 
 	return &conversationv1.MarkReadResponse{ReadThroughSequence: state.LastReadSequence}, nil
 }
@@ -502,18 +511,17 @@ func (a *api) CreateThread(
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.GetRootMessageId()) != "" {
-		return nil, grpcError(domainconversation.ErrInvalidInput)
-	}
 
 	topic, _, err := a.conversation.CreateTopic(ctx, domainconversation.CreateTopicParams{
 		ConversationID:   req.GetConversationId(),
+		RootMessageID:    req.GetRootMessageId(),
 		CreatorAccountID: authContext.Account.ID,
 		Title:            req.GetTitle(),
 	})
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.notifySyncSubscribers()
 
 	return &conversationv1.CreateThreadResponse{Thread: threadProto(topic)}, nil
 }
@@ -764,7 +772,7 @@ func threadProto(topic domainconversation.ConversationTopic) *conversationv1.Thr
 	return &conversationv1.Thread{
 		ThreadId:       topic.ID,
 		ConversationId: topic.ConversationID,
-		RootMessageId:  "",
+		RootMessageId:  topic.RootMessageID,
 		Title:          topic.Title,
 		ReplyCount:     uint32(topic.MessageCount),
 		CreatedAt:      protoTime(topic.CreatedAt),

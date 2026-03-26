@@ -59,6 +59,17 @@ func (s *Service) DeleteMedia(ctx context.Context, params DeleteParams) (MediaAs
 	if deleteErr := s.blob.DeleteObject(ctx, saved.ObjectKey); deleteErr != nil && !errors.Is(deleteErr, domainstorage.ErrNotFound) {
 		return saved, fmt.Errorf("delete media object %s: %w", saved.ObjectKey, deleteErr)
 	}
+	if params.HardDelete {
+		if err := s.store.WithinTx(ctx, func(tx Store) error {
+			if deleteErr := tx.DeleteMediaAsset(ctx, saved.ID); deleteErr != nil {
+				return fmt.Errorf("hard delete media asset %s: %w", saved.ID, deleteErr)
+			}
+
+			return nil
+		}); err != nil {
+			return saved, err
+		}
+	}
 
 	return saved, nil
 }

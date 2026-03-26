@@ -81,6 +81,8 @@ const (
 	EventTypeConversationCreated    EventType = "conversation.created"
 	EventTypeConversationUpdated    EventType = "conversation.updated"
 	EventTypeConversationMembers    EventType = "conversation.members_changed"
+	EventTypeUserUpdated            EventType = "user.updated"
+	EventTypeAdminActionRecorded    EventType = "admin_action.recorded"
 	EventTypeMessageCreated         EventType = "message.created"
 	EventTypeMessageDelivered       EventType = "message.delivered"
 	EventTypeMessageRead            EventType = "message.read"
@@ -136,6 +138,7 @@ type Conversation struct {
 type ConversationTopic struct {
 	ConversationID     string
 	ID                 string
+	RootMessageID      string
 	Title              string
 	CreatedByAccountID string
 	IsGeneral          bool

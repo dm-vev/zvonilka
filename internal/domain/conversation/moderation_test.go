@@ -883,3 +883,48 @@ func TestModerationActionIDsAreImmutable(t *testing.T) {
 	})
 	require.ErrorIs(t, err, conversation.ErrConflict)
 }
+
+func TestModerationRestrictionEmitsSyncEvent(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 25, 15, 0, 0, 0, time.UTC)
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time {
+		return now
+	}))
+	require.NoError(t, err)
+
+	created, _, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-owner",
+		Kind:             conversation.ConversationKindDirect,
+		Title:            "Direct",
+		MemberAccountIDs: []string{"acc-peer"},
+		CreatedAt:        now,
+	})
+	require.NoError(t, err)
+
+	_, err = svc.ApplyModerationRestriction(ctx, conversation.ApplyModerationRestrictionParams{
+		TargetKind:      conversation.ModerationTargetKindConversation,
+		TargetID:        created.ID,
+		ActorAccountID:  "acc-owner",
+		TargetAccountID: "acc-peer",
+		State:           conversation.ModerationRestrictionStateMuted,
+		CreatedAt:       now.Add(time.Minute),
+	})
+	require.NoError(t, err)
+
+	events, syncState, err := svc.PullEvents(ctx, conversation.PullEventsParams{
+		DeviceID:     "dev-owner",
+		FromSequence: created.LastSequence,
+		Limit:        50,
+	})
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	require.Equal(t, conversation.EventTypeAdminActionRecorded, events[0].EventType)
+	require.Equal(t, "moderation_action", events[0].PayloadType)
+	require.Equal(t, "mute", events[0].Metadata["action_type"])
+	require.Equal(t, "acc-peer", events[0].Metadata["target_account_id"])
+	require.Equal(t, events[0].Sequence, syncState.LastAppliedSequence)
+}

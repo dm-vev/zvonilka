@@ -239,7 +239,7 @@ func (s *Service) SetModerationPolicy(
 			return fmt.Errorf("generate moderation action id: %w", idErr)
 		}
 
-		if _, err := tx.SaveModerationAction(ctx, ModerationAction{
+		if _, _, err := s.saveModerationActionWithSyncEvent(ctx, tx, conversation.ID, ModerationAction{
 			ID:             actionID,
 			TargetKind:     params.TargetKind,
 			TargetID:       params.TargetID,

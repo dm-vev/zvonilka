@@ -26,6 +26,9 @@ func (s *memoryStore) ConversationMemberByConversationAndAccount(ctx context.Con
 	if err := s.validateRead(ctx); err != nil {
 		return conversation.ConversationMember{}, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	key := conversationMemberKey(strings.TrimSpace(conversationID), strings.TrimSpace(accountID))
 	member, ok := s.membersByKey[key]
 	if !ok {
@@ -39,6 +42,9 @@ func (s *memoryStore) ConversationMembersByConversationID(ctx context.Context, c
 	if err := s.validateRead(ctx); err != nil {
 		return nil, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	conversationID = strings.TrimSpace(conversationID)
 	if conversationID == "" {
 		return nil, conversation.ErrInvalidInput

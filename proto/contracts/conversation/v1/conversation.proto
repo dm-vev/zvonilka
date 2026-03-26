@@ -12,7 +12,14 @@ service ConversationService {
   rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
   rpc GetConversation(GetConversationRequest) returns (GetConversationResponse);
   rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+  rpc UpdateConversation(UpdateConversationRequest) returns (UpdateConversationResponse);
   rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
+  rpc AddMembers(AddMembersRequest) returns (AddMembersResponse);
+  rpc RemoveMembers(RemoveMembersRequest) returns (RemoveMembersResponse);
+  rpc UpdateMemberRole(UpdateMemberRoleRequest) returns (UpdateMemberRoleResponse);
+  rpc CreateInvite(CreateInviteRequest) returns (CreateInviteResponse);
+  rpc ListInvites(ListInvitesRequest) returns (ListInvitesResponse);
+  rpc RevokeInvite(RevokeInviteRequest) returns (RevokeInviteResponse);
   rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
   rpc GetMessage(GetMessageRequest) returns (GetMessageResponse);
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);

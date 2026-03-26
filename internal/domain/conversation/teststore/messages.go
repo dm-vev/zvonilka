@@ -44,6 +44,9 @@ func (s *memoryStore) MessageByID(ctx context.Context, conversationID string, me
 	if err := s.validateRead(ctx); err != nil {
 		return conversation.Message{}, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	messageID = strings.TrimSpace(messageID)
 	conversationID = strings.TrimSpace(conversationID)
 	message, ok := s.messagesByID[messageID]
@@ -61,6 +64,9 @@ func (s *memoryStore) MessagesByConversationID(ctx context.Context, conversation
 	if err := s.validateRead(ctx); err != nil {
 		return nil, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	conversationID = strings.TrimSpace(conversationID)
 	threadID = strings.TrimSpace(threadID)
 	if conversationID == "" {

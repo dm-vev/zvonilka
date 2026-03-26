@@ -37,6 +37,8 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -203,6 +205,8 @@ func TestConversationSchemaConstraints(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -259,6 +263,8 @@ func TestModerationPolicySchemaRejectsAntiSpamMismatch(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -300,6 +306,8 @@ func TestModerationReportSchemaRejectsReviewMismatch(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -350,6 +358,8 @@ func TestConversationTopicSchemaLifecycle(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -433,12 +443,16 @@ func TestConversationTopicSchemaLifecycle(t *testing.T) {
 
 	topic, _, err := svc.CreateTopic(context.Background(), conversation.CreateTopicParams{
 		ConversationID:   created.ID,
+		RootMessageID:    rootMessage.ID,
 		CreatorAccountID: "id-owner",
 		Title:            "Announcements",
 		CreatedAt:        time.Date(2026, time.March, 24, 13, 1, 0, 0, time.UTC),
 	})
 	if err != nil {
 		t.Fatalf("create topic: %v", err)
+	}
+	if topic.RootMessageID != rootMessage.ID {
+		t.Fatalf("expected root message id %s, got %s", rootMessage.ID, topic.RootMessageID)
 	}
 
 	renamed, _, err := svc.RenameTopic(context.Background(), conversation.RenameTopicParams{
@@ -560,6 +574,8 @@ func TestConversationMessageActionSchemaLifecycle(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)

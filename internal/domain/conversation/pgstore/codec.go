@@ -159,6 +159,7 @@ func scanConversation(row rowScanner) (conversation.Conversation, error) {
 func scanTopic(row rowScanner) (conversation.ConversationTopic, error) {
 	var (
 		topic         conversation.ConversationTopic
+		rootMessageID sql.NullString
 		lastMessageAt sql.NullTime
 		archivedAt    sql.NullTime
 		closedAt      sql.NullTime
@@ -167,6 +168,7 @@ func scanTopic(row rowScanner) (conversation.ConversationTopic, error) {
 	if err := row.Scan(
 		&topic.ConversationID,
 		&topic.ID,
+		&rootMessageID,
 		&topic.Title,
 		&topic.CreatedByAccountID,
 		&topic.IsGeneral,
@@ -184,6 +186,7 @@ func scanTopic(row rowScanner) (conversation.ConversationTopic, error) {
 		return conversation.ConversationTopic{}, err
 	}
 
+	topic.RootMessageID = rootMessageID.String
 	topic.CreatedAt = topic.CreatedAt.UTC()
 	topic.UpdatedAt = topic.UpdatedAt.UTC()
 	topic.LastMessageAt = decodeTime(lastMessageAt)

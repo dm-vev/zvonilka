@@ -19,32 +19,40 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	AuthService_SubmitJoinRequest_FullMethodName = "/zvonilka.auth.v1.AuthService/SubmitJoinRequest"
-	AuthService_BeginLogin_FullMethodName        = "/zvonilka.auth.v1.AuthService/BeginLogin"
-	AuthService_VerifyLoginCode_FullMethodName   = "/zvonilka.auth.v1.AuthService/VerifyLoginCode"
-	AuthService_AuthenticateBot_FullMethodName   = "/zvonilka.auth.v1.AuthService/AuthenticateBot"
-	AuthService_RefreshSession_FullMethodName    = "/zvonilka.auth.v1.AuthService/RefreshSession"
-	AuthService_RegisterDevice_FullMethodName    = "/zvonilka.auth.v1.AuthService/RegisterDevice"
-	AuthService_ListDevices_FullMethodName       = "/zvonilka.auth.v1.AuthService/ListDevices"
-	AuthService_ListSessions_FullMethodName      = "/zvonilka.auth.v1.AuthService/ListSessions"
-	AuthService_RevokeSession_FullMethodName     = "/zvonilka.auth.v1.AuthService/RevokeSession"
-	AuthService_RevokeAllSessions_FullMethodName = "/zvonilka.auth.v1.AuthService/RevokeAllSessions"
+	AuthService_GetLoginOptions_FullMethodName          = "/zvonilka.auth.v1.AuthService/GetLoginOptions"
+	AuthService_SubmitJoinRequest_FullMethodName        = "/zvonilka.auth.v1.AuthService/SubmitJoinRequest"
+	AuthService_BeginLogin_FullMethodName               = "/zvonilka.auth.v1.AuthService/BeginLogin"
+	AuthService_VerifyLoginCode_FullMethodName          = "/zvonilka.auth.v1.AuthService/VerifyLoginCode"
+	AuthService_AuthenticateBot_FullMethodName          = "/zvonilka.auth.v1.AuthService/AuthenticateBot"
+	AuthService_RefreshSession_FullMethodName           = "/zvonilka.auth.v1.AuthService/RefreshSession"
+	AuthService_RegisterDevice_FullMethodName           = "/zvonilka.auth.v1.AuthService/RegisterDevice"
+	AuthService_RotateDeviceKey_FullMethodName          = "/zvonilka.auth.v1.AuthService/RotateDeviceKey"
+	AuthService_ListDevices_FullMethodName              = "/zvonilka.auth.v1.AuthService/ListDevices"
+	AuthService_ListSessions_FullMethodName             = "/zvonilka.auth.v1.AuthService/ListSessions"
+	AuthService_RevokeSession_FullMethodName            = "/zvonilka.auth.v1.AuthService/RevokeSession"
+	AuthService_RevokeAllSessions_FullMethodName        = "/zvonilka.auth.v1.AuthService/RevokeAllSessions"
+	AuthService_BeginPasswordRecovery_FullMethodName    = "/zvonilka.auth.v1.AuthService/BeginPasswordRecovery"
+	AuthService_CompletePasswordRecovery_FullMethodName = "/zvonilka.auth.v1.AuthService/CompletePasswordRecovery"
 )
 
 // AuthServiceClient is the client API for AuthService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AuthServiceClient interface {
+	GetLoginOptions(ctx context.Context, in *GetLoginOptionsRequest, opts ...grpc.CallOption) (*GetLoginOptionsResponse, error)
 	SubmitJoinRequest(ctx context.Context, in *SubmitJoinRequestRequest, opts ...grpc.CallOption) (*SubmitJoinRequestResponse, error)
 	BeginLogin(ctx context.Context, in *BeginLoginRequest, opts ...grpc.CallOption) (*BeginLoginResponse, error)
 	VerifyLoginCode(ctx context.Context, in *VerifyLoginCodeRequest, opts ...grpc.CallOption) (*VerifyLoginCodeResponse, error)
 	AuthenticateBot(ctx context.Context, in *AuthenticateBotRequest, opts ...grpc.CallOption) (*AuthenticateBotResponse, error)
 	RefreshSession(ctx context.Context, in *RefreshSessionRequest, opts ...grpc.CallOption) (*RefreshSessionResponse, error)
 	RegisterDevice(ctx context.Context, in *RegisterDeviceRequest, opts ...grpc.CallOption) (*RegisterDeviceResponse, error)
+	RotateDeviceKey(ctx context.Context, in *RotateDeviceKeyRequest, opts ...grpc.CallOption) (*RotateDeviceKeyResponse, error)
 	ListDevices(ctx context.Context, in *ListDevicesRequest, opts ...grpc.CallOption) (*ListDevicesResponse, error)
 	ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error)
 	RevokeSession(ctx context.Context, in *RevokeSessionRequest, opts ...grpc.CallOption) (*RevokeSessionResponse, error)
 	RevokeAllSessions(ctx context.Context, in *RevokeAllSessionsRequest, opts ...grpc.CallOption) (*RevokeAllSessionsResponse, error)
+	BeginPasswordRecovery(ctx context.Context, in *BeginPasswordRecoveryRequest, opts ...grpc.CallOption) (*BeginPasswordRecoveryResponse, error)
+	CompletePasswordRecovery(ctx context.Context, in *CompletePasswordRecoveryRequest, opts ...grpc.CallOption) (*CompletePasswordRecoveryResponse, error)
 }
 
 type authServiceClient struct {
@@ -53,6 +61,15 @@ type authServiceClient struct {
 
 func NewAuthServiceClient(cc grpc.ClientConnInterface) AuthServiceClient {
 	return &authServiceClient{cc}
+}
+
+func (c *authServiceClient) GetLoginOptions(ctx context.Context, in *GetLoginOptionsRequest, opts ...grpc.CallOption) (*GetLoginOptionsResponse, error) {
+	out := new(GetLoginOptionsResponse)
+	err := c.cc.Invoke(ctx, AuthService_GetLoginOptions_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *authServiceClient) SubmitJoinRequest(ctx context.Context, in *SubmitJoinRequestRequest, opts ...grpc.CallOption) (*SubmitJoinRequestResponse, error) {
@@ -109,6 +126,15 @@ func (c *authServiceClient) RegisterDevice(ctx context.Context, in *RegisterDevi
 	return out, nil
 }
 
+func (c *authServiceClient) RotateDeviceKey(ctx context.Context, in *RotateDeviceKeyRequest, opts ...grpc.CallOption) (*RotateDeviceKeyResponse, error) {
+	out := new(RotateDeviceKeyResponse)
+	err := c.cc.Invoke(ctx, AuthService_RotateDeviceKey_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *authServiceClient) ListDevices(ctx context.Context, in *ListDevicesRequest, opts ...grpc.CallOption) (*ListDevicesResponse, error) {
 	out := new(ListDevicesResponse)
 	err := c.cc.Invoke(ctx, AuthService_ListDevices_FullMethodName, in, out, opts...)
@@ -145,20 +171,42 @@ func (c *authServiceClient) RevokeAllSessions(ctx context.Context, in *RevokeAll
 	return out, nil
 }
 
+func (c *authServiceClient) BeginPasswordRecovery(ctx context.Context, in *BeginPasswordRecoveryRequest, opts ...grpc.CallOption) (*BeginPasswordRecoveryResponse, error) {
+	out := new(BeginPasswordRecoveryResponse)
+	err := c.cc.Invoke(ctx, AuthService_BeginPasswordRecovery_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) CompletePasswordRecovery(ctx context.Context, in *CompletePasswordRecoveryRequest, opts ...grpc.CallOption) (*CompletePasswordRecoveryResponse, error) {
+	out := new(CompletePasswordRecoveryResponse)
+	err := c.cc.Invoke(ctx, AuthService_CompletePasswordRecovery_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility
 type AuthServiceServer interface {
+	GetLoginOptions(context.Context, *GetLoginOptionsRequest) (*GetLoginOptionsResponse, error)
 	SubmitJoinRequest(context.Context, *SubmitJoinRequestRequest) (*SubmitJoinRequestResponse, error)
 	BeginLogin(context.Context, *BeginLoginRequest) (*BeginLoginResponse, error)
 	VerifyLoginCode(context.Context, *VerifyLoginCodeRequest) (*VerifyLoginCodeResponse, error)
 	AuthenticateBot(context.Context, *AuthenticateBotRequest) (*AuthenticateBotResponse, error)
 	RefreshSession(context.Context, *RefreshSessionRequest) (*RefreshSessionResponse, error)
 	RegisterDevice(context.Context, *RegisterDeviceRequest) (*RegisterDeviceResponse, error)
+	RotateDeviceKey(context.Context, *RotateDeviceKeyRequest) (*RotateDeviceKeyResponse, error)
 	ListDevices(context.Context, *ListDevicesRequest) (*ListDevicesResponse, error)
 	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
 	RevokeSession(context.Context, *RevokeSessionRequest) (*RevokeSessionResponse, error)
 	RevokeAllSessions(context.Context, *RevokeAllSessionsRequest) (*RevokeAllSessionsResponse, error)
+	BeginPasswordRecovery(context.Context, *BeginPasswordRecoveryRequest) (*BeginPasswordRecoveryResponse, error)
+	CompletePasswordRecovery(context.Context, *CompletePasswordRecoveryRequest) (*CompletePasswordRecoveryResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -166,6 +214,9 @@ type AuthServiceServer interface {
 type UnimplementedAuthServiceServer struct {
 }
 
+func (UnimplementedAuthServiceServer) GetLoginOptions(context.Context, *GetLoginOptionsRequest) (*GetLoginOptionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLoginOptions not implemented")
+}
 func (UnimplementedAuthServiceServer) SubmitJoinRequest(context.Context, *SubmitJoinRequestRequest) (*SubmitJoinRequestResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SubmitJoinRequest not implemented")
 }
@@ -184,6 +235,9 @@ func (UnimplementedAuthServiceServer) RefreshSession(context.Context, *RefreshSe
 func (UnimplementedAuthServiceServer) RegisterDevice(context.Context, *RegisterDeviceRequest) (*RegisterDeviceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RegisterDevice not implemented")
 }
+func (UnimplementedAuthServiceServer) RotateDeviceKey(context.Context, *RotateDeviceKeyRequest) (*RotateDeviceKeyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RotateDeviceKey not implemented")
+}
 func (UnimplementedAuthServiceServer) ListDevices(context.Context, *ListDevicesRequest) (*ListDevicesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListDevices not implemented")
 }
@@ -196,6 +250,12 @@ func (UnimplementedAuthServiceServer) RevokeSession(context.Context, *RevokeSess
 func (UnimplementedAuthServiceServer) RevokeAllSessions(context.Context, *RevokeAllSessionsRequest) (*RevokeAllSessionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RevokeAllSessions not implemented")
 }
+func (UnimplementedAuthServiceServer) BeginPasswordRecovery(context.Context, *BeginPasswordRecoveryRequest) (*BeginPasswordRecoveryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BeginPasswordRecovery not implemented")
+}
+func (UnimplementedAuthServiceServer) CompletePasswordRecovery(context.Context, *CompletePasswordRecoveryRequest) (*CompletePasswordRecoveryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CompletePasswordRecovery not implemented")
+}
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 
 // UnsafeAuthServiceServer may be embedded to opt out of forward compatibility for this service.
@@ -207,6 +267,24 @@ type UnsafeAuthServiceServer interface {
 
 func RegisterAuthServiceServer(s grpc.ServiceRegistrar, srv AuthServiceServer) {
 	s.RegisterService(&AuthService_ServiceDesc, srv)
+}
+
+func _AuthService_GetLoginOptions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLoginOptionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GetLoginOptions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_GetLoginOptions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GetLoginOptions(ctx, req.(*GetLoginOptionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _AuthService_SubmitJoinRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -317,6 +395,24 @@ func _AuthService_RegisterDevice_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_RotateDeviceKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RotateDeviceKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).RotateDeviceKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_RotateDeviceKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).RotateDeviceKey(ctx, req.(*RotateDeviceKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AuthService_ListDevices_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListDevicesRequest)
 	if err := dec(in); err != nil {
@@ -389,6 +485,42 @@ func _AuthService_RevokeAllSessions_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_BeginPasswordRecovery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BeginPasswordRecoveryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).BeginPasswordRecovery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_BeginPasswordRecovery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).BeginPasswordRecovery(ctx, req.(*BeginPasswordRecoveryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_CompletePasswordRecovery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompletePasswordRecoveryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).CompletePasswordRecovery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_CompletePasswordRecovery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).CompletePasswordRecovery(ctx, req.(*CompletePasswordRecoveryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -396,6 +528,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "zvonilka.auth.v1.AuthService",
 	HandlerType: (*AuthServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetLoginOptions",
+			Handler:    _AuthService_GetLoginOptions_Handler,
+		},
 		{
 			MethodName: "SubmitJoinRequest",
 			Handler:    _AuthService_SubmitJoinRequest_Handler,
@@ -421,6 +557,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AuthService_RegisterDevice_Handler,
 		},
 		{
+			MethodName: "RotateDeviceKey",
+			Handler:    _AuthService_RotateDeviceKey_Handler,
+		},
+		{
 			MethodName: "ListDevices",
 			Handler:    _AuthService_ListDevices_Handler,
 		},
@@ -435,6 +575,14 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RevokeAllSessions",
 			Handler:    _AuthService_RevokeAllSessions_Handler,
+		},
+		{
+			MethodName: "BeginPasswordRecovery",
+			Handler:    _AuthService_BeginPasswordRecovery_Handler,
+		},
+		{
+			MethodName: "CompletePasswordRecovery",
+			Handler:    _AuthService_CompletePasswordRecovery_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

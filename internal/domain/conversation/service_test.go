@@ -551,6 +551,7 @@ func TestTopicLifecycle(t *testing.T) {
 
 	topic, event, err := svc.CreateTopic(ctx, conversation.CreateTopicParams{
 		ConversationID:   created.ID,
+		RootMessageID:    rootMessage.ID,
 		CreatorAccountID: "acc-owner",
 		Title:            "Announcements",
 		CreatedAt:        fixedNow.Add(time.Minute),
@@ -560,6 +561,9 @@ func TestTopicLifecycle(t *testing.T) {
 	}
 	if topic.ID == "" || event.EventType != conversation.EventTypeTopicCreated {
 		t.Fatalf("unexpected topic create result: %+v %+v", topic, event)
+	}
+	if topic.RootMessageID != rootMessage.ID {
+		t.Fatalf("expected root message id %s, got %s", rootMessage.ID, topic.RootMessageID)
 	}
 
 	renamed, _, err := svc.RenameTopic(ctx, conversation.RenameTopicParams{

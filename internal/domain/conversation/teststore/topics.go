@@ -14,12 +14,16 @@ func (s *memoryStore) SaveTopic(ctx context.Context, topic conversation.Conversa
 	}
 	topic.ConversationID = strings.TrimSpace(topic.ConversationID)
 	topic.ID = strings.TrimSpace(topic.ID)
+	topic.RootMessageID = strings.TrimSpace(topic.RootMessageID)
 	topic.Title = strings.TrimSpace(topic.Title)
 	topic.CreatedByAccountID = strings.TrimSpace(topic.CreatedByAccountID)
 	if topic.ConversationID == "" || topic.CreatedByAccountID == "" || topic.Title == "" {
 		return conversation.ConversationTopic{}, conversation.ErrInvalidInput
 	}
 	if topic.IsGeneral && topic.ID != "" {
+		return conversation.ConversationTopic{}, conversation.ErrInvalidInput
+	}
+	if topic.IsGeneral && topic.RootMessageID != "" {
 		return conversation.ConversationTopic{}, conversation.ErrInvalidInput
 	}
 	if !topic.IsGeneral && topic.ID == "" {
@@ -38,6 +42,9 @@ func (s *memoryStore) TopicByConversationAndID(ctx context.Context, conversation
 	if err := s.validateRead(ctx); err != nil {
 		return conversation.ConversationTopic{}, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	key := topicKey(strings.TrimSpace(conversationID), strings.TrimSpace(topicID))
 	topic, ok := s.topicsByKey[key]
 	if !ok {
@@ -51,6 +58,9 @@ func (s *memoryStore) TopicsByConversationID(ctx context.Context, conversationID
 	if err := s.validateRead(ctx); err != nil {
 		return nil, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	conversationID = strings.TrimSpace(conversationID)
 	if conversationID == "" {
 		return nil, conversation.ErrInvalidInput

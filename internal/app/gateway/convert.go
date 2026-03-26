@@ -336,7 +336,7 @@ func mediaObject(asset domainmedia.MediaAsset) *mediav1.MediaObject {
 	return &mediav1.MediaObject{
 		MediaId:     asset.ID,
 		OwnerUserId: asset.OwnerAccountID,
-		Purpose:     mediaPurposeFromKind(asset.Kind),
+		Purpose:     mediaPurposeFromAsset(asset),
 		FileName:    asset.FileName,
 		MimeType:    asset.ContentType,
 		SizeBytes:   asset.SizeBytes,
@@ -597,6 +597,10 @@ func eventTypeToProto(eventType domainconversation.EventType) commonv1.EventType
 		return commonv1.EventType_EVENT_TYPE_CONVERSATION_UPDATED
 	case domainconversation.EventTypeConversationMembers:
 		return commonv1.EventType_EVENT_TYPE_CONVERSATION_MEMBERS_CHANGED
+	case domainconversation.EventTypeUserUpdated:
+		return commonv1.EventType_EVENT_TYPE_USER_UPDATED
+	case domainconversation.EventTypeAdminActionRecorded:
+		return commonv1.EventType_EVENT_TYPE_ADMIN_ACTION_RECORDED
 	default:
 		return commonv1.EventType_EVENT_TYPE_UNSPECIFIED
 	}

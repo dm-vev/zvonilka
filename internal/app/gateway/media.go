@@ -29,6 +29,7 @@ func (a *api) InitiateUpload(
 		ContentType:    req.GetMimeType(),
 		SizeBytes:      req.GetSizeBytes(),
 		SHA256Hex:      req.GetSha256Hex(),
+		Metadata:       mediaUploadMetadata(req),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -114,7 +115,7 @@ func (a *api) GetMedia(
 	return &mediav1.GetMediaResponse{Media: mediaObject(asset)}, nil
 }
 
-// GetDownloadUrl resolves an application-owned download target.
+// GetDownloadUrl resolves a presigned download target.
 func (a *api) GetDownloadUrl(
 	ctx context.Context,
 	req *mediav1.GetDownloadUrlRequest,
@@ -123,13 +124,10 @@ func (a *api) GetDownloadUrl(
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.GetVariant()) != "" {
-		return nil, grpcError(domainmedia.ErrInvalidInput)
-	}
-
 	_, target, err := a.media.GetDownloadURL(ctx, domainmedia.GetDownloadParams{
 		OwnerAccountID: authContext.Account.ID,
 		MediaID:        req.GetMediaId(),
+		Variant:        req.GetVariant(),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -154,17 +152,22 @@ func (a *api) ListMedia(
 	if owner := strings.TrimSpace(req.GetOwnerUserId()); owner != "" && owner != authContext.Account.ID {
 		return nil, grpcError(domainmedia.ErrForbidden)
 	}
-	if len(req.GetPurposes()) > 0 || strings.TrimSpace(req.GetConversationId()) != "" {
-		return nil, grpcError(domainmedia.ErrInvalidInput)
-	}
 
 	assets, err := a.media.ListMedia(ctx, domainmedia.ListParams{
 		OwnerAccountID: authContext.Account.ID,
-		Limit:          maxPageSize,
+		Limit:          500,
 	})
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	filteredAssets := make([]domainmedia.MediaAsset, 0, len(assets))
+	for _, asset := range assets {
+		if !mediaMatchesListFilters(asset, req.GetPurposes(), req.GetConversationId()) {
+			continue
+		}
+		filteredAssets = append(filteredAssets, asset)
+	}
+	assets = filteredAssets
 
 	offset, err := decodeOffset(req.GetPage(), "media")
 	if err != nil {
@@ -211,13 +214,11 @@ func (a *api) DeleteMedia(
 	if err != nil {
 		return nil, err
 	}
-	if req.GetHardDelete() {
-		return nil, grpcError(domainmedia.ErrInvalidInput)
-	}
 
 	asset, err := a.media.DeleteMedia(ctx, domainmedia.DeleteParams{
 		OwnerAccountID: authContext.Account.ID,
 		MediaID:        req.GetMediaId(),
+		HardDelete:     req.GetHardDelete(),
 	})
 	if err != nil {
 		return nil, grpcError(err)

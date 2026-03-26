@@ -57,6 +57,9 @@ func (s *memoryStore) ModerationPolicyByTarget(ctx context.Context, targetKind c
 	if err := s.validateRead(ctx); err != nil {
 		return conversation.ModerationPolicy{}, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	targetKind = conversation.ModerationTargetKind(strings.TrimSpace(string(targetKind)))
 	targetID = strings.TrimSpace(targetID)
 	if targetKind == conversation.ModerationTargetKindUnspecified || targetID == "" {
@@ -114,6 +117,9 @@ func (s *memoryStore) ModerationReportByID(ctx context.Context, reportID string)
 	if err := s.validateRead(ctx); err != nil {
 		return conversation.ModerationReport{}, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	reportID = moderationReportKey(reportID)
 	if reportID == "" {
 		return conversation.ModerationReport{}, conversation.ErrNotFound
@@ -131,6 +137,9 @@ func (s *memoryStore) ModerationReportsByTarget(ctx context.Context, targetKind 
 	if err := s.validateRead(ctx); err != nil {
 		return nil, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	targetKind = conversation.ModerationTargetKind(strings.TrimSpace(string(targetKind)))
 	targetID = strings.TrimSpace(targetID)
 	if targetKind == conversation.ModerationTargetKindUnspecified || targetID == "" {
@@ -183,6 +192,9 @@ func (s *memoryStore) ModerationActionsByTarget(ctx context.Context, targetKind 
 	if err := s.validateRead(ctx); err != nil {
 		return nil, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	targetKind = conversation.ModerationTargetKind(strings.TrimSpace(string(targetKind)))
 	targetID = strings.TrimSpace(targetID)
 	if targetKind == conversation.ModerationTargetKindUnspecified || targetID == "" {
@@ -234,6 +246,9 @@ func (s *memoryStore) ModerationRestrictionByTargetAndAccount(ctx context.Contex
 	if err := s.validateRead(ctx); err != nil {
 		return conversation.ModerationRestriction{}, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	targetKind = conversation.ModerationTargetKind(strings.TrimSpace(string(targetKind)))
 	targetID = strings.TrimSpace(targetID)
 	accountID = strings.TrimSpace(accountID)
@@ -253,6 +268,9 @@ func (s *memoryStore) ModerationRestrictionsByTarget(ctx context.Context, target
 	if err := s.validateRead(ctx); err != nil {
 		return nil, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	targetKind = conversation.ModerationTargetKind(strings.TrimSpace(string(targetKind)))
 	targetID = strings.TrimSpace(targetID)
 	if targetKind == conversation.ModerationTargetKindUnspecified || targetID == "" {
@@ -333,6 +351,9 @@ func (s *memoryStore) ModerationRateStateByTargetAndAccount(ctx context.Context,
 	if err := s.validateRead(ctx); err != nil {
 		return conversation.ModerationRateState{}, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	targetKind = conversation.ModerationTargetKind(strings.TrimSpace(string(targetKind)))
 	targetID = strings.TrimSpace(targetID)
 	accountID = strings.TrimSpace(accountID)

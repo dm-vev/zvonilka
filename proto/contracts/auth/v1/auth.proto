@@ -7,14 +7,18 @@ import "contracts/auth/v1/requests.proto";
 option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/auth/v1;authv1";
 
 service AuthService {
+  rpc GetLoginOptions(GetLoginOptionsRequest) returns (GetLoginOptionsResponse);
   rpc SubmitJoinRequest(SubmitJoinRequestRequest) returns (SubmitJoinRequestResponse);
   rpc BeginLogin(BeginLoginRequest) returns (BeginLoginResponse);
   rpc VerifyLoginCode(VerifyLoginCodeRequest) returns (VerifyLoginCodeResponse);
   rpc AuthenticateBot(AuthenticateBotRequest) returns (AuthenticateBotResponse);
   rpc RefreshSession(RefreshSessionRequest) returns (RefreshSessionResponse);
   rpc RegisterDevice(RegisterDeviceRequest) returns (RegisterDeviceResponse);
+  rpc RotateDeviceKey(RotateDeviceKeyRequest) returns (RotateDeviceKeyResponse);
   rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
   rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
   rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
   rpc RevokeAllSessions(RevokeAllSessionsRequest) returns (RevokeAllSessionsResponse);
+  rpc BeginPasswordRecovery(BeginPasswordRecoveryRequest) returns (BeginPasswordRecoveryResponse);
+  rpc CompletePasswordRecovery(CompletePasswordRecoveryRequest) returns (CompletePasswordRecoveryResponse);
 }

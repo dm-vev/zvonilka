@@ -3,17 +3,17 @@ package media
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
 )
 
-// GetDownloadURL resolves an application-owned download target for a ready media asset.
+// GetDownloadURL resolves a presigned download target for a ready media asset.
 func (s *Service) GetDownloadURL(ctx context.Context, params GetDownloadParams) (MediaAsset, DownloadTarget, error) {
 	if err := s.validateContext(ctx, "get media download URL"); err != nil {
 		return MediaAsset{}, DownloadTarget{}, err
 	}
 	params.OwnerAccountID = strings.TrimSpace(params.OwnerAccountID)
 	params.MediaID = strings.TrimSpace(params.MediaID)
+	params.Variant = strings.TrimSpace(params.Variant)
 	if params.OwnerAccountID == "" || params.MediaID == "" {
 		return MediaAsset{}, DownloadTarget{}, ErrInvalidInput
 	}
@@ -29,10 +29,25 @@ func (s *Service) GetDownloadURL(ctx context.Context, params GetDownloadParams) 
 		return MediaAsset{}, DownloadTarget{}, ErrNotFound
 	}
 
+	objectKey := asset.ObjectKey
+	if params.Variant != "" && !strings.EqualFold(params.Variant, "original") {
+		variantObjectKey := strings.TrimSpace(asset.Metadata[variantObjectKeyMetadataKey(params.Variant)])
+		if variantObjectKey == "" {
+			return MediaAsset{}, DownloadTarget{}, ErrNotFound
+		}
+		objectKey = variantObjectKey
+	}
+
+	target, err := s.blob.PresignGetObject(ctx, objectKey, s.settings.DownloadURLTTL)
+	if err != nil {
+		return MediaAsset{}, DownloadTarget{}, fmt.Errorf("presign download for media %s: %w", params.MediaID, err)
+	}
+
 	return asset, DownloadTarget{
-		URL:       fmt.Sprintf("/media/%s/download", asset.ID),
-		Method:    http.MethodGet,
-		ExpiresAt: s.currentTime().Add(s.settings.DownloadURLTTL),
+		URL:       target.URL,
+		Method:    target.Method,
+		Headers:   target.Headers,
+		ExpiresAt: target.ExpiresAt,
 	}, nil
 }
 

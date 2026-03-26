@@ -22,7 +22,14 @@ const (
 	ConversationService_CreateConversation_FullMethodName = "/zvonilka.conversation.v1.ConversationService/CreateConversation"
 	ConversationService_GetConversation_FullMethodName    = "/zvonilka.conversation.v1.ConversationService/GetConversation"
 	ConversationService_ListConversations_FullMethodName  = "/zvonilka.conversation.v1.ConversationService/ListConversations"
+	ConversationService_UpdateConversation_FullMethodName = "/zvonilka.conversation.v1.ConversationService/UpdateConversation"
 	ConversationService_ListMembers_FullMethodName        = "/zvonilka.conversation.v1.ConversationService/ListMembers"
+	ConversationService_AddMembers_FullMethodName         = "/zvonilka.conversation.v1.ConversationService/AddMembers"
+	ConversationService_RemoveMembers_FullMethodName      = "/zvonilka.conversation.v1.ConversationService/RemoveMembers"
+	ConversationService_UpdateMemberRole_FullMethodName   = "/zvonilka.conversation.v1.ConversationService/UpdateMemberRole"
+	ConversationService_CreateInvite_FullMethodName       = "/zvonilka.conversation.v1.ConversationService/CreateInvite"
+	ConversationService_ListInvites_FullMethodName        = "/zvonilka.conversation.v1.ConversationService/ListInvites"
+	ConversationService_RevokeInvite_FullMethodName       = "/zvonilka.conversation.v1.ConversationService/RevokeInvite"
 	ConversationService_ListMessages_FullMethodName       = "/zvonilka.conversation.v1.ConversationService/ListMessages"
 	ConversationService_GetMessage_FullMethodName         = "/zvonilka.conversation.v1.ConversationService/GetMessage"
 	ConversationService_SendMessage_FullMethodName        = "/zvonilka.conversation.v1.ConversationService/SendMessage"
@@ -44,7 +51,14 @@ type ConversationServiceClient interface {
 	CreateConversation(ctx context.Context, in *CreateConversationRequest, opts ...grpc.CallOption) (*CreateConversationResponse, error)
 	GetConversation(ctx context.Context, in *GetConversationRequest, opts ...grpc.CallOption) (*GetConversationResponse, error)
 	ListConversations(ctx context.Context, in *ListConversationsRequest, opts ...grpc.CallOption) (*ListConversationsResponse, error)
+	UpdateConversation(ctx context.Context, in *UpdateConversationRequest, opts ...grpc.CallOption) (*UpdateConversationResponse, error)
 	ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersResponse, error)
+	AddMembers(ctx context.Context, in *AddMembersRequest, opts ...grpc.CallOption) (*AddMembersResponse, error)
+	RemoveMembers(ctx context.Context, in *RemoveMembersRequest, opts ...grpc.CallOption) (*RemoveMembersResponse, error)
+	UpdateMemberRole(ctx context.Context, in *UpdateMemberRoleRequest, opts ...grpc.CallOption) (*UpdateMemberRoleResponse, error)
+	CreateInvite(ctx context.Context, in *CreateInviteRequest, opts ...grpc.CallOption) (*CreateInviteResponse, error)
+	ListInvites(ctx context.Context, in *ListInvitesRequest, opts ...grpc.CallOption) (*ListInvitesResponse, error)
+	RevokeInvite(ctx context.Context, in *RevokeInviteRequest, opts ...grpc.CallOption) (*RevokeInviteResponse, error)
 	ListMessages(ctx context.Context, in *ListMessagesRequest, opts ...grpc.CallOption) (*ListMessagesResponse, error)
 	GetMessage(ctx context.Context, in *GetMessageRequest, opts ...grpc.CallOption) (*GetMessageResponse, error)
 	SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*SendMessageResponse, error)
@@ -94,9 +108,72 @@ func (c *conversationServiceClient) ListConversations(ctx context.Context, in *L
 	return out, nil
 }
 
+func (c *conversationServiceClient) UpdateConversation(ctx context.Context, in *UpdateConversationRequest, opts ...grpc.CallOption) (*UpdateConversationResponse, error) {
+	out := new(UpdateConversationResponse)
+	err := c.cc.Invoke(ctx, ConversationService_UpdateConversation_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *conversationServiceClient) ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersResponse, error) {
 	out := new(ListMembersResponse)
 	err := c.cc.Invoke(ctx, ConversationService_ListMembers_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) AddMembers(ctx context.Context, in *AddMembersRequest, opts ...grpc.CallOption) (*AddMembersResponse, error) {
+	out := new(AddMembersResponse)
+	err := c.cc.Invoke(ctx, ConversationService_AddMembers_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) RemoveMembers(ctx context.Context, in *RemoveMembersRequest, opts ...grpc.CallOption) (*RemoveMembersResponse, error) {
+	out := new(RemoveMembersResponse)
+	err := c.cc.Invoke(ctx, ConversationService_RemoveMembers_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) UpdateMemberRole(ctx context.Context, in *UpdateMemberRoleRequest, opts ...grpc.CallOption) (*UpdateMemberRoleResponse, error) {
+	out := new(UpdateMemberRoleResponse)
+	err := c.cc.Invoke(ctx, ConversationService_UpdateMemberRole_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) CreateInvite(ctx context.Context, in *CreateInviteRequest, opts ...grpc.CallOption) (*CreateInviteResponse, error) {
+	out := new(CreateInviteResponse)
+	err := c.cc.Invoke(ctx, ConversationService_CreateInvite_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) ListInvites(ctx context.Context, in *ListInvitesRequest, opts ...grpc.CallOption) (*ListInvitesResponse, error) {
+	out := new(ListInvitesResponse)
+	err := c.cc.Invoke(ctx, ConversationService_ListInvites_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) RevokeInvite(ctx context.Context, in *RevokeInviteRequest, opts ...grpc.CallOption) (*RevokeInviteResponse, error) {
+	out := new(RevokeInviteResponse)
+	err := c.cc.Invoke(ctx, ConversationService_RevokeInvite_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +295,14 @@ type ConversationServiceServer interface {
 	CreateConversation(context.Context, *CreateConversationRequest) (*CreateConversationResponse, error)
 	GetConversation(context.Context, *GetConversationRequest) (*GetConversationResponse, error)
 	ListConversations(context.Context, *ListConversationsRequest) (*ListConversationsResponse, error)
+	UpdateConversation(context.Context, *UpdateConversationRequest) (*UpdateConversationResponse, error)
 	ListMembers(context.Context, *ListMembersRequest) (*ListMembersResponse, error)
+	AddMembers(context.Context, *AddMembersRequest) (*AddMembersResponse, error)
+	RemoveMembers(context.Context, *RemoveMembersRequest) (*RemoveMembersResponse, error)
+	UpdateMemberRole(context.Context, *UpdateMemberRoleRequest) (*UpdateMemberRoleResponse, error)
+	CreateInvite(context.Context, *CreateInviteRequest) (*CreateInviteResponse, error)
+	ListInvites(context.Context, *ListInvitesRequest) (*ListInvitesResponse, error)
+	RevokeInvite(context.Context, *RevokeInviteRequest) (*RevokeInviteResponse, error)
 	ListMessages(context.Context, *ListMessagesRequest) (*ListMessagesResponse, error)
 	GetMessage(context.Context, *GetMessageRequest) (*GetMessageResponse, error)
 	SendMessage(context.Context, *SendMessageRequest) (*SendMessageResponse, error)
@@ -247,8 +331,29 @@ func (UnimplementedConversationServiceServer) GetConversation(context.Context, *
 func (UnimplementedConversationServiceServer) ListConversations(context.Context, *ListConversationsRequest) (*ListConversationsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListConversations not implemented")
 }
+func (UnimplementedConversationServiceServer) UpdateConversation(context.Context, *UpdateConversationRequest) (*UpdateConversationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateConversation not implemented")
+}
 func (UnimplementedConversationServiceServer) ListMembers(context.Context, *ListMembersRequest) (*ListMembersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListMembers not implemented")
+}
+func (UnimplementedConversationServiceServer) AddMembers(context.Context, *AddMembersRequest) (*AddMembersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddMembers not implemented")
+}
+func (UnimplementedConversationServiceServer) RemoveMembers(context.Context, *RemoveMembersRequest) (*RemoveMembersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveMembers not implemented")
+}
+func (UnimplementedConversationServiceServer) UpdateMemberRole(context.Context, *UpdateMemberRoleRequest) (*UpdateMemberRoleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateMemberRole not implemented")
+}
+func (UnimplementedConversationServiceServer) CreateInvite(context.Context, *CreateInviteRequest) (*CreateInviteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateInvite not implemented")
+}
+func (UnimplementedConversationServiceServer) ListInvites(context.Context, *ListInvitesRequest) (*ListInvitesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListInvites not implemented")
+}
+func (UnimplementedConversationServiceServer) RevokeInvite(context.Context, *RevokeInviteRequest) (*RevokeInviteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RevokeInvite not implemented")
 }
 func (UnimplementedConversationServiceServer) ListMessages(context.Context, *ListMessagesRequest) (*ListMessagesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListMessages not implemented")
@@ -353,6 +458,24 @@ func _ConversationService_ListConversations_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConversationService_UpdateConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateConversationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).UpdateConversation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_UpdateConversation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).UpdateConversation(ctx, req.(*UpdateConversationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ConversationService_ListMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListMembersRequest)
 	if err := dec(in); err != nil {
@@ -367,6 +490,114 @@ func _ConversationService_ListMembers_Handler(srv interface{}, ctx context.Conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ConversationServiceServer).ListMembers(ctx, req.(*ListMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_AddMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddMembersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).AddMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_AddMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).AddMembers(ctx, req.(*AddMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_RemoveMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveMembersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).RemoveMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_RemoveMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).RemoveMembers(ctx, req.(*RemoveMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_UpdateMemberRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateMemberRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).UpdateMemberRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_UpdateMemberRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).UpdateMemberRole(ctx, req.(*UpdateMemberRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_CreateInvite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateInviteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).CreateInvite(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_CreateInvite_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).CreateInvite(ctx, req.(*CreateInviteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_ListInvites_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListInvitesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).ListInvites(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_ListInvites_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).ListInvites(ctx, req.(*ListInvitesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_RevokeInvite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeInviteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).RevokeInvite(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_RevokeInvite_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).RevokeInvite(ctx, req.(*RevokeInviteRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -607,8 +838,36 @@ var ConversationService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ConversationService_ListConversations_Handler,
 		},
 		{
+			MethodName: "UpdateConversation",
+			Handler:    _ConversationService_UpdateConversation_Handler,
+		},
+		{
 			MethodName: "ListMembers",
 			Handler:    _ConversationService_ListMembers_Handler,
+		},
+		{
+			MethodName: "AddMembers",
+			Handler:    _ConversationService_AddMembers_Handler,
+		},
+		{
+			MethodName: "RemoveMembers",
+			Handler:    _ConversationService_RemoveMembers_Handler,
+		},
+		{
+			MethodName: "UpdateMemberRole",
+			Handler:    _ConversationService_UpdateMemberRole_Handler,
+		},
+		{
+			MethodName: "CreateInvite",
+			Handler:    _ConversationService_CreateInvite_Handler,
+		},
+		{
+			MethodName: "ListInvites",
+			Handler:    _ConversationService_ListInvites_Handler,
+		},
+		{
+			MethodName: "RevokeInvite",
+			Handler:    _ConversationService_RevokeInvite_Handler,
 		},
 		{
 			MethodName: "ListMessages",

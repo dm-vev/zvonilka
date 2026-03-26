@@ -8,7 +8,16 @@ option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1;use
 
 service UserService {
   rpc GetMyProfile(GetMyProfileRequest) returns (GetMyProfileResponse);
+  rpc UpdateMyProfile(UpdateMyProfileRequest) returns (UpdateMyProfileResponse);
+  rpc UpdatePrivacySettings(UpdatePrivacySettingsRequest) returns (UpdatePrivacySettingsResponse);
   rpc SetPresence(SetPresenceRequest) returns (SetPresenceResponse);
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
   rpc SearchUsers(SearchUsersRequest) returns (SearchUsersResponse);
+  rpc ListContacts(ListContactsRequest) returns (ListContactsResponse);
+  rpc SyncContacts(SyncContactsRequest) returns (SyncContactsResponse);
+  rpc AddContact(AddContactRequest) returns (AddContactResponse);
+  rpc RemoveContact(RemoveContactRequest) returns (RemoveContactResponse);
+  rpc BlockUser(BlockUserRequest) returns (BlockUserResponse);
+  rpc UnblockUser(UnblockUserRequest) returns (UnblockUserResponse);
+  rpc ListBlockedUsers(ListBlockedUsersRequest) returns (ListBlockedUsersResponse);
 }

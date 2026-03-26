@@ -29,6 +29,8 @@ func TestModerationSchemaLifecycle(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
 	)
 	require.NoError(t, platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"))
 
@@ -192,6 +194,8 @@ func TestModerationSchemaConstraints(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
 	)
 	require.NoError(t, platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"))
 
@@ -231,6 +235,8 @@ func TestModerationPolicyRejectsAntiSpamMismatch(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
 	)
 	require.NoError(t, platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"))
 

@@ -44,6 +44,7 @@ type api struct {
 	media        *media.Service
 	presence     *presence.Service
 	search       *search.Service
+	syncNotifier *syncNotifier
 }
 
 func (a *app) registerGRPC(server *grpc.Server) {
@@ -83,6 +84,7 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 			media:        mediaService,
 			presence:     presenceService,
 			search:       searchService,
+			syncNotifier: newSyncNotifier(),
 		},
 		cleanupTimeout: cfg.Runtime.ShutdownTimeout,
 	}, nil

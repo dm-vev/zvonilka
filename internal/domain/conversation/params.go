@@ -160,9 +160,19 @@ type GetSyncStateParams struct {
 	DeviceID string
 }
 
+// PublishUserUpdateParams describes a fan-out user update event.
+type PublishUserUpdateParams struct {
+	AccountID   string
+	DeviceID    string
+	PayloadType string
+	Metadata    map[string]string
+	CreatedAt   time.Time
+}
+
 // CreateTopicParams describes a new topic to persist.
 type CreateTopicParams struct {
 	ConversationID   string
+	RootMessageID    string
 	CreatorAccountID string
 	Title            string
 	CreatedAt        time.Time

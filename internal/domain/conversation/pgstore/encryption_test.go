@@ -27,6 +27,8 @@ func TestEncryptedPayloadRejectsInvalidMessage(t *testing.T) {
 		"0010.sql",
 		"0011.sql",
 		"0012.sql",
+		"0018.sql",
+		"0019.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -93,6 +95,8 @@ func TestEncryptedPayloadStripsPlaintextHints(t *testing.T) {
 		"0010.sql",
 		"0011.sql",
 		"0012.sql",
+		"0018.sql",
+		"0019.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)

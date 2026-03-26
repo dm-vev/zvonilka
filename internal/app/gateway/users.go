@@ -6,6 +6,7 @@ import (
 
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
+	domainconversation "github.com/dm-vev/zvonilka/internal/domain/conversation"
 	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
 	domainsearch "github.com/dm-vev/zvonilka/internal/domain/search"
 )
@@ -48,6 +49,18 @@ func (a *api) SetPresence(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	if _, err := a.conversation.PublishUserUpdate(ctx, domainconversation.PublishUserUpdateParams{
+		AccountID:   authContext.Account.ID,
+		DeviceID:    authContext.Device.ID,
+		PayloadType: "presence",
+		Metadata: map[string]string{
+			"scope": "presence",
+		},
+		CreatedAt: state.UpdatedAt,
+	}); err != nil {
+		return nil, grpcError(err)
+	}
+	a.notifySyncSubscribers()
 
 	profile := profile(authContext.Account, domainpresence.Snapshot{
 		AccountID:      state.AccountID,

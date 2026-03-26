@@ -47,39 +47,52 @@ func (a *api) PullEvents(
 	if err != nil {
 		return nil, err
 	}
-	if req.GetIncludePresence() || req.GetIncludeModeration() {
-		return nil, grpcError(domainconversation.ErrInvalidInput)
-	}
 
 	deviceID, err := syncDeviceID(authContext, req.GetDeviceId())
 	if err != nil {
 		return nil, err
 	}
 	limit := pageSize(req.GetPage())
-
-	events, state, err := a.conversation.PullEvents(ctx, domainconversation.PullEventsParams{
-		DeviceID:        deviceID,
-		FromSequence:    req.GetFromSequence(),
-		Limit:           limit + 1,
-		ConversationIDs: req.GetConversationIds(),
-	})
-	if err != nil {
-		return nil, grpcError(err)
-	}
+	rawBatchLimit := syncPullBatchLimit(limit)
+	scanSequence := req.GetFromSequence()
+	nextSequence := scanSequence
 	hasMore := false
-	if len(events) > limit {
-		hasMore = true
-		events = events[:limit]
-	}
+	eventRows := make([]*commonv1.EventEnvelope, 0, limit)
+	var state domainconversation.SyncState
 
-	eventRows := make([]*commonv1.EventEnvelope, 0, len(events))
-	for _, event := range events {
-		eventRows = append(eventRows, eventProto(event))
-	}
+	for batchCount := 0; batchCount < 8 && len(eventRows) < limit; batchCount++ {
+		events, batchState, pullErr := a.conversation.PullEvents(ctx, domainconversation.PullEventsParams{
+			DeviceID:        deviceID,
+			FromSequence:    scanSequence,
+			Limit:           rawBatchLimit,
+			ConversationIDs: req.GetConversationIds(),
+		})
+		if pullErr != nil {
+			return nil, grpcError(pullErr)
+		}
+		state = batchState
+		if len(events) == 0 {
+			hasMore = false
+			break
+		}
 
-	nextSequence := req.GetFromSequence()
-	if len(events) > 0 {
-		nextSequence = events[len(events)-1].Sequence
+		scanSequence = events[len(events)-1].Sequence
+		nextSequence = scanSequence
+		hasMore = len(events) == rawBatchLimit
+
+		for _, event := range events {
+			if !includeSyncEvent(event, req.GetIncludePresence(), req.GetIncludeModeration()) {
+				continue
+			}
+			if len(eventRows) >= limit {
+				break
+			}
+			eventRows = append(eventRows, eventProto(event))
+		}
+
+		if len(events) < rawBatchLimit {
+			break
+		}
 	}
 
 	return &syncv1.PullEventsResponse{
@@ -117,7 +130,7 @@ func (a *api) AcknowledgeEvents(
 	return &syncv1.AcknowledgeEventsResponse{State: syncStateProto(state)}, nil
 }
 
-// SubscribeEvents streams sync events by polling the durable event log.
+// SubscribeEvents streams sync events using durable-log replay with in-process wakeups.
 func (a *api) SubscribeEvents(
 	req *syncv1.SubscribeEventsRequest,
 	stream syncv1.SyncService_SubscribeEventsServer,
@@ -133,16 +146,13 @@ func (a *api) SubscribeEvents(
 	}
 
 	fromSequence := req.GetFromSequence()
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
+	updates, unsubscribe := a.subscribeSyncNotifications()
+	defer unsubscribe()
+
+	reconcileTicker := time.NewTicker(30 * time.Second)
+	defer reconcileTicker.Stop()
 
 	for {
-		select {
-		case <-stream.Context().Done():
-			return nil
-		default:
-		}
-
 		events, _, pullErr := a.conversation.PullEvents(stream.Context(), domainconversation.PullEventsParams{
 			DeviceID:        deviceID,
 			FromSequence:    fromSequence,
@@ -150,6 +160,9 @@ func (a *api) SubscribeEvents(
 			ConversationIDs: req.GetConversationIds(),
 		})
 		if pullErr != nil {
+			if stream.Context().Err() != nil {
+				return nil
+			}
 			return grpcError(pullErr)
 		}
 
@@ -157,12 +170,18 @@ func (a *api) SubscribeEvents(
 			select {
 			case <-stream.Context().Done():
 				return nil
-			case <-ticker.C:
+			case <-updates:
+				continue
+			case <-reconcileTicker.C:
 				continue
 			}
 		}
 
 		for _, event := range events {
+			if !includeSyncEvent(event, req.GetIncludePresence(), req.GetIncludeModeration()) {
+				fromSequence = event.Sequence
+				continue
+			}
 			if sendErr := stream.Send(&syncv1.SubscribeEventsResponse{Event: eventProto(event)}); sendErr != nil {
 				return sendErr
 			}
@@ -177,6 +196,38 @@ func syncStateProto(state domainconversation.SyncState) *commonv1.SyncState {
 		LastAckedSequence:      state.LastAckedSequence,
 		ServerTime:             protoTime(state.ServerTime),
 		ConversationWatermarks: state.ConversationWatermarks,
+	}
+}
+
+func includeSyncEvent(
+	event domainconversation.EventEnvelope,
+	includePresence bool,
+	includeModeration bool,
+) bool {
+	switch event.EventType {
+	case domainconversation.EventTypeUserUpdated:
+		if event.PayloadType == "presence" {
+			return includePresence
+		}
+	case domainconversation.EventTypeAdminActionRecorded:
+		if event.PayloadType == "moderation_action" {
+			return includeModeration
+		}
+	}
+
+	return true
+}
+
+func syncPullBatchLimit(limit int) int {
+	switch {
+	case limit <= 0:
+		return 128
+	case limit < 32:
+		return 32
+	case limit > 128:
+		return limit
+	default:
+		return limit * 4
 	}
 }
 

@@ -16,6 +16,7 @@ func (s *Service) CreateTopic(ctx context.Context, params CreateTopicParams) (Co
 		return ConversationTopic{}, EventEnvelope{}, err
 	}
 	params.ConversationID = strings.TrimSpace(params.ConversationID)
+	params.RootMessageID = strings.TrimSpace(params.RootMessageID)
 	params.CreatorAccountID = strings.TrimSpace(params.CreatorAccountID)
 	params.Title = strings.TrimSpace(params.Title)
 	if params.ConversationID == "" || params.CreatorAccountID == "" || params.Title == "" {
@@ -53,6 +54,16 @@ func (s *Service) CreateTopic(ctx context.Context, params CreateTopicParams) (Co
 			return ErrForbidden
 		}
 
+		if params.RootMessageID != "" {
+			rootMessage, err := tx.MessageByID(ctx, conversation.ID, params.RootMessageID)
+			if err != nil {
+				return fmt.Errorf("load root message %s in conversation %s: %w", params.RootMessageID, conversation.ID, err)
+			}
+			if strings.TrimSpace(rootMessage.ThreadID) != "" {
+				return ErrInvalidInput
+			}
+		}
+
 		topicID, idErr := newID("top")
 		if idErr != nil {
 			return fmt.Errorf("generate topic id: %w", idErr)
@@ -61,6 +72,7 @@ func (s *Service) CreateTopic(ctx context.Context, params CreateTopicParams) (Co
 		topic := ConversationTopic{
 			ConversationID:     conversation.ID,
 			ID:                 topicID,
+			RootMessageID:      params.RootMessageID,
 			Title:              params.Title,
 			CreatedByAccountID: params.CreatorAccountID,
 			CreatedAt:          now,
@@ -77,7 +89,8 @@ func (s *Service) CreateTopic(ctx context.Context, params CreateTopicParams) (Co
 			ConversationID: conversation.ID,
 			ActorAccountID: params.CreatorAccountID,
 			Metadata: topicEventMetadata(savedTopic.ID, map[string]string{
-				"title": savedTopic.Title,
+				"title":           savedTopic.Title,
+				"root_message_id": savedTopic.RootMessageID,
 			}),
 			CreatedAt: now,
 		})

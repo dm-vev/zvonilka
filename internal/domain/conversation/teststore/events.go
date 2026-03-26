@@ -26,6 +26,9 @@ func (s *memoryStore) SyncStateByDevice(ctx context.Context, deviceID string) (c
 	if err := s.validateRead(ctx); err != nil {
 		return conversation.SyncState{}, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	deviceID = strings.TrimSpace(deviceID)
 	state, ok := s.syncStatesByDevice[deviceID]
 	if !ok {
@@ -62,6 +65,8 @@ func (s *memoryStore) EventsAfterSequence(ctx context.Context, fromSequence uint
 	if err := s.validateRead(ctx); err != nil {
 		return nil, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	filter := make(map[string]struct{}, len(conversationIDs))
 	for _, conversationID := range conversationIDs {
