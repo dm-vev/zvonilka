@@ -61,6 +61,13 @@ type BeginLoginParams struct {
 	RequestedAt    time.Time
 }
 
+// GetLoginOptionsParams contains the identifier lookup for login capability discovery.
+type GetLoginOptionsParams struct {
+	Username string
+	Email    string
+	Phone    string
+}
+
 // VerifyLoginCodeParams contains the code verification payload.
 type VerifyLoginCodeParams struct {
 	ChallengeID            string
@@ -88,15 +95,71 @@ type AuthenticateBotParams struct {
 	RequestedAt    time.Time
 }
 
-// RegisterDeviceParams contains the device registration payload.
-type RegisterDeviceParams struct {
-	SessionID      string
-	DeviceName     string
-	Platform       DevicePlatform
-	PublicKey      string
-	PushToken      string
+// RefreshSessionParams contains the refresh-token rotation payload.
+type RefreshSessionParams struct {
+	RefreshToken   string
+	DeviceID       string
 	IdempotencyKey string
 	RequestedAt    time.Time
+}
+
+// RegisterDeviceParams contains the device registration payload.
+type RegisterDeviceParams struct {
+	SessionID              string
+	DeviceName             string
+	Platform               DevicePlatform
+	PublicKey              string
+	PushToken              string
+	EnablePasswordRecovery bool
+	RecoveryPassword       string
+	IdempotencyKey         string
+	RequestedAt            time.Time
+}
+
+// RotateDeviceKeyParams contains one device public-key rotation payload.
+type RotateDeviceKeyParams struct {
+	AccountID      string
+	DeviceID       string
+	PublicKey      string
+	IdempotencyKey string
+	RequestedAt    time.Time
+}
+
+// UpdateProfileParams contains one profile update payload.
+type UpdateProfileParams struct {
+	AccountID        string
+	Username         string
+	DisplayName      string
+	Bio              string
+	Email            string
+	Phone            string
+	CustomBadgeEmoji string
+	IdempotencyKey   string
+	RequestedAt      time.Time
+}
+
+// BeginPasswordRecoveryParams contains one recovery-start payload.
+type BeginPasswordRecoveryParams struct {
+	Username       string
+	Email          string
+	Phone          string
+	Delivery       LoginDeliveryChannel
+	Locale         string
+	IdempotencyKey string
+	RequestedAt    time.Time
+}
+
+// CompletePasswordRecoveryParams contains one recovery-completion payload.
+type CompletePasswordRecoveryParams struct {
+	RecoveryChallengeID string
+	Code                string
+	NewPassword         string
+	NewRecoveryPassword string
+	DeviceName          string
+	Platform            DevicePlatform
+	PublicKey           string
+	IdempotencyKey      string
+	RequestedAt         time.Time
 }
 
 // RevokeSessionParams contains the session revocation payload.

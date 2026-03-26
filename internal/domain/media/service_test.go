@@ -87,7 +87,7 @@ func TestMediaLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get download url: %v", err)
 	}
-	if download.Method != http.MethodGet || download.URL != "/media/"+asset.ID+"/download" {
+	if download.Method != http.MethodGet || download.URL != "https://example.invalid/download/"+asset.ObjectKey {
 		t.Fatalf("unexpected download target: %+v", download)
 	}
 	if download.ExpiresAt.Before(fixedNow) {
@@ -170,6 +170,101 @@ func TestDeleteMediaRetriesBlobCleanupAfterFailure(t *testing.T) {
 	}
 	if blob.deleteCalls != 2 {
 		t.Fatalf("expected two delete attempts, got %d", blob.deleteCalls)
+	}
+}
+
+func TestDeleteMediaHardDeleteRemovesRecord(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := newMemoryStore()
+	blob := newMemoryBlobStore("media-bucket")
+
+	svc, err := media.NewService(store, blob, media.WithSettings(media.Settings{
+		UploadURLTTL:   time.Minute,
+		DownloadURLTTL: time.Minute,
+		MaxUploadSize:  10 << 20,
+	}))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	asset, _, err := svc.ReserveUpload(ctx, media.ReserveUploadParams{
+		OwnerAccountID: "acc-owner",
+		Kind:           media.MediaKindFile,
+		FileName:       "archive.zip",
+		SizeBytes:      1024,
+	})
+	if err != nil {
+		t.Fatalf("reserve upload: %v", err)
+	}
+
+	deleted, err := svc.DeleteMedia(ctx, media.DeleteParams{
+		OwnerAccountID: "acc-owner",
+		MediaID:        asset.ID,
+		HardDelete:     true,
+	})
+	if err != nil {
+		t.Fatalf("hard delete media: %v", err)
+	}
+	if deleted.Status != media.MediaStatusDeleted {
+		t.Fatalf("expected deleted status, got %s", deleted.Status)
+	}
+	if _, err := store.MediaAssetByID(ctx, asset.ID); !errors.Is(err, media.ErrNotFound) {
+		t.Fatalf("expected media row to be removed, got %v", err)
+	}
+}
+
+func TestGetDownloadURLResolvesStoredVariant(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := newMemoryStore()
+	blob := newMemoryBlobStore("media-bucket")
+
+	svc, err := media.NewService(store, blob, media.WithSettings(media.Settings{
+		UploadURLTTL:   time.Minute,
+		DownloadURLTTL: time.Minute,
+		MaxUploadSize:  10 << 20,
+	}))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	now := time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC)
+	asset := media.MediaAsset{
+		ID:              "media-variant",
+		OwnerAccountID:  "acc-owner",
+		Kind:            media.MediaKindImage,
+		Status:          media.MediaStatusReady,
+		StorageProvider: "object",
+		Bucket:          "media-bucket",
+		ObjectKey:       "media/acc-owner/media-variant",
+		FileName:        "photo.jpg",
+		ContentType:     "image/jpeg",
+		SizeBytes:       1024,
+		Metadata: map[string]string{
+			"variant_object_key.thumb": "media/acc-owner/media-variant-thumb",
+		},
+		UploadExpiresAt: now.Add(time.Minute),
+		ReadyAt:         now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	if _, err := store.SaveMediaAsset(ctx, asset); err != nil {
+		t.Fatalf("save asset: %v", err)
+	}
+
+	_, target, err := svc.GetDownloadURL(ctx, media.GetDownloadParams{
+		OwnerAccountID: "acc-owner",
+		MediaID:        asset.ID,
+		Variant:        "thumb",
+	})
+	if err != nil {
+		t.Fatalf("get variant download url: %v", err)
+	}
+	if target.URL != "https://example.invalid/download/media/acc-owner/media-variant-thumb" {
+		t.Fatalf("unexpected variant download url: %s", target.URL)
 	}
 }
 
@@ -552,6 +647,17 @@ func (s *memoryStore) MediaAssetByObjectKey(ctx context.Context, objectKey strin
 	}
 
 	return media.MediaAsset{}, media.ErrNotFound
+}
+
+func (s *memoryStore) DeleteMediaAsset(ctx context.Context, mediaID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.assets[mediaID]; !ok {
+		return media.ErrNotFound
+	}
+	delete(s.assets, mediaID)
+	return nil
 }
 
 func (s *memoryStore) clone() *memoryStore {

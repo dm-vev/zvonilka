@@ -32,6 +32,7 @@ func TestIdentitySchemaHardening(t *testing.T) {
 		"0002_identity_hardening.sql",
 		"0003_identity_account_boundaries.sql",
 		"0004_identity_session_device_deferrable.sql",
+		"0021.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)

@@ -244,13 +244,14 @@ func TestSaveLoginChallengeReturnsInvalidInputOnCheckViolation(t *testing.T) {
 
 	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(`
 INSERT INTO %s (
-	id, account_id, account_kind, code_hash, delivery_channel, targets, expires_at, created_at, used_at, used
+	id, account_id, account_kind, purpose, code_hash, delivery_channel, targets, expires_at, created_at, used_at, used
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 )
 ON CONFLICT (id) DO UPDATE SET
 	account_id = EXCLUDED.account_id,
 	account_kind = EXCLUDED.account_kind,
+	purpose = EXCLUDED.purpose,
 	code_hash = EXCLUDED.code_hash,
 	delivery_channel = EXCLUDED.delivery_channel,
 	targets = EXCLUDED.targets,
@@ -263,6 +264,7 @@ RETURNING %s
 			"chal-1",
 			"acc-1",
 			identity.AccountKindUser,
+			identity.LoginChallengePurposeLogin,
 			"hash",
 			identity.LoginDeliveryChannel("fax"),
 			"[]",
@@ -277,6 +279,7 @@ RETURNING %s
 		ID:              "chal-1",
 		AccountID:       "acc-1",
 		AccountKind:     identity.AccountKindUser,
+		Purpose:         identity.LoginChallengePurposeLogin,
 		CodeHash:        "hash",
 		DeliveryChannel: identity.LoginDeliveryChannel("fax"),
 		ExpiresAt:       now.Add(time.Hour),

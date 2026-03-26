@@ -25,11 +25,9 @@ service ConversationService {
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
   rpc EditMessage(EditMessageRequest) returns (EditMessageResponse);
   rpc DeleteMessage(DeleteMessageRequest) returns (DeleteMessageResponse);
-  rpc ForwardMessage(ForwardMessageRequest) returns (ForwardMessageResponse);
   rpc AddReaction(AddReactionRequest) returns (AddReactionResponse);
   rpc RemoveReaction(RemoveReactionRequest) returns (RemoveReactionResponse);
   rpc PinMessage(PinMessageRequest) returns (PinMessageResponse);
-  rpc UnpinMessage(UnpinMessageRequest) returns (UnpinMessageResponse);
   rpc MarkRead(MarkReadRequest) returns (MarkReadResponse);
   rpc CreateThread(CreateThreadRequest) returns (CreateThreadResponse);
   rpc GetThread(GetThreadRequest) returns (GetThreadResponse);

@@ -25,6 +25,9 @@ func (s *memoryStore) ConversationByID(ctx context.Context, conversationID strin
 	if err := s.validateRead(ctx); err != nil {
 		return conversation.Conversation{}, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	conversationID = strings.TrimSpace(conversationID)
 	if conversationID == "" {
 		return conversation.Conversation{}, conversation.ErrNotFound
@@ -42,6 +45,9 @@ func (s *memoryStore) ConversationsByAccountID(ctx context.Context, accountID st
 	if err := s.validateRead(ctx); err != nil {
 		return nil, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
 		return nil, conversation.ErrInvalidInput

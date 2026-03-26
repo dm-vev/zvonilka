@@ -11,4 +11,5 @@ type Store interface {
 	MediaAssetsByOwner(ctx context.Context, ownerAccountID string, limit int) ([]MediaAsset, error)
 	MediaActiveAssetsByOwner(ctx context.Context, ownerAccountID string, limit int) ([]MediaAsset, error)
 	MediaAssetByObjectKey(ctx context.Context, objectKey string) (MediaAsset, error)
+	DeleteMediaAsset(ctx context.Context, mediaID string) error
 }

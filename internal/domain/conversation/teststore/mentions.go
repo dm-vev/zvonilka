@@ -33,6 +33,9 @@ func (s *memoryStore) ConversationCountersByAccount(ctx context.Context, account
 	if err := s.validateRead(ctx); err != nil {
 		return nil, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	accountID = strings.TrimSpace(accountID)
 	conversationIDs = normalizeIDs(conversationIDs)
 	if accountID == "" {

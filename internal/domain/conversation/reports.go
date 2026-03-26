@@ -75,7 +75,7 @@ func (s *Service) SubmitModerationReport(
 		if actionErr != nil {
 			return fmt.Errorf("generate moderation action id: %w", actionErr)
 		}
-		if _, err := tx.SaveModerationAction(ctx, ModerationAction{
+		if _, _, err := s.saveModerationActionWithSyncEvent(ctx, tx, conversation.ID, ModerationAction{
 			ID:              actionID,
 			TargetKind:      params.TargetKind,
 			TargetID:        params.TargetID,
@@ -209,7 +209,7 @@ func (s *Service) ResolveModerationReport(
 		if !params.Resolved {
 			actionType = ModerationActionTypeReportReject
 		}
-		if _, err := tx.SaveModerationAction(ctx, ModerationAction{
+		if _, _, err := s.saveModerationActionWithSyncEvent(ctx, tx, conversation.ID, ModerationAction{
 			ID:              actionID,
 			TargetKind:      report.TargetKind,
 			TargetID:        report.TargetID,

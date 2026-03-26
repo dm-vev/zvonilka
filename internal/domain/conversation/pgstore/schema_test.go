@@ -37,6 +37,9 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
+		"0022.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -185,6 +188,117 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 	}
 }
 
+func TestConversationMembershipInviteSchemaLifecycle(t *testing.T) {
+	db := openDockerPostgres(t)
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	migrationsPath := repoMigrationsPath(t,
+		"0001.sql",
+		"0002_identity_hardening.sql",
+		"0003_identity_account_boundaries.sql",
+		"0004_identity_session_device_deferrable.sql",
+		"0005.sql",
+		"0006.sql",
+		"0009.sql",
+		"0010.sql",
+		"0011.sql",
+		"0012.sql",
+		"0016.sql",
+		"0018.sql",
+		"0019.sql",
+		"0022.sql",
+	)
+	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	seedIdentity(t, db, "tenant",
+		"id-owner", "owner", "owner@example.com", "dev-owner", "sess-owner",
+		"id-peer", "peer", "peer@example.com", "dev-peer", "sess-peer",
+	)
+
+	store, err := New(db, "tenant")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	now := time.Date(2026, time.March, 24, 16, 0, 0, 0, time.UTC)
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time { return now }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	created, _, err := svc.CreateConversation(context.Background(), conversation.CreateConversationParams{
+		OwnerAccountID: "id-owner",
+		Kind:           conversation.ConversationKindGroup,
+		Title:          "Invites",
+		CreatedAt:      now,
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	updatedTitle := "Invites Updated"
+	updated, err := svc.UpdateConversation(context.Background(), conversation.UpdateConversationParams{
+		ConversationID: created.ID,
+		ActorAccountID: "id-owner",
+		Title:          &updatedTitle,
+		UpdatedAt:      now.Add(time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("update conversation: %v", err)
+	}
+	if updated.Title != updatedTitle {
+		t.Fatalf("expected updated title, got %+v", updated)
+	}
+
+	added, err := svc.AddMembers(context.Background(), conversation.AddMembersParams{
+		ConversationID: created.ID,
+		ActorAccountID: "id-owner",
+		AccountIDs:     []string{"id-peer"},
+		Role:           conversation.MemberRoleMember,
+		CreatedAt:      now.Add(2 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("add members: %v", err)
+	}
+	if len(added) != 1 || added[0].AccountID != "id-peer" {
+		t.Fatalf("unexpected added members: %+v", added)
+	}
+
+	invite, err := svc.CreateInvite(context.Background(), conversation.CreateInviteParams{
+		ConversationID: created.ID,
+		ActorAccountID: "id-owner",
+		AllowedRoles:   []conversation.MemberRole{conversation.MemberRoleMember},
+		MaxUses:        3,
+		CreatedAt:      now.Add(3 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("create invite: %v", err)
+	}
+	loadedInvite, err := store.ConversationInviteByConversationAndID(context.Background(), created.ID, invite.ID)
+	if err != nil {
+		t.Fatalf("load invite: %v", err)
+	}
+	if loadedInvite.Code != invite.Code || len(loadedInvite.AllowedRoles) != 1 {
+		t.Fatalf("unexpected loaded invite: %+v", loadedInvite)
+	}
+
+	revoked, err := svc.RevokeInvite(context.Background(), conversation.RevokeInviteParams{
+		ConversationID: created.ID,
+		InviteID:       invite.ID,
+		ActorAccountID: "id-owner",
+		RevokedAt:      now.Add(4 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("revoke invite: %v", err)
+	}
+	if !revoked.Revoked {
+		t.Fatalf("expected revoked invite, got %+v", revoked)
+	}
+}
+
 func TestConversationSchemaConstraints(t *testing.T) {
 	db := openDockerPostgres(t)
 	t.Cleanup(func() {
@@ -203,6 +317,9 @@ func TestConversationSchemaConstraints(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
+		"0022.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -259,6 +376,9 @@ func TestModerationPolicySchemaRejectsAntiSpamMismatch(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
+		"0022.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -300,6 +420,9 @@ func TestModerationReportSchemaRejectsReviewMismatch(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
+		"0022.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -350,6 +473,9 @@ func TestConversationTopicSchemaLifecycle(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
+		"0022.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -433,12 +559,16 @@ func TestConversationTopicSchemaLifecycle(t *testing.T) {
 
 	topic, _, err := svc.CreateTopic(context.Background(), conversation.CreateTopicParams{
 		ConversationID:   created.ID,
+		RootMessageID:    rootMessage.ID,
 		CreatorAccountID: "id-owner",
 		Title:            "Announcements",
 		CreatedAt:        time.Date(2026, time.March, 24, 13, 1, 0, 0, time.UTC),
 	})
 	if err != nil {
 		t.Fatalf("create topic: %v", err)
+	}
+	if topic.RootMessageID != rootMessage.ID {
+		t.Fatalf("expected root message id %s, got %s", rootMessage.ID, topic.RootMessageID)
 	}
 
 	renamed, _, err := svc.RenameTopic(context.Background(), conversation.RenameTopicParams{
@@ -560,6 +690,9 @@ func TestConversationMessageActionSchemaLifecycle(t *testing.T) {
 		"0011.sql",
 		"0012.sql",
 		"0016.sql",
+		"0018.sql",
+		"0019.sql",
+		"0022.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)

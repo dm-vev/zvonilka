@@ -186,6 +186,9 @@ func topicSearchMetadata(topic ConversationTopic) map[string]string {
 		"closed":        fmt.Sprintf("%t", topic.Closed),
 		"message_count": fmt.Sprintf("%d", topic.MessageCount),
 	}
+	if topic.RootMessageID != "" {
+		metadata["root_message_id"] = topic.RootMessageID
+	}
 	if !topic.LastMessageAt.IsZero() {
 		metadata["last_message_at"] = topic.LastMessageAt.UTC().Format(time.RFC3339Nano)
 	}

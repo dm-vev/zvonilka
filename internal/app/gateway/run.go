@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/dm-vev/zvonilka/internal/platform/buildinfo"
@@ -10,7 +11,7 @@ import (
 	"github.com/dm-vev/zvonilka/internal/platform/runtime"
 )
 
-// Run boots the gateway skeleton.
+// Run boots the public gRPC gateway.
 func Run(ctx context.Context) error {
 	cfg, err := config.Load("gateway")
 	if err != nil {
@@ -18,7 +19,13 @@ func Run(ctx context.Context) error {
 	}
 
 	logger := observability.NewLogger(cfg.Logging, cfg.Service)
-	app := newApp(cfg)
+	app, err := newApp(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = app.close(context.Background())
+	}()
 
 	logger.InfoContext(
 		ctx,
@@ -35,12 +42,20 @@ func Run(ctx context.Context) error {
 		cfg.Runtime.GRPC.Address,
 	)
 
-	return runtime.Run(
+	if err := runtime.Run(
 		ctx,
 		cfg.Runtime.ToRuntime(cfg.Service),
 		logger,
 		app.health,
 		app.handler,
-		nil,
-	)
+		app.registerGRPC,
+	); err != nil {
+		closeErr := app.close(ctx)
+		if closeErr != nil {
+			return errors.Join(err, closeErr)
+		}
+		return err
+	}
+
+	return app.close(ctx)
 }

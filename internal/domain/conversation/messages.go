@@ -82,9 +82,7 @@ func (s *Service) ListMessages(ctx context.Context, params ListMessagesParams) (
 			continue
 		}
 		if _, shadowed := shadowedAccounts[message.SenderAccountID]; shadowed && message.SenderAccountID != params.AccountID {
-			if member.Role != MemberRoleOwner && member.Role != MemberRoleAdmin {
-				continue
-			}
+			continue
 		}
 		filtered = append(filtered, message)
 	}
@@ -177,7 +175,7 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 			return ErrInvalidInput
 		}
 		targetKind, targetID := moderationTarget(conversation, topic.ID)
-		decision, err = s.CheckModerationWrite(ctx, CheckModerationWriteParams{
+		decision, err = s.checkModerationWrite(ctx, tx, CheckModerationWriteParams{
 			TargetKind:     targetKind,
 			TargetID:       targetID,
 			ActorAccountID: params.SenderAccountID,

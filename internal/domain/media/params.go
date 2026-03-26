@@ -28,12 +28,14 @@ type FinalizeUploadParams struct {
 type GetDownloadParams struct {
 	OwnerAccountID string
 	MediaID        string
+	Variant        string
 }
 
 // DeleteParams identifies a media asset for deletion.
 type DeleteParams struct {
 	OwnerAccountID string
 	MediaID        string
+	HardDelete     bool
 	DeletedAt      time.Time
 }
 

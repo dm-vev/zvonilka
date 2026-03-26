@@ -1,6 +1,9 @@
 package media
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // MediaKind identifies the family of stored media.
 type MediaKind string
@@ -29,6 +32,13 @@ const (
 	MediaStatusFailed      MediaStatus = "failed"
 	MediaStatusDeleted     MediaStatus = "deleted"
 )
+
+const (
+	MetadataPurposeKey        = "purpose"
+	MetadataConversationIDKey = "conversation_id"
+)
+
+const metadataVariantObjectKeyPrefix = "variant_object_key."
 
 // MediaAsset describes a stored media record.
 type MediaAsset struct {
@@ -64,10 +74,19 @@ type UploadTarget struct {
 	Bucket    string
 }
 
-// DownloadTarget describes an application-owned download target.
+// DownloadTarget describes a presigned download target.
 type DownloadTarget struct {
 	URL       string
 	Method    string
 	Headers   map[string]string
 	ExpiresAt time.Time
+}
+
+func variantObjectKeyMetadataKey(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if name == "" {
+		return ""
+	}
+
+	return metadataVariantObjectKeyPrefix + name
 }

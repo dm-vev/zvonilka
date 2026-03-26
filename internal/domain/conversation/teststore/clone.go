@@ -28,6 +28,19 @@ func cloneMembers(src map[string]conversation.ConversationMember) map[string]con
 	return dst
 }
 
+func cloneInvites(src map[string]conversation.ConversationInvite) map[string]conversation.ConversationInvite {
+	if len(src) == 0 {
+		return make(map[string]conversation.ConversationInvite)
+	}
+
+	dst := make(map[string]conversation.ConversationInvite, len(src))
+	for key, value := range src {
+		dst[key] = cloneInvite(value)
+	}
+
+	return dst
+}
+
 func cloneTopics(src map[string]conversation.ConversationTopic) map[string]conversation.ConversationTopic {
 	if len(src) == 0 {
 		return make(map[string]conversation.ConversationTopic)
@@ -180,6 +193,11 @@ func cloneTopic(value conversation.ConversationTopic) conversation.ConversationT
 }
 
 func cloneMember(value conversation.ConversationMember) conversation.ConversationMember {
+	return value
+}
+
+func cloneInvite(value conversation.ConversationInvite) conversation.ConversationInvite {
+	value.AllowedRoles = append([]conversation.MemberRole(nil), value.AllowedRoles...)
 	return value
 }
 

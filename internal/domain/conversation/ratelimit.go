@@ -12,8 +12,19 @@ func (s *Service) CheckModerationWrite(
 	ctx context.Context,
 	params CheckModerationWriteParams,
 ) (ModerationDecision, error) {
+	return s.checkModerationWrite(ctx, s.store, params)
+}
+
+func (s *Service) checkModerationWrite(
+	ctx context.Context,
+	store Store,
+	params CheckModerationWriteParams,
+) (ModerationDecision, error) {
 	if err := s.validateContext(ctx, "check moderation write"); err != nil {
 		return ModerationDecision{}, err
+	}
+	if store == nil {
+		return ModerationDecision{}, ErrInvalidInput
 	}
 
 	params.TargetID = strings.TrimSpace(params.TargetID)
@@ -27,7 +38,7 @@ func (s *Service) CheckModerationWrite(
 		now = s.currentTime()
 	}
 
-	restriction, err := s.store.ModerationRestrictionByTargetAndAccount(ctx, params.TargetKind, params.TargetID, params.ActorAccountID)
+	restriction, err := store.ModerationRestrictionByTargetAndAccount(ctx, params.TargetKind, params.TargetID, params.ActorAccountID)
 	if err != nil && err != ErrNotFound {
 		return ModerationDecision{}, fmt.Errorf(
 			"load moderation restriction for %s:%s and account %s: %w",
@@ -43,7 +54,7 @@ func (s *Service) CheckModerationWrite(
 	if restriction.State == ModerationRestrictionStateUnspecified && params.TargetKind == ModerationTargetKindTopic {
 		conversationID, topicID := splitModerationKey(params.TargetID)
 		if conversationID != "" && topicID != "" {
-			fallback, fallbackErr := s.store.ModerationRestrictionByTargetAndAccount(
+			fallback, fallbackErr := store.ModerationRestrictionByTargetAndAccount(
 				ctx,
 				ModerationTargetKindConversation,
 				conversationID,
@@ -77,7 +88,7 @@ func (s *Service) CheckModerationWrite(
 	}
 
 	if params.BasePolicy.SlowModeInterval > 0 || params.BasePolicy.AntiSpamWindow > 0 || params.BasePolicy.AntiSpamBurstLimit > 0 {
-		rateState, err := s.store.ModerationRateStateByTargetAndAccount(ctx, params.TargetKind, params.TargetID, params.ActorAccountID)
+		rateState, err := store.ModerationRateStateByTargetAndAccount(ctx, params.TargetKind, params.TargetID, params.ActorAccountID)
 		if err != nil && err != ErrNotFound {
 			return ModerationDecision{}, fmt.Errorf(
 				"load moderation rate state for %s:%s and account %s: %w",

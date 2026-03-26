@@ -308,3 +308,33 @@ func (s *Store) MediaAssetByObjectKey(ctx context.Context, objectKey string) (me
 
 	return asset, nil
 }
+
+// DeleteMediaAsset removes one media asset row by primary key.
+func (s *Store) DeleteMediaAsset(ctx context.Context, mediaID string) error {
+	if err := s.requireStore(); err != nil {
+		return err
+	}
+	if err := s.requireContext(ctx); err != nil {
+		return err
+	}
+	mediaID = strings.TrimSpace(mediaID)
+	if mediaID == "" {
+		return media.ErrInvalidInput
+	}
+
+	query := fmt.Sprintf(`DELETE FROM %s WHERE id = $1`, s.table("media_assets"))
+	result, err := s.conn().ExecContext(ctx, query, mediaID)
+	if err != nil {
+		return fmt.Errorf("delete media asset %s: %w", mediaID, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("delete media asset %s rows affected: %w", mediaID, err)
+	}
+	if rowsAffected == 0 {
+		return media.ErrNotFound
+	}
+
+	return nil
+}

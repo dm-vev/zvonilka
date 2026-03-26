@@ -159,6 +159,7 @@ func scanConversation(row rowScanner) (conversation.Conversation, error) {
 func scanTopic(row rowScanner) (conversation.ConversationTopic, error) {
 	var (
 		topic         conversation.ConversationTopic
+		rootMessageID sql.NullString
 		lastMessageAt sql.NullTime
 		archivedAt    sql.NullTime
 		closedAt      sql.NullTime
@@ -167,6 +168,7 @@ func scanTopic(row rowScanner) (conversation.ConversationTopic, error) {
 	if err := row.Scan(
 		&topic.ConversationID,
 		&topic.ID,
+		&rootMessageID,
 		&topic.Title,
 		&topic.CreatedByAccountID,
 		&topic.IsGeneral,
@@ -184,6 +186,7 @@ func scanTopic(row rowScanner) (conversation.ConversationTopic, error) {
 		return conversation.ConversationTopic{}, err
 	}
 
+	topic.RootMessageID = rootMessageID.String
 	topic.CreatedAt = topic.CreatedAt.UTC()
 	topic.UpdatedAt = topic.UpdatedAt.UTC()
 	topic.LastMessageAt = decodeTime(lastMessageAt)
@@ -217,6 +220,69 @@ func scanConversationMember(row rowScanner) (conversation.ConversationMember, er
 	member.LeftAt = decodeTime(leftAt)
 
 	return member, nil
+}
+
+func encodeInviteRoles(roles []conversation.MemberRole) (string, error) {
+	values := make([]string, 0, len(roles))
+	for _, role := range roles {
+		values = append(values, string(role))
+	}
+
+	return encodeJSON(values)
+}
+
+func decodeInviteRoles(raw string) ([]conversation.MemberRole, error) {
+	if raw == "" {
+		return nil, nil
+	}
+
+	var values []string
+	if err := json.Unmarshal([]byte(raw), &values); err != nil {
+		return nil, fmt.Errorf("decode invite roles: %w", err)
+	}
+
+	roles := make([]conversation.MemberRole, 0, len(values))
+	for _, value := range values {
+		roles = append(roles, conversation.MemberRole(value))
+	}
+	return roles, nil
+}
+
+func scanConversationInvite(row rowScanner) (conversation.ConversationInvite, error) {
+	var (
+		invite          conversation.ConversationInvite
+		rawAllowedRoles string
+		expiresAt       sql.NullTime
+		revokedAt       sql.NullTime
+	)
+
+	if err := row.Scan(
+		&invite.ID,
+		&invite.ConversationID,
+		&invite.Code,
+		&invite.CreatedByAccountID,
+		&rawAllowedRoles,
+		&expiresAt,
+		&invite.MaxUses,
+		&invite.UseCount,
+		&invite.Revoked,
+		&revokedAt,
+		&invite.CreatedAt,
+		&invite.UpdatedAt,
+	); err != nil {
+		return conversation.ConversationInvite{}, err
+	}
+
+	roles, err := decodeInviteRoles(rawAllowedRoles)
+	if err != nil {
+		return conversation.ConversationInvite{}, err
+	}
+	invite.AllowedRoles = roles
+	invite.ExpiresAt = decodeTime(expiresAt)
+	invite.RevokedAt = decodeTime(revokedAt)
+	invite.CreatedAt = invite.CreatedAt.UTC()
+	invite.UpdatedAt = invite.UpdatedAt.UTC()
+	return invite, nil
 }
 
 func scanReaction(row rowScanner) (conversation.MessageReaction, error) {

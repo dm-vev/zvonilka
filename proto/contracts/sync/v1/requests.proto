@@ -45,6 +45,8 @@ message SubscribeEventsRequest {
   string device_id = 1;
   uint64 from_sequence = 2;
   repeated string conversation_ids = 3;
+  bool include_presence = 4;
+  bool include_moderation = 5;
 }
 
 message SubscribeEventsResponse {

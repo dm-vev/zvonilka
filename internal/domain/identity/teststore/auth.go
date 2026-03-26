@@ -11,11 +11,17 @@ func (s *memoryStore) SaveLoginChallenge(_ context.Context, challenge identity.L
 	if challenge.ID == "" {
 		return identity.LoginChallenge{}, identity.ErrInvalidInput
 	}
+	if challenge.Purpose == "" {
+		challenge.Purpose = identity.LoginChallengePurposeLogin
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	storedChallenge := cloneChallenge(challenge)
+	if storedChallenge.Purpose == "" {
+		storedChallenge.Purpose = identity.LoginChallengePurposeLogin
+	}
 	s.challengesByID[storedChallenge.ID] = storedChallenge
 	return cloneChallenge(storedChallenge), nil
 }

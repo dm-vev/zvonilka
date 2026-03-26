@@ -171,6 +171,7 @@ type idempotencyCache struct {
 	beginLogin         *idempotencyBucket[beginLoginCacheResult]
 	verifyLogin        *idempotencyBucket[LoginResult]
 	authenticateBot    *idempotencyBucket[LoginResult]
+	refreshSession     *idempotencyBucket[LoginResult]
 	registerDevice     *idempotencyBucket[registerDeviceCacheResult]
 	revokeSession      *idempotencyBucket[Session]
 	revokeAllSessions  *idempotencyBucket[uint32]
@@ -186,6 +187,7 @@ func newIdempotencyCache() *idempotencyCache {
 		beginLogin:         newIdempotencyBucket[beginLoginCacheResult](),
 		verifyLogin:        newIdempotencyBucket[LoginResult](),
 		authenticateBot:    newIdempotencyBucket[LoginResult](),
+		refreshSession:     newIdempotencyBucket[LoginResult](),
 		registerDevice:     newIdempotencyBucket[registerDeviceCacheResult](),
 		revokeSession:      newIdempotencyBucket[Session](),
 		revokeAllSessions:  newIdempotencyBucket[uint32](),
@@ -342,6 +344,25 @@ func (c *idempotencyCache) storeAuthenticateBotResult(
 	now time.Time,
 ) {
 	c.authenticateBot.put(key, fingerprint, result, now)
+}
+
+// refreshSessionResult returns the cached refresh outcome if the fingerprint still matches.
+func (c *idempotencyCache) refreshSessionResult(
+	key string,
+	fingerprint string,
+	now time.Time,
+) (LoginResult, bool, error) {
+	return c.refreshSession.get(key, fingerprint, now)
+}
+
+// storeRefreshSessionResult caches a successful session-refresh outcome.
+func (c *idempotencyCache) storeRefreshSessionResult(
+	key string,
+	fingerprint string,
+	result LoginResult,
+	now time.Time,
+) {
+	c.refreshSession.put(key, fingerprint, result, now)
 }
 
 // registerDeviceResult returns the cached device-registration outcome if the fingerprint still matches.

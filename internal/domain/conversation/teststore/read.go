@@ -27,6 +27,9 @@ func (s *memoryStore) ReadStateByConversationAndDevice(ctx context.Context, conv
 	if err := s.validateRead(ctx); err != nil {
 		return conversation.ReadState{}, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	conversationID = strings.TrimSpace(conversationID)
 	deviceID = strings.TrimSpace(deviceID)
 	for _, state := range s.readStatesByKey {
@@ -42,6 +45,9 @@ func (s *memoryStore) ReadStatesByDevice(ctx context.Context, deviceID string) (
 	if err := s.validateRead(ctx); err != nil {
 		return nil, err
 	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	deviceID = strings.TrimSpace(deviceID)
 	if deviceID == "" {
 		return nil, conversation.ErrInvalidInput
