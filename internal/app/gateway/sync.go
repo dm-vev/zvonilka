@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
@@ -153,39 +154,34 @@ func (a *api) SubscribeEvents(
 	defer reconcileTicker.Stop()
 
 	for {
-		events, _, pullErr := a.conversation.PullEvents(stream.Context(), domainconversation.PullEventsParams{
-			DeviceID:        deviceID,
-			FromSequence:    fromSequence,
-			Limit:           defaultPageSize,
-			ConversationIDs: req.GetConversationIds(),
-		})
-		if pullErr != nil {
+		nextSequence, sentAny, err := a.streamSyncBacklog(stream.Context(), stream, req, deviceID, fromSequence)
+		if err != nil {
 			if stream.Context().Err() != nil {
 				return nil
 			}
-			return grpcError(pullErr)
+			return err
+		}
+		if nextSequence > fromSequence {
+			fromSequence = nextSequence
+		}
+		if sentAny {
+			continue
 		}
 
-		if len(events) == 0 {
-			select {
-			case <-stream.Context().Done():
-				return nil
-			case <-updates:
-				continue
-			case <-reconcileTicker.C:
-				continue
+		select {
+		case <-stream.Context().Done():
+			return nil
+		case signal := <-updates:
+			directNext, sentDirect, directErr := a.tryDirectSyncSignal(stream, req, fromSequence, signal)
+			if directErr != nil {
+				return directErr
 			}
-		}
-
-		for _, event := range events {
-			if !includeSyncEvent(event, req.GetIncludePresence(), req.GetIncludeModeration()) {
-				fromSequence = event.Sequence
-				continue
+			if sentDirect {
+				fromSequence = directNext
 			}
-			if sendErr := stream.Send(&syncv1.SubscribeEventsResponse{Event: eventProto(event)}); sendErr != nil {
-				return sendErr
-			}
-			fromSequence = event.Sequence
+			continue
+		case <-reconcileTicker.C:
+			continue
 		}
 	}
 }
@@ -216,6 +212,88 @@ func includeSyncEvent(
 	}
 
 	return true
+}
+
+func (a *api) streamSyncBacklog(
+	ctx context.Context,
+	stream syncv1.SyncService_SubscribeEventsServer,
+	req *syncv1.SubscribeEventsRequest,
+	deviceID string,
+	fromSequence uint64,
+) (uint64, bool, error) {
+	events, _, pullErr := a.conversation.PullEvents(ctx, domainconversation.PullEventsParams{
+		DeviceID:        deviceID,
+		FromSequence:    fromSequence,
+		Limit:           defaultPageSize,
+		ConversationIDs: req.GetConversationIds(),
+	})
+	if pullErr != nil {
+		return fromSequence, false, grpcError(pullErr)
+	}
+	if len(events) == 0 {
+		return fromSequence, false, nil
+	}
+
+	nextSequence := fromSequence
+	sentAny := false
+	for _, event := range events {
+		nextSequence = event.Sequence
+		if !includeSyncEvent(event, req.GetIncludePresence(), req.GetIncludeModeration()) {
+			continue
+		}
+		if sendErr := stream.Send(&syncv1.SubscribeEventsResponse{Event: eventProto(event)}); sendErr != nil {
+			return fromSequence, false, sendErr
+		}
+		sentAny = true
+	}
+
+	return nextSequence, sentAny, nil
+}
+
+func (a *api) tryDirectSyncSignal(
+	stream syncv1.SyncService_SubscribeEventsServer,
+	req *syncv1.SubscribeEventsRequest,
+	fromSequence uint64,
+	signal syncSignal,
+) (uint64, bool, error) {
+	if signal.event == nil {
+		return fromSequence, false, nil
+	}
+
+	event := *signal.event
+	if event.Sequence <= fromSequence {
+		return fromSequence, false, nil
+	}
+	if event.Sequence != fromSequence+1 {
+		return fromSequence, false, nil
+	}
+	if !syncConversationAllowed(event.ConversationID, req.GetConversationIds()) {
+		return fromSequence, false, nil
+	}
+	if !includeSyncEvent(event, req.GetIncludePresence(), req.GetIncludeModeration()) {
+		return fromSequence, false, nil
+	}
+
+	if err := stream.Send(&syncv1.SubscribeEventsResponse{Event: eventProto(event)}); err != nil {
+		return fromSequence, false, err
+	}
+
+	return event.Sequence, true, nil
+}
+
+func syncConversationAllowed(conversationID string, allowed []string) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+
+	conversationID = strings.TrimSpace(conversationID)
+	for _, candidate := range allowed {
+		if strings.TrimSpace(candidate) == conversationID {
+			return true
+		}
+	}
+
+	return false
 }
 
 func syncPullBatchLimit(limit int) int {

@@ -568,6 +568,62 @@ func TestSubscribeEventsFiltersPresenceUntilRequested(t *testing.T) {
 	_ = owner
 }
 
+func TestGetMessageDoesNotWakeSubscribeEvents(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	_, authCtx := fixture.mustCreateUserAndLogin(t, "readonly-owner", "readonly-owner@example.com")
+	created, err := fixture.api.CreateConversation(authCtx, &conversationv1.CreateConversationRequest{
+		Kind:  commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title: "Readonly",
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+	sent, err := fixture.api.SendMessage(authCtx, &conversationv1.SendMessageRequest{
+		ConversationId: created.Conversation.ConversationId,
+		Draft:          testMessageDraft("readonly-message"),
+	})
+	if err != nil {
+		t.Fatalf("send message: %v", err)
+	}
+
+	stream := newTestSubscribeEventsStream(authCtx)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- fixture.api.SubscribeEvents(&syncv1.SubscribeEventsRequest{
+			FromSequence:    sent.Event.Sequence,
+			ConversationIds: []string{created.Conversation.ConversationId},
+		}, stream)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+
+	if _, err := fixture.api.GetMessage(authCtx, &conversationv1.GetMessageRequest{
+		ConversationId: created.Conversation.ConversationId,
+		MessageId:      sent.Message.MessageId,
+	}); err != nil {
+		t.Fatalf("get message: %v", err)
+	}
+
+	select {
+	case response := <-stream.responses:
+		t.Fatalf("expected no sync event for get message, got %+v", response)
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	stream.cancel()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("subscribe events returned error: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for subscribe loop to stop")
+	}
+}
+
 type gatewayFeatureFixture struct {
 	api        *api
 	sender     *recordingSender

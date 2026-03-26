@@ -491,7 +491,6 @@ func (a *api) GetMessage(
 	if err != nil {
 		return nil, grpcError(err)
 	}
-	a.notifySyncSubscribers()
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
@@ -524,7 +523,7 @@ func (a *api) SendMessage(
 	if err != nil {
 		return nil, grpcError(err)
 	}
-	a.notifySyncSubscribers()
+	a.publishSyncEvent(event)
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
@@ -547,7 +546,7 @@ func (a *api) EditMessage(
 		return nil, err
 	}
 
-	message, _, err := a.conversation.EditMessage(ctx, domainconversation.EditMessageParams{
+	message, event, err := a.conversation.EditMessage(ctx, domainconversation.EditMessageParams{
 		ConversationID: req.GetConversationId(),
 		MessageID:      req.GetMessageId(),
 		ActorAccountID: authContext.Account.ID,
@@ -557,7 +556,7 @@ func (a *api) EditMessage(
 	if err != nil {
 		return nil, grpcError(err)
 	}
-	a.notifySyncSubscribers()
+	a.publishSyncEvent(event)
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
@@ -579,7 +578,7 @@ func (a *api) DeleteMessage(
 		return nil, err
 	}
 
-	message, _, err := a.conversation.DeleteMessage(ctx, domainconversation.DeleteMessageParams{
+	message, event, err := a.conversation.DeleteMessage(ctx, domainconversation.DeleteMessageParams{
 		ConversationID: req.GetConversationId(),
 		MessageID:      req.GetMessageId(),
 		ActorAccountID: authContext.Account.ID,
@@ -588,7 +587,7 @@ func (a *api) DeleteMessage(
 	if err != nil {
 		return nil, grpcError(err)
 	}
-	a.notifySyncSubscribers()
+	a.publishSyncEvent(event)
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
@@ -610,7 +609,7 @@ func (a *api) AddReaction(
 		return nil, err
 	}
 
-	message, _, err := a.conversation.AddMessageReaction(ctx, domainconversation.AddMessageReactionParams{
+	message, event, err := a.conversation.AddMessageReaction(ctx, domainconversation.AddMessageReactionParams{
 		ConversationID: req.GetConversationId(),
 		MessageID:      req.GetMessageId(),
 		ActorAccountID: authContext.Account.ID,
@@ -620,7 +619,7 @@ func (a *api) AddReaction(
 	if err != nil {
 		return nil, grpcError(err)
 	}
-	a.notifySyncSubscribers()
+	a.publishSyncEvent(event)
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
@@ -642,7 +641,7 @@ func (a *api) RemoveReaction(
 		return nil, err
 	}
 
-	message, _, err := a.conversation.RemoveMessageReaction(ctx, domainconversation.RemoveMessageReactionParams{
+	message, event, err := a.conversation.RemoveMessageReaction(ctx, domainconversation.RemoveMessageReactionParams{
 		ConversationID: req.GetConversationId(),
 		MessageID:      req.GetMessageId(),
 		ActorAccountID: authContext.Account.ID,
@@ -652,7 +651,7 @@ func (a *api) RemoveReaction(
 	if err != nil {
 		return nil, grpcError(err)
 	}
-	a.notifySyncSubscribers()
+	a.publishSyncEvent(event)
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
@@ -674,7 +673,7 @@ func (a *api) PinMessage(
 		return nil, err
 	}
 
-	message, _, err := a.conversation.PinMessage(ctx, domainconversation.PinMessageParams{
+	message, event, err := a.conversation.PinMessage(ctx, domainconversation.PinMessageParams{
 		ConversationID: req.GetConversationId(),
 		MessageID:      req.GetMessageId(),
 		ActorAccountID: authContext.Account.ID,
@@ -684,7 +683,7 @@ func (a *api) PinMessage(
 	if err != nil {
 		return nil, grpcError(err)
 	}
-	a.notifySyncSubscribers()
+	a.publishSyncEvent(event)
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
@@ -722,7 +721,7 @@ func (a *api) MarkRead(
 		return nil, grpcError(domainconversation.ErrInvalidInput)
 	}
 
-	state, _, err := a.conversation.MarkRead(ctx, domainconversation.MarkReadParams{
+	state, event, err := a.conversation.MarkRead(ctx, domainconversation.MarkReadParams{
 		ConversationID:      req.GetConversationId(),
 		AccountID:           authContext.Account.ID,
 		DeviceID:            authContext.Device.ID,
@@ -732,7 +731,7 @@ func (a *api) MarkRead(
 	if err != nil {
 		return nil, grpcError(err)
 	}
-	a.notifySyncSubscribers()
+	a.publishSyncEvent(event)
 
 	return &conversationv1.MarkReadResponse{ReadThroughSequence: state.LastReadSequence}, nil
 }
@@ -747,7 +746,7 @@ func (a *api) CreateThread(
 		return nil, err
 	}
 
-	topic, _, err := a.conversation.CreateTopic(ctx, domainconversation.CreateTopicParams{
+	topic, event, err := a.conversation.CreateTopic(ctx, domainconversation.CreateTopicParams{
 		ConversationID:   req.GetConversationId(),
 		RootMessageID:    req.GetRootMessageId(),
 		CreatorAccountID: authContext.Account.ID,
@@ -756,7 +755,7 @@ func (a *api) CreateThread(
 	if err != nil {
 		return nil, grpcError(err)
 	}
-	a.notifySyncSubscribers()
+	a.publishSyncEvent(event)
 
 	return &conversationv1.CreateThreadResponse{Thread: threadProto(topic)}, nil
 }

@@ -55,7 +55,7 @@ func (a *api) UpdateMyProfile(
 		return nil, grpcError(err)
 	}
 
-	if _, err := a.conversation.PublishUserUpdate(ctx, domainconversation.PublishUserUpdateParams{
+	events, err := a.conversation.PublishUserUpdate(ctx, domainconversation.PublishUserUpdateParams{
 		AccountID:   account.ID,
 		DeviceID:    authContext.Device.ID,
 		PayloadType: "profile",
@@ -63,10 +63,11 @@ func (a *api) UpdateMyProfile(
 			"scope": "profile",
 		},
 		CreatedAt: account.UpdatedAt,
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, grpcError(err)
 	}
-	a.notifySyncSubscribers()
+	a.publishSyncEvents(events...)
 
 	return &usersv1.UpdateMyProfileResponse{Profile: userProfile}, nil
 }
@@ -124,7 +125,7 @@ func (a *api) SetPresence(
 	if err != nil {
 		return nil, grpcError(err)
 	}
-	if _, err := a.conversation.PublishUserUpdate(ctx, domainconversation.PublishUserUpdateParams{
+	events, err := a.conversation.PublishUserUpdate(ctx, domainconversation.PublishUserUpdateParams{
 		AccountID:   authContext.Account.ID,
 		DeviceID:    authContext.Device.ID,
 		PayloadType: "presence",
@@ -132,10 +133,11 @@ func (a *api) SetPresence(
 			"scope": "presence",
 		},
 		CreatedAt: state.UpdatedAt,
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, grpcError(err)
 	}
-	a.notifySyncSubscribers()
+	a.publishSyncEvents(events...)
 
 	userProfile, err := a.profileByID(ctx, authContext.Account.ID, authContext.Account.ID)
 	if err != nil {
