@@ -5,6 +5,7 @@ import (
 	"time"
 
 	domainbot "github.com/dm-vev/zvonilka/internal/domain/bot"
+	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	domainnotification "github.com/dm-vev/zvonilka/internal/domain/notification"
 	"github.com/dm-vev/zvonilka/internal/domain/presence"
@@ -61,6 +62,7 @@ func defaultConfiguration(serviceName string) Configuration {
 	environment := defaultEnvironment
 	runtimeDefaults := defaultRuntime(serviceName, environment)
 	identityDefaults := identity.DefaultSettings()
+	callDefaults := domaincall.DefaultSettings()
 	botDefaults := domainbot.DefaultSettings()
 	presenceDefaults := presence.DefaultSettings()
 	notificationDefaults := domainnotification.DefaultSettings()
@@ -83,6 +85,15 @@ func defaultConfiguration(serviceName string) Configuration {
 			AccessTokenTTL:  identityDefaults.AccessTokenTTL,
 			RefreshTokenTTL: identityDefaults.RefreshTokenTTL,
 			LoginCodeLength: identityDefaults.LoginCodeLength,
+		},
+		Call: CallConfig{
+			InviteTimeout:  callDefaults.InviteTimeout,
+			RingingTimeout: callDefaults.RingingTimeout,
+			MaxDuration:    callDefaults.MaxDuration,
+		},
+		RTC: RTCConfig{
+			PublicEndpoint: "webrtc://gateway/calls",
+			CredentialTTL:  15 * time.Minute,
 		},
 		Bot: BotConfig{
 			FanoutPollInterval:  botDefaults.FanoutPollInterval,

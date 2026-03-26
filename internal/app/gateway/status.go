@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 	domainconversation "github.com/dm-vev/zvonilka/internal/domain/conversation"
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
 	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
@@ -36,22 +37,26 @@ func grpcError(err error) error {
 	case errors.Is(err, domainidentity.ErrExpiredJoinRequest):
 		return status.Error(codes.FailedPrecondition, "join request expired")
 	case errors.Is(err, domainidentity.ErrForbidden),
+		errors.Is(err, domaincall.ErrForbidden),
 		errors.Is(err, domainconversation.ErrForbidden),
 		errors.Is(err, domainmedia.ErrForbidden),
 		errors.Is(err, domainuser.ErrForbidden):
 		return status.Error(codes.PermissionDenied, "operation forbidden")
 	case errors.Is(err, domainidentity.ErrNotFound),
+		errors.Is(err, domaincall.ErrNotFound),
 		errors.Is(err, domainconversation.ErrNotFound),
 		errors.Is(err, domainmedia.ErrNotFound),
 		errors.Is(err, domainpresence.ErrNotFound),
 		errors.Is(err, domainuser.ErrNotFound):
 		return status.Error(codes.NotFound, "resource not found")
 	case errors.Is(err, domainidentity.ErrConflict),
+		errors.Is(err, domaincall.ErrConflict),
 		errors.Is(err, domainconversation.ErrConflict),
 		errors.Is(err, domainmedia.ErrConflict),
 		errors.Is(err, domainuser.ErrConflict):
 		return status.Error(codes.FailedPrecondition, "state conflict")
 	case errors.Is(err, domainidentity.ErrInvalidInput),
+		errors.Is(err, domaincall.ErrInvalidInput),
 		errors.Is(err, domainconversation.ErrInvalidInput),
 		errors.Is(err, domainmedia.ErrInvalidInput),
 		errors.Is(err, domainpresence.ErrInvalidInput),

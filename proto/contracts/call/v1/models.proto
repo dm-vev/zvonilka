@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+package zvonilka.call.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1;callv1";
+
+enum CallState {
+  CALL_STATE_UNSPECIFIED = 0;
+  CALL_STATE_RINGING = 1;
+  CALL_STATE_ACTIVE = 2;
+  CALL_STATE_ENDED = 3;
+}
+
+enum CallEndReason {
+  CALL_END_REASON_UNSPECIFIED = 0;
+  CALL_END_REASON_CANCELLED = 1;
+  CALL_END_REASON_DECLINED = 2;
+  CALL_END_REASON_MISSED = 3;
+  CALL_END_REASON_ENDED = 4;
+  CALL_END_REASON_FAILED = 5;
+}
+
+enum CallInviteState {
+  CALL_INVITE_STATE_UNSPECIFIED = 0;
+  CALL_INVITE_STATE_PENDING = 1;
+  CALL_INVITE_STATE_ACCEPTED = 2;
+  CALL_INVITE_STATE_DECLINED = 3;
+  CALL_INVITE_STATE_CANCELLED = 4;
+  CALL_INVITE_STATE_EXPIRED = 5;
+}
+
+enum CallParticipantState {
+  CALL_PARTICIPANT_STATE_UNSPECIFIED = 0;
+  CALL_PARTICIPANT_STATE_JOINED = 1;
+  CALL_PARTICIPANT_STATE_LEFT = 2;
+}
+
+enum CallEventType {
+  CALL_EVENT_TYPE_UNSPECIFIED = 0;
+  CALL_EVENT_TYPE_STARTED = 1;
+  CALL_EVENT_TYPE_INVITED = 2;
+  CALL_EVENT_TYPE_ACCEPTED = 3;
+  CALL_EVENT_TYPE_DECLINED = 4;
+  CALL_EVENT_TYPE_JOINED = 5;
+  CALL_EVENT_TYPE_LEFT = 6;
+  CALL_EVENT_TYPE_MEDIA_UPDATED = 7;
+  CALL_EVENT_TYPE_ENDED = 8;
+}
+
+message CallMediaState {
+  bool audio_muted = 1;
+  bool video_muted = 2;
+  bool camera_enabled = 3;
+}
+
+message IceServer {
+  repeated string urls = 1;
+  string username = 2;
+  string credential = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message CallInvite {
+  string user_id = 1;
+  CallInviteState state = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  google.protobuf.Timestamp answered_at = 4;
+}
+
+message CallParticipant {
+  string user_id = 1;
+  string device_id = 2;
+  CallParticipantState state = 3;
+  CallMediaState media_state = 4;
+  google.protobuf.Timestamp joined_at = 5;
+  google.protobuf.Timestamp left_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message Call {
+  string call_id = 1;
+  string conversation_id = 2;
+  string initiator_user_id = 3;
+  string active_session_id = 4;
+  bool requested_video = 5;
+  CallState state = 6;
+  CallEndReason end_reason = 7;
+  google.protobuf.Timestamp started_at = 8;
+  google.protobuf.Timestamp answered_at = 9;
+  google.protobuf.Timestamp ended_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+  repeated CallInvite invites = 12;
+  repeated CallParticipant participants = 13;
+}
+
+message CallEvent {
+  string event_id = 1;
+  string call_id = 2;
+  string conversation_id = 3;
+  CallEventType event_type = 4;
+  string actor_user_id = 5;
+  string actor_device_id = 6;
+  uint64 sequence = 7;
+  map<string, string> metadata = 8;
+  google.protobuf.Timestamp created_at = 9;
+  Call call = 10;
+}
+
+message JoinTransport {
+  string session_id = 1;
+  string session_token = 2;
+  string runtime_endpoint = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  repeated IceServer ice_servers = 5;
+}

@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package zvonilka.call.v1;
+
+import "contracts/call/v1/models.proto";
+import "contracts/common/v1/messages.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1;callv1";
+
+message StartCallRequest {
+  string conversation_id = 1;
+  bool with_video = 2;
+}
+
+message StartCallResponse {
+  Call call = 1;
+}
+
+message GetCallRequest {
+  string call_id = 1;
+}
+
+message GetCallResponse {
+  Call call = 1;
+}
+
+message ListCallsRequest {
+  string conversation_id = 1;
+  bool include_ended = 2;
+  zvonilka.common.v1.PageRequest page = 3;
+}
+
+message ListCallsResponse {
+  repeated Call calls = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message AcceptCallRequest {
+  string call_id = 1;
+}
+
+message AcceptCallResponse {
+  Call call = 1;
+}
+
+message DeclineCallRequest {
+  string call_id = 1;
+}
+
+message DeclineCallResponse {
+  Call call = 1;
+}
+
+message CancelCallRequest {
+  string call_id = 1;
+}
+
+message CancelCallResponse {
+  Call call = 1;
+}
+
+message EndCallRequest {
+  string call_id = 1;
+  CallEndReason reason = 2;
+}
+
+message EndCallResponse {
+  Call call = 1;
+}
+
+message JoinCallRequest {
+  string call_id = 1;
+  bool with_video = 2;
+}
+
+message JoinCallResponse {
+  Call call = 1;
+  JoinTransport transport = 2;
+}
+
+message LeaveCallRequest {
+  string call_id = 1;
+}
+
+message LeaveCallResponse {
+  Call call = 1;
+}
+
+message UpdateCallMediaStateRequest {
+  string call_id = 1;
+  CallMediaState media_state = 2;
+}
+
+message UpdateCallMediaStateResponse {
+  Call call = 1;
+  CallParticipant participant = 2;
+}
+
+message GetIceConfigRequest {
+  string call_id = 1;
+}
+
+message GetIceConfigResponse {
+  repeated IceServer ice_servers = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  string runtime_endpoint = 3;
+}
+
+message SubscribeCallEventsRequest {
+  string call_id = 1;
+  string conversation_id = 2;
+  uint64 from_sequence = 3;
+}
+
+message SubscribeCallEventsResponse {
+  CallEvent event = 1;
+}

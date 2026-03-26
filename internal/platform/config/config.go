@@ -11,6 +11,8 @@ type Configuration struct {
 	Logging        LoggingConfig
 	Runtime        RuntimeConfig
 	Identity       IdentityConfig
+	Call           CallConfig
+	RTC            RTCConfig
 	Bot            BotConfig
 	Media          MediaConfig
 	Presence       PresenceConfig

@@ -1,0 +1,89 @@
+package call
+
+// StartParams describes one outbound call attempt.
+type StartParams struct {
+	ConversationID string
+	AccountID      string
+	DeviceID       string
+	WithVideo      bool
+}
+
+// AcceptParams describes one accepted incoming call.
+type AcceptParams struct {
+	CallID    string
+	AccountID string
+	DeviceID  string
+}
+
+// DeclineParams describes one declined incoming call.
+type DeclineParams struct {
+	CallID    string
+	AccountID string
+	DeviceID  string
+}
+
+// CancelParams describes one caller-side cancellation.
+type CancelParams struct {
+	CallID    string
+	AccountID string
+	DeviceID  string
+}
+
+// EndParams describes one active call termination.
+type EndParams struct {
+	CallID    string
+	AccountID string
+	DeviceID  string
+	Reason    EndReason
+}
+
+// JoinParams describes one participant room join.
+type JoinParams struct {
+	CallID    string
+	AccountID string
+	DeviceID  string
+	WithVideo bool
+}
+
+// LeaveParams describes one participant leave.
+type LeaveParams struct {
+	CallID    string
+	AccountID string
+	DeviceID  string
+}
+
+// UpdateParams describes one media-state update.
+type UpdateParams struct {
+	CallID    string
+	AccountID string
+	DeviceID  string
+	Media     MediaState
+}
+
+// GetParams identifies one visible call.
+type GetParams struct {
+	CallID    string
+	AccountID string
+}
+
+// ListParams filters calls in one conversation.
+type ListParams struct {
+	ConversationID string
+	AccountID      string
+	IncludeEnded   bool
+}
+
+// IceParams requests the RTC server list for a visible call.
+type IceParams struct {
+	CallID    string
+	AccountID string
+}
+
+// EventParams filters the call event stream.
+type EventParams struct {
+	FromSequence   uint64
+	CallID         string
+	ConversationID string
+	Limit          int
+	AccountID      string
+}

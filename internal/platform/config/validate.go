@@ -45,6 +45,21 @@ func (c Configuration) Validate() error {
 	if c.Identity.LoginCodeLength <= 0 {
 		errs = append(errs, errors.New("identity login code length must be positive"))
 	}
+	if c.Call.InviteTimeout <= 0 {
+		errs = append(errs, errors.New("call invite timeout must be positive"))
+	}
+	if c.Call.RingingTimeout <= 0 {
+		errs = append(errs, errors.New("call ringing timeout must be positive"))
+	}
+	if c.Call.MaxDuration <= 0 {
+		errs = append(errs, errors.New("call max duration must be positive"))
+	}
+	if c.RTC.CredentialTTL <= 0 {
+		errs = append(errs, errors.New("rtc credential ttl must be positive"))
+	}
+	if len(c.RTC.TURNURLs) > 0 && c.RTC.TURNSecret == "" {
+		errs = append(errs, errors.New("rtc turn secret is required when turn urls are configured"))
+	}
 	if c.Bot.FanoutPollInterval <= 0 {
 		errs = append(errs, errors.New("bot fanout poll interval must be positive"))
 	}

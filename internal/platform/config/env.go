@@ -109,6 +109,46 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Identity.LoginCodeLength = value
 	}
+	if value, ok, err := durationValue(serviceName, "CALL_INVITE_TIMEOUT", cfg.Call.InviteTimeout); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.InviteTimeout = value
+	}
+	if value, ok, err := durationValue(serviceName, "CALL_RINGING_TIMEOUT", cfg.Call.RingingTimeout); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.RingingTimeout = value
+	}
+	if value, ok, err := durationValue(serviceName, "CALL_MAX_DURATION", cfg.Call.MaxDuration); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.MaxDuration = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "RTC_PUBLIC_ENDPOINT", cfg.RTC.PublicEndpoint); err != nil {
+		return err
+	} else if ok {
+		cfg.RTC.PublicEndpoint = value
+	}
+	if value, ok, err := durationValue(serviceName, "RTC_CREDENTIAL_TTL", cfg.RTC.CredentialTTL); err != nil {
+		return err
+	} else if ok {
+		cfg.RTC.CredentialTTL = value
+	}
+	if value, ok, err := stringSliceValue(serviceName, "RTC_STUN_URLS", cfg.RTC.STUNURLs); err != nil {
+		return err
+	} else if ok {
+		cfg.RTC.STUNURLs = value
+	}
+	if value, ok, err := stringSliceValue(serviceName, "RTC_TURN_URLS", cfg.RTC.TURNURLs); err != nil {
+		return err
+	} else if ok {
+		cfg.RTC.TURNURLs = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "RTC_TURN_SECRET", cfg.RTC.TURNSecret); err != nil {
+		return err
+	} else if ok {
+		cfg.RTC.TURNSecret = value
+	}
 	if value, ok, err := durationValue(serviceName, "BOT_FANOUT_POLL_INTERVAL", cfg.Bot.FanoutPollInterval); err != nil {
 		return err
 	} else if ok {
@@ -576,4 +616,29 @@ func durationValue(serviceName string, key string, fallback time.Duration) (time
 	}
 
 	return value, true, nil
+}
+
+func stringSliceValue(serviceName string, key string, fallback []string) ([]string, bool, error) {
+	raw, ok, err := stringValueWithPresence(serviceName, key, "")
+	if err != nil {
+		return nil, false, err
+	}
+	if !ok {
+		return append([]string(nil), fallback...), false, nil
+	}
+	if strings.TrimSpace(raw) == "" {
+		return nil, true, nil
+	}
+
+	parts := strings.Split(raw, ",")
+	values := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		values = append(values, part)
+	}
+
+	return values, true, nil
 }

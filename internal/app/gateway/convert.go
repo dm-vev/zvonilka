@@ -6,11 +6,13 @@ import (
 	"time"
 
 	authv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/auth/v1"
+	callv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1"
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
 	conversationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1"
 	mediav1 "github.com/dm-vev/zvonilka/gen/proto/contracts/media/v1"
 	searchv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/search/v1"
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
+	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 	domainconversation "github.com/dm-vev/zvonilka/internal/domain/conversation"
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
 	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
@@ -35,6 +37,216 @@ func protoDuration(value time.Duration) *durationpb.Duration {
 	}
 
 	return durationpb.New(value)
+}
+
+func callStateToProto(state domaincall.State) callv1.CallState {
+	switch state {
+	case domaincall.StateRinging:
+		return callv1.CallState_CALL_STATE_RINGING
+	case domaincall.StateActive:
+		return callv1.CallState_CALL_STATE_ACTIVE
+	case domaincall.StateEnded:
+		return callv1.CallState_CALL_STATE_ENDED
+	default:
+		return callv1.CallState_CALL_STATE_UNSPECIFIED
+	}
+}
+
+func callEndReasonToProto(reason domaincall.EndReason) callv1.CallEndReason {
+	switch reason {
+	case domaincall.EndReasonCancelled:
+		return callv1.CallEndReason_CALL_END_REASON_CANCELLED
+	case domaincall.EndReasonDeclined:
+		return callv1.CallEndReason_CALL_END_REASON_DECLINED
+	case domaincall.EndReasonMissed:
+		return callv1.CallEndReason_CALL_END_REASON_MISSED
+	case domaincall.EndReasonEnded:
+		return callv1.CallEndReason_CALL_END_REASON_ENDED
+	case domaincall.EndReasonFailed:
+		return callv1.CallEndReason_CALL_END_REASON_FAILED
+	default:
+		return callv1.CallEndReason_CALL_END_REASON_UNSPECIFIED
+	}
+}
+
+func callEndReasonFromProto(reason callv1.CallEndReason) domaincall.EndReason {
+	switch reason {
+	case callv1.CallEndReason_CALL_END_REASON_CANCELLED:
+		return domaincall.EndReasonCancelled
+	case callv1.CallEndReason_CALL_END_REASON_DECLINED:
+		return domaincall.EndReasonDeclined
+	case callv1.CallEndReason_CALL_END_REASON_MISSED:
+		return domaincall.EndReasonMissed
+	case callv1.CallEndReason_CALL_END_REASON_ENDED:
+		return domaincall.EndReasonEnded
+	case callv1.CallEndReason_CALL_END_REASON_FAILED:
+		return domaincall.EndReasonFailed
+	default:
+		return domaincall.EndReasonUnspecified
+	}
+}
+
+func callInviteStateToProto(state domaincall.InviteState) callv1.CallInviteState {
+	switch state {
+	case domaincall.InviteStatePending:
+		return callv1.CallInviteState_CALL_INVITE_STATE_PENDING
+	case domaincall.InviteStateAccepted:
+		return callv1.CallInviteState_CALL_INVITE_STATE_ACCEPTED
+	case domaincall.InviteStateDeclined:
+		return callv1.CallInviteState_CALL_INVITE_STATE_DECLINED
+	case domaincall.InviteStateCancelled:
+		return callv1.CallInviteState_CALL_INVITE_STATE_CANCELLED
+	case domaincall.InviteStateExpired:
+		return callv1.CallInviteState_CALL_INVITE_STATE_EXPIRED
+	default:
+		return callv1.CallInviteState_CALL_INVITE_STATE_UNSPECIFIED
+	}
+}
+
+func callParticipantStateToProto(state domaincall.ParticipantState) callv1.CallParticipantState {
+	switch state {
+	case domaincall.ParticipantStateJoined:
+		return callv1.CallParticipantState_CALL_PARTICIPANT_STATE_JOINED
+	case domaincall.ParticipantStateLeft:
+		return callv1.CallParticipantState_CALL_PARTICIPANT_STATE_LEFT
+	default:
+		return callv1.CallParticipantState_CALL_PARTICIPANT_STATE_UNSPECIFIED
+	}
+}
+
+func callEventTypeToProto(eventType domaincall.EventType) callv1.CallEventType {
+	switch eventType {
+	case domaincall.EventTypeStarted:
+		return callv1.CallEventType_CALL_EVENT_TYPE_STARTED
+	case domaincall.EventTypeInvited:
+		return callv1.CallEventType_CALL_EVENT_TYPE_INVITED
+	case domaincall.EventTypeAccepted:
+		return callv1.CallEventType_CALL_EVENT_TYPE_ACCEPTED
+	case domaincall.EventTypeDeclined:
+		return callv1.CallEventType_CALL_EVENT_TYPE_DECLINED
+	case domaincall.EventTypeJoined:
+		return callv1.CallEventType_CALL_EVENT_TYPE_JOINED
+	case domaincall.EventTypeLeft:
+		return callv1.CallEventType_CALL_EVENT_TYPE_LEFT
+	case domaincall.EventTypeMediaUpdated:
+		return callv1.CallEventType_CALL_EVENT_TYPE_MEDIA_UPDATED
+	case domaincall.EventTypeEnded:
+		return callv1.CallEventType_CALL_EVENT_TYPE_ENDED
+	default:
+		return callv1.CallEventType_CALL_EVENT_TYPE_UNSPECIFIED
+	}
+}
+
+func callMediaStateFromProto(state *callv1.CallMediaState) domaincall.MediaState {
+	if state == nil {
+		return domaincall.MediaState{}
+	}
+
+	return domaincall.MediaState{
+		AudioMuted:    state.GetAudioMuted(),
+		VideoMuted:    state.GetVideoMuted(),
+		CameraEnabled: state.GetCameraEnabled(),
+	}
+}
+
+func callMediaStateProto(state domaincall.MediaState) *callv1.CallMediaState {
+	return &callv1.CallMediaState{
+		AudioMuted:    state.AudioMuted,
+		VideoMuted:    state.VideoMuted,
+		CameraEnabled: state.CameraEnabled,
+	}
+}
+
+func iceServerProto(server domaincall.IceServer) *callv1.IceServer {
+	return &callv1.IceServer{
+		Urls:       append([]string(nil), server.URLs...),
+		Username:   server.Username,
+		Credential: server.Credential,
+		ExpiresAt:  protoTime(server.ExpiresAt),
+	}
+}
+
+func joinDetailsProto(details domaincall.JoinDetails) *callv1.JoinTransport {
+	servers := make([]*callv1.IceServer, 0, len(details.IceServers))
+	for _, server := range details.IceServers {
+		servers = append(servers, iceServerProto(server))
+	}
+
+	return &callv1.JoinTransport{
+		SessionId:       details.SessionID,
+		SessionToken:    details.SessionToken,
+		RuntimeEndpoint: details.RuntimeEndpoint,
+		ExpiresAt:       protoTime(details.ExpiresAt),
+		IceServers:      servers,
+	}
+}
+
+func callInviteProto(value domaincall.Invite) *callv1.CallInvite {
+	return &callv1.CallInvite{
+		UserId:     value.AccountID,
+		State:      callInviteStateToProto(value.State),
+		ExpiresAt:  protoTime(value.ExpiresAt),
+		AnsweredAt: protoTime(value.AnsweredAt),
+	}
+}
+
+func callParticipantProto(value domaincall.Participant) *callv1.CallParticipant {
+	return &callv1.CallParticipant{
+		UserId:     value.AccountID,
+		DeviceId:   value.DeviceID,
+		State:      callParticipantStateToProto(value.State),
+		MediaState: callMediaStateProto(value.MediaState),
+		JoinedAt:   protoTime(value.JoinedAt),
+		LeftAt:     protoTime(value.LeftAt),
+		UpdatedAt:  protoTime(value.UpdatedAt),
+	}
+}
+
+func callProto(value domaincall.Call) *callv1.Call {
+	invites := make([]*callv1.CallInvite, 0, len(value.Invites))
+	for _, invite := range value.Invites {
+		invites = append(invites, callInviteProto(invite))
+	}
+	participants := make([]*callv1.CallParticipant, 0, len(value.Participants))
+	for _, participant := range value.Participants {
+		participants = append(participants, callParticipantProto(participant))
+	}
+
+	return &callv1.Call{
+		CallId:          value.ID,
+		ConversationId:  value.ConversationID,
+		InitiatorUserId: value.InitiatorAccountID,
+		ActiveSessionId: value.ActiveSessionID,
+		RequestedVideo:  value.RequestedVideo,
+		State:           callStateToProto(value.State),
+		EndReason:       callEndReasonToProto(value.EndReason),
+		StartedAt:       protoTime(value.StartedAt),
+		AnsweredAt:      protoTime(value.AnsweredAt),
+		EndedAt:         protoTime(value.EndedAt),
+		UpdatedAt:       protoTime(value.UpdatedAt),
+		Invites:         invites,
+		Participants:    participants,
+	}
+}
+
+func callEventProto(value domaincall.Event) *callv1.CallEvent {
+	metadata := make(map[string]string, len(value.Metadata))
+	for key, item := range value.Metadata {
+		metadata[key] = item
+	}
+
+	return &callv1.CallEvent{
+		EventId:        value.EventID,
+		CallId:         value.CallID,
+		ConversationId: value.ConversationID,
+		EventType:      callEventTypeToProto(value.EventType),
+		ActorUserId:    value.ActorAccountID,
+		ActorDeviceId:  value.ActorDeviceID,
+		Sequence:       value.Sequence,
+		Metadata:       metadata,
+		CreatedAt:      protoTime(value.CreatedAt),
+		Call:           callProto(value.Call),
+	}
 }
 
 func identityPlatformFromProto(platform commonv1.DevicePlatform) domainidentity.DevicePlatform {

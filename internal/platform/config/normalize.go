@@ -20,6 +20,10 @@ func (c *Configuration) normalize() {
 
 	c.Runtime.HTTP.Address = strings.TrimSpace(c.Runtime.HTTP.Address)
 	c.Runtime.GRPC.Address = strings.TrimSpace(c.Runtime.GRPC.Address)
+	c.RTC.PublicEndpoint = strings.TrimSpace(c.RTC.PublicEndpoint)
+	c.RTC.TURNSecret = strings.TrimSpace(c.RTC.TURNSecret)
+	c.RTC.STUNURLs = normalizeList(c.RTC.STUNURLs)
+	c.RTC.TURNURLs = normalizeList(c.RTC.TURNURLs)
 
 	c.Storage.PrimaryProvider = strings.ToLower(strings.TrimSpace(c.Storage.PrimaryProvider))
 	c.Storage.CacheProvider = strings.ToLower(strings.TrimSpace(c.Storage.CacheProvider))
@@ -44,4 +48,21 @@ func (c *Configuration) normalize() {
 
 	c.Infrastructure.Telemetry.OTLPAddress = strings.TrimSpace(c.Infrastructure.Telemetry.OTLPAddress)
 	c.Infrastructure.Telemetry.SentryDSN = strings.TrimSpace(c.Infrastructure.Telemetry.SentryDSN)
+}
+
+func normalizeList(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		result = append(result, value)
+	}
+
+	return result
 }

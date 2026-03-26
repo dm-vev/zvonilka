@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package zvonilka.call.v1;
+
+import "contracts/call/v1/requests.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1;callv1";
+
+service CallService {
+  rpc StartCall(StartCallRequest) returns (StartCallResponse);
+  rpc GetCall(GetCallRequest) returns (GetCallResponse);
+  rpc ListCalls(ListCallsRequest) returns (ListCallsResponse);
+  rpc AcceptCall(AcceptCallRequest) returns (AcceptCallResponse);
+  rpc DeclineCall(DeclineCallRequest) returns (DeclineCallResponse);
+  rpc CancelCall(CancelCallRequest) returns (CancelCallResponse);
+  rpc EndCall(EndCallRequest) returns (EndCallResponse);
+  rpc JoinCall(JoinCallRequest) returns (JoinCallResponse);
+  rpc LeaveCall(LeaveCallRequest) returns (LeaveCallResponse);
+  rpc UpdateCallMediaState(UpdateCallMediaStateRequest) returns (UpdateCallMediaStateResponse);
+  rpc GetIceConfig(GetIceConfigRequest) returns (GetIceConfigResponse);
+  rpc SubscribeCallEvents(SubscribeCallEventsRequest) returns (stream SubscribeCallEventsResponse);
+}

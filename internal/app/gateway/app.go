@@ -6,18 +6,20 @@ import (
 	"time"
 
 	authv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/auth/v1"
+	callv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1"
 	conversationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1"
 	mediav1 "github.com/dm-vev/zvonilka/gen/proto/contracts/media/v1"
 	searchv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/search/v1"
 	syncv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/sync/v1"
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
+	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	"github.com/dm-vev/zvonilka/internal/domain/media"
 	"github.com/dm-vev/zvonilka/internal/domain/presence"
 	"github.com/dm-vev/zvonilka/internal/domain/search"
-	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
+	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
 	"github.com/dm-vev/zvonilka/internal/platform/buildinfo"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
 	"github.com/dm-vev/zvonilka/internal/platform/runtime"
@@ -33,6 +35,7 @@ type app struct {
 }
 
 type api struct {
+	callv1.UnimplementedCallServiceServer
 	authv1.UnimplementedAuthServiceServer
 	usersv1.UnimplementedUserServiceServer
 	conversationv1.UnimplementedConversationServiceServer
@@ -40,16 +43,19 @@ type api struct {
 	searchv1.UnimplementedSearchServiceServer
 	syncv1.UnimplementedSyncServiceServer
 
+	call         *domaincall.Service
 	identity     *identity.Service
 	conversation *conversation.Service
 	media        *media.Service
 	presence     *presence.Service
 	search       *search.Service
 	user         *domainuser.Service
+	callNotifier *callNotifier
 	syncNotifier *syncNotifier
 }
 
 func (a *app) registerGRPC(server *grpc.Server) {
+	callv1.RegisterCallServiceServer(server, a.api)
 	authv1.RegisterAuthServiceServer(server, a.api)
 	usersv1.RegisterUserServiceServer(server, a.api)
 	conversationv1.RegisterConversationServiceServer(server, a.api)
@@ -71,7 +77,7 @@ func (a *app) close(ctx context.Context) error {
 
 func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 	health := runtime.NewHealth(cfg.Service.Name, buildinfo.Version, buildinfo.Commit, buildinfo.Date)
-	catalog, identityService, conversationService, mediaService, presenceService, searchService, userService, err := buildAppStorage(ctx, cfg)
+	catalog, callService, identityService, conversationService, mediaService, presenceService, searchService, userService, err := buildAppStorage(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -81,12 +87,14 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 		handler: http.NotFoundHandler(),
 		catalog: catalog,
 		api: &api{
+			call:         callService,
 			identity:     identityService,
 			conversation: conversationService,
 			media:        mediaService,
 			presence:     presenceService,
 			search:       searchService,
 			user:         userService,
+			callNotifier: newCallNotifier(),
 			syncNotifier: newSyncNotifier(),
 		},
 		cleanupTimeout: cfg.Runtime.ShutdownTimeout,

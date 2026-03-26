@@ -1,0 +1,312 @@
+package call
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/dm-vev/zvonilka/internal/domain/conversation"
+)
+
+// GetCall returns one call visible to the requesting account.
+func (s *Service) GetCall(ctx context.Context, params GetParams) (Call, error) {
+	if err := s.validateContext(ctx, "get call"); err != nil {
+		return Call{}, err
+	}
+	if strings.TrimSpace(params.CallID) == "" || strings.TrimSpace(params.AccountID) == "" {
+		return Call{}, ErrInvalidInput
+	}
+
+	var result Call
+	err := s.runTx(ctx, func(store Store) error {
+		callRow, loadErr := s.visibleCall(ctx, store, params.CallID, params.AccountID)
+		if loadErr != nil {
+			return loadErr
+		}
+		result = cloneCall(callRow)
+		return nil
+	})
+	if err != nil {
+		return Call{}, err
+	}
+
+	return result, nil
+}
+
+// ListCalls returns visible calls inside one conversation.
+func (s *Service) ListCalls(ctx context.Context, params ListParams) ([]Call, error) {
+	if err := s.validateContext(ctx, "list calls"); err != nil {
+		return nil, err
+	}
+	params.ConversationID = strings.TrimSpace(params.ConversationID)
+	params.AccountID = strings.TrimSpace(params.AccountID)
+	if params.ConversationID == "" || params.AccountID == "" {
+		return nil, ErrInvalidInput
+	}
+
+	if _, _, err := s.visibleConversation(ctx, params.ConversationID, params.AccountID); err != nil {
+		return nil, err
+	}
+
+	var calls []Call
+	err := s.runTx(ctx, func(store Store) error {
+		rows, listErr := store.CallsByConversation(ctx, params.ConversationID, params.IncludeEnded)
+		if listErr != nil {
+			return fmt.Errorf("list calls for conversation %s: %w", params.ConversationID, listErr)
+		}
+
+		calls = make([]Call, 0, len(rows))
+		for _, row := range rows {
+			visible, loadErr := s.visibleCall(ctx, store, row.ID, params.AccountID)
+			if loadErr != nil {
+				if loadErr == ErrNotFound {
+					continue
+				}
+				return loadErr
+			}
+			if !params.IncludeEnded && visible.State == StateEnded {
+				continue
+			}
+			calls = append(calls, cloneCall(visible))
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return calls, nil
+}
+
+// Events returns the durable call-event log visible to one account.
+func (s *Service) Events(ctx context.Context, params EventParams) ([]Event, error) {
+	if err := s.validateContext(ctx, "list call events"); err != nil {
+		return nil, err
+	}
+	params.CallID = strings.TrimSpace(params.CallID)
+	params.ConversationID = strings.TrimSpace(params.ConversationID)
+	params.AccountID = strings.TrimSpace(params.AccountID)
+	if params.AccountID == "" {
+		return nil, ErrInvalidInput
+	}
+	if params.CallID == "" && params.ConversationID == "" {
+		return nil, ErrInvalidInput
+	}
+
+	var conversationID string
+	if params.CallID != "" {
+		callRow, err := s.GetCall(ctx, GetParams{CallID: params.CallID, AccountID: params.AccountID})
+		if err != nil {
+			return nil, err
+		}
+		conversationID = callRow.ConversationID
+	} else {
+		if _, _, err := s.visibleConversation(ctx, params.ConversationID, params.AccountID); err != nil {
+			return nil, err
+		}
+		conversationID = params.ConversationID
+	}
+
+	limit := params.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	events, err := s.store.EventsAfterSequence(ctx, params.FromSequence, params.CallID, conversationID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list call events: %w", err)
+	}
+
+	hydrated := make(map[string]Call)
+	for i := range events {
+		callID := events[i].CallID
+		if callID == "" {
+			continue
+		}
+		callRow, ok := hydrated[callID]
+		if !ok {
+			loaded, loadErr := s.GetCall(ctx, GetParams{CallID: callID, AccountID: params.AccountID})
+			if loadErr != nil {
+				return nil, loadErr
+			}
+			callRow = loaded
+			hydrated[callID] = loaded
+		}
+		events[i].Call = cloneCall(callRow)
+	}
+
+	return cloneEvents(events), nil
+}
+
+func (s *Service) visibleConversation(
+	ctx context.Context,
+	conversationID string,
+	accountID string,
+) (conversation.Conversation, conversation.ConversationMember, error) {
+	conversationID = strings.TrimSpace(conversationID)
+	accountID = strings.TrimSpace(accountID)
+	if conversationID == "" || accountID == "" {
+		return conversation.Conversation{}, conversation.ConversationMember{}, ErrInvalidInput
+	}
+
+	conversationRow, err := s.conversations.ConversationByID(ctx, conversationID)
+	if err != nil {
+		if err == conversation.ErrNotFound {
+			return conversation.Conversation{}, conversation.ConversationMember{}, ErrNotFound
+		}
+		return conversation.Conversation{}, conversation.ConversationMember{}, fmt.Errorf(
+			"load conversation %s: %w",
+			conversationID,
+			err,
+		)
+	}
+	member, err := s.conversations.ConversationMemberByConversationAndAccount(ctx, conversationID, accountID)
+	if err != nil {
+		if err == conversation.ErrNotFound {
+			return conversation.Conversation{}, conversation.ConversationMember{}, ErrForbidden
+		}
+		return conversation.Conversation{}, conversation.ConversationMember{}, fmt.Errorf(
+			"load conversation member %s/%s: %w",
+			conversationID,
+			accountID,
+			err,
+		)
+	}
+	if !activeMember(member) {
+		return conversation.Conversation{}, conversation.ConversationMember{}, ErrForbidden
+	}
+
+	return conversationRow, member, nil
+}
+
+func (s *Service) visibleCall(ctx context.Context, store Store, callID string, accountID string) (Call, error) {
+	callRow, err := s.loadCall(ctx, store, callID)
+	if err != nil {
+		return Call{}, err
+	}
+	if _, _, err := s.visibleConversation(ctx, callRow.ConversationID, accountID); err != nil {
+		return Call{}, err
+	}
+
+	return s.hydrateCall(ctx, store, callRow.ID)
+}
+
+func (s *Service) loadCall(ctx context.Context, store Store, callID string) (Call, error) {
+	callID = strings.TrimSpace(callID)
+	if callID == "" {
+		return Call{}, ErrInvalidInput
+	}
+
+	callRow, err := store.CallByID(ctx, callID)
+	if err != nil {
+		if err == ErrNotFound {
+			return Call{}, ErrNotFound
+		}
+		return Call{}, fmt.Errorf("load call %s: %w", callID, err)
+	}
+
+	return s.expireCallIfNeeded(ctx, store, callRow)
+}
+
+func (s *Service) hydrateCall(ctx context.Context, store Store, callID string) (Call, error) {
+	callRow, err := store.CallByID(ctx, callID)
+	if err != nil {
+		if err == ErrNotFound {
+			return Call{}, ErrNotFound
+		}
+		return Call{}, fmt.Errorf("reload call %s: %w", callID, err)
+	}
+
+	invites, err := store.InvitesByCall(ctx, callID)
+	if err != nil {
+		return Call{}, fmt.Errorf("load invites for call %s: %w", callID, err)
+	}
+	participants, err := store.ParticipantsByCall(ctx, callID)
+	if err != nil {
+		return Call{}, fmt.Errorf("load participants for call %s: %w", callID, err)
+	}
+
+	callRow.Invites = cloneInvites(invites)
+	callRow.Participants = cloneParticipants(participants)
+	return cloneCall(callRow), nil
+}
+
+func (s *Service) ensureDirectConversation(
+	ctx context.Context,
+	conversationID string,
+	accountID string,
+) (conversation.Conversation, []conversation.ConversationMember, error) {
+	conversationRow, _, err := s.visibleConversation(ctx, conversationID, accountID)
+	if err != nil {
+		return conversation.Conversation{}, nil, err
+	}
+	if conversationRow.Kind != conversation.ConversationKindDirect {
+		return conversation.Conversation{}, nil, ErrConflict
+	}
+
+	members, err := s.conversations.ConversationMembersByConversationID(ctx, conversationID)
+	if err != nil {
+		return conversation.Conversation{}, nil, fmt.Errorf("load members for conversation %s: %w", conversationID, err)
+	}
+
+	activeMembers := make([]conversation.ConversationMember, 0, len(members))
+	for _, member := range members {
+		if activeMember(member) {
+			activeMembers = append(activeMembers, member)
+		}
+	}
+	if len(activeMembers) < 2 {
+		return conversation.Conversation{}, nil, ErrConflict
+	}
+
+	return conversationRow, activeMembers, nil
+}
+
+func (s *Service) expireCallIfNeeded(ctx context.Context, store Store, callRow Call) (Call, error) {
+	if callRow.State != StateRinging || callRow.EndedAt.IsZero() == false {
+		return callRow, nil
+	}
+
+	now := s.currentTime()
+	if now.Before(callRow.StartedAt.Add(s.settings.RingingTimeout)) {
+		return callRow, nil
+	}
+
+	callRow.State = StateEnded
+	callRow.EndReason = EndReasonMissed
+	callRow.EndedAt = now
+	callRow.UpdatedAt = now
+
+	saved, err := store.SaveCall(ctx, callRow)
+	if err != nil {
+		return Call{}, fmt.Errorf("expire call %s: %w", callRow.ID, err)
+	}
+
+	invites, err := store.InvitesByCall(ctx, callRow.ID)
+	if err != nil {
+		return Call{}, fmt.Errorf("load invites for expiring call %s: %w", callRow.ID, err)
+	}
+	for _, invite := range invites {
+		if invite.State != InviteStatePending {
+			continue
+		}
+		invite.State = InviteStateExpired
+		invite.UpdatedAt = now
+		if invite.AnsweredAt.IsZero() {
+			invite.AnsweredAt = now
+		}
+		if _, saveErr := store.SaveInvite(ctx, invite); saveErr != nil {
+			return Call{}, fmt.Errorf("expire invite %s/%s: %w", invite.CallID, invite.AccountID, saveErr)
+		}
+	}
+	if _, err := s.appendEvent(ctx, store, saved, EventTypeEnded, "", "", map[string]string{
+		"reason": string(EndReasonMissed),
+	}, now); err != nil {
+		return Call{}, err
+	}
+
+	return saved, nil
+}

@@ -11,11 +11,14 @@ import (
 	"time"
 
 	authv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/auth/v1"
+	callv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1"
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
 	conversationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1"
 	mediav1 "github.com/dm-vev/zvonilka/gen/proto/contracts/media/v1"
 	syncv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/sync/v1"
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
+	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
+	calltest "github.com/dm-vev/zvonilka/internal/domain/call/teststore"
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 	conversationtest "github.com/dm-vev/zvonilka/internal/domain/conversation/teststore"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
@@ -28,6 +31,7 @@ import (
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
 	usertest "github.com/dm-vev/zvonilka/internal/domain/user/teststore"
+	platformrtc "github.com/dm-vev/zvonilka/internal/platform/rtc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -659,13 +663,27 @@ func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
 		t.Fatalf("new presence service: %v", err)
 	}
 
+	conversationStore := conversationtest.NewMemoryStore()
 	conversationService, err := conversation.NewService(
-		conversationtest.NewMemoryStore(),
+		conversationStore,
 		conversation.WithNow(nowFunc),
 		conversation.WithIndexer(searchService),
 	)
 	if err != nil {
 		t.Fatalf("new conversation service: %v", err)
+	}
+	callService, err := domaincall.NewService(
+		calltest.NewMemoryStore(),
+		conversationStore,
+		platformrtc.NewManager("webrtc://test/calls", 15*time.Minute),
+		domaincall.WithNow(nowFunc),
+		domaincall.WithRTC(domaincall.RTCConfig{
+			PublicEndpoint: "webrtc://test/calls",
+			CredentialTTL:  15 * time.Minute,
+		}),
+	)
+	if err != nil {
+		t.Fatalf("new call service: %v", err)
 	}
 
 	mediaStore := newGatewayMediaStore()
@@ -691,12 +709,14 @@ func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
 
 	return &gatewayFeatureFixture{
 		api: &api{
+			call:         callService,
 			identity:     identityService,
 			presence:     presenceService,
 			conversation: conversationService,
 			media:        mediaService,
 			search:       searchService,
 			user:         userService,
+			callNotifier: newCallNotifier(),
 			syncNotifier: newSyncNotifier(),
 		},
 		sender:     sender,
@@ -795,6 +815,32 @@ func (*testSubscribeEventsStream) SendHeader(metadata.MD) error { return nil }
 func (*testSubscribeEventsStream) SetTrailer(metadata.MD)       {}
 func (*testSubscribeEventsStream) SendMsg(any) error            { return nil }
 func (*testSubscribeEventsStream) RecvMsg(any) error            { return nil }
+
+type testSubscribeCallEventsStream struct {
+	ctx       context.Context
+	cancel    context.CancelFunc
+	responses chan *callv1.SubscribeCallEventsResponse
+}
+
+func newTestSubscribeCallEventsStream(ctx context.Context) *testSubscribeCallEventsStream {
+	streamCtx, cancel := context.WithCancel(ctx)
+	return &testSubscribeCallEventsStream{
+		ctx:       streamCtx,
+		cancel:    cancel,
+		responses: make(chan *callv1.SubscribeCallEventsResponse, 4),
+	}
+}
+
+func (s *testSubscribeCallEventsStream) Context() context.Context { return s.ctx }
+func (s *testSubscribeCallEventsStream) Send(resp *callv1.SubscribeCallEventsResponse) error {
+	s.responses <- resp
+	return nil
+}
+func (*testSubscribeCallEventsStream) SetHeader(metadata.MD) error  { return nil }
+func (*testSubscribeCallEventsStream) SendHeader(metadata.MD) error { return nil }
+func (*testSubscribeCallEventsStream) SetTrailer(metadata.MD)       {}
+func (*testSubscribeCallEventsStream) SendMsg(any) error            { return nil }
+func (*testSubscribeCallEventsStream) RecvMsg(any) error            { return nil }
 
 type gatewayMediaStore struct {
 	mu     sync.Mutex
