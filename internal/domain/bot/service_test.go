@@ -403,6 +403,87 @@ func TestBotSendAnimationAudioAndVideoNote(t *testing.T) {
 	require.Nil(t, videoNote.Video)
 }
 
+func TestBotSendLocationContactAndPoll(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+
+	userAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "nora",
+		DisplayName: "Nora",
+		AccountKind: identity.AccountKindUser,
+		Email:       "nora@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "structbot",
+		DisplayName: "Struct Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	chat, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   userAccount.ID,
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{botAccount.ID},
+	})
+	require.NoError(t, err)
+
+	service, err := domainbot.NewService(
+		bottest.NewMemoryStore(),
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaFixture{},
+	)
+	require.NoError(t, err)
+
+	location, err := service.SendLocation(ctx, domainbot.SendLocationParams{
+		BotToken:  botToken,
+		ChatID:    chat.ID,
+		Latitude:  55.7522,
+		Longitude: 37.6156,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, location.Location)
+	require.InDelta(t, 55.7522, location.Location.Latitude, 0.000001)
+	require.InDelta(t, 37.6156, location.Location.Longitude, 0.000001)
+	require.Empty(t, location.Text)
+
+	contact, err := service.SendContact(ctx, domainbot.SendContactParams{
+		BotToken:    botToken,
+		ChatID:      chat.ID,
+		PhoneNumber: "+79990001122",
+		FirstName:   "Pavel",
+		LastName:    "Ivanov",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, contact.Contact)
+	require.Equal(t, "+79990001122", contact.Contact.PhoneNumber)
+	require.Equal(t, "Pavel", contact.Contact.FirstName)
+	require.Empty(t, contact.Text)
+
+	poll, err := service.SendPoll(ctx, domainbot.SendPollParams{
+		BotToken: botToken,
+		ChatID:   chat.ID,
+		Question: "ship it?",
+		Options:  []string{"yes", "no"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, poll.Poll)
+	require.Equal(t, "ship it?", poll.Poll.Question)
+	require.Len(t, poll.Poll.Options, 2)
+	require.Equal(t, "yes", poll.Poll.Options[0].Text)
+	require.Empty(t, poll.Text)
+}
+
 func TestBotCallbackQueryLifecycle(t *testing.T) {
 	t.Parallel()
 

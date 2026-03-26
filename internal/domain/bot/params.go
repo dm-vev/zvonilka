@@ -138,6 +138,52 @@ type SendVideoNoteParams struct {
 	DisableNotification bool
 }
 
+// SendLocationParams describes one sendLocation request.
+type SendLocationParams struct {
+	BotToken             string
+	ChatID               string
+	MessageThreadID      string
+	Latitude             float64
+	Longitude            float64
+	HorizontalAccuracy   float64
+	LivePeriod           int
+	Heading              int
+	ProximityAlertRadius int
+	ReplyToMessageID     string
+	ReplyMarkup          *InlineKeyboardMarkup
+	DisableNotification  bool
+}
+
+// SendContactParams describes one sendContact request.
+type SendContactParams struct {
+	BotToken            string
+	ChatID              string
+	MessageThreadID     string
+	PhoneNumber         string
+	FirstName           string
+	LastName            string
+	VCard               string
+	UserID              string
+	ReplyToMessageID    string
+	ReplyMarkup         *InlineKeyboardMarkup
+	DisableNotification bool
+}
+
+// SendPollParams describes one sendPoll request.
+type SendPollParams struct {
+	BotToken              string
+	ChatID                string
+	MessageThreadID       string
+	Question              string
+	Options               []string
+	IsAnonymous           bool
+	Type                  string
+	AllowsMultipleAnswers bool
+	ReplyToMessageID      string
+	ReplyMarkup           *InlineKeyboardMarkup
+	DisableNotification   bool
+}
+
 // EditMessageTextParams describes one editMessageText request.
 type EditMessageTextParams struct {
 	BotToken              string

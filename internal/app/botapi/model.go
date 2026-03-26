@@ -137,6 +137,46 @@ type sendVideoNoteRequest struct {
 	DisableNotification bool                            `json:"disable_notification"`
 }
 
+type sendLocationRequest struct {
+	ChatID               textID                          `json:"chat_id"`
+	MessageThreadID      textID                          `json:"message_thread_id"`
+	Latitude             float64                         `json:"latitude"`
+	Longitude            float64                         `json:"longitude"`
+	HorizontalAccuracy   float64                         `json:"horizontal_accuracy"`
+	LivePeriod           int                             `json:"live_period"`
+	Heading              int                             `json:"heading"`
+	ProximityAlertRadius int                             `json:"proximity_alert_radius"`
+	ReplyToMessageID     textID                          `json:"reply_to_message_id"`
+	ReplyMarkup          *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+	DisableNotification  bool                            `json:"disable_notification"`
+}
+
+type sendContactRequest struct {
+	ChatID              textID                          `json:"chat_id"`
+	MessageThreadID     textID                          `json:"message_thread_id"`
+	PhoneNumber         string                          `json:"phone_number"`
+	FirstName           string                          `json:"first_name"`
+	LastName            string                          `json:"last_name"`
+	VCard               string                          `json:"vcard"`
+	UserID              textID                          `json:"user_id"`
+	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+	DisableNotification bool                            `json:"disable_notification"`
+}
+
+type sendPollRequest struct {
+	ChatID                textID                          `json:"chat_id"`
+	MessageThreadID       textID                          `json:"message_thread_id"`
+	Question              string                          `json:"question"`
+	Options               []string                        `json:"options"`
+	IsAnonymous           bool                            `json:"is_anonymous"`
+	Type                  string                          `json:"type"`
+	AllowsMultipleAnswers bool                            `json:"allows_multiple_answers"`
+	ReplyToMessageID      textID                          `json:"reply_to_message_id"`
+	ReplyMarkup           *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+	DisableNotification   bool                            `json:"disable_notification"`
+}
+
 type editMessageTextRequest struct {
 	ChatID                textID                          `json:"chat_id"`
 	MessageID             textID                          `json:"message_id"`

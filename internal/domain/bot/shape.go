@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"unicode/utf8"
 
@@ -49,6 +50,10 @@ func chatTypeFromConversation(conv conversation.Conversation) ChatType {
 
 func plainText(message conversation.Message) string {
 	if message.Kind != conversation.MessageKindText {
+		return ""
+	}
+	switch messageShape(message) {
+	case "location", "contact", "poll":
 		return ""
 	}
 	if strings.TrimSpace(message.Payload.KeyID) != "" || strings.TrimSpace(message.Payload.Algorithm) != "" {
@@ -180,6 +185,54 @@ func messageMedia(message conversation.Message) ([]PhotoSize, *Document, *Video,
 	}
 }
 
+func messageLocation(message conversation.Message) *Location {
+	if messageShape(message) != "location" {
+		return nil
+	}
+
+	var location Location
+	if !decodeStructured(message, &location) {
+		return nil
+	}
+
+	return &location
+}
+
+func messageContact(message conversation.Message) *Contact {
+	if messageShape(message) != "contact" {
+		return nil
+	}
+
+	var contact Contact
+	if !decodeStructured(message, &contact) {
+		return nil
+	}
+
+	return &contact
+}
+
+func messagePoll(message conversation.Message) *Poll {
+	if messageShape(message) != "poll" {
+		return nil
+	}
+
+	var poll Poll
+	if !decodeStructured(message, &poll) {
+		return nil
+	}
+
+	return &poll
+}
+
+func decodeStructured(message conversation.Message, target any) bool {
+	raw := strings.TrimSpace(message.Metadata[metadataJSONKey])
+	if raw == "" {
+		return false
+	}
+
+	return json.Unmarshal([]byte(raw), target) == nil
+}
+
 func (s *Service) chatForConversation(
 	ctx context.Context,
 	botAccountID string,
@@ -269,6 +322,9 @@ func (s *Service) messageForConversation(
 		result.EditDate = msg.EditedAt.UTC().Unix()
 	}
 	result.Photo, result.Document, result.Video, result.Animation, result.Audio, result.VideoNote, result.Voice, result.Sticker = messageMedia(msg)
+	result.Location = messageLocation(msg)
+	result.Contact = messageContact(msg)
+	result.Poll = messagePoll(msg)
 	if !includeReply || msg.ReplyTo.MessageID == "" {
 		return result, nil
 	}

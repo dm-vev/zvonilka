@@ -473,6 +473,87 @@ func TestHTTPSendVideoNoteMultipartUpload(t *testing.T) {
 	require.Equal(t, "note.mp4", uploader.last.FileName)
 }
 
+func TestHTTPSendLocationContactAndPoll(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+
+	userAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "olga",
+		DisplayName: "Olga",
+		AccountKind: identity.AccountKindUser,
+		Email:       "olga@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "structuredbot",
+		DisplayName: "Structured Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	conv, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   userAccount.ID,
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{botAccount.ID},
+	})
+	require.NoError(t, err)
+
+	botService, err := domainbot.NewService(
+		bottest.NewMemoryStore(),
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaFixture{},
+	)
+	require.NoError(t, err)
+
+	boundary := &api{bot: botService}
+
+	locationRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/bot"+botToken+"/sendLocation",
+		strings.NewReader(`{"chat_id":"`+conv.ID+`","latitude":55.75,"longitude":37.61}`),
+	)
+	locationRequest.Header.Set("Content-Type", "application/json")
+	locationRecorder := httptest.NewRecorder()
+	boundary.routes().ServeHTTP(locationRecorder, locationRequest)
+	require.Equal(t, http.StatusOK, locationRecorder.Code)
+	require.Contains(t, locationRecorder.Body.String(), `"location"`)
+	require.Contains(t, locationRecorder.Body.String(), `"latitude":55.75`)
+
+	contactRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/bot"+botToken+"/sendContact",
+		strings.NewReader(`{"chat_id":"`+conv.ID+`","phone_number":"+79990000000","first_name":"Ivan","last_name":"Petrov"}`),
+	)
+	contactRequest.Header.Set("Content-Type", "application/json")
+	contactRecorder := httptest.NewRecorder()
+	boundary.routes().ServeHTTP(contactRecorder, contactRequest)
+	require.Equal(t, http.StatusOK, contactRecorder.Code)
+	require.Contains(t, contactRecorder.Body.String(), `"contact"`)
+	require.Contains(t, contactRecorder.Body.String(), `"phone_number":"+79990000000"`)
+
+	pollRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/bot"+botToken+"/sendPoll",
+		strings.NewReader(`{"chat_id":"`+conv.ID+`","question":"Choose","options":["A","B"]}`),
+	)
+	pollRequest.Header.Set("Content-Type", "application/json")
+	pollRecorder := httptest.NewRecorder()
+	boundary.routes().ServeHTTP(pollRecorder, pollRequest)
+	require.Equal(t, http.StatusOK, pollRecorder.Code)
+	require.Contains(t, pollRecorder.Body.String(), `"poll"`)
+	require.Contains(t, pollRecorder.Body.String(), `"question":"Choose"`)
+	require.Contains(t, pollRecorder.Body.String(), `"text":"A"`)
+}
+
 type mediaFixture struct {
 	assets map[string]domainmedia.MediaAsset
 }

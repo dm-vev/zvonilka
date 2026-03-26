@@ -198,6 +198,94 @@ func (a *api) sendVideoNote(writer http.ResponseWriter, request *http.Request, t
 	}, token, "video_note", domainmedia.MediaKindVideo)
 }
 
+func (a *api) sendLocation(writer http.ResponseWriter, request *http.Request, token string) {
+	var payload sendLocationRequest
+	if err := decodeRequest(request, &payload); err != nil {
+		writeError(writer, http.StatusBadRequest, "Bad Request")
+		return
+	}
+
+	result, err := a.bot.SendLocation(request.Context(), domainbot.SendLocationParams{
+		BotToken:             token,
+		ChatID:               string(payload.ChatID),
+		MessageThreadID:      string(payload.MessageThreadID),
+		Latitude:             payload.Latitude,
+		Longitude:            payload.Longitude,
+		HorizontalAccuracy:   payload.HorizontalAccuracy,
+		LivePeriod:           payload.LivePeriod,
+		Heading:              payload.Heading,
+		ProximityAlertRadius: payload.ProximityAlertRadius,
+		ReplyToMessageID:     string(payload.ReplyToMessageID),
+		ReplyMarkup:          payload.ReplyMarkup,
+		DisableNotification:  payload.DisableNotification,
+	})
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, result)
+}
+
+func (a *api) sendContact(writer http.ResponseWriter, request *http.Request, token string) {
+	var payload sendContactRequest
+	if err := decodeRequest(request, &payload); err != nil {
+		writeError(writer, http.StatusBadRequest, "Bad Request")
+		return
+	}
+
+	result, err := a.bot.SendContact(request.Context(), domainbot.SendContactParams{
+		BotToken:            token,
+		ChatID:              string(payload.ChatID),
+		MessageThreadID:     string(payload.MessageThreadID),
+		PhoneNumber:         payload.PhoneNumber,
+		FirstName:           payload.FirstName,
+		LastName:            payload.LastName,
+		VCard:               payload.VCard,
+		UserID:              string(payload.UserID),
+		ReplyToMessageID:    string(payload.ReplyToMessageID),
+		ReplyMarkup:         payload.ReplyMarkup,
+		DisableNotification: payload.DisableNotification,
+	})
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, result)
+}
+
+func (a *api) sendPoll(writer http.ResponseWriter, request *http.Request, token string) {
+	var payload sendPollRequest
+	if err := decodeRequest(request, &payload); err != nil {
+		writeError(writer, http.StatusBadRequest, "Bad Request")
+		return
+	}
+
+	result, err := a.bot.SendPoll(request.Context(), domainbot.SendPollParams{
+		BotToken:              token,
+		ChatID:                string(payload.ChatID),
+		MessageThreadID:       string(payload.MessageThreadID),
+		Question:              payload.Question,
+		Options:               payload.Options,
+		IsAnonymous:           payload.IsAnonymous,
+		Type:                  payload.Type,
+		AllowsMultipleAnswers: payload.AllowsMultipleAnswers,
+		ReplyToMessageID:      string(payload.ReplyToMessageID),
+		ReplyMarkup:           payload.ReplyMarkup,
+		DisableNotification:   payload.DisableNotification,
+	})
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, result)
+}
+
 func (a *api) sendVoice(writer http.ResponseWriter, request *http.Request, token string) {
 	var payload sendVoiceRequest
 	a.sendMedia(writer, request, &payload, func() normalizedMediaRequest {

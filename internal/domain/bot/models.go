@@ -154,6 +154,43 @@ type Sticker struct {
 	MimeType string `json:"mime_type,omitempty"`
 }
 
+// Location describes one Telegram-shaped location projection.
+type Location struct {
+	Longitude            float64 `json:"longitude"`
+	Latitude             float64 `json:"latitude"`
+	HorizontalAccuracy   float64 `json:"horizontal_accuracy,omitempty"`
+	LivePeriod           int     `json:"live_period,omitempty"`
+	Heading              int     `json:"heading,omitempty"`
+	ProximityAlertRadius int     `json:"proximity_alert_radius,omitempty"`
+}
+
+// Contact describes one Telegram-shaped contact projection.
+type Contact struct {
+	PhoneNumber string `json:"phone_number"`
+	FirstName   string `json:"first_name"`
+	LastName    string `json:"last_name,omitempty"`
+	UserID      string `json:"user_id,omitempty"`
+	VCard       string `json:"vcard,omitempty"`
+}
+
+// PollOption describes one Telegram-shaped poll option projection.
+type PollOption struct {
+	Text       string `json:"text"`
+	VoterCount int    `json:"voter_count,omitempty"`
+}
+
+// Poll describes one Telegram-shaped poll projection.
+type Poll struct {
+	ID                    string       `json:"id"`
+	Question              string       `json:"question"`
+	Options               []PollOption `json:"options"`
+	TotalVoterCount       int          `json:"total_voter_count"`
+	IsClosed              bool         `json:"is_closed"`
+	IsAnonymous           bool         `json:"is_anonymous"`
+	Type                  string       `json:"type,omitempty"`
+	AllowsMultipleAnswers bool         `json:"allows_multiple_answers,omitempty"`
+}
+
 // Message describes a Telegram-shaped message projection.
 type Message struct {
 	MessageID       string                `json:"message_id"`
@@ -172,6 +209,9 @@ type Message struct {
 	VideoNote       *VideoNote            `json:"video_note,omitempty"`
 	Voice           *Voice                `json:"voice,omitempty"`
 	Sticker         *Sticker              `json:"sticker,omitempty"`
+	Location        *Location             `json:"location,omitempty"`
+	Contact         *Contact              `json:"contact,omitempty"`
+	Poll            *Poll                 `json:"poll,omitempty"`
 	ReplyMarkup     *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 	ReplyToMessage  *Message              `json:"reply_to_message,omitempty"`
 }

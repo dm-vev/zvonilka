@@ -14,6 +14,7 @@ const (
 	metadataCaptionKey = "bot.caption"
 	metadataMediaIDKey = "bot.media_id"
 	metadataShapeKey   = "bot.shape"
+	metadataJSONKey    = "bot.json"
 )
 
 type sendMediaParams struct {

@@ -54,6 +54,12 @@ func (a *api) serve(writer http.ResponseWriter, request *http.Request) {
 		a.sendAudio(writer, request, token)
 	case "sendVideoNote":
 		a.sendVideoNote(writer, request, token)
+	case "sendLocation":
+		a.sendLocation(writer, request, token)
+	case "sendContact":
+		a.sendContact(writer, request, token)
+	case "sendPoll":
+		a.sendPoll(writer, request, token)
 	case "sendVoice":
 		a.sendVoice(writer, request, token)
 	case "sendSticker":
