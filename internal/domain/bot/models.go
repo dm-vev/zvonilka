@@ -228,7 +228,10 @@ type InlineQueryResult struct {
 	InputMessageContent *InputTextMessageContent `json:"input_message_content,omitempty"`
 	ReplyMarkup         *InlineKeyboardMarkup    `json:"reply_markup,omitempty"`
 	PhotoURL            string                   `json:"photo_url,omitempty"`
+	AudioURL            string                   `json:"audio_url,omitempty"`
 	DocumentURL         string                   `json:"document_url,omitempty"`
+	GIFURL              string                   `json:"gif_url,omitempty"`
+	Mpeg4URL            string                   `json:"mpeg4_url,omitempty"`
 	VideoURL            string                   `json:"video_url,omitempty"`
 	MimeType            string                   `json:"mime_type,omitempty"`
 	ThumbURL            string                   `json:"thumb_url,omitempty"`
@@ -520,7 +523,10 @@ func (q InlineQueryState) normalize(now time.Time) (InlineQueryState, error) {
 		result.Description = strings.TrimSpace(result.Description)
 		result.Caption = strings.TrimSpace(result.Caption)
 		result.PhotoURL = strings.TrimSpace(result.PhotoURL)
+		result.AudioURL = strings.TrimSpace(result.AudioURL)
 		result.DocumentURL = strings.TrimSpace(result.DocumentURL)
+		result.GIFURL = strings.TrimSpace(result.GIFURL)
+		result.Mpeg4URL = strings.TrimSpace(result.Mpeg4URL)
 		result.VideoURL = strings.TrimSpace(result.VideoURL)
 		result.MimeType = strings.TrimSpace(result.MimeType)
 		result.ThumbURL = strings.TrimSpace(result.ThumbURL)
@@ -568,8 +574,14 @@ func validInlineResult(result InlineQueryResult) bool {
 		return result.Title != "" && result.InputMessageContent != nil && result.InputMessageContent.MessageText != ""
 	case "photo":
 		return result.PhotoURL != ""
+	case "audio":
+		return result.Title != "" && result.AudioURL != ""
 	case "document":
 		return result.Title != "" && result.DocumentURL != ""
+	case "gif":
+		return result.GIFURL != ""
+	case "mpeg4_gif":
+		return result.Mpeg4URL != ""
 	case "video":
 		return result.Title != "" && result.VideoURL != ""
 	default:

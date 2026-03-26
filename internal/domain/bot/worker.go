@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -178,7 +179,7 @@ func (w *Worker) buildUpdatesForEvent(ctx context.Context, event conversation.Ev
 			continue
 		}
 
-		payload, err := w.updatePayload(ctx, botAccount.ID, conv, members, message, updateType)
+		payload, err := w.updatePayload(ctx, botAccount.ID, conv, members, message, event, updateType)
 		if err != nil {
 			return nil, err
 		}
@@ -268,8 +269,11 @@ func (w *Worker) updatePayload(
 	conv conversation.Conversation,
 	members []conversation.ConversationMember,
 	message conversation.Message,
+	event conversation.EventEnvelope,
 	updateType UpdateType,
 ) (Update, error) {
+	message = messageAtEvent(message, event)
+
 	projected, err := w.service.messageForConversation(ctx, botAccountID, conv, members, message, true)
 	if err != nil {
 		return Update{}, err
@@ -288,6 +292,63 @@ func (w *Worker) updatePayload(
 	}
 
 	return update, nil
+}
+
+func messageAtEvent(message conversation.Message, event conversation.EventEnvelope) conversation.Message {
+	if event.MessageID == "" {
+		return message
+	}
+
+	switch event.EventType {
+	case conversation.EventTypeMessageCreated:
+		message.Payload = event.Payload
+		message.Metadata = cloneSnapshotMetadata(event.Metadata)
+		message.DisableLinkPreviews = metadataBool(event.Metadata["disable_link_previews"], message.DisableLinkPreviews)
+		message.EditedAt = time.Time{}
+	case conversation.EventTypeMessageEdited:
+		message.Payload = event.Payload
+		message.Metadata = cloneSnapshotMetadata(event.Metadata)
+		message.DisableLinkPreviews = metadataBool(event.Metadata["disable_link_previews"], message.DisableLinkPreviews)
+		message.EditedAt = event.CreatedAt
+	}
+
+	return message
+}
+
+func cloneSnapshotMetadata(metadata map[string]string) map[string]string {
+	if len(metadata) == 0 {
+		return nil
+	}
+
+	cloned := make(map[string]string, len(metadata))
+	for key, value := range metadata {
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key == "" || value == "" {
+			continue
+		}
+		cloned[key] = value
+	}
+
+	if len(cloned) == 0 {
+		return nil
+	}
+
+	return cloned
+}
+
+func metadataBool(raw string, fallback bool) bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return fallback
+	}
+
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return fallback
+	}
+
+	return value
 }
 
 func memberUpdateForEvent(

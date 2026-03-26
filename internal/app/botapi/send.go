@@ -36,7 +36,7 @@ func (a *api) sendMessage(writer http.ResponseWriter, request *http.Request, tok
 		writeError(writer, code, description)
 		return
 	}
-	replyToMessageID, err := a.internalMessageID(request.Context(), payload.ReplyToMessageID)
+	replyToMessageID, err := a.internalMessageID(request.Context(), replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters))
 	if err != nil {
 		code, description := botError(err)
 		writeError(writer, code, description)
@@ -51,7 +51,7 @@ func (a *api) sendMessage(writer http.ResponseWriter, request *http.Request, tok
 		ReplyToMessageID:      replyToMessageID,
 		ReplyMarkup:           payload.ReplyMarkup,
 		DisableNotification:   payload.DisableNotification,
-		DisableWebPagePreview: payload.DisableWebPagePreview,
+		DisableWebPagePreview: disablePreview(payload.DisableWebPagePreview, payload.LinkPreviewOptions),
 	})
 	if err != nil {
 		code, description := botError(err)
@@ -77,7 +77,7 @@ func (a *api) sendPhoto(writer http.ResponseWriter, request *http.Request, token
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.Photo,
 			Caption:             payload.Caption,
-			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyToMessageID:    replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		}
@@ -103,7 +103,7 @@ func (a *api) sendDocument(writer http.ResponseWriter, request *http.Request, to
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.Document,
 			Caption:             payload.Caption,
-			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyToMessageID:    replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		}
@@ -129,7 +129,7 @@ func (a *api) sendVideo(writer http.ResponseWriter, request *http.Request, token
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.Video,
 			Caption:             payload.Caption,
-			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyToMessageID:    replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		}
@@ -155,7 +155,7 @@ func (a *api) sendAnimation(writer http.ResponseWriter, request *http.Request, t
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.Animation,
 			Caption:             payload.Caption,
-			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyToMessageID:    replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		}
@@ -181,7 +181,7 @@ func (a *api) sendAudio(writer http.ResponseWriter, request *http.Request, token
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.Audio,
 			Caption:             payload.Caption,
-			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyToMessageID:    replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		}
@@ -206,7 +206,7 @@ func (a *api) sendVideoNote(writer http.ResponseWriter, request *http.Request, t
 			ChatID:              payload.ChatID,
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.VideoNote,
-			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyToMessageID:    replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		}
@@ -241,7 +241,7 @@ func (a *api) sendLocation(writer http.ResponseWriter, request *http.Request, to
 		writeError(writer, code, description)
 		return
 	}
-	replyToMessageID, err := a.internalMessageID(request.Context(), payload.ReplyToMessageID)
+	replyToMessageID, err := a.internalMessageID(request.Context(), replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters))
 	if err != nil {
 		code, description := botError(err)
 		writeError(writer, code, description)
@@ -296,7 +296,7 @@ func (a *api) sendContact(writer http.ResponseWriter, request *http.Request, tok
 		writeError(writer, code, description)
 		return
 	}
-	replyToMessageID, err := a.internalMessageID(request.Context(), payload.ReplyToMessageID)
+	replyToMessageID, err := a.internalMessageID(request.Context(), replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters))
 	if err != nil {
 		code, description := botError(err)
 		writeError(writer, code, description)
@@ -356,7 +356,7 @@ func (a *api) sendPoll(writer http.ResponseWriter, request *http.Request, token 
 		writeError(writer, code, description)
 		return
 	}
-	replyToMessageID, err := a.internalMessageID(request.Context(), payload.ReplyToMessageID)
+	replyToMessageID, err := a.internalMessageID(request.Context(), replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters))
 	if err != nil {
 		code, description := botError(err)
 		writeError(writer, code, description)
@@ -368,7 +368,7 @@ func (a *api) sendPoll(writer http.ResponseWriter, request *http.Request, token 
 		ChatID:                chatID,
 		MessageThreadID:       threadID,
 		Question:              payload.Question,
-		Options:               payload.Options,
+		Options:               []string(payload.Options),
 		IsAnonymous:           payload.IsAnonymous,
 		Type:                  payload.Type,
 		AllowsMultipleAnswers: payload.AllowsMultipleAnswers,
@@ -400,7 +400,7 @@ func (a *api) sendVoice(writer http.ResponseWriter, request *http.Request, token
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.Voice,
 			Caption:             payload.Caption,
-			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyToMessageID:    replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		}
@@ -425,7 +425,7 @@ func (a *api) sendSticker(writer http.ResponseWriter, request *http.Request, tok
 			ChatID:              payload.ChatID,
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.Sticker,
-			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyToMessageID:    replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		}
@@ -540,7 +540,7 @@ func (a *api) editMessageText(writer http.ResponseWriter, request *http.Request,
 		MessageID:             messageID,
 		Text:                  payload.Text,
 		ReplyMarkup:           payload.ReplyMarkup,
-		DisableWebPagePreview: payload.DisableWebPagePreview,
+		DisableWebPagePreview: disablePreview(payload.DisableWebPagePreview, payload.LinkPreviewOptions),
 	})
 	if err != nil {
 		code, description := botError(err)

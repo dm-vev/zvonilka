@@ -2,6 +2,7 @@ package botapi
 
 import (
 	"net/http"
+	"strings"
 
 	domainbot "github.com/dm-vev/zvonilka/internal/domain/bot"
 )
@@ -30,10 +31,13 @@ func (a *api) answerInlineQuery(writer http.ResponseWriter, request *http.Reques
 			InputMessageContent: input,
 			ReplyMarkup:         result.ReplyMarkup,
 			PhotoURL:            result.PhotoURL,
+			AudioURL:            result.AudioURL,
 			DocumentURL:         result.DocumentURL,
+			GIFURL:              result.GIFURL,
+			Mpeg4URL:            result.Mpeg4URL,
 			VideoURL:            result.VideoURL,
 			MimeType:            result.MimeType,
-			ThumbURL:            result.ThumbURL,
+			ThumbURL:            result.thumbnailURL(),
 		})
 	}
 
@@ -54,4 +58,12 @@ func (a *api) answerInlineQuery(writer http.ResponseWriter, request *http.Reques
 	}
 
 	writeResult(writer, true)
+}
+
+func (r inlineQueryResultRequest) thumbnailURL() string {
+	if value := strings.TrimSpace(r.ThumbnailURL); value != "" {
+		return value
+	}
+
+	return strings.TrimSpace(r.ThumbURL)
 }

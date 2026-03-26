@@ -40,6 +40,7 @@ type memoryStore struct {
 	cursorsByName  map[string]bot.Cursor
 	nextPublicID   int64
 	nextUpdateID   int64
+	version        uint64
 }
 
 type txStore struct {
@@ -51,20 +52,30 @@ func (s *memoryStore) WithinTx(_ context.Context, fn func(bot.Store) error) erro
 		return bot.ErrInvalidInput
 	}
 
-	s.mu.RLock()
-	snapshot := s.cloneLocked()
-	s.mu.RUnlock()
+	for attempt := 0; attempt < 32; attempt++ {
+		s.mu.RLock()
+		version := s.version
+		snapshot := s.cloneLocked()
+		s.mu.RUnlock()
 
-	tx := &txStore{memoryStore: snapshot}
-	if err := fn(tx); err != nil {
-		return err
+		tx := &txStore{memoryStore: snapshot}
+		if err := fn(tx); err != nil {
+			return err
+		}
+
+		s.mu.Lock()
+		if s.version != version {
+			s.mu.Unlock()
+			continue
+		}
+		snapshot.version = version + 1
+		s.replaceLocked(snapshot)
+		s.mu.Unlock()
+
+		return nil
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.replaceLocked(snapshot)
-
-	return nil
+	return bot.ErrConflict
 }
 
 func (s *memoryStore) SaveWebhook(_ context.Context, webhook bot.Webhook) (bot.Webhook, error) {
@@ -76,6 +87,7 @@ func (s *memoryStore) SaveWebhook(_ context.Context, webhook bot.Webhook) (bot.W
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.webhooksByBot[value.BotAccountID] = cloneWebhook(value)
+	s.version++
 
 	return cloneWebhook(value), nil
 }
@@ -106,6 +118,7 @@ func (s *memoryStore) EnsurePublicID(
 	s.nextPublicID++
 	s.publicByKind[kind][internalID] = value
 	s.internalByKind[kind][value] = internalID
+	s.version++
 
 	return value, nil
 }
@@ -165,6 +178,7 @@ func (s *memoryStore) DeleteWebhook(_ context.Context, botAccountID string) erro
 		return bot.ErrNotFound
 	}
 	delete(s.webhooksByBot, botAccountID)
+	s.version++
 
 	return nil
 }
@@ -188,6 +202,7 @@ func (s *memoryStore) SaveUpdate(_ context.Context, entry bot.QueueEntry) (bot.Q
 	s.updatesByID[value.UpdateID] = cloneEntry(value)
 	s.updateIDByKey[key] = value.UpdateID
 	s.updateIDsByBot[value.BotAccountID] = append(s.updateIDsByBot[value.BotAccountID], value.UpdateID)
+	s.version++
 
 	return cloneEntry(value), nil
 }
@@ -258,6 +273,7 @@ func (s *memoryStore) DeleteUpdatesBefore(_ context.Context, botAccountID string
 		delete(s.updateIDByKey, updateKey(entry.BotAccountID, entry.EventID, entry.UpdateType))
 	}
 	s.updateIDsByBot[botAccountID] = append([]int64(nil), filtered...)
+	s.version++
 
 	return nil
 }
@@ -273,6 +289,7 @@ func (s *memoryStore) DeleteUpdate(_ context.Context, botAccountID string, updat
 	delete(s.updatesByID, updateID)
 	delete(s.updateIDByKey, updateKey(entry.BotAccountID, entry.EventID, entry.UpdateType))
 	s.deleteBotUpdateIDLocked(botAccountID, updateID)
+	s.version++
 
 	return nil
 }
@@ -290,6 +307,7 @@ func (s *memoryStore) DeleteAllUpdates(_ context.Context, botAccountID string) e
 		delete(s.updateIDByKey, updateKey(entry.BotAccountID, entry.EventID, entry.UpdateType))
 	}
 	delete(s.updateIDsByBot, botAccountID)
+	s.version++
 
 	return nil
 }
@@ -315,6 +333,7 @@ func (s *memoryStore) RetryUpdate(_ context.Context, params bot.RetryParams) (bo
 	entry.LastError = params.LastError
 	entry.UpdatedAt = params.AttemptedAt.UTC()
 	s.updatesByID[entry.UpdateID] = cloneEntry(entry)
+	s.version++
 
 	return cloneEntry(entry), nil
 }
@@ -332,6 +351,7 @@ func (s *memoryStore) SaveCursor(_ context.Context, cursor bot.Cursor) (bot.Curs
 		return cloneCursor(existing), nil
 	}
 	s.cursorsByName[value.Name] = cloneCursor(value)
+	s.version++
 
 	return cloneCursor(value), nil
 }
@@ -345,6 +365,7 @@ func (s *memoryStore) SaveCallback(_ context.Context, callback bot.Callback) (bo
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.callbacksByID[value.ID] = cloneCallback(value)
+	s.version++
 
 	return cloneCallback(value), nil
 }
@@ -373,6 +394,7 @@ func (s *memoryStore) AnswerCallback(_ context.Context, callback bot.Callback) (
 		return bot.Callback{}, bot.ErrNotFound
 	}
 	s.callbacksByID[value.ID] = cloneCallback(value)
+	s.version++
 
 	return cloneCallback(value), nil
 }
@@ -386,6 +408,7 @@ func (s *memoryStore) SaveInlineQuery(_ context.Context, query bot.InlineQuerySt
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.inlineByID[value.ID] = cloneInlineQuery(value)
+	s.version++
 
 	return cloneInlineQuery(value), nil
 }
@@ -414,6 +437,7 @@ func (s *memoryStore) AnswerInlineQuery(_ context.Context, query bot.InlineQuery
 		return bot.InlineQueryState{}, bot.ErrNotFound
 	}
 	s.inlineByID[value.ID] = cloneInlineQuery(value)
+	s.version++
 
 	return cloneInlineQuery(value), nil
 }
@@ -434,6 +458,7 @@ func (s *memoryStore) cloneLocked() *memoryStore {
 	clone := NewMemoryStore().(*memoryStore)
 	clone.nextPublicID = s.nextPublicID
 	clone.nextUpdateID = s.nextUpdateID
+	clone.version = s.version
 	for kind, values := range s.publicByKind {
 		if clone.publicByKind[kind] == nil {
 			clone.publicByKind[kind] = make(map[string]int64)
@@ -487,6 +512,7 @@ func (s *memoryStore) replaceLocked(snapshot *memoryStore) {
 	s.cursorsByName = snapshot.cursorsByName
 	s.nextPublicID = snapshot.nextPublicID
 	s.nextUpdateID = snapshot.nextUpdateID
+	s.version = snapshot.version
 }
 
 func (s *memoryStore) deleteBotUpdateIDLocked(botAccountID string, updateID int64) {

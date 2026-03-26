@@ -141,5 +141,5 @@ func (a *api) getChatMember(writer http.ResponseWriter, request *http.Request, t
 		return
 	}
 
-	writeResult(writer, member)
+	writeResult(writer, &member)
 }

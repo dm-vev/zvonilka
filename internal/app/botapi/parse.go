@@ -90,6 +90,9 @@ func scalar(value string) any {
 	if value == "" {
 		return ""
 	}
+	if strings.HasPrefix(value, "+") {
+		return value
+	}
 	if strings.HasPrefix(value, "[") || strings.HasPrefix(value, "{") {
 		var decoded any
 		if err := json.Unmarshal([]byte(value), &decoded); err == nil {
@@ -101,6 +104,9 @@ func scalar(value string) any {
 	}
 	if intValue, err := strconv.ParseInt(value, 10, 64); err == nil {
 		return intValue
+	}
+	if floatValue, err := strconv.ParseFloat(value, 64); err == nil {
+		return floatValue
 	}
 
 	return value

@@ -54,9 +54,11 @@ type sendMessageRequest struct {
 	MessageThreadID       textID                          `json:"message_thread_id"`
 	Text                  string                          `json:"text"`
 	ReplyToMessageID      textID                          `json:"reply_to_message_id"`
+	ReplyParameters       *replyData                      `json:"reply_parameters"`
 	ReplyMarkup           *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableNotification   bool                            `json:"disable_notification"`
 	DisableWebPagePreview bool                            `json:"disable_web_page_preview"`
+	LinkPreviewOptions    *previewData                    `json:"link_preview_options"`
 }
 
 type sendPhotoRequest struct {
@@ -65,6 +67,7 @@ type sendPhotoRequest struct {
 	Photo               string                          `json:"photo"`
 	Caption             string                          `json:"caption"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableNotification bool                            `json:"disable_notification"`
 }
@@ -75,6 +78,7 @@ type sendDocumentRequest struct {
 	Document            string                          `json:"document"`
 	Caption             string                          `json:"caption"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableNotification bool                            `json:"disable_notification"`
 }
@@ -85,6 +89,7 @@ type sendVideoRequest struct {
 	Video               string                          `json:"video"`
 	Caption             string                          `json:"caption"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableNotification bool                            `json:"disable_notification"`
 }
@@ -95,6 +100,7 @@ type sendVoiceRequest struct {
 	Voice               string                          `json:"voice"`
 	Caption             string                          `json:"caption"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableNotification bool                            `json:"disable_notification"`
 }
@@ -104,6 +110,7 @@ type sendStickerRequest struct {
 	MessageThreadID     textID                          `json:"message_thread_id"`
 	Sticker             string                          `json:"sticker"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableNotification bool                            `json:"disable_notification"`
 }
@@ -114,6 +121,7 @@ type sendAnimationRequest struct {
 	Animation           string                          `json:"animation"`
 	Caption             string                          `json:"caption"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableNotification bool                            `json:"disable_notification"`
 }
@@ -124,6 +132,7 @@ type sendAudioRequest struct {
 	Audio               string                          `json:"audio"`
 	Caption             string                          `json:"caption"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableNotification bool                            `json:"disable_notification"`
 }
@@ -133,6 +142,7 @@ type sendVideoNoteRequest struct {
 	MessageThreadID     textID                          `json:"message_thread_id"`
 	VideoNote           string                          `json:"video_note"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableNotification bool                            `json:"disable_notification"`
 }
@@ -147,6 +157,7 @@ type sendLocationRequest struct {
 	Heading              int                             `json:"heading"`
 	ProximityAlertRadius int                             `json:"proximity_alert_radius"`
 	ReplyToMessageID     textID                          `json:"reply_to_message_id"`
+	ReplyParameters      *replyData                      `json:"reply_parameters"`
 	ReplyMarkup          *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableNotification  bool                            `json:"disable_notification"`
 }
@@ -160,6 +171,7 @@ type sendContactRequest struct {
 	VCard               string                          `json:"vcard"`
 	UserID              textID                          `json:"user_id"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableNotification bool                            `json:"disable_notification"`
 }
@@ -168,11 +180,12 @@ type sendPollRequest struct {
 	ChatID                textID                          `json:"chat_id"`
 	MessageThreadID       textID                          `json:"message_thread_id"`
 	Question              string                          `json:"question"`
-	Options               []string                        `json:"options"`
+	Options               pollData                        `json:"options"`
 	IsAnonymous           bool                            `json:"is_anonymous"`
 	Type                  string                          `json:"type"`
 	AllowsMultipleAnswers bool                            `json:"allows_multiple_answers"`
 	ReplyToMessageID      textID                          `json:"reply_to_message_id"`
+	ReplyParameters       *replyData                      `json:"reply_parameters"`
 	ReplyMarkup           *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableNotification   bool                            `json:"disable_notification"`
 }
@@ -183,6 +196,7 @@ type editMessageTextRequest struct {
 	Text                  string                          `json:"text"`
 	ReplyMarkup           *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableWebPagePreview bool                            `json:"disable_web_page_preview"`
+	LinkPreviewOptions    *previewData                    `json:"link_preview_options"`
 }
 
 type answerCallbackQueryRequest struct {
@@ -202,10 +216,14 @@ type inlineQueryResultRequest struct {
 	InputMessageContent *inlineTextMessageContentRequest `json:"input_message_content"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup  `json:"reply_markup"`
 	PhotoURL            string                           `json:"photo_url"`
+	AudioURL            string                           `json:"audio_url"`
 	DocumentURL         string                           `json:"document_url"`
+	GIFURL              string                           `json:"gif_url"`
+	Mpeg4URL            string                           `json:"mpeg4_url"`
 	VideoURL            string                           `json:"video_url"`
 	MimeType            string                           `json:"mime_type"`
 	ThumbURL            string                           `json:"thumb_url"`
+	ThumbnailURL        string                           `json:"thumbnail_url"`
 }
 
 type inlineTextMessageContentRequest struct {

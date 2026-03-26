@@ -253,8 +253,13 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 			MessageID:      savedMessage.ID,
 			PayloadType:    "message",
 			Payload:        draft.Payload,
-			Metadata:       messageEventMetadata(savedMessage.ID, draft.ThreadID, replyTo, draft.Metadata),
-			CreatedAt:      now,
+			Metadata: messageEventMetadata(
+				savedMessage.ID,
+				draft.ThreadID,
+				replyTo,
+				messageSnapshotMetadata(savedMessage, nil),
+			),
+			CreatedAt: now,
 		}
 		savedEvent, err = tx.SaveEvent(ctx, event)
 		if err != nil {

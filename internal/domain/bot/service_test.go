@@ -565,6 +565,80 @@ func TestBotCallbackQueryLifecycle(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestBotEditMessagePreservesCallbackMarkupWhenOmitted(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+
+	userAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "olga",
+		DisplayName: "Olga",
+		AccountKind: identity.AccountKindUser,
+		Email:       "olga@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "editbuttonsbot",
+		DisplayName: "Edit Buttons Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	conv, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   userAccount.ID,
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{botAccount.ID},
+	})
+	require.NoError(t, err)
+
+	service, err := domainbot.NewService(
+		bottest.NewMemoryStore(),
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaFixture{},
+	)
+	require.NoError(t, err)
+
+	message, err := service.SendMessage(ctx, domainbot.SendMessageParams{
+		BotToken: botToken,
+		ChatID:   conv.ID,
+		Text:     "before edit",
+		ReplyMarkup: &domainbot.InlineKeyboardMarkup{
+			InlineKeyboard: [][]domainbot.InlineKeyboardButton{{
+				{Text: "Tap", CallbackData: "tap"},
+			}},
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, message.ReplyMarkup)
+
+	edited, err := service.EditMessageText(ctx, domainbot.EditMessageTextParams{
+		BotToken:  botToken,
+		ChatID:    conv.ID,
+		MessageID: message.MessageID,
+		Text:      "after edit",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, edited.ReplyMarkup)
+
+	callback, err := service.TriggerCallbackQuery(ctx, domainbot.TriggerCallbackParams{
+		ConversationID: conv.ID,
+		MessageID:      edited.MessageID,
+		FromAccountID:  userAccount.ID,
+		Data:           "tap",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "tap", callback.Data)
+}
+
 func TestBotInlineQueryLifecycle(t *testing.T) {
 	t.Parallel()
 

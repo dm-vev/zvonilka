@@ -221,3 +221,117 @@ func TestWorkerEnqueuesMyChatMemberAndChatMemberUpdates(t *testing.T) {
 			updates[0].ChatMember.NewChatMember.Status == domainbot.MemberStatusMember
 	}, time.Second, 20*time.Millisecond)
 }
+
+func TestWorkerPreservesMessageSnapshotAcrossEdits(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+
+	botStore := bottest.NewMemoryStore()
+	settings := domainbot.DefaultSettings()
+	settings.FanoutPollInterval = 10 * time.Millisecond
+	settings.LongPollStep = 10 * time.Millisecond
+	service, err := domainbot.NewService(
+		botStore,
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaFixture{},
+		domainbot.WithSettings(settings),
+	)
+	require.NoError(t, err)
+
+	userAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "snapshotuser",
+		DisplayName: "Snapshot User",
+		AccountKind: identity.AccountKindUser,
+		Email:       "snapshot@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "snapshotbot",
+		DisplayName: "Snapshot Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	conv, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   userAccount.ID,
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{botAccount.ID},
+	})
+	require.NoError(t, err)
+
+	created, _, err := conversationService.SendMessage(ctx, conversation.SendMessageParams{
+		ConversationID:  conv.ID,
+		SenderAccountID: userAccount.ID,
+		SenderDeviceID:  "dev-user",
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				Ciphertext: []byte("before edit"),
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	_, _, err = conversationService.EditMessage(ctx, conversation.EditMessageParams{
+		ConversationID: conv.ID,
+		MessageID:      created.ID,
+		ActorAccountID: userAccount.ID,
+		ActorDeviceID:  "dev-user",
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				Ciphertext: []byte("after edit"),
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	worker, err := domainbot.NewWorker(service, nil)
+	require.NoError(t, err)
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- worker.Run(runCtx, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	}()
+	defer func() {
+		cancel()
+		<-done
+	}()
+
+	var (
+		messageText string
+		editedText  string
+	)
+	require.Eventually(t, func() bool {
+		updates, err := service.GetUpdates(ctx, domainbot.GetUpdatesParams{
+			BotToken: botToken,
+			Limit:    10,
+		})
+		require.NoError(t, err)
+
+		for _, update := range updates {
+			if update.Message != nil {
+				messageText = update.Message.Text
+			}
+			if update.EditedMessage != nil {
+				editedText = update.EditedMessage.Text
+			}
+		}
+
+		return messageText != "" && editedText != ""
+	}, time.Second, 20*time.Millisecond)
+
+	require.Equal(t, "before edit", messageText)
+	require.Equal(t, "after edit", editedText)
+}

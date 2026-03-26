@@ -78,7 +78,21 @@ func (s *Service) EditMessageText(ctx context.Context, params EditMessageTextPar
 	if params.ChatID == "" || params.MessageID == "" || params.Text == "" {
 		return Message{}, ErrInvalidInput
 	}
-	metadata, err := markupMetadata(nil, params.ReplyMarkup)
+
+	existingMessage, err := s.GetMessage(ctx, GetMessageParams{
+		BotToken:  params.BotToken,
+		ChatID:    params.ChatID,
+		MessageID: params.MessageID,
+	})
+	if err != nil {
+		return Message{}, err
+	}
+
+	replyMarkup := params.ReplyMarkup
+	if replyMarkup == nil {
+		replyMarkup = existingMessage.ReplyMarkup
+	}
+	metadata, err := markupMetadata(nil, replyMarkup)
 	if err != nil {
 		return Message{}, err
 	}
