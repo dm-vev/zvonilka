@@ -155,6 +155,9 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 	if len(loadedMessage.Attachments) != 1 {
 		t.Fatalf("expected loaded attachment, got %d", len(loadedMessage.Attachments))
 	}
+	if loadedMessage.ReplyTo.MessageID != "" || loadedMessage.ReplyTo.ConversationID != "" {
+		t.Fatalf("expected root message without reply reference, got %+v", loadedMessage.ReplyTo)
+	}
 	if loadedMessage.Attachments[0].Caption != "" {
 		t.Fatalf("expected attachment caption to be stripped, got %q", loadedMessage.Attachments[0].Caption)
 	}
@@ -169,6 +172,12 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 	}
 	if len(events) < 3 {
 		t.Fatalf("expected at least 3 events, got %d", len(events))
+	}
+	if events[0].EventType != conversation.EventTypeConversationCreated {
+		t.Fatalf("expected first event to be conversation created, got %s", events[0].EventType)
+	}
+	if events[0].MessageID != "" {
+		t.Fatalf("expected conversation-created event without message id, got %q", events[0].MessageID)
 	}
 	if syncState.LastAppliedSequence != events[len(events)-1].Sequence {
 		t.Fatalf("sync state did not advance to latest event")
@@ -756,31 +765,58 @@ func openDockerPostgres(t *testing.T) *sql.DB {
 	release := dockermutex.Acquire(t, "conversation-postgres")
 	t.Cleanup(release)
 
-	if err := runDockerCompose("up", "-d", "postgres"); err != nil {
-		t.Skipf("docker postgres unavailable: %v", err)
+	if _, err := exec.LookPath("docker"); err != nil {
+		t.Skip("docker is not available")
 	}
 
-	dsn := "postgres://zvonilka:zvonilka@localhost:5432/zvonilka?sslmode=disable"
-	db, err := sql.Open("pgx", dsn)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(
+		ctx,
+		"docker",
+		"run",
+		"-d",
+		"--rm",
+		"--network",
+		"host",
+		"-e",
+		"POSTGRES_PASSWORD=pass",
+		"-e",
+		"POSTGRES_DB=zvonilka",
+		"postgres:16-alpine",
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Skipf("docker postgres unavailable: %v: %s", err, strings.TrimSpace(string(output)))
+	}
+
+	containerID := strings.TrimSpace(string(output))
+	if containerID == "" {
+		t.Skip("docker returned an empty container id")
+	}
+
+	t.Cleanup(func() {
+		_ = exec.Command("docker", "rm", "-f", containerID).Run()
+	})
+
+	db, err := sql.Open("pgx", "postgres://postgres:pass@127.0.0.1:5432/zvonilka?sslmode=disable")
 	if err != nil {
 		t.Fatalf("open postgres: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		t.Fatalf("ping postgres: %v", err)
+	for ctx.Err() == nil {
+		if err := db.PingContext(ctx); err == nil {
+			return db
+		}
+		time.Sleep(1 * time.Second)
 	}
 
-	return db
-}
-
-func runDockerCompose(args ...string) error {
-	commandArgs := append([]string{"compose", "-f", "deploy/local/docker-compose.yml"}, args...)
-	cmd := exec.Command("docker", commandArgs...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	_ = db.Close()
+	t.Fatal("ping postgres: timed out")
+	return nil
 }
 
 func repoMigrationsPath(t *testing.T, files ...string) string {

@@ -8,13 +8,15 @@ import (
 	"strings"
 	"time"
 
+	domainsearch "github.com/dm-vev/zvonilka/internal/domain/search"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 )
 
 // Service coordinates conversation, message, and sync state changes.
 type Service struct {
-	store Store
-	now   func() time.Time
+	store   Store
+	now     func() time.Time
+	indexer domainsearch.Indexer
 }
 
 // NewService constructs a conversation service backed by the provided store.
@@ -325,6 +327,8 @@ func (s *Service) CreateConversation(ctx context.Context, params CreateConversat
 	if err != nil {
 		return Conversation{}, nil, err
 	}
+
+	s.indexConversation(ctx, savedConversation, savedMembers)
 
 	return savedConversation, savedMembers, nil
 }

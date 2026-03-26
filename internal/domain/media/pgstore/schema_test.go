@@ -213,7 +213,7 @@ func TestMediaSchema(t *testing.T) {
 					nil,
 					nil,
 				),
-				constraint: "media_assets_updated_at_check",
+				constraint: "media_assets_updated_after_created_check",
 			},
 			{
 				name: "zero upload expires at",
@@ -258,7 +258,7 @@ func TestMediaSchema(t *testing.T) {
 					time.Date(2026, time.March, 24, 12, 30, 0, 0, time.UTC),
 					nil,
 				),
-				constraint: "media_assets_ready_at_check",
+				constraint: "media_assets_deleted_before_updated_check",
 			},
 			{
 				name: "deleted without deleted at",
@@ -363,7 +363,7 @@ func seedOwner(t *testing.T, db *sql.DB, schema string, accountID string, userna
 	t.Helper()
 
 	_, err := db.ExecContext(context.Background(), fmt.Sprintf(`
-INSERT INTO %s.identity_accounts (
+INSERT INTO %s (
 	id, kind, username, display_name, bio, email, phone, roles, status, bot_token_hash,
 	created_by, created_at, updated_at, disabled_at, last_auth_at, custom_badge_emoji
 ) VALUES ($1, 'user', $2, $2, '', $3, '', '[]', 'active', '', 'seed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, '')
@@ -397,12 +397,12 @@ func openDockerPostgres(t *testing.T) *sql.DB {
 		"run",
 		"-d",
 		"--rm",
+		"--network",
+		"host",
 		"-e",
 		"POSTGRES_PASSWORD=pass",
 		"-e",
 		"POSTGRES_DB=test",
-		"-p",
-		"127.0.0.1::5432",
 		"postgres:16-alpine",
 	)
 	output, err := cmd.CombinedOutput()
@@ -419,17 +419,7 @@ func openDockerPostgres(t *testing.T) *sql.DB {
 		_ = exec.Command("docker", "rm", "-f", containerID).Run()
 	})
 
-	portOut, err := exec.CommandContext(ctx, "docker", "port", containerID, "5432/tcp").CombinedOutput()
-	if err != nil {
-		t.Skipf("lookup postgres port: %v: %s", err, strings.TrimSpace(string(portOut)))
-	}
-	hostPort := strings.TrimSpace(string(portOut))
-	if hostPort == "" {
-		t.Skip("docker did not report a mapped port")
-	}
-	hostPort = hostPort[strings.LastIndex(hostPort, ":")+1:]
-
-	dsn := fmt.Sprintf("postgres://postgres:pass@127.0.0.1:%s/test?sslmode=disable", hostPort)
+	dsn := "postgres://postgres:pass@127.0.0.1:5432/test?sslmode=disable"
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		t.Fatalf("open postgres database: %v", err)

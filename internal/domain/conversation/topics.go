@@ -100,6 +100,9 @@ func (s *Service) CreateTopic(ctx context.Context, params CreateTopicParams) (Co
 		return ConversationTopic{}, EventEnvelope{}, err
 	}
 
+	s.indexTopic(ctx, savedTopic)
+	s.indexConversationByID(ctx, savedTopic.ConversationID)
+
 	return savedTopic, savedEvent, nil
 }
 
@@ -405,6 +408,9 @@ func (s *Service) updateTopic(
 	if err != nil {
 		return ConversationTopic{}, EventEnvelope{}, err
 	}
+
+	s.indexTopic(ctx, savedTopic)
+	s.indexConversationByID(ctx, savedTopic.ConversationID)
 
 	return savedTopic, savedEvent, nil
 }

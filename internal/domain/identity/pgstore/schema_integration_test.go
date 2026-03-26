@@ -1054,12 +1054,12 @@ func postgresDockerConfigForGOOS(goos string) postgresDockerConfig {
 				"--network",
 				"host",
 				"-e",
-				"POSTGRES_HOST_AUTH_METHOD=trust",
+				"POSTGRES_PASSWORD=pass",
 				"-e",
 				"POSTGRES_DB=test",
 				"postgres:16-alpine",
 			},
-			dsn: "postgres://postgres@127.0.0.1:5432/test?sslmode=disable",
+			dsn: "postgres://postgres:pass@127.0.0.1:5432/test?sslmode=disable",
 		}
 	}
 
@@ -1110,10 +1110,10 @@ func TestPostgresDockerConfigForGOOS(t *testing.T) {
 		if cfg.needsPortMapping {
 			t.Fatal("expected linux config to avoid port mapping")
 		}
-		if !containsAll(cfg.runArgs, "--network", "host", "POSTGRES_HOST_AUTH_METHOD=trust") {
-			t.Fatalf("expected linux config to use host network and trust auth, got %v", cfg.runArgs)
+		if !containsAll(cfg.runArgs, "--network", "host", "POSTGRES_PASSWORD=pass") {
+			t.Fatalf("expected linux config to use host network and password auth, got %v", cfg.runArgs)
 		}
-		if cfg.dsn != "postgres://postgres@127.0.0.1:5432/test?sslmode=disable" {
+		if cfg.dsn != "postgres://postgres:pass@127.0.0.1:5432/test?sslmode=disable" {
 			t.Fatalf("unexpected linux DSN: %s", cfg.dsn)
 		}
 	})

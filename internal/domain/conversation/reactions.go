@@ -127,6 +127,9 @@ func (s *Service) AddMessageReaction(ctx context.Context, params AddMessageReact
 		return Message{}, EventEnvelope{}, err
 	}
 
+	s.indexMessage(ctx, savedMessage)
+	s.indexConversationByID(ctx, savedMessage.ConversationID)
+
 	return savedMessage, savedEvent, nil
 }
 
@@ -211,6 +214,9 @@ func (s *Service) RemoveMessageReaction(ctx context.Context, params RemoveMessag
 	if err != nil {
 		return Message{}, EventEnvelope{}, err
 	}
+
+	s.indexMessage(ctx, savedMessage)
+	s.indexConversationByID(ctx, savedMessage.ConversationID)
 
 	return savedMessage, savedEvent, nil
 }

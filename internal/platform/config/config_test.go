@@ -8,6 +8,7 @@ import (
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
 	domainnotification "github.com/dm-vev/zvonilka/internal/domain/notification"
 	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
+	domainsearch "github.com/dm-vev/zvonilka/internal/domain/search"
 )
 
 func TestFromEnvUsesDistinctServiceDefaults(t *testing.T) {
@@ -206,6 +207,61 @@ func TestLoadIdentityDefaultsMatchDomainSettings(t *testing.T) {
 
 	if got, want := cfg.Identity.ToSettings(), domainidentity.DefaultSettings(); got != want {
 		t.Fatalf("identity settings mismatch: got %+v, want %+v", got, want)
+	}
+}
+
+func TestLoadSearchDefaultsMatchDomainSettings(t *testing.T) {
+	resetConfigEnv(t)
+
+	cfg, err := Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if got, want := cfg.Search.ToSettings(), domainsearch.DefaultSettings(); got != want {
+		t.Fatalf("search settings mismatch: got %+v, want %+v", got, want)
+	}
+}
+
+func TestLoadAppliesSearchOverrides(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_SEARCH_DEFAULT_LIMIT", "11")
+	t.Setenv("ZVONILKA_SEARCH_MAX_LIMIT", "44")
+	t.Setenv("ZVONILKA_SEARCH_MIN_QUERY_LENGTH", "3")
+	t.Setenv("ZVONILKA_SEARCH_SNIPPET_LENGTH", "240")
+
+	cfg, err := Load("controlplane")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.Search.DefaultLimit != 11 {
+		t.Fatalf("search default limit: got %d, want 11", cfg.Search.DefaultLimit)
+	}
+	if cfg.Search.MaxLimit != 44 {
+		t.Fatalf("search max limit: got %d, want 44", cfg.Search.MaxLimit)
+	}
+	if cfg.Search.MinQueryLength != 3 {
+		t.Fatalf("search min query length: got %d, want 3", cfg.Search.MinQueryLength)
+	}
+	if cfg.Search.SnippetLength != 240 {
+		t.Fatalf("search snippet length: got %d, want 240", cfg.Search.SnippetLength)
+	}
+}
+
+func TestLoadRejectsInvalidSearchLimitWindow(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_SEARCH_DEFAULT_LIMIT", "50")
+	t.Setenv("ZVONILKA_SEARCH_MAX_LIMIT", "10")
+
+	_, err := Load("controlplane")
+	if err == nil {
+		t.Fatal("expected load to fail")
+	}
+	if !strings.Contains(err.Error(), "search max limit must be greater than or equal to the default limit") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

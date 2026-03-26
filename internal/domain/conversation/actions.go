@@ -209,6 +209,9 @@ func (s *Service) EditMessage(ctx context.Context, params EditMessageParams) (Me
 		return Message{}, EventEnvelope{}, err
 	}
 
+	s.deleteMessageIndex(ctx, savedMessage)
+	s.indexConversationByID(ctx, savedMessage.ConversationID)
+
 	return savedMessage, savedEvent, nil
 }
 
@@ -285,6 +288,9 @@ func (s *Service) DeleteMessage(ctx context.Context, params DeleteMessageParams)
 	if err != nil {
 		return Message{}, EventEnvelope{}, err
 	}
+
+	s.indexMessage(ctx, savedMessage)
+	s.indexConversationByID(ctx, savedMessage.ConversationID)
 
 	return savedMessage, savedEvent, nil
 }

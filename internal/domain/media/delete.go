@@ -55,6 +55,7 @@ func (s *Service) DeleteMedia(ctx context.Context, params DeleteParams) (MediaAs
 		return MediaAsset{}, err
 	}
 
+	s.deleteMediaIndex(ctx, saved)
 	if deleteErr := s.blob.DeleteObject(ctx, saved.ObjectKey); deleteErr != nil && !errors.Is(deleteErr, domainstorage.ErrNotFound) {
 		return saved, fmt.Errorf("delete media object %s: %w", saved.ObjectKey, deleteErr)
 	}

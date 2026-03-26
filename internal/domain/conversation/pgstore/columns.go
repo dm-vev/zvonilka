@@ -1,5 +1,7 @@
 package pgstore
 
+import "strings"
+
 const conversationColumnList = `id, kind, title, description, avatar_media_id, owner_account_id, only_admins_can_write, only_admins_can_add_members, allow_reactions, allow_forwards, allow_threads, require_encrypted_messages, require_join_approval, pinned_messages_only_admins, slow_mode_interval_nanos, archived, muted, pinned, hidden, last_sequence, created_at, updated_at, last_message_at`
 
 const topicColumnList = `conversation_id, id, title, created_by_account_id, is_general, archived, pinned, closed, last_sequence, message_count, created_at, updated_at, last_message_at, archived_at, closed_at`
@@ -17,3 +19,12 @@ const readStateColumnList = `conversation_id, account_id, device_id, last_read_s
 const syncStateColumnList = `device_id, account_id, last_applied_sequence, last_acked_sequence, conversation_watermarks, server_time, updated_at`
 
 const eventColumnList = `sequence, event_id, event_type, conversation_id, actor_account_id, actor_device_id, causation_id, correlation_id, message_id, payload_type, payload_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_aad, payload_metadata, read_through_sequence, metadata, created_at`
+
+func qualifyColumns(alias string, columnList string) string {
+	parts := strings.Split(columnList, ", ")
+	for idx, column := range parts {
+		parts[idx] = alias + "." + column
+	}
+
+	return strings.Join(parts, ", ")
+}

@@ -346,7 +346,7 @@ func (s *Store) attachmentsByMessageIDs(ctx context.Context, messageIDs []string
 	}
 
 	query := fmt.Sprintf(`
-SELECT message_id, %s
+SELECT %s
 FROM %s
 WHERE message_id = ANY($1)
 ORDER BY message_id ASC, attachment_index ASC

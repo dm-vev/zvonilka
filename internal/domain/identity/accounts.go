@@ -348,11 +348,14 @@ func (s *Service) createAccount(
 				return Account{}, "", ErrConflict
 			}
 
+			s.indexAccount(ctx, existingAccount)
 			return existingAccount, "", nil
 		}
 
 		return Account{}, "", fmt.Errorf("save account %s: %w", username, err)
 	}
+
+	s.indexAccount(ctx, savedAccount)
 
 	return savedAccount, botToken, nil
 }

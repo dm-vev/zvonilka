@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -77,12 +76,12 @@ func openDockerPostgres(t *testing.T) *sql.DB {
 		"run",
 		"-d",
 		"--rm",
+		"--network",
+		"host",
 		"-e",
 		"POSTGRES_PASSWORD=pass",
 		"-e",
 		"POSTGRES_DB=test",
-		"-p",
-		"127.0.0.1::5432",
 		"postgres:16-alpine",
 	)
 	output, err := cmd.CombinedOutput()
@@ -99,17 +98,7 @@ func openDockerPostgres(t *testing.T) *sql.DB {
 		_ = exec.Command("docker", "rm", "-f", containerID).Run()
 	})
 
-	portOut, err := exec.CommandContext(ctx, "docker", "port", containerID, "5432/tcp").CombinedOutput()
-	if err != nil {
-		t.Skipf("lookup postgres port: %v: %s", err, strings.TrimSpace(string(portOut)))
-	}
-	hostPort := strings.TrimSpace(string(portOut))
-	if hostPort == "" {
-		t.Skip("docker did not report a mapped port")
-	}
-	hostPort = hostPort[strings.LastIndex(hostPort, ":")+1:]
-
-	dsn := fmt.Sprintf("postgres://postgres:pass@127.0.0.1:%s/test?sslmode=disable", hostPort)
+	dsn := "postgres://postgres:pass@127.0.0.1:5432/test?sslmode=disable"
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		t.Fatalf("open postgres database: %v", err)

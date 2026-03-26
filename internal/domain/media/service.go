@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	domainsearch "github.com/dm-vev/zvonilka/internal/domain/search"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 )
 
@@ -15,6 +16,7 @@ type Service struct {
 	blob     domainstorage.BlobStore
 	now      func() time.Time
 	settings Settings
+	indexer  domainsearch.Indexer
 }
 
 // NewService constructs a media service backed by the provided store and blob store.
