@@ -18,6 +18,8 @@ func updateTypeForEvent(eventType conversation.EventType, conv conversation.Conv
 			return UpdateTypeEditedChannelPost
 		}
 		return UpdateTypeEditedMessage
+	case conversation.EventTypeConversationMembers:
+		return UpdateTypeChatMember
 	default:
 		return UpdateTypeUnspecified
 	}

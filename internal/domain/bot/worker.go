@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
@@ -113,7 +114,7 @@ func (w *Worker) processFanout(ctx context.Context) error {
 }
 
 func (w *Worker) buildUpdatesForEvent(ctx context.Context, event conversation.EventEnvelope) ([]QueueEntry, error) {
-	if event.ConversationID == "" || event.MessageID == "" {
+	if event.ConversationID == "" {
 		return nil, nil
 	}
 
@@ -133,18 +134,21 @@ func (w *Worker) buildUpdatesForEvent(ctx context.Context, event conversation.Ev
 	if actor.Kind == identity.AccountKindBot {
 		return nil, nil
 	}
-
-	message, err := w.service.conversations.GetMessage(ctx, conversation.GetMessageParams{
-		ConversationID: conv.ID,
-		MessageID:      event.MessageID,
-		AccountID:      event.ActorAccountID,
-	})
-	if err != nil {
-		return nil, nil
-	}
 	members, err := w.service.conversationDB.ConversationMembersByConversationID(ctx, conv.ID)
 	if err != nil {
 		return nil, fmt.Errorf("load conversation members %s: %w", conv.ID, err)
+	}
+
+	var message conversation.Message
+	if event.MessageID != "" {
+		message, err = w.service.conversations.GetMessage(ctx, conversation.GetMessageParams{
+			ConversationID: conv.ID,
+			MessageID:      event.MessageID,
+			AccountID:      event.ActorAccountID,
+		})
+		if err != nil && updateType != UpdateTypeChatMember && updateType != UpdateTypeMyChatMember {
+			return nil, nil
+		}
 	}
 
 	result := make([]QueueEntry, 0)
@@ -157,6 +161,17 @@ func (w *Worker) buildUpdatesForEvent(ctx context.Context, event conversation.Ev
 			continue
 		}
 		if botAccount.Kind != identity.AccountKindBot || botAccount.Status != identity.AccountStatusActive {
+			continue
+		}
+		if updateType == UpdateTypeChatMember {
+			entry, ok, err := w.memberUpdateEntry(ctx, event, conv, members, actor, member, botAccount)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				continue
+			}
+			result = append(result, entry)
 			continue
 		}
 		if !shouldRoute(conv, message, botAccount.ID) {
@@ -185,6 +200,68 @@ func (w *Worker) buildUpdatesForEvent(ctx context.Context, event conversation.Ev
 	return result, nil
 }
 
+func (w *Worker) memberUpdateEntry(
+	ctx context.Context,
+	event conversation.EventEnvelope,
+	conv conversation.Conversation,
+	members []conversation.ConversationMember,
+	actor identity.Account,
+	botMember conversation.ConversationMember,
+	botAccount identity.Account,
+) (QueueEntry, bool, error) {
+	targetAccountID := strings.TrimSpace(event.Metadata["target_account_id"])
+	if targetAccountID == "" {
+		return QueueEntry{}, false, nil
+	}
+
+	targetMember, found := memberByAccountID(members, targetAccountID)
+	if !found {
+		return QueueEntry{}, false, nil
+	}
+	targetAccount, err := w.service.identity.AccountByID(ctx, targetAccountID)
+	if err != nil {
+		return QueueEntry{}, false, nil
+	}
+
+	updateType, oldMember, newMember, ok := memberUpdateForEvent(event, botMember, botAccount.ID, targetMember, targetAccount)
+	if !ok {
+		return QueueEntry{}, false, nil
+	}
+
+	chat, err := w.service.chatForConversation(ctx, botAccount.ID, conv, members)
+	if err != nil {
+		return QueueEntry{}, false, err
+	}
+	payload := Update{
+		ChatMember: &ChatMemberUpdated{
+			Chat:          chat,
+			From:          userFromAccount(actor),
+			Date:          event.CreatedAt.UTC().Unix(),
+			OldChatMember: oldMember,
+			NewChatMember: newMember,
+		},
+	}
+	if updateType == UpdateTypeMyChatMember {
+		payload.MyChatMember = payload.ChatMember
+		payload.ChatMember = nil
+	}
+
+	entry, err := NormalizeQueueEntry(QueueEntry{
+		BotAccountID:  botAccount.ID,
+		EventID:       event.EventID + ":" + targetAccountID + ":" + string(updateType),
+		UpdateType:    updateType,
+		Payload:       payload,
+		NextAttemptAt: w.currentTime(),
+		CreatedAt:     event.CreatedAt,
+		UpdatedAt:     event.CreatedAt,
+	}, w.currentTime())
+	if err != nil {
+		return QueueEntry{}, false, err
+	}
+
+	return entry, true, nil
+}
+
 func (w *Worker) updatePayload(
 	ctx context.Context,
 	botAccountID string,
@@ -211,6 +288,80 @@ func (w *Worker) updatePayload(
 	}
 
 	return update, nil
+}
+
+func memberUpdateForEvent(
+	event conversation.EventEnvelope,
+	botMember conversation.ConversationMember,
+	botAccountID string,
+	targetMember conversation.ConversationMember,
+	targetAccount identity.Account,
+) (UpdateType, ChatMember, ChatMember, bool) {
+	change := strings.TrimSpace(event.Metadata["change"])
+	if targetMember.AccountID != botAccountID && !botCanObserveMemberUpdate(botMember.Role) {
+		return UpdateTypeUnspecified, ChatMember{}, ChatMember{}, false
+	}
+
+	newRestricted := targetMember.Muted
+	newProjection := ChatMember{
+		User:   userFromAccount(targetAccount),
+		Status: memberStatus(targetMember, newRestricted),
+	}
+	oldMember := targetMember
+
+	switch change {
+	case "added":
+		oldMember.LeftAt = event.CreatedAt
+		oldMember.Banned = false
+		oldProjection := ChatMember{
+			User:   userFromAccount(targetAccount),
+			Status: memberStatus(oldMember, false),
+		}
+		if targetMember.AccountID == botAccountID {
+			return UpdateTypeMyChatMember, oldProjection, newProjection, true
+		}
+		return UpdateTypeChatMember, oldProjection, newProjection, true
+	case "removed":
+		oldMember.LeftAt = time.Time{}
+		oldProjection := ChatMember{
+			User:   userFromAccount(targetAccount),
+			Status: memberStatus(oldMember, oldMember.Muted),
+		}
+		if targetMember.AccountID == botAccountID {
+			return UpdateTypeMyChatMember, oldProjection, newProjection, true
+		}
+		return UpdateTypeChatMember, oldProjection, newProjection, true
+	case "role_updated":
+		previousRole := conversation.MemberRole(strings.TrimSpace(event.Metadata["previous_role"]))
+		if previousRole == conversation.MemberRoleUnspecified {
+			return UpdateTypeUnspecified, ChatMember{}, ChatMember{}, false
+		}
+		oldMember.Role = previousRole
+		oldProjection := ChatMember{
+			User:   userFromAccount(targetAccount),
+			Status: memberStatus(oldMember, oldMember.Muted),
+		}
+		if targetMember.AccountID == botAccountID {
+			return UpdateTypeMyChatMember, oldProjection, newProjection, true
+		}
+		return UpdateTypeChatMember, oldProjection, newProjection, true
+	default:
+		return UpdateTypeUnspecified, ChatMember{}, ChatMember{}, false
+	}
+}
+
+func memberByAccountID(members []conversation.ConversationMember, accountID string) (conversation.ConversationMember, bool) {
+	for _, member := range members {
+		if member.AccountID == accountID {
+			return member, true
+		}
+	}
+
+	return conversation.ConversationMember{}, false
+}
+
+func botCanObserveMemberUpdate(role conversation.MemberRole) bool {
+	return role == conversation.MemberRoleOwner || role == conversation.MemberRoleAdmin
 }
 
 func (w *Worker) processWebhooks(ctx context.Context) error {

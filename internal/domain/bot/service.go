@@ -118,7 +118,7 @@ func uniqueUpdateTypes(values []UpdateType) []UpdateType {
 
 func normalizeUpdateType(value UpdateType) UpdateType {
 	switch value {
-	case UpdateTypeMessage, UpdateTypeEditedMessage, UpdateTypeChannelPost, UpdateTypeEditedChannelPost, UpdateTypeCallbackQuery, UpdateTypeInlineQuery:
+	case UpdateTypeMessage, UpdateTypeEditedMessage, UpdateTypeChannelPost, UpdateTypeEditedChannelPost, UpdateTypeCallbackQuery, UpdateTypeInlineQuery, UpdateTypeChatMember, UpdateTypeMyChatMember:
 		return value
 	default:
 		return UpdateTypeUnspecified

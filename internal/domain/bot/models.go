@@ -17,6 +17,8 @@ const (
 	UpdateTypeEditedChannelPost UpdateType = "edited_channel_post"
 	UpdateTypeCallbackQuery     UpdateType = "callback_query"
 	UpdateTypeInlineQuery       UpdateType = "inline_query"
+	UpdateTypeChatMember        UpdateType = "chat_member"
+	UpdateTypeMyChatMember      UpdateType = "my_chat_member"
 )
 
 // ChatType identifies a Bot API chat kind.
@@ -69,6 +71,15 @@ type Chat struct {
 type ChatMember struct {
 	User   User         `json:"user"`
 	Status MemberStatus `json:"status"`
+}
+
+// ChatMemberUpdated describes one Telegram-shaped chat member update.
+type ChatMemberUpdated struct {
+	Chat          Chat       `json:"chat"`
+	From          User       `json:"from"`
+	Date          int64      `json:"date"`
+	OldChatMember ChatMember `json:"old_chat_member"`
+	NewChatMember ChatMember `json:"new_chat_member"`
 }
 
 // InlineKeyboardButton describes one Telegram-shaped inline keyboard button.
@@ -253,13 +264,15 @@ type CallbackQuery struct {
 
 // Update describes a Telegram-shaped update payload.
 type Update struct {
-	UpdateID          int64          `json:"update_id"`
-	Message           *Message       `json:"message,omitempty"`
-	EditedMessage     *Message       `json:"edited_message,omitempty"`
-	ChannelPost       *Message       `json:"channel_post,omitempty"`
-	EditedChannelPost *Message       `json:"edited_channel_post,omitempty"`
-	CallbackQuery     *CallbackQuery `json:"callback_query,omitempty"`
-	InlineQuery       *InlineQuery   `json:"inline_query,omitempty"`
+	UpdateID          int64              `json:"update_id"`
+	Message           *Message           `json:"message,omitempty"`
+	EditedMessage     *Message           `json:"edited_message,omitempty"`
+	ChannelPost       *Message           `json:"channel_post,omitempty"`
+	EditedChannelPost *Message           `json:"edited_channel_post,omitempty"`
+	CallbackQuery     *CallbackQuery     `json:"callback_query,omitempty"`
+	InlineQuery       *InlineQuery       `json:"inline_query,omitempty"`
+	ChatMember        *ChatMemberUpdated `json:"chat_member,omitempty"`
+	MyChatMember      *ChatMemberUpdated `json:"my_chat_member,omitempty"`
 }
 
 // Webhook stores one bot webhook configuration row.

@@ -99,3 +99,125 @@ func TestWebhookDeliveryAcknowledgesUpdate(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, count)
 }
+
+func TestWorkerEnqueuesMyChatMemberAndChatMemberUpdates(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+	botStore := bottest.NewMemoryStore()
+	settings := domainbot.DefaultSettings()
+	settings.FanoutPollInterval = 10 * time.Millisecond
+	settings.LongPollStep = 10 * time.Millisecond
+	service, err := domainbot.NewService(
+		botStore,
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaFixture{},
+		domainbot.WithSettings(settings),
+	)
+	require.NoError(t, err)
+
+	owner, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "owner",
+		DisplayName: "Owner",
+		AccountKind: identity.AccountKindUser,
+		Email:       "owner@example.org",
+	})
+	require.NoError(t, err)
+	target, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "target",
+		DisplayName: "Target",
+		AccountKind: identity.AccountKindUser,
+		Email:       "target@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "memberbot",
+		DisplayName: "Member Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	group, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID: owner.ID,
+		Kind:           conversation.ConversationKindGroup,
+		Title:          "ops",
+	})
+	require.NoError(t, err)
+
+	worker, err := domainbot.NewWorker(service, nil)
+	require.NoError(t, err)
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- worker.Run(runCtx, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	}()
+	defer func() {
+		cancel()
+		<-done
+	}()
+
+	_, err = conversationService.AddMembers(ctx, conversation.AddMembersParams{
+		ConversationID:     group.ID,
+		ActorAccountID:     owner.ID,
+		InvitedByAccountID: owner.ID,
+		AccountIDs:         []string{botAccount.ID},
+	})
+	require.NoError(t, err)
+
+	var offset int64
+	require.Eventually(t, func() bool {
+		updates, err := service.GetUpdates(ctx, domainbot.GetUpdatesParams{BotToken: botToken, Offset: offset})
+		require.NoError(t, err)
+		if len(updates) != 1 || updates[0].MyChatMember == nil ||
+			updates[0].MyChatMember.NewChatMember.Status != domainbot.MemberStatusMember {
+			return false
+		}
+		offset = updates[0].UpdateID + 1
+		return true
+	}, time.Second, 20*time.Millisecond)
+
+	_, err = conversationService.UpdateMemberRole(ctx, conversation.UpdateMemberRoleParams{
+		ConversationID:  group.ID,
+		ActorAccountID:  owner.ID,
+		TargetAccountID: botAccount.ID,
+		Role:            conversation.MemberRoleAdmin,
+	})
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		updates, err := service.GetUpdates(ctx, domainbot.GetUpdatesParams{BotToken: botToken, Offset: offset})
+		require.NoError(t, err)
+		if len(updates) != 1 || updates[0].MyChatMember == nil ||
+			updates[0].MyChatMember.OldChatMember.Status != domainbot.MemberStatusMember ||
+			updates[0].MyChatMember.NewChatMember.Status != domainbot.MemberStatusAdministrator {
+			return false
+		}
+		offset = updates[0].UpdateID + 1
+		return true
+	}, time.Second, 20*time.Millisecond)
+
+	_, err = conversationService.AddMembers(ctx, conversation.AddMembersParams{
+		ConversationID:     group.ID,
+		ActorAccountID:     owner.ID,
+		InvitedByAccountID: owner.ID,
+		AccountIDs:         []string{target.ID},
+	})
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		updates, err := service.GetUpdates(ctx, domainbot.GetUpdatesParams{BotToken: botToken, Offset: offset})
+		require.NoError(t, err)
+		return len(updates) == 1 && updates[0].ChatMember != nil &&
+			updates[0].ChatMember.NewChatMember.User.ID == target.ID &&
+			updates[0].ChatMember.NewChatMember.Status == domainbot.MemberStatusMember
+	}, time.Second, 20*time.Millisecond)
+}
