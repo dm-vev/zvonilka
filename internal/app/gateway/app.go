@@ -16,6 +16,7 @@ import (
 	"github.com/dm-vev/zvonilka/internal/domain/media"
 	"github.com/dm-vev/zvonilka/internal/domain/presence"
 	"github.com/dm-vev/zvonilka/internal/domain/search"
+	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 	"github.com/dm-vev/zvonilka/internal/platform/buildinfo"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
@@ -44,6 +45,7 @@ type api struct {
 	media        *media.Service
 	presence     *presence.Service
 	search       *search.Service
+	user         *domainuser.Service
 	syncNotifier *syncNotifier
 }
 
@@ -69,7 +71,7 @@ func (a *app) close(ctx context.Context) error {
 
 func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 	health := runtime.NewHealth(cfg.Service.Name, buildinfo.Version, buildinfo.Commit, buildinfo.Date)
-	catalog, identityService, conversationService, mediaService, presenceService, searchService, err := buildAppStorage(ctx, cfg)
+	catalog, identityService, conversationService, mediaService, presenceService, searchService, userService, err := buildAppStorage(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +86,7 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 			media:        mediaService,
 			presence:     presenceService,
 			search:       searchService,
+			user:         userService,
 			syncNotifier: newSyncNotifier(),
 		},
 		cleanupTimeout: cfg.Runtime.ShutdownTimeout,

@@ -15,6 +15,7 @@ import (
 	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
 	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
 	domainsearch "github.com/dm-vev/zvonilka/internal/domain/search"
+	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -458,6 +459,102 @@ func loginChannelToProto(channel domainidentity.LoginDeliveryChannel) authv1.Log
 	}
 }
 
+func loginFactorToProto(factor domainidentity.LoginFactor) authv1.LoginFactor {
+	switch factor {
+	case domainidentity.LoginFactorCode:
+		return authv1.LoginFactor_LOGIN_FACTOR_CODE
+	case domainidentity.LoginFactorPassword:
+		return authv1.LoginFactor_LOGIN_FACTOR_PASSWORD
+	case domainidentity.LoginFactorRecoveryPassword:
+		return authv1.LoginFactor_LOGIN_FACTOR_RECOVERY_PASSWORD
+	case domainidentity.LoginFactorBotToken:
+		return authv1.LoginFactor_LOGIN_FACTOR_BOT_TOKEN
+	default:
+		return authv1.LoginFactor_LOGIN_FACTOR_UNSPECIFIED
+	}
+}
+
+func visibilityFromProto(value commonv1.Visibility) domainuser.Visibility {
+	switch value {
+	case commonv1.Visibility_VISIBILITY_EVERYONE:
+		return domainuser.VisibilityEveryone
+	case commonv1.Visibility_VISIBILITY_CONTACTS:
+		return domainuser.VisibilityContacts
+	case commonv1.Visibility_VISIBILITY_NOBODY:
+		return domainuser.VisibilityNobody
+	case commonv1.Visibility_VISIBILITY_CUSTOM:
+		return domainuser.VisibilityCustom
+	default:
+		return domainuser.VisibilityUnspecified
+	}
+}
+
+func visibilityToProto(value domainuser.Visibility) commonv1.Visibility {
+	switch value {
+	case domainuser.VisibilityEveryone:
+		return commonv1.Visibility_VISIBILITY_EVERYONE
+	case domainuser.VisibilityContacts:
+		return commonv1.Visibility_VISIBILITY_CONTACTS
+	case domainuser.VisibilityNobody:
+		return commonv1.Visibility_VISIBILITY_NOBODY
+	case domainuser.VisibilityCustom:
+		return commonv1.Visibility_VISIBILITY_CUSTOM
+	default:
+		return commonv1.Visibility_VISIBILITY_UNSPECIFIED
+	}
+}
+
+func privacyToProto(privacy domainuser.Privacy) *usersv1.PrivacySettings {
+	if privacy.AccountID == "" {
+		return nil
+	}
+
+	return &usersv1.PrivacySettings{
+		PhoneVisibility:     visibilityToProto(privacy.PhoneVisibility),
+		LastSeenVisibility:  visibilityToProto(privacy.LastSeenVisibility),
+		MessagePrivacy:      visibilityToProto(privacy.MessagePrivacy),
+		BirthdayVisibility:  visibilityToProto(privacy.BirthdayVisibility),
+		AllowContactSync:    privacy.AllowContactSync,
+		AllowUnknownSenders: privacy.AllowUnknownSenders,
+		AllowUsernameSearch: privacy.AllowUsernameSearch,
+	}
+}
+
+func contactSourceToProto(source domainuser.ContactSource) usersv1.ContactSource {
+	switch source {
+	case domainuser.ContactSourceManual:
+		return usersv1.ContactSource_CONTACT_SOURCE_MANUAL
+	case domainuser.ContactSourceImported:
+		return usersv1.ContactSource_CONTACT_SOURCE_IMPORTED
+	case domainuser.ContactSourceSynced:
+		return usersv1.ContactSource_CONTACT_SOURCE_SYNCED
+	case domainuser.ContactSourceInvited:
+		return usersv1.ContactSource_CONTACT_SOURCE_INVITED
+	default:
+		return usersv1.ContactSource_CONTACT_SOURCE_UNSPECIFIED
+	}
+}
+
+func userContact(contact domainuser.Contact) *usersv1.Contact {
+	return &usersv1.Contact{
+		ContactUserId: contact.ContactAccountID,
+		DisplayName:   contact.DisplayName,
+		Username:      contact.Username,
+		PhoneHash:     contact.PhoneHash,
+		Source:        contactSourceToProto(contact.Source),
+		Starred:       contact.Starred,
+		AddedAt:       protoTime(contact.AddedAt),
+	}
+}
+
+func userBlock(block domainuser.BlockEntry) *usersv1.BlockEntry {
+	return &usersv1.BlockEntry{
+		BlockedUserId: block.BlockedAccountID,
+		Reason:        block.Reason,
+		BlockedAt:     protoTime(block.BlockedAt),
+	}
+}
+
 func protoPublicKey(value string) *commonv1.PublicKeyBundle {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -622,6 +719,43 @@ func profile(account domainidentity.Account, snapshot domainpresence.Snapshot) *
 		CreatedAt:        protoTime(account.CreatedAt),
 		UpdatedAt:        protoTime(account.UpdatedAt),
 		AccountKind:      accountKindToProto(account.Kind),
+	}
+}
+
+func userProfile(
+	account domainidentity.Account,
+	snapshot domainpresence.Snapshot,
+	privacy domainuser.Privacy,
+	relation domainuser.Relation,
+	self bool,
+) *usersv1.UserProfile {
+	result := profile(account, snapshot)
+	result.IsContact = relation.IsContact
+	result.IsBlocked = relation.IsBlocked
+	if self {
+		result.Privacy = privacyToProto(privacy)
+		return result
+	}
+
+	result.Email = ""
+	if !canViewVisibility(privacy.PhoneVisibility, relation) {
+		result.Phone = ""
+	}
+	if !canViewVisibility(privacy.LastSeenVisibility, relation) {
+		result.LastSeenAt = nil
+	}
+	result.Privacy = nil
+	return result
+}
+
+func canViewVisibility(visibility domainuser.Visibility, relation domainuser.Relation) bool {
+	switch visibility {
+	case domainuser.VisibilityEveryone:
+		return true
+	case domainuser.VisibilityContacts:
+		return relation.IsContact
+	default:
+		return false
 	}
 }
 

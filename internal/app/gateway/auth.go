@@ -9,6 +9,47 @@ import (
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 )
 
+// GetLoginOptions returns the supported login factors for one identifier.
+func (a *api) GetLoginOptions(
+	ctx context.Context,
+	req *authv1.GetLoginOptionsRequest,
+) (*authv1.GetLoginOptionsResponse, error) {
+	params := identity.GetLoginOptionsParams{}
+	switch identifier := req.Identifier.(type) {
+	case *authv1.GetLoginOptionsRequest_Username:
+		params.Username = identifier.Username
+	case *authv1.GetLoginOptionsRequest_Email:
+		params.Email = identifier.Email
+	case *authv1.GetLoginOptionsRequest_Phone:
+		params.Phone = identifier.Phone
+	}
+
+	result, err := a.identity.GetLoginOptions(ctx, params)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	options := make([]*authv1.LoginOption, 0, len(result.Options))
+	for _, option := range result.Options {
+		channels := make([]authv1.LoginDeliveryChannel, 0, len(option.Channels))
+		for _, channel := range option.Channels {
+			channels = append(channels, loginChannelToProto(channel))
+		}
+		options = append(options, &authv1.LoginOption{
+			Factor:   loginFactorToProto(option.Factor),
+			Required: option.Required,
+			Channels: channels,
+		})
+	}
+
+	return &authv1.GetLoginOptionsResponse{
+		Options:                 options,
+		PasswordRecoveryEnabled: result.PasswordRecoveryEnabled,
+		RequiresAdminApproval:   result.RequiresAdminApproval,
+		AccountKind:             accountKindToProto(result.AccountKind),
+	}, nil
+}
+
 // SubmitJoinRequest accepts a self-service account request.
 func (a *api) SubmitJoinRequest(
 	ctx context.Context,
@@ -165,12 +206,14 @@ func (a *api) RegisterDevice(
 	}
 
 	device, session, err := a.identity.RegisterDevice(ctx, identity.RegisterDeviceParams{
-		SessionID:      sessionID,
-		DeviceName:     req.GetDeviceName(),
-		Platform:       identityPlatformFromProto(req.GetDevicePlatform()),
-		PublicKey:      publicKeyFromProto(req.GetDeviceKey()),
-		PushToken:      req.GetPushToken(),
-		IdempotencyKey: req.GetIdempotencyKey(),
+		SessionID:              sessionID,
+		DeviceName:             req.GetDeviceName(),
+		Platform:               identityPlatformFromProto(req.GetDevicePlatform()),
+		PublicKey:              publicKeyFromProto(req.GetDeviceKey()),
+		PushToken:              req.GetPushToken(),
+		EnablePasswordRecovery: req.GetEnablePasswordRecovery(),
+		RecoveryPassword:       req.GetRecoveryPassword(),
+		IdempotencyKey:         req.GetIdempotencyKey(),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -180,6 +223,34 @@ func (a *api) RegisterDevice(
 		Device:  authDevice(device),
 		Session: authSession(session),
 	}, nil
+}
+
+// RotateDeviceKey replaces the public key for one of the authenticated account's devices.
+func (a *api) RotateDeviceKey(
+	ctx context.Context,
+	req *authv1.RotateDeviceKeyRequest,
+) (*authv1.RotateDeviceKeyResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	deviceID := strings.TrimSpace(req.GetDeviceId())
+	if deviceID == "" {
+		deviceID = authContext.Device.ID
+	}
+
+	device, err := a.identity.RotateDeviceKey(ctx, identity.RotateDeviceKeyParams{
+		AccountID:      authContext.Account.ID,
+		DeviceID:       deviceID,
+		PublicKey:      publicKeyFromProto(req.GetDeviceKey()),
+		IdempotencyKey: req.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &authv1.RotateDeviceKeyResponse{Device: authDevice(device)}, nil
 }
 
 // ListDevices returns the authenticated account's devices.
@@ -363,6 +434,64 @@ func (a *api) RevokeAllSessions(
 	}
 
 	return &authv1.RevokeAllSessionsResponse{RevokedSessions: revoked}, nil
+}
+
+// BeginPasswordRecovery starts a recovery challenge for a human account.
+func (a *api) BeginPasswordRecovery(
+	ctx context.Context,
+	req *authv1.BeginPasswordRecoveryRequest,
+) (*authv1.BeginPasswordRecoveryResponse, error) {
+	params := identity.BeginPasswordRecoveryParams{
+		Delivery:       loginChannelFromProto(req.GetDeliveryChannel()),
+		Locale:         req.GetLocale(),
+		IdempotencyKey: req.GetIdempotencyKey(),
+	}
+	switch identifier := req.Identifier.(type) {
+	case *authv1.BeginPasswordRecoveryRequest_Username:
+		params.Username = identifier.Username
+	case *authv1.BeginPasswordRecoveryRequest_Email:
+		params.Email = identifier.Email
+	case *authv1.BeginPasswordRecoveryRequest_Phone:
+		params.Phone = identifier.Phone
+	}
+
+	challenge, targets, err := a.identity.BeginPasswordRecovery(ctx, params)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &authv1.BeginPasswordRecoveryResponse{
+		RecoveryChallengeId: challenge.ID,
+		Targets:             authTargets(targets),
+		ExpiresAt:           protoTime(challenge.ExpiresAt),
+	}, nil
+}
+
+// CompletePasswordRecovery finalizes recovery, rotates stored secrets, and opens a new session.
+func (a *api) CompletePasswordRecovery(
+	ctx context.Context,
+	req *authv1.CompletePasswordRecoveryRequest,
+) (*authv1.CompletePasswordRecoveryResponse, error) {
+	result, recoveryEnabled, err := a.identity.CompletePasswordRecovery(ctx, identity.CompletePasswordRecoveryParams{
+		RecoveryChallengeID: req.GetRecoveryChallengeId(),
+		Code:                req.GetCode(),
+		NewPassword:         req.GetNewPassword(),
+		NewRecoveryPassword: req.GetNewRecoveryPassword(),
+		DeviceName:          req.GetDeviceName(),
+		Platform:            identityPlatformFromProto(req.GetDevicePlatform()),
+		PublicKey:           publicKeyFromProto(req.GetDeviceKey()),
+		IdempotencyKey:      req.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &authv1.CompletePasswordRecoveryResponse{
+		Tokens:          authTokens(result),
+		Session:         authSession(result.Session),
+		Device:          authDevice(result.Device),
+		RecoveryEnabled: recoveryEnabled,
+	}, nil
 }
 
 func authTokens(result identity.LoginResult) *commonv1.AuthTokens {

@@ -109,3 +109,49 @@ func (s *memoryStore) DeleteSessionCredentialsBySessionID(_ context.Context, ses
 func credentialKey(sessionID string, kind identity.SessionCredentialKind) string {
 	return sessionID + ":" + string(kind)
 }
+
+// SaveAccountCredential stores one hashed account secret.
+func (s *memoryStore) SaveAccountCredential(
+	_ context.Context,
+	credential identity.AccountCredential,
+) (identity.AccountCredential, error) {
+	if credential.AccountID == "" || credential.SecretHash == "" {
+		return identity.AccountCredential{}, identity.ErrInvalidInput
+	}
+	if credential.Kind != identity.AccountCredentialKindPassword &&
+		credential.Kind != identity.AccountCredentialKindRecovery {
+		return identity.AccountCredential{}, identity.ErrInvalidInput
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.accountCredentialsByKey[accountCredentialKey(credential.AccountID, credential.Kind)] = credential
+	return credential, nil
+}
+
+// AccountCredentialByAccountID resolves one stored account secret.
+func (s *memoryStore) AccountCredentialByAccountID(
+	_ context.Context,
+	accountID string,
+	kind identity.AccountCredentialKind,
+) (identity.AccountCredential, error) {
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return identity.AccountCredential{}, identity.ErrNotFound
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	credential, ok := s.accountCredentialsByKey[accountCredentialKey(accountID, kind)]
+	if !ok {
+		return identity.AccountCredential{}, identity.ErrNotFound
+	}
+
+	return credential, nil
+}
+
+func accountCredentialKey(accountID string, kind identity.AccountCredentialKind) string {
+	return accountID + ":" + string(kind)
+}

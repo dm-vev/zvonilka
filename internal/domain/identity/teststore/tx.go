@@ -58,6 +58,7 @@ func (s *memoryStore) cloneLocked() memoryStore {
 		sessionIDsByAccount:      cloneStringSetMap(s.sessionIDsByAccount),
 		credentialsByHash:        cloneCredentials(s.credentialsByHash),
 		credentialHashesByKey:    cloneStringMap(s.credentialHashesByKey),
+		accountCredentialsByKey:  cloneAccountCredentials(s.accountCredentialsByKey),
 	}
 }
 
@@ -79,6 +80,7 @@ func (s *memoryStore) replaceLocked(tx *memoryStore) {
 	s.sessionIDsByAccount = cloneStringSetMap(tx.sessionIDsByAccount)
 	s.credentialsByHash = cloneCredentials(tx.credentialsByHash)
 	s.credentialHashesByKey = cloneStringMap(tx.credentialHashesByKey)
+	s.accountCredentialsByKey = cloneAccountCredentials(tx.accountCredentialsByKey)
 }
 
 func cloneStringMap(src map[string]string) map[string]string {
@@ -182,6 +184,19 @@ func cloneCredentials(src map[string]identity.SessionCredential) map[string]iden
 	}
 
 	dst := make(map[string]identity.SessionCredential, len(src))
+	for key, credential := range src {
+		dst[key] = credential
+	}
+
+	return dst
+}
+
+func cloneAccountCredentials(src map[string]identity.AccountCredential) map[string]identity.AccountCredential {
+	if len(src) == 0 {
+		return make(map[string]identity.AccountCredential)
+	}
+
+	dst := make(map[string]identity.AccountCredential, len(src))
 	for key, credential := range src {
 		dst[key] = credential
 	}

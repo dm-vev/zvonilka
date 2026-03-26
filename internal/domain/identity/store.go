@@ -23,6 +23,13 @@ type Store interface {
 	LoginChallengeByID(ctx context.Context, challengeID string) (LoginChallenge, error)
 	DeleteLoginChallenge(ctx context.Context, challengeID string) error
 
+	SaveAccountCredential(ctx context.Context, credential AccountCredential) (AccountCredential, error)
+	AccountCredentialByAccountID(
+		ctx context.Context,
+		accountID string,
+		kind AccountCredentialKind,
+	) (AccountCredential, error)
+
 	SaveDevice(ctx context.Context, device Device) (Device, error)
 	DeleteDevice(ctx context.Context, deviceID string) error
 	DeviceByID(ctx context.Context, deviceID string) (Device, error)

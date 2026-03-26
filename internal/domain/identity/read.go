@@ -43,3 +43,41 @@ func (s *Service) AccountByUsername(ctx context.Context, username string) (Accou
 
 	return account, nil
 }
+
+// AccountByEmail resolves one account by normalized email.
+func (s *Service) AccountByEmail(ctx context.Context, email string) (Account, error) {
+	if err := s.validateContext(ctx, "get account by email"); err != nil {
+		return Account{}, err
+	}
+
+	email = normalizeEmail(email)
+	if email == "" {
+		return Account{}, ErrInvalidInput
+	}
+
+	account, err := s.store.AccountByEmail(ctx, email)
+	if err != nil {
+		return Account{}, fmt.Errorf("load account by email %s: %w", email, err)
+	}
+
+	return account, nil
+}
+
+// AccountByPhone resolves one account by normalized phone.
+func (s *Service) AccountByPhone(ctx context.Context, phone string) (Account, error) {
+	if err := s.validateContext(ctx, "get account by phone"); err != nil {
+		return Account{}, err
+	}
+
+	phone = normalizePhone(phone)
+	if phone == "" {
+		return Account{}, ErrInvalidInput
+	}
+
+	account, err := s.store.AccountByPhone(ctx, phone)
+	if err != nil {
+		return Account{}, fmt.Errorf("load account by phone %s: %w", phone, err)
+	}
+
+	return account, nil
+}

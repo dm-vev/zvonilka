@@ -173,6 +173,7 @@ func scanLoginChallenge(row rowScanner) (identity.LoginChallenge, error) {
 		&challenge.ID,
 		&challenge.AccountID,
 		&challenge.AccountKind,
+		&challenge.Purpose,
 		&challenge.CodeHash,
 		&challenge.DeliveryChannel,
 		&targetsRaw,
@@ -276,6 +277,25 @@ func scanCredential(row rowScanner) (identity.SessionCredential, error) {
 	}
 
 	credential.ExpiresAt = credential.ExpiresAt.UTC()
+	credential.CreatedAt = credential.CreatedAt.UTC()
+	credential.UpdatedAt = credential.UpdatedAt.UTC()
+
+	return credential, nil
+}
+
+func scanAccountCredential(row rowScanner) (identity.AccountCredential, error) {
+	var credential identity.AccountCredential
+
+	if err := row.Scan(
+		&credential.AccountID,
+		&credential.Kind,
+		&credential.SecretHash,
+		&credential.CreatedAt,
+		&credential.UpdatedAt,
+	); err != nil {
+		return identity.AccountCredential{}, err
+	}
+
 	credential.CreatedAt = credential.CreatedAt.UTC()
 	credential.UpdatedAt = credential.UpdatedAt.UTC()
 

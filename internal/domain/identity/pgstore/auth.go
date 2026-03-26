@@ -21,6 +21,9 @@ func (s *Store) SaveLoginChallenge(ctx context.Context, challenge identity.Login
 	if challenge.ID == "" {
 		return identity.LoginChallenge{}, identity.ErrInvalidInput
 	}
+	if challenge.Purpose == "" {
+		challenge.Purpose = identity.LoginChallengePurposeLogin
+	}
 
 	targetsRaw, err := encodeTargets(challenge.Targets)
 	if err != nil {
@@ -29,13 +32,14 @@ func (s *Store) SaveLoginChallenge(ctx context.Context, challenge identity.Login
 
 	query := fmt.Sprintf(`
 INSERT INTO %s (
-	id, account_id, account_kind, code_hash, delivery_channel, targets, expires_at, created_at, used_at, used
+	id, account_id, account_kind, purpose, code_hash, delivery_channel, targets, expires_at, created_at, used_at, used
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 )
 ON CONFLICT (id) DO UPDATE SET
 	account_id = EXCLUDED.account_id,
 	account_kind = EXCLUDED.account_kind,
+	purpose = EXCLUDED.purpose,
 	code_hash = EXCLUDED.code_hash,
 	delivery_channel = EXCLUDED.delivery_channel,
 	targets = EXCLUDED.targets,
@@ -49,6 +53,7 @@ RETURNING %s
 		challenge.ID,
 		challenge.AccountID,
 		challenge.AccountKind,
+		challenge.Purpose,
 		challenge.CodeHash,
 		challenge.DeliveryChannel,
 		targetsRaw,

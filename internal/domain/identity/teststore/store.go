@@ -29,6 +29,7 @@ func NewMemoryStore() identity.Store {
 		sessionIDsByAccount:      make(map[string]map[string]struct{}),
 		credentialsByHash:        make(map[string]identity.SessionCredential),
 		credentialHashesByKey:    make(map[string]string),
+		accountCredentialsByKey:  make(map[string]identity.AccountCredential),
 	}
 }
 
@@ -55,6 +56,7 @@ type memoryStore struct {
 	sessionIDsByAccount      map[string]map[string]struct{}
 	credentialsByHash        map[string]identity.SessionCredential
 	credentialHashesByKey    map[string]string
+	accountCredentialsByKey  map[string]identity.AccountCredential
 }
 
 // accountByIndex resolves an account through one of the secondary indexes.

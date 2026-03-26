@@ -173,6 +173,7 @@ type LoginChallenge struct {
 	ID              string
 	AccountID       string
 	AccountKind     AccountKind
+	Purpose         LoginChallengePurpose
 	CodeHash        string
 	DeliveryChannel LoginDeliveryChannel
 	Targets         []LoginTarget
@@ -228,4 +229,65 @@ type LoginResult struct {
 	Tokens  Tokens
 	Session Session
 	Device  Device
+}
+
+// LoginChallengePurpose identifies why a challenge was issued.
+type LoginChallengePurpose string
+
+// Supported login-challenge purposes.
+const (
+	// LoginChallengePurposeLogin represents a normal login flow.
+	LoginChallengePurposeLogin LoginChallengePurpose = "login"
+	// LoginChallengePurposeRecovery represents a password recovery flow.
+	LoginChallengePurposeRecovery LoginChallengePurpose = "recovery"
+)
+
+// AccountCredentialKind identifies a persisted account secret.
+type AccountCredentialKind string
+
+// Supported account-credential kinds.
+const (
+	// AccountCredentialKindPassword stores the account password hash.
+	AccountCredentialKindPassword AccountCredentialKind = "password"
+	// AccountCredentialKindRecovery stores the recovery password hash.
+	AccountCredentialKindRecovery AccountCredentialKind = "recovery"
+)
+
+// AccountCredential stores one hashed account secret.
+type AccountCredential struct {
+	AccountID  string
+	Kind       AccountCredentialKind
+	SecretHash string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
+// LoginFactor identifies one supported login factor.
+type LoginFactor string
+
+// Supported login factors.
+const (
+	// LoginFactorCode represents code-based login.
+	LoginFactorCode LoginFactor = "code"
+	// LoginFactorPassword represents a stored password.
+	LoginFactorPassword LoginFactor = "password"
+	// LoginFactorRecoveryPassword represents a stored recovery password.
+	LoginFactorRecoveryPassword LoginFactor = "recovery_password"
+	// LoginFactorBotToken represents a bot token.
+	LoginFactorBotToken LoginFactor = "bot_token"
+)
+
+// LoginOption describes one available auth factor.
+type LoginOption struct {
+	Factor   LoginFactor
+	Required bool
+	Channels []LoginDeliveryChannel
+}
+
+// LoginOptionsResult describes the factors available for one identifier.
+type LoginOptionsResult struct {
+	Options                 []LoginOption
+	PasswordRecoveryEnabled bool
+	RequiresAdminApproval   bool
+	AccountKind             AccountKind
 }

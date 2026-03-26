@@ -47,6 +47,8 @@ func registerDeviceFingerprint(params RegisterDeviceParams) string {
 		string(params.Platform),
 		params.PublicKey,
 		params.PushToken,
+		strconv.FormatBool(params.EnablePasswordRecovery),
+		hashSecret(params.RecoveryPassword),
 	)
 }
 
@@ -140,6 +142,58 @@ func refreshSessionFingerprint(params RefreshSessionParams) string {
 		"refresh-session",
 		hashSecret(params.RefreshToken),
 		params.DeviceID,
+	)
+}
+
+// beginPasswordRecoveryFingerprint captures the fields that define a recovery-start request.
+func beginPasswordRecoveryFingerprint(params BeginPasswordRecoveryParams) string {
+	username, email, phone := normalizeUsername(params.Username), normalizeEmail(params.Email), normalizePhone(params.Phone)
+	return idempotencyFingerprint(
+		"begin-password-recovery",
+		username,
+		email,
+		phone,
+		string(params.Delivery),
+		params.Locale,
+	)
+}
+
+// completePasswordRecoveryFingerprint captures the fields that define a recovery completion.
+func completePasswordRecoveryFingerprint(params CompletePasswordRecoveryParams) string {
+	return idempotencyFingerprint(
+		"complete-password-recovery",
+		params.RecoveryChallengeID,
+		hashSecret(params.Code),
+		hashSecret(params.NewPassword),
+		hashSecret(params.NewRecoveryPassword),
+		params.DeviceName,
+		string(params.Platform),
+		params.PublicKey,
+	)
+}
+
+// rotateDeviceKeyFingerprint captures the fields that define a device-key rotation.
+func rotateDeviceKeyFingerprint(params RotateDeviceKeyParams) string {
+	return idempotencyFingerprint(
+		"rotate-device-key",
+		params.AccountID,
+		params.DeviceID,
+		params.PublicKey,
+	)
+}
+
+// updateProfileFingerprint captures the fields that define a profile update.
+func updateProfileFingerprint(params UpdateProfileParams) string {
+	username, email, phone := normalizeUsername(params.Username), normalizeEmail(params.Email), normalizePhone(params.Phone)
+	return idempotencyFingerprint(
+		"update-profile",
+		params.AccountID,
+		username,
+		trimmed(params.DisplayName),
+		trimmed(params.Bio),
+		email,
+		phone,
+		trimmed(params.CustomBadgeEmoji),
 	)
 }
 

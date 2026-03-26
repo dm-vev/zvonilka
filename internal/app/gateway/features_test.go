@@ -23,7 +23,11 @@ import (
 	"github.com/dm-vev/zvonilka/internal/domain/media"
 	"github.com/dm-vev/zvonilka/internal/domain/presence"
 	presencetest "github.com/dm-vev/zvonilka/internal/domain/presence/teststore"
+	"github.com/dm-vev/zvonilka/internal/domain/search"
+	searchtest "github.com/dm-vev/zvonilka/internal/domain/search/teststore"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
+	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
+	usertest "github.com/dm-vev/zvonilka/internal/domain/user/teststore"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -468,9 +472,18 @@ func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
 
 	identityStore := identitytest.NewMemoryStore()
 	sender := &recordingSender{}
-	identityService, err := identity.NewService(identityStore, sender, identity.WithNow(nowFunc))
+	searchService, err := search.NewService(searchtest.New())
 	if err != nil {
-		t.Fatalf("new identity service: %v", err)
+		t.Fatalf("new search service: %v", err)
+	}
+	identityService, err := identity.NewService(
+		identityStore,
+		sender,
+		identity.WithNow(nowFunc),
+		identity.WithIndexer(searchService),
+	)
+	if err != nil {
+		t.Fatalf("new indexed identity service: %v", err)
 	}
 
 	presenceService, err := presence.NewService(presencetest.NewMemoryStore(), identityStore, presence.WithNow(nowFunc))
@@ -481,6 +494,7 @@ func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
 	conversationService, err := conversation.NewService(
 		conversationtest.NewMemoryStore(),
 		conversation.WithNow(nowFunc),
+		conversation.WithIndexer(searchService),
 	)
 	if err != nil {
 		t.Fatalf("new conversation service: %v", err)
@@ -497,9 +511,14 @@ func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
 			DownloadURLTTL: 15 * time.Minute,
 			MaxUploadSize:  10 << 20,
 		}),
+		media.WithIndexer(searchService),
 	)
 	if err != nil {
 		t.Fatalf("new media service: %v", err)
+	}
+	userService, err := domainuser.NewService(usertest.NewMemoryStore(), identityService, domainuser.WithNow(nowFunc))
+	if err != nil {
+		t.Fatalf("new user service: %v", err)
 	}
 
 	return &gatewayFeatureFixture{
@@ -508,6 +527,8 @@ func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
 			presence:     presenceService,
 			conversation: conversationService,
 			media:        mediaService,
+			search:       searchService,
+			user:         userService,
 			syncNotifier: newSyncNotifier(),
 		},
 		sender:     sender,

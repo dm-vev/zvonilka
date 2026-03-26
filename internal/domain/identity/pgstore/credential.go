@@ -139,3 +139,95 @@ func (s *Store) DeleteSessionCredentialsBySessionID(ctx context.Context, session
 
 	return nil
 }
+
+// SaveAccountCredential stores or replaces one hashed account secret.
+func (s *Store) SaveAccountCredential(
+	ctx context.Context,
+	credential identity.AccountCredential,
+) (identity.AccountCredential, error) {
+	if err := s.requireStore(); err != nil {
+		return identity.AccountCredential{}, err
+	}
+	if err := s.requireContext(ctx); err != nil {
+		return identity.AccountCredential{}, err
+	}
+
+	credential.AccountID = strings.TrimSpace(credential.AccountID)
+	credential.SecretHash = strings.TrimSpace(credential.SecretHash)
+	if credential.AccountID == "" || credential.SecretHash == "" {
+		return identity.AccountCredential{}, identity.ErrInvalidInput
+	}
+	if credential.Kind != identity.AccountCredentialKindPassword &&
+		credential.Kind != identity.AccountCredentialKindRecovery {
+		return identity.AccountCredential{}, identity.ErrInvalidInput
+	}
+
+	query := fmt.Sprintf(`
+INSERT INTO %s (
+	account_id, kind, secret_hash, created_at, updated_at
+) VALUES (
+	$1, $2, $3, $4, $5
+)
+ON CONFLICT (account_id, kind) DO UPDATE SET
+	secret_hash = EXCLUDED.secret_hash,
+	updated_at = EXCLUDED.updated_at
+RETURNING %s
+`, s.table("identity_account_credentials"), accountCredentialColumnList)
+
+	saved, err := scanAccountCredential(s.conn().QueryRowContext(
+		ctx,
+		query,
+		credential.AccountID,
+		credential.Kind,
+		credential.SecretHash,
+		credential.CreatedAt.UTC(),
+		credential.UpdatedAt.UTC(),
+	))
+	if err != nil {
+		if mappedErr := mapConstraintError(err, identity.ErrNotFound); mappedErr != nil {
+			return identity.AccountCredential{}, mappedErr
+		}
+		return identity.AccountCredential{}, fmt.Errorf(
+			"save account credential %s:%s: %w",
+			credential.AccountID,
+			credential.Kind,
+			err,
+		)
+	}
+
+	return saved, nil
+}
+
+// AccountCredentialByAccountID resolves one stored account secret.
+func (s *Store) AccountCredentialByAccountID(
+	ctx context.Context,
+	accountID string,
+	kind identity.AccountCredentialKind,
+) (identity.AccountCredential, error) {
+	if err := s.requireStore(); err != nil {
+		return identity.AccountCredential{}, err
+	}
+	if err := s.requireContext(ctx); err != nil {
+		return identity.AccountCredential{}, err
+	}
+
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return identity.AccountCredential{}, identity.ErrNotFound
+	}
+
+	query := fmt.Sprintf(
+		`SELECT %s FROM %s WHERE account_id = $1 AND kind = $2`,
+		accountCredentialColumnList,
+		s.table("identity_account_credentials"),
+	)
+	credential, err := scanAccountCredential(s.conn().QueryRowContext(ctx, query, accountID, kind))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return identity.AccountCredential{}, identity.ErrNotFound
+		}
+		return identity.AccountCredential{}, fmt.Errorf("load account credential: %w", err)
+	}
+
+	return credential, nil
+}

@@ -63,6 +63,7 @@ func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (Logi
 		ID:              challengeID,
 		AccountID:       account.ID,
 		AccountKind:     account.Kind,
+		Purpose:         LoginChallengePurposeLogin,
 		CodeHash:        hashSecret(code),
 		DeliveryChannel: delivery,
 		Targets:         append([]LoginTarget(nil), targets...),
@@ -174,9 +175,25 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 		if loadErr != nil {
 			return fmt.Errorf("load account %s from challenge %s: %w", challenge.AccountID, challenge.ID, loadErr)
 		}
+		if challenge.Purpose != "" && challenge.Purpose != LoginChallengePurposeLogin {
+			return ErrForbidden
+		}
 
 		result, err = s.issueSession(ctx, tx, account, params.DeviceName, params.Platform, params.PublicKey, params.PushToken)
-		return err
+		if err != nil {
+			return err
+		}
+		if !params.EnablePasswordRecovery {
+			return nil
+		}
+		return s.saveAccountCredential(
+			ctx,
+			tx,
+			account.ID,
+			AccountCredentialKindRecovery,
+			params.RecoveryPassword,
+			now,
+		)
 	})
 	if err != nil {
 		return LoginResult{}, err
@@ -345,6 +362,18 @@ func (s *Service) RegisterDevice(ctx context.Context, params RegisterDeviceParam
 		savedSession, loadErr = tx.UpdateSession(ctx, session)
 		if loadErr != nil {
 			return fmt.Errorf("update session %s after device registration: %w", session.ID, loadErr)
+		}
+		if params.EnablePasswordRecovery {
+			if loadErr := s.saveAccountCredential(
+				ctx,
+				tx,
+				account.ID,
+				AccountCredentialKindRecovery,
+				params.RecoveryPassword,
+				now,
+			); loadErr != nil {
+				return loadErr
+			}
 		}
 
 		return nil
