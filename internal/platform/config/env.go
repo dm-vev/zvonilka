@@ -109,6 +109,56 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Identity.LoginCodeLength = value
 	}
+	if value, ok, err := durationValue(serviceName, "BOT_FANOUT_POLL_INTERVAL", cfg.Bot.FanoutPollInterval); err != nil {
+		return err
+	} else if ok {
+		cfg.Bot.FanoutPollInterval = value
+	}
+	if value, ok, err := intValue(serviceName, "BOT_FANOUT_BATCH_SIZE", cfg.Bot.FanoutBatchSize); err != nil {
+		return err
+	} else if ok {
+		cfg.Bot.FanoutBatchSize = value
+	}
+	if value, ok, err := intValue(serviceName, "BOT_GET_UPDATES_MAX_LIMIT", cfg.Bot.GetUpdatesMaxLimit); err != nil {
+		return err
+	} else if ok {
+		cfg.Bot.GetUpdatesMaxLimit = value
+	}
+	if value, ok, err := durationValue(serviceName, "BOT_LONG_POLL_MAX_TIMEOUT", cfg.Bot.LongPollMaxTimeout); err != nil {
+		return err
+	} else if ok {
+		cfg.Bot.LongPollMaxTimeout = value
+	}
+	if value, ok, err := durationValue(serviceName, "BOT_LONG_POLL_STEP", cfg.Bot.LongPollStep); err != nil {
+		return err
+	} else if ok {
+		cfg.Bot.LongPollStep = value
+	}
+	if value, ok, err := durationValue(serviceName, "BOT_WEBHOOK_TIMEOUT", cfg.Bot.WebhookTimeout); err != nil {
+		return err
+	} else if ok {
+		cfg.Bot.WebhookTimeout = value
+	}
+	if value, ok, err := intValue(serviceName, "BOT_WEBHOOK_BATCH_SIZE", cfg.Bot.WebhookBatchSize); err != nil {
+		return err
+	} else if ok {
+		cfg.Bot.WebhookBatchSize = value
+	}
+	if value, ok, err := durationValue(serviceName, "BOT_RETRY_INITIAL_BACKOFF", cfg.Bot.RetryInitialBackoff); err != nil {
+		return err
+	} else if ok {
+		cfg.Bot.RetryInitialBackoff = value
+	}
+	if value, ok, err := durationValue(serviceName, "BOT_RETRY_MAX_BACKOFF", cfg.Bot.RetryMaxBackoff); err != nil {
+		return err
+	} else if ok {
+		cfg.Bot.RetryMaxBackoff = value
+	}
+	if value, ok, err := intValue(serviceName, "BOT_MAX_ATTEMPTS", cfg.Bot.MaxAttempts); err != nil {
+		return err
+	} else if ok {
+		cfg.Bot.MaxAttempts = value
+	}
 	if value, ok, err := durationValue(serviceName, "PRESENCE_ONLINE_WINDOW", cfg.Presence.OnlineWindow); err != nil {
 		return err
 	} else if ok {

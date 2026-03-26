@@ -1,0 +1,89 @@
+package bot
+
+import "time"
+
+// GetUpdatesParams describes one getUpdates request.
+type GetUpdatesParams struct {
+	BotToken       string
+	Offset         int64
+	Limit          int
+	Timeout        time.Duration
+	AllowedUpdates []UpdateType
+}
+
+// SetWebhookParams describes one setWebhook request.
+type SetWebhookParams struct {
+	BotToken           string
+	URL                string
+	MaxConnections     int
+	AllowedUpdates     []UpdateType
+	DropPendingUpdates bool
+	SecretToken        string
+}
+
+// DeleteWebhookParams describes one deleteWebhook request.
+type DeleteWebhookParams struct {
+	BotToken           string
+	DropPendingUpdates bool
+}
+
+// WebhookInfoParams describes one getWebhookInfo request.
+type WebhookInfoParams struct {
+	BotToken string
+}
+
+// SendMessageParams describes one sendMessage request.
+type SendMessageParams struct {
+	BotToken              string
+	ChatID                string
+	MessageThreadID       string
+	Text                  string
+	ReplyToMessageID      string
+	DisableNotification   bool
+	DisableWebPagePreview bool
+}
+
+// EditMessageTextParams describes one editMessageText request.
+type EditMessageTextParams struct {
+	BotToken              string
+	ChatID                string
+	MessageID             string
+	Text                  string
+	DisableWebPagePreview bool
+}
+
+// DeleteMessageParams describes one deleteMessage request.
+type DeleteMessageParams struct {
+	BotToken  string
+	ChatID    string
+	MessageID string
+}
+
+// GetChatParams describes one getChat request.
+type GetChatParams struct {
+	BotToken string
+	ChatID   string
+}
+
+// GetChatMemberParams describes one getChatMember request.
+type GetChatMemberParams struct {
+	BotToken string
+	ChatID   string
+	UserID   string
+}
+
+// GetMessageParams describes one internal message lookup request.
+type GetMessageParams struct {
+	BotToken  string
+	ChatID    string
+	MessageID string
+}
+
+// RetryParams describes one webhook retry update.
+type RetryParams struct {
+	BotAccountID  string
+	UpdateID      int64
+	AttemptedAt   time.Time
+	NextAttemptAt time.Time
+	LastError     string
+}

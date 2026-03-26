@@ -45,6 +45,39 @@ func (c Configuration) Validate() error {
 	if c.Identity.LoginCodeLength <= 0 {
 		errs = append(errs, errors.New("identity login code length must be positive"))
 	}
+	if c.Bot.FanoutPollInterval <= 0 {
+		errs = append(errs, errors.New("bot fanout poll interval must be positive"))
+	}
+	if c.Bot.FanoutBatchSize <= 0 {
+		errs = append(errs, errors.New("bot fanout batch size must be positive"))
+	}
+	if c.Bot.GetUpdatesMaxLimit <= 0 {
+		errs = append(errs, errors.New("bot getUpdates max limit must be positive"))
+	}
+	if c.Bot.LongPollMaxTimeout <= 0 {
+		errs = append(errs, errors.New("bot long-poll max timeout must be positive"))
+	}
+	if c.Bot.LongPollStep <= 0 {
+		errs = append(errs, errors.New("bot long-poll step must be positive"))
+	}
+	if c.Bot.WebhookTimeout <= 0 {
+		errs = append(errs, errors.New("bot webhook timeout must be positive"))
+	}
+	if c.Bot.WebhookBatchSize <= 0 {
+		errs = append(errs, errors.New("bot webhook batch size must be positive"))
+	}
+	if c.Bot.RetryInitialBackoff <= 0 {
+		errs = append(errs, errors.New("bot retry initial backoff must be positive"))
+	}
+	if c.Bot.RetryMaxBackoff <= 0 {
+		errs = append(errs, errors.New("bot retry max backoff must be positive"))
+	}
+	if c.Bot.RetryMaxBackoff < c.Bot.RetryInitialBackoff {
+		errs = append(errs, errors.New("bot retry max backoff must be greater than or equal to the initial backoff"))
+	}
+	if c.Bot.MaxAttempts <= 0 {
+		errs = append(errs, errors.New("bot max attempts must be positive"))
+	}
 	if c.Presence.OnlineWindow <= 0 {
 		errs = append(errs, errors.New("presence online window must be positive"))
 	}

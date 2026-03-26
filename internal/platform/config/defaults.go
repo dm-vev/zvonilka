@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	domainbot "github.com/dm-vev/zvonilka/internal/domain/bot"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	domainnotification "github.com/dm-vev/zvonilka/internal/domain/notification"
 	"github.com/dm-vev/zvonilka/internal/domain/presence"
@@ -60,6 +61,7 @@ func defaultConfiguration(serviceName string) Configuration {
 	environment := defaultEnvironment
 	runtimeDefaults := defaultRuntime(serviceName, environment)
 	identityDefaults := identity.DefaultSettings()
+	botDefaults := domainbot.DefaultSettings()
 	presenceDefaults := presence.DefaultSettings()
 	notificationDefaults := domainnotification.DefaultSettings()
 	searchDefaults := domainsearch.DefaultSettings()
@@ -81,6 +83,18 @@ func defaultConfiguration(serviceName string) Configuration {
 			AccessTokenTTL:  identityDefaults.AccessTokenTTL,
 			RefreshTokenTTL: identityDefaults.RefreshTokenTTL,
 			LoginCodeLength: identityDefaults.LoginCodeLength,
+		},
+		Bot: BotConfig{
+			FanoutPollInterval:  botDefaults.FanoutPollInterval,
+			FanoutBatchSize:     botDefaults.FanoutBatchSize,
+			GetUpdatesMaxLimit:  botDefaults.GetUpdatesMaxLimit,
+			LongPollMaxTimeout:  botDefaults.LongPollMaxTimeout,
+			LongPollStep:        botDefaults.LongPollStep,
+			WebhookTimeout:      botDefaults.WebhookTimeout,
+			WebhookBatchSize:    botDefaults.WebhookBatchSize,
+			RetryInitialBackoff: botDefaults.RetryInitialBackoff,
+			RetryMaxBackoff:     botDefaults.RetryMaxBackoff,
+			MaxAttempts:         botDefaults.MaxAttempts,
 		},
 		Media: MediaConfig{
 			UploadURLTTL:   defaultMediaUploadURLTTL,
