@@ -18,7 +18,7 @@ func (a *api) setWebhook(writer http.ResponseWriter, request *http.Request, toke
 		allowed = append(allowed, domainbot.UpdateType(value))
 	}
 
-	result, err := a.bot.SetWebhook(request.Context(), domainbot.SetWebhookParams{
+	_, err := a.bot.SetWebhook(request.Context(), domainbot.SetWebhookParams{
 		BotToken:           token,
 		URL:                payload.URL,
 		MaxConnections:     payload.MaxConnections,
@@ -32,7 +32,7 @@ func (a *api) setWebhook(writer http.ResponseWriter, request *http.Request, toke
 		return
 	}
 
-	writeResult(writer, result)
+	writeResult(writer, true)
 }
 
 func (a *api) deleteWebhook(writer http.ResponseWriter, request *http.Request, token string) {

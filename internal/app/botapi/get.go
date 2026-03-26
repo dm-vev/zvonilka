@@ -15,7 +15,14 @@ func (a *api) getMe(writer http.ResponseWriter, request *http.Request, token str
 		return
 	}
 
-	writeResult(writer, result)
+	user, err := a.telegramUser(request.Context(), result)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, user)
 }
 
 func (a *api) getUpdates(writer http.ResponseWriter, request *http.Request, token string) {
@@ -43,7 +50,14 @@ func (a *api) getUpdates(writer http.ResponseWriter, request *http.Request, toke
 		return
 	}
 
-	writeResult(writer, result)
+	updates, err := a.telegramUpdates(request.Context(), result)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, updates)
 }
 
 func (a *api) getWebhookInfo(writer http.ResponseWriter, request *http.Request, token string) {
@@ -63,10 +77,16 @@ func (a *api) getChat(writer http.ResponseWriter, request *http.Request, token s
 		writeError(writer, http.StatusBadRequest, "Bad Request")
 		return
 	}
+	chatID, err := a.internalChatID(request.Context(), payload.ChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
 
 	result, err := a.bot.GetChat(request.Context(), domainbot.GetChatParams{
 		BotToken: token,
-		ChatID:   string(payload.ChatID),
+		ChatID:   chatID,
 	})
 	if err != nil {
 		code, description := botError(err)
@@ -74,7 +94,14 @@ func (a *api) getChat(writer http.ResponseWriter, request *http.Request, token s
 		return
 	}
 
-	writeResult(writer, result)
+	chat, err := a.telegramChat(request.Context(), result)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, chat)
 }
 
 func (a *api) getChatMember(writer http.ResponseWriter, request *http.Request, token string) {
@@ -83,11 +110,23 @@ func (a *api) getChatMember(writer http.ResponseWriter, request *http.Request, t
 		writeError(writer, http.StatusBadRequest, "Bad Request")
 		return
 	}
+	chatID, err := a.internalChatID(request.Context(), payload.ChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	userID, err := a.internalUserID(request.Context(), payload.UserID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
 
 	result, err := a.bot.GetChatMember(request.Context(), domainbot.GetChatMemberParams{
 		BotToken: token,
-		ChatID:   string(payload.ChatID),
-		UserID:   string(payload.UserID),
+		ChatID:   chatID,
+		UserID:   userID,
 	})
 	if err != nil {
 		code, description := botError(err)
@@ -95,5 +134,12 @@ func (a *api) getChatMember(writer http.ResponseWriter, request *http.Request, t
 		return
 	}
 
-	writeResult(writer, result)
+	member, err := a.telegramMember(request.Context(), result)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, member)
 }

@@ -24,13 +24,31 @@ func (a *api) sendMessage(writer http.ResponseWriter, request *http.Request, tok
 		writeError(writer, http.StatusBadRequest, "Bad Request")
 		return
 	}
+	chatID, err := a.internalChatID(request.Context(), payload.ChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	threadID, err := a.internalTopicID(request.Context(), payload.MessageThreadID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	replyToMessageID, err := a.internalMessageID(request.Context(), payload.ReplyToMessageID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
 
 	result, err := a.bot.SendMessage(request.Context(), domainbot.SendMessageParams{
 		BotToken:              token,
-		ChatID:                string(payload.ChatID),
-		MessageThreadID:       string(payload.MessageThreadID),
+		ChatID:                chatID,
+		MessageThreadID:       threadID,
 		Text:                  payload.Text,
-		ReplyToMessageID:      string(payload.ReplyToMessageID),
+		ReplyToMessageID:      replyToMessageID,
 		ReplyMarkup:           payload.ReplyMarkup,
 		DisableNotification:   payload.DisableNotification,
 		DisableWebPagePreview: payload.DisableWebPagePreview,
@@ -41,7 +59,14 @@ func (a *api) sendMessage(writer http.ResponseWriter, request *http.Request, tok
 		return
 	}
 
-	writeResult(writer, result)
+	message, err := a.telegramMessage(request.Context(), result)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, message)
 }
 
 func (a *api) sendPhoto(writer http.ResponseWriter, request *http.Request, token string) {
@@ -204,18 +229,36 @@ func (a *api) sendLocation(writer http.ResponseWriter, request *http.Request, to
 		writeError(writer, http.StatusBadRequest, "Bad Request")
 		return
 	}
+	chatID, err := a.internalChatID(request.Context(), payload.ChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	threadID, err := a.internalTopicID(request.Context(), payload.MessageThreadID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	replyToMessageID, err := a.internalMessageID(request.Context(), payload.ReplyToMessageID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
 
 	result, err := a.bot.SendLocation(request.Context(), domainbot.SendLocationParams{
 		BotToken:             token,
-		ChatID:               string(payload.ChatID),
-		MessageThreadID:      string(payload.MessageThreadID),
+		ChatID:               chatID,
+		MessageThreadID:      threadID,
 		Latitude:             payload.Latitude,
 		Longitude:            payload.Longitude,
 		HorizontalAccuracy:   payload.HorizontalAccuracy,
 		LivePeriod:           payload.LivePeriod,
 		Heading:              payload.Heading,
 		ProximityAlertRadius: payload.ProximityAlertRadius,
-		ReplyToMessageID:     string(payload.ReplyToMessageID),
+		ReplyToMessageID:     replyToMessageID,
 		ReplyMarkup:          payload.ReplyMarkup,
 		DisableNotification:  payload.DisableNotification,
 	})
@@ -225,7 +268,14 @@ func (a *api) sendLocation(writer http.ResponseWriter, request *http.Request, to
 		return
 	}
 
-	writeResult(writer, result)
+	message, err := a.telegramMessage(request.Context(), result)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, message)
 }
 
 func (a *api) sendContact(writer http.ResponseWriter, request *http.Request, token string) {
@@ -234,17 +284,41 @@ func (a *api) sendContact(writer http.ResponseWriter, request *http.Request, tok
 		writeError(writer, http.StatusBadRequest, "Bad Request")
 		return
 	}
+	chatID, err := a.internalChatID(request.Context(), payload.ChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	threadID, err := a.internalTopicID(request.Context(), payload.MessageThreadID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	replyToMessageID, err := a.internalMessageID(request.Context(), payload.ReplyToMessageID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	userID, err := a.internalUserID(request.Context(), payload.UserID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
 
 	result, err := a.bot.SendContact(request.Context(), domainbot.SendContactParams{
 		BotToken:            token,
-		ChatID:              string(payload.ChatID),
-		MessageThreadID:     string(payload.MessageThreadID),
+		ChatID:              chatID,
+		MessageThreadID:     threadID,
 		PhoneNumber:         payload.PhoneNumber,
 		FirstName:           payload.FirstName,
 		LastName:            payload.LastName,
 		VCard:               payload.VCard,
-		UserID:              string(payload.UserID),
-		ReplyToMessageID:    string(payload.ReplyToMessageID),
+		UserID:              userID,
+		ReplyToMessageID:    replyToMessageID,
 		ReplyMarkup:         payload.ReplyMarkup,
 		DisableNotification: payload.DisableNotification,
 	})
@@ -254,7 +328,14 @@ func (a *api) sendContact(writer http.ResponseWriter, request *http.Request, tok
 		return
 	}
 
-	writeResult(writer, result)
+	message, err := a.telegramMessage(request.Context(), result)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, message)
 }
 
 func (a *api) sendPoll(writer http.ResponseWriter, request *http.Request, token string) {
@@ -263,17 +344,35 @@ func (a *api) sendPoll(writer http.ResponseWriter, request *http.Request, token 
 		writeError(writer, http.StatusBadRequest, "Bad Request")
 		return
 	}
+	chatID, err := a.internalChatID(request.Context(), payload.ChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	threadID, err := a.internalTopicID(request.Context(), payload.MessageThreadID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	replyToMessageID, err := a.internalMessageID(request.Context(), payload.ReplyToMessageID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
 
 	result, err := a.bot.SendPoll(request.Context(), domainbot.SendPollParams{
 		BotToken:              token,
-		ChatID:                string(payload.ChatID),
-		MessageThreadID:       string(payload.MessageThreadID),
+		ChatID:                chatID,
+		MessageThreadID:       threadID,
 		Question:              payload.Question,
 		Options:               payload.Options,
 		IsAnonymous:           payload.IsAnonymous,
 		Type:                  payload.Type,
 		AllowsMultipleAnswers: payload.AllowsMultipleAnswers,
-		ReplyToMessageID:      string(payload.ReplyToMessageID),
+		ReplyToMessageID:      replyToMessageID,
 		ReplyMarkup:           payload.ReplyMarkup,
 		DisableNotification:   payload.DisableNotification,
 	})
@@ -283,7 +382,14 @@ func (a *api) sendPoll(writer http.ResponseWriter, request *http.Request, token 
 		return
 	}
 
-	writeResult(writer, result)
+	message, err := a.telegramMessage(request.Context(), result)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, message)
 }
 
 func (a *api) sendVoice(writer http.ResponseWriter, request *http.Request, token string) {
@@ -362,6 +468,28 @@ func (a *api) sendMedia(
 	}
 
 	payload := normalize()
+	chatID, err := a.internalChatID(request.Context(), payload.ChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	threadID, err := a.internalTopicID(request.Context(), payload.MessageThreadID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	replyToMessageID, err := a.internalMessageID(request.Context(), payload.ReplyToMessageID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	payload.ChatID = textID(chatID)
+	payload.MessageThreadID = textID(threadID)
+	payload.ReplyToMessageID = textID(replyToMessageID)
+
 	mediaID, err := a.resolveMediaID(request.Context(), request, token, field, kind, payload.MediaID)
 	if err != nil {
 		code, description := botError(err)
@@ -377,7 +505,14 @@ func (a *api) sendMedia(
 		return
 	}
 
-	writeResult(writer, result)
+	message, err := a.telegramMessage(request.Context(), result)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, message)
 }
 
 func (a *api) editMessageText(writer http.ResponseWriter, request *http.Request, token string) {
@@ -386,11 +521,23 @@ func (a *api) editMessageText(writer http.ResponseWriter, request *http.Request,
 		writeError(writer, http.StatusBadRequest, "Bad Request")
 		return
 	}
+	chatID, err := a.internalChatID(request.Context(), payload.ChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	messageID, err := a.internalMessageID(request.Context(), payload.MessageID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
 
 	result, err := a.bot.EditMessageText(request.Context(), domainbot.EditMessageTextParams{
 		BotToken:              token,
-		ChatID:                string(payload.ChatID),
-		MessageID:             string(payload.MessageID),
+		ChatID:                chatID,
+		MessageID:             messageID,
 		Text:                  payload.Text,
 		ReplyMarkup:           payload.ReplyMarkup,
 		DisableWebPagePreview: payload.DisableWebPagePreview,
@@ -401,7 +548,14 @@ func (a *api) editMessageText(writer http.ResponseWriter, request *http.Request,
 		return
 	}
 
-	writeResult(writer, result)
+	message, err := a.telegramMessage(request.Context(), result)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, message)
 }
 
 func (a *api) deleteMessage(writer http.ResponseWriter, request *http.Request, token string) {
@@ -410,11 +564,23 @@ func (a *api) deleteMessage(writer http.ResponseWriter, request *http.Request, t
 		writeError(writer, http.StatusBadRequest, "Bad Request")
 		return
 	}
+	chatID, err := a.internalChatID(request.Context(), payload.ChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	messageID, err := a.internalMessageID(request.Context(), payload.MessageID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
 
 	if err := a.bot.DeleteMessage(request.Context(), domainbot.DeleteMessageParams{
 		BotToken:  token,
-		ChatID:    string(payload.ChatID),
-		MessageID: string(payload.MessageID),
+		ChatID:    chatID,
+		MessageID: messageID,
 	}); err != nil {
 		code, description := botError(err)
 		writeError(writer, code, description)

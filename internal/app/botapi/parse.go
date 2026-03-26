@@ -25,6 +25,26 @@ func decodeRequest(request *http.Request, target any) error {
 		return nil
 	}
 
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		if err := request.ParseMultipartForm(defaultMultipartMemory); err != nil {
+			if errors.Is(err, io.EOF) || strings.Contains(err.Error(), "EOF") {
+				return nil
+			}
+			return err
+		}
+		payload := formPayload(request.Form)
+		if len(payload) == 0 {
+			return nil
+		}
+
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+
+		return json.Unmarshal(raw, target)
+	}
+
 	if err := request.ParseForm(); err != nil {
 		return err
 	}

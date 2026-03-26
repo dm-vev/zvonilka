@@ -12,6 +12,8 @@ import (
 // NewMemoryStore builds an in-memory bot store for tests.
 func NewMemoryStore() bot.Store {
 	return &memoryStore{
+		publicByKind:   make(map[bot.PublicIDKind]map[string]int64),
+		internalByKind: make(map[bot.PublicIDKind]map[int64]string),
 		webhooksByBot:  make(map[string]bot.Webhook),
 		updatesByID:    make(map[int64]bot.QueueEntry),
 		updateIDsByBot: make(map[string][]int64),
@@ -19,6 +21,7 @@ func NewMemoryStore() bot.Store {
 		callbacksByID:  make(map[string]bot.Callback),
 		inlineByID:     make(map[string]bot.InlineQueryState),
 		cursorsByName:  make(map[string]bot.Cursor),
+		nextPublicID:   1,
 		nextUpdateID:   1,
 	}
 }
@@ -26,6 +29,8 @@ func NewMemoryStore() bot.Store {
 type memoryStore struct {
 	mu sync.RWMutex
 
+	publicByKind   map[bot.PublicIDKind]map[string]int64
+	internalByKind map[bot.PublicIDKind]map[int64]string
 	webhooksByBot  map[string]bot.Webhook
 	updatesByID    map[int64]bot.QueueEntry
 	updateIDsByBot map[string][]int64
@@ -33,6 +38,7 @@ type memoryStore struct {
 	callbacksByID  map[string]bot.Callback
 	inlineByID     map[string]bot.InlineQueryState
 	cursorsByName  map[string]bot.Cursor
+	nextPublicID   int64
 	nextUpdateID   int64
 }
 
@@ -72,6 +78,56 @@ func (s *memoryStore) SaveWebhook(_ context.Context, webhook bot.Webhook) (bot.W
 	s.webhooksByBot[value.BotAccountID] = cloneWebhook(value)
 
 	return cloneWebhook(value), nil
+}
+
+func (s *memoryStore) EnsurePublicID(
+	_ context.Context,
+	kind bot.PublicIDKind,
+	internalID string,
+) (int64, error) {
+	if kind == "" || internalID == "" {
+		return 0, bot.ErrInvalidInput
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if value, ok := s.publicByKind[kind][internalID]; ok {
+		return value, nil
+	}
+	if s.publicByKind[kind] == nil {
+		s.publicByKind[kind] = make(map[string]int64)
+	}
+	if s.internalByKind[kind] == nil {
+		s.internalByKind[kind] = make(map[int64]string)
+	}
+
+	value := s.nextPublicID
+	s.nextPublicID++
+	s.publicByKind[kind][internalID] = value
+	s.internalByKind[kind][value] = internalID
+
+	return value, nil
+}
+
+func (s *memoryStore) InternalIDByPublic(
+	_ context.Context,
+	kind bot.PublicIDKind,
+	publicID int64,
+) (string, error) {
+	if kind == "" || publicID <= 0 {
+		return "", bot.ErrInvalidInput
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	internalID, ok := s.internalByKind[kind][publicID]
+	if !ok {
+		return "", bot.ErrNotFound
+	}
+
+	return internalID, nil
 }
 
 func (s *memoryStore) WebhookByBotAccountID(_ context.Context, botAccountID string) (bot.Webhook, error) {
@@ -376,7 +432,24 @@ func (s *memoryStore) CursorByName(_ context.Context, name string) (bot.Cursor, 
 
 func (s *memoryStore) cloneLocked() *memoryStore {
 	clone := NewMemoryStore().(*memoryStore)
+	clone.nextPublicID = s.nextPublicID
 	clone.nextUpdateID = s.nextUpdateID
+	for kind, values := range s.publicByKind {
+		if clone.publicByKind[kind] == nil {
+			clone.publicByKind[kind] = make(map[string]int64)
+		}
+		for key, value := range values {
+			clone.publicByKind[kind][key] = value
+		}
+	}
+	for kind, values := range s.internalByKind {
+		if clone.internalByKind[kind] == nil {
+			clone.internalByKind[kind] = make(map[int64]string)
+		}
+		for key, value := range values {
+			clone.internalByKind[kind][key] = value
+		}
+	}
 	for key, value := range s.webhooksByBot {
 		clone.webhooksByBot[key] = cloneWebhook(value)
 	}
@@ -403,6 +476,8 @@ func (s *memoryStore) cloneLocked() *memoryStore {
 }
 
 func (s *memoryStore) replaceLocked(snapshot *memoryStore) {
+	s.publicByKind = snapshot.publicByKind
+	s.internalByKind = snapshot.internalByKind
 	s.webhooksByBot = snapshot.webhooksByBot
 	s.updatesByID = snapshot.updatesByID
 	s.updateIDsByBot = snapshot.updateIDsByBot
@@ -410,6 +485,7 @@ func (s *memoryStore) replaceLocked(snapshot *memoryStore) {
 	s.callbacksByID = snapshot.callbacksByID
 	s.inlineByID = snapshot.inlineByID
 	s.cursorsByName = snapshot.cursorsByName
+	s.nextPublicID = snapshot.nextPublicID
 	s.nextUpdateID = snapshot.nextUpdateID
 }
 

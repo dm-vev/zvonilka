@@ -9,6 +9,9 @@ import (
 type Store interface {
 	WithinTx(ctx context.Context, fn func(Store) error) error
 
+	EnsurePublicID(ctx context.Context, kind PublicIDKind, internalID string) (int64, error)
+	InternalIDByPublic(ctx context.Context, kind PublicIDKind, publicID int64) (string, error)
+
 	SaveWebhook(ctx context.Context, webhook Webhook) (Webhook, error)
 	WebhookByBotAccountID(ctx context.Context, botAccountID string) (Webhook, error)
 	ListWebhooks(ctx context.Context) ([]Webhook, error)
