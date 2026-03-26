@@ -45,6 +45,9 @@ func (s *memoryStore) SaveModerationPolicy(ctx context.Context, policy conversat
 	if policy.CreatedAt.IsZero() || policy.UpdatedAt.IsZero() || policy.UpdatedAt.Before(policy.CreatedAt) {
 		return conversation.ModerationPolicy{}, conversation.ErrInvalidInput
 	}
+	if (policy.AntiSpamWindow == 0) != (policy.AntiSpamBurstLimit == 0) {
+		return conversation.ModerationPolicy{}, conversation.ErrInvalidInput
+	}
 
 	s.moderationPoliciesByKey[moderationPolicyKey(policy.TargetKind, policy.TargetID)] = policy
 	return policy, nil
@@ -79,6 +82,8 @@ func (s *memoryStore) SaveModerationReport(ctx context.Context, report conversat
 	report.TargetAccountID = strings.TrimSpace(report.TargetAccountID)
 	report.Reason = strings.TrimSpace(report.Reason)
 	report.Details = strings.TrimSpace(report.Details)
+	report.Resolution = strings.TrimSpace(report.Resolution)
+	report.ReviewedByAccountID = strings.TrimSpace(report.ReviewedByAccountID)
 	if report.ID == "" || report.TargetKind == conversation.ModerationTargetKindUnspecified || report.TargetID == "" || report.ReporterAccountID == "" || report.Reason == "" {
 		return conversation.ModerationReport{}, conversation.ErrInvalidInput
 	}
@@ -86,6 +91,18 @@ func (s *memoryStore) SaveModerationReport(ctx context.Context, report conversat
 		return conversation.ModerationReport{}, conversation.ErrInvalidInput
 	}
 	if report.CreatedAt.IsZero() || report.UpdatedAt.IsZero() || report.UpdatedAt.Before(report.CreatedAt) {
+		return conversation.ModerationReport{}, conversation.ErrInvalidInput
+	}
+	switch report.Status {
+	case conversation.ModerationReportStatusPending:
+		if report.ReviewedByAccountID != "" || !report.ReviewedAt.IsZero() {
+			return conversation.ModerationReport{}, conversation.ErrInvalidInput
+		}
+	case conversation.ModerationReportStatusResolved, conversation.ModerationReportStatusRejected:
+		if report.ReviewedByAccountID == "" || report.ReviewedAt.IsZero() {
+			return conversation.ModerationReport{}, conversation.ErrInvalidInput
+		}
+	default:
 		return conversation.ModerationReport{}, conversation.ErrInvalidInput
 	}
 
@@ -153,6 +170,9 @@ func (s *memoryStore) SaveModerationAction(ctx context.Context, action conversat
 	}
 	if action.CreatedAt.IsZero() {
 		return conversation.ModerationAction{}, conversation.ErrInvalidInput
+	}
+	if _, exists := s.moderationActionsByID[moderationActionKey(action.ID)]; exists {
+		return conversation.ModerationAction{}, conversation.ErrConflict
 	}
 
 	s.moderationActionsByID[moderationActionKey(action.ID)] = cloneModerationAction(action)

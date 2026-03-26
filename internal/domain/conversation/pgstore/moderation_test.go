@@ -93,6 +93,19 @@ func TestModerationSchemaLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, conversation.ModerationReportStatusPending, report.Status)
 
+	_, err = store.SaveModerationReport(context.Background(), conversation.ModerationReport{
+		ID:                "rep-invalid",
+		TargetKind:        conversation.ModerationTargetKindConversation,
+		TargetID:          "conv-1",
+		ReporterAccountID: "acc-peer",
+		TargetAccountID:   "acc-owner",
+		Reason:            "spam",
+		Status:            conversation.ModerationReportStatusResolved,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	})
+	require.ErrorIs(t, err, conversation.ErrInvalidInput)
+
 	loadedReport, err := store.ModerationReportByID(context.Background(), report.ID)
 	require.NoError(t, err)
 	require.Equal(t, report.ID, loadedReport.ID)
@@ -112,6 +125,17 @@ func TestModerationSchemaLifecycle(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "mod-1", action.ID)
+
+	_, err = store.SaveModerationAction(context.Background(), conversation.ModerationAction{
+		ID:              "mod-1",
+		TargetKind:      conversation.ModerationTargetKindConversation,
+		TargetID:        "conv-1",
+		ActorAccountID:  "acc-owner",
+		TargetAccountID: "acc-peer",
+		Type:            conversation.ModerationActionTypeMute,
+		CreatedAt:       now.Add(time.Minute),
+	})
+	require.ErrorIs(t, err, conversation.ErrConflict)
 
 	actions, err := store.ModerationActionsByTarget(context.Background(), conversation.ModerationTargetKindConversation, "conv-1")
 	require.NoError(t, err)
@@ -176,4 +200,43 @@ INSERT INTO tenant.conversation_moderation_policies (
 		time.Now().UTC(),
 	)
 	require.Error(t, err)
+}
+
+func TestModerationPolicyRejectsAntiSpamMismatch(t *testing.T) {
+	db := openDockerPostgres(t)
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	migrationsPath := repoMigrationsPath(t,
+		"0001.sql",
+		"0002_identity_hardening.sql",
+		"0003_identity_account_boundaries.sql",
+		"0004_identity_session_device_deferrable.sql",
+		"0005.sql",
+		"0006.sql",
+		"0009.sql",
+		"0010.sql",
+		"0011.sql",
+		"0012.sql",
+		"0016.sql",
+	)
+	require.NoError(t, platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"))
+
+	seedIdentity(t, db, "tenant",
+		"acc-owner", "owner", "owner@example.com", "dev-owner", "sess-owner",
+	)
+
+	store, err := New(db, "tenant")
+	require.NoError(t, err)
+
+	_, err = store.SaveModerationPolicy(context.Background(), conversation.ModerationPolicy{
+		TargetKind:         conversation.ModerationTargetKindConversation,
+		TargetID:           "conv-anti-spam",
+		OnlyAdminsCanWrite: true,
+		AntiSpamWindow:     time.Hour,
+		CreatedAt:          time.Now().UTC(),
+		UpdatedAt:          time.Now().UTC(),
+	})
+	require.ErrorIs(t, err, conversation.ErrInvalidInput)
 }

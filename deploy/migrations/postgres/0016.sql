@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS {{schema}}.conversation_moderation_policies (
 	CHECK (slow_mode_interval_nanos >= 0),
 	CHECK (anti_spam_window_nanos >= 0),
 	CHECK (anti_spam_burst_limit >= 0),
+	CHECK (
+		(anti_spam_window_nanos = 0 AND anti_spam_burst_limit = 0)
+		OR (anti_spam_window_nanos > 0 AND anti_spam_burst_limit > 0)
+	),
 	CHECK (created_at <= updated_at)
 );
 
@@ -52,6 +56,18 @@ CREATE TABLE IF NOT EXISTS {{schema}}.conversation_moderation_reports (
 	CHECK (
 		(reviewed_by_account_id = '' AND reviewed_at IS NULL)
 		OR (reviewed_by_account_id <> '' AND reviewed_at IS NOT NULL)
+	),
+	CHECK (
+		(
+			status = 'pending'
+			AND reviewed_by_account_id = ''
+			AND reviewed_at IS NULL
+		)
+		OR (
+			status IN ('resolved', 'rejected')
+			AND reviewed_by_account_id <> ''
+			AND reviewed_at IS NOT NULL
+		)
 	),
 	CHECK (reviewed_at IS NULL OR reviewed_at >= created_at),
 	CHECK (created_at <= updated_at)

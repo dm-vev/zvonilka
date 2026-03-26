@@ -49,6 +49,9 @@ func (s *Store) saveModerationPolicy(ctx context.Context, policy conversation.Mo
 	if policy.CreatedAt.IsZero() || policy.UpdatedAt.IsZero() || policy.UpdatedAt.Before(policy.CreatedAt) {
 		return conversation.ModerationPolicy{}, conversation.ErrInvalidInput
 	}
+	if (policy.AntiSpamWindow == 0) != (policy.AntiSpamBurstLimit == 0) {
+		return conversation.ModerationPolicy{}, conversation.ErrInvalidInput
+	}
 
 	query := fmt.Sprintf(`
 INSERT INTO %s (
@@ -177,6 +180,18 @@ func (s *Store) saveModerationReport(ctx context.Context, report conversation.Mo
 		return conversation.ModerationReport{}, conversation.ErrInvalidInput
 	}
 	if report.CreatedAt.IsZero() || report.UpdatedAt.IsZero() || report.UpdatedAt.Before(report.CreatedAt) {
+		return conversation.ModerationReport{}, conversation.ErrInvalidInput
+	}
+	switch report.Status {
+	case conversation.ModerationReportStatusPending:
+		if report.ReviewedByAccountID != "" || !report.ReviewedAt.IsZero() {
+			return conversation.ModerationReport{}, conversation.ErrInvalidInput
+		}
+	case conversation.ModerationReportStatusResolved, conversation.ModerationReportStatusRejected:
+		if report.ReviewedByAccountID == "" || report.ReviewedAt.IsZero() {
+			return conversation.ModerationReport{}, conversation.ErrInvalidInput
+		}
+	default:
 		return conversation.ModerationReport{}, conversation.ErrInvalidInput
 	}
 
@@ -351,16 +366,6 @@ INSERT INTO %s (
 ) VALUES (
 	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 )
-ON CONFLICT (id) DO UPDATE SET
-	target_kind = EXCLUDED.target_kind,
-	target_id = EXCLUDED.target_id,
-	actor_account_id = EXCLUDED.actor_account_id,
-	target_account_id = EXCLUDED.target_account_id,
-	type = EXCLUDED.type,
-	duration_seconds = EXCLUDED.duration_seconds,
-	reason = EXCLUDED.reason,
-	metadata = EXCLUDED.metadata,
-	created_at = EXCLUDED.created_at
 RETURNING %s
 `, s.table("conversation_moderation_actions"), moderationActionColumnList)
 
