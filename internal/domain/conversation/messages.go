@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -11,6 +12,7 @@ func (s *Service) ListMessages(ctx context.Context, params ListMessagesParams) (
 	if err := s.validateContext(ctx, "list messages"); err != nil {
 		return nil, err
 	}
+	now := s.currentTime()
 	params.ConversationID = strings.TrimSpace(params.ConversationID)
 	params.AccountID = strings.TrimSpace(params.AccountID)
 	params.ThreadID = strings.TrimSpace(params.ThreadID)
@@ -25,17 +27,43 @@ func (s *Service) ListMessages(ctx context.Context, params ListMessagesParams) (
 	if !isActiveMember(member) {
 		return nil, ErrForbidden
 	}
+	conversation, err := s.store.ConversationByID(ctx, params.ConversationID)
+	if err != nil {
+		return nil, fmt.Errorf("load conversation %s: %w", params.ConversationID, err)
+	}
 	if params.ThreadID != "" {
-		conversation, err := s.store.ConversationByID(ctx, params.ConversationID)
-		if err != nil {
-			return nil, fmt.Errorf("load conversation %s for thread %s: %w", params.ConversationID, params.ThreadID, err)
-		}
 		if conversation.Kind != ConversationKindGroup || !conversation.Settings.AllowThreads {
 			return nil, ErrForbidden
 		}
 		if _, err := s.store.TopicByConversationAndID(ctx, params.ConversationID, params.ThreadID); err != nil {
 			return nil, fmt.Errorf("load topic %s in conversation %s: %w", params.ThreadID, params.ConversationID, err)
 		}
+	}
+
+	shadowedAccounts := make(map[string]struct{})
+	targetKind, targetID := moderationTarget(conversation, params.ThreadID)
+	collectRestrictions := func(restrictions []ModerationRestriction) {
+		for _, restriction := range restrictions {
+			if restriction.State != ModerationRestrictionStateShadowed {
+				continue
+			}
+			if !restriction.ExpiresAt.IsZero() && !now.Before(restriction.ExpiresAt) {
+				continue
+			}
+			shadowedAccounts[restriction.AccountID] = struct{}{}
+		}
+	}
+	restrictions, err := s.store.ModerationRestrictionsByTarget(ctx, targetKind, targetID)
+	if err != nil {
+		return nil, fmt.Errorf("load moderation restrictions for %s:%s: %w", targetKind, targetID, err)
+	}
+	collectRestrictions(restrictions)
+	if params.ThreadID != "" {
+		fallbackRestrictions, fallbackErr := s.store.ModerationRestrictionsByTarget(ctx, ModerationTargetKindConversation, conversation.ID)
+		if fallbackErr != nil {
+			return nil, fmt.Errorf("load moderation restrictions for %s:%s: %w", ModerationTargetKindConversation, conversation.ID, fallbackErr)
+		}
+		collectRestrictions(fallbackRestrictions)
 	}
 
 	limit := clampLimit(params.Limit, 100, 500)
@@ -51,6 +79,11 @@ func (s *Service) ListMessages(ctx context.Context, params ListMessagesParams) (
 	filtered := messages[:0]
 	for _, message := range messages {
 		if message.DeletedAt.IsZero() {
+			if _, shadowed := shadowedAccounts[message.SenderAccountID]; shadowed && message.SenderAccountID != params.AccountID {
+				if member.Role != MemberRoleOwner && member.Role != MemberRoleAdmin {
+					continue
+				}
+			}
 			filtered = append(filtered, message)
 		}
 	}
@@ -89,6 +122,7 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 	var (
 		savedMessage Message
 		savedEvent   EventEnvelope
+		decision     ModerationDecision
 	)
 
 	err := s.runTx(ctx, func(tx Store) error {
@@ -102,12 +136,6 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 		}
 		if !isActiveMember(member) {
 			return ErrForbidden
-		}
-		if conversation.Settings.OnlyAdminsCanWrite && member.Role != MemberRoleOwner && member.Role != MemberRoleAdmin {
-			return ErrForbidden
-		}
-		if err := ValidateMessagePayload(draft.Payload, conversation.Settings.RequireEncryptedMessages); err != nil {
-			return ErrInvalidInput
 		}
 		if len(draft.MentionAccountIDs) > 0 {
 			members, loadErr := tx.ConversationMembersByConversationID(ctx, conversation.ID)
@@ -131,6 +159,26 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 		}
 		if topic.Archived || topic.Closed {
 			return ErrForbidden
+		}
+
+		policy, err := s.policyForConversation(ctx, tx, conversation, topic.ID)
+		if err != nil {
+			return err
+		}
+		if err := ValidateMessagePayload(draft.Payload, policy.RequireEncryptedMessages); err != nil {
+			return ErrInvalidInput
+		}
+		targetKind, targetID := moderationTarget(conversation, topic.ID)
+		decision, err = s.CheckModerationWrite(ctx, CheckModerationWriteParams{
+			TargetKind:     targetKind,
+			TargetID:       targetID,
+			ActorAccountID: params.SenderAccountID,
+			ActorRole:      member.Role,
+			BasePolicy:     policy,
+			CreatedAt:      now,
+		})
+		if err != nil {
+			return err
 		}
 
 		replyTo := draft.ReplyTo
@@ -207,6 +255,26 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 			return fmt.Errorf("save message event: %w", err)
 		}
 
+		rateState, stateErr := tx.ModerationRateStateByTargetAndAccount(ctx, targetKind, targetID, params.SenderAccountID)
+		if stateErr != nil && !errors.Is(stateErr, ErrNotFound) {
+			return fmt.Errorf("load moderation rate state: %w", stateErr)
+		}
+
+		rateState.TargetKind = targetKind
+		rateState.TargetID = targetID
+		rateState.AccountID = params.SenderAccountID
+		rateState.LastWriteAt = now
+		if rateState.WindowStartedAt.IsZero() || now.Sub(rateState.WindowStartedAt) >= policy.AntiSpamWindow {
+			rateState.WindowStartedAt = now
+			rateState.WindowCount = 1
+		} else {
+			rateState.WindowCount++
+		}
+		rateState.UpdatedAt = now
+		if _, err := tx.SaveModerationRateState(ctx, rateState); err != nil {
+			return fmt.Errorf("save moderation rate state: %w", err)
+		}
+
 		topic.LastSequence = savedEvent.Sequence
 		topic.MessageCount++
 		topic.LastMessageAt = now
@@ -242,14 +310,14 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 			return fmt.Errorf("update conversation %s after message: %w", conversation.ID, err)
 		}
 
-		state := SyncState{
+		syncState := SyncState{
 			DeviceID:            params.SenderDeviceID,
 			AccountID:           params.SenderAccountID,
 			LastAppliedSequence: savedEvent.Sequence,
 			LastAckedSequence:   savedEvent.Sequence,
 			ServerTime:          now,
 		}
-		if _, err := tx.SaveSyncState(ctx, state); err != nil {
+		if _, err := tx.SaveSyncState(ctx, syncState); err != nil {
 			return fmt.Errorf("save sync state: %w", err)
 		}
 
@@ -259,7 +327,9 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 		return Message{}, EventEnvelope{}, err
 	}
 
-	s.indexMessage(ctx, savedMessage)
+	if !decision.ShadowHidden {
+		s.indexMessage(ctx, savedMessage)
+	}
 	s.indexConversationByID(ctx, savedMessage.ConversationID)
 
 	return savedMessage, savedEvent, nil

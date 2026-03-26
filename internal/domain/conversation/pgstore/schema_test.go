@@ -36,6 +36,7 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 		"0010.sql",
 		"0011.sql",
 		"0012.sql",
+		"0016.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -201,6 +202,7 @@ func TestConversationSchemaConstraints(t *testing.T) {
 		"0010.sql",
 		"0011.sql",
 		"0012.sql",
+		"0016.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -256,6 +258,7 @@ func TestConversationTopicSchemaLifecycle(t *testing.T) {
 		"0010.sql",
 		"0011.sql",
 		"0012.sql",
+		"0016.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -465,6 +468,7 @@ func TestConversationMessageActionSchemaLifecycle(t *testing.T) {
 		"0010.sql",
 		"0011.sql",
 		"0012.sql",
+		"0016.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)

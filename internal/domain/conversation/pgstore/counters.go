@@ -31,7 +31,7 @@ WITH requested AS (
 	SELECT unnest($2::text[]) AS conversation_id
 ),
 members AS (
-	SELECT conversation_id, joined_at
+	SELECT conversation_id, role, joined_at
 	FROM %s
 	WHERE account_id = $1 AND conversation_id = ANY($2) AND left_at IS NULL AND banned = FALSE
 ),
@@ -50,6 +50,26 @@ counts AS (
 				AND m.status <> 'deleted'
 				AND m.sender_account_id <> $1
 				AND m.created_at >= members.joined_at
+				AND (
+					members.role IN ('owner', 'admin')
+					OR NOT EXISTS (
+						SELECT 1
+						FROM %s AS rs
+						WHERE rs.state = 'shadowed'
+							AND rs.account_id = m.sender_account_id
+							AND (
+								(rs.target_kind = 'conversation' AND rs.target_id = m.conversation_id)
+								OR (
+									rs.target_kind = 'topic'
+									AND rs.target_id = CASE
+										WHEN m.thread_id = '' THEN ''
+										ELSE m.conversation_id || %s || m.thread_id
+									END
+								)
+							)
+							AND (rs.expires_at IS NULL OR rs.expires_at > CURRENT_TIMESTAMP)
+					)
+				)
 		) AS unread_count,
 		COUNT(*) FILTER (
 			WHERE m.sequence > COALESCE(w.last_read_sequence, 0)
@@ -58,6 +78,26 @@ counts AS (
 				AND m.sender_account_id <> $1
 				AND m.created_at >= members.joined_at
 				AND mm.account_id IS NOT NULL
+				AND (
+					members.role IN ('owner', 'admin')
+					OR NOT EXISTS (
+						SELECT 1
+						FROM %s AS rs
+						WHERE rs.state = 'shadowed'
+							AND rs.account_id = m.sender_account_id
+							AND (
+								(rs.target_kind = 'conversation' AND rs.target_id = m.conversation_id)
+								OR (
+									rs.target_kind = 'topic'
+									AND rs.target_id = CASE
+										WHEN m.thread_id = '' THEN ''
+										ELSE m.conversation_id || %s || m.thread_id
+									END
+								)
+							)
+							AND (rs.expires_at IS NULL OR rs.expires_at > CURRENT_TIMESTAMP)
+					)
+				)
 		) AS unread_mention_count
 	FROM %s AS m
 	JOIN members ON members.conversation_id = m.conversation_id
@@ -70,7 +110,7 @@ SELECT requested.conversation_id, COALESCE(counts.unread_count, 0), COALESCE(cou
 FROM requested
 LEFT JOIN counts ON counts.conversation_id = requested.conversation_id
 ORDER BY requested.conversation_id ASC
-`, s.table("conversation_members"), s.table("conversation_read_states"), s.table("conversation_messages"), s.table("conversation_message_mentions"))
+`, s.table("conversation_members"), s.table("conversation_read_states"), s.table("conversation_moderation_restrictions"), "E'\\x1f'", s.table("conversation_moderation_restrictions"), "E'\\x1f'", s.table("conversation_messages"), s.table("conversation_message_mentions"))
 
 	rows, err := s.conn().QueryContext(ctx, query, accountID, conversationIDs)
 	if err != nil {

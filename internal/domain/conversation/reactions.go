@@ -60,7 +60,30 @@ func (s *Service) AddMessageReaction(ctx context.Context, params AddMessageReact
 		if err != nil {
 			return err
 		}
-		if !state.conversation.Settings.AllowReactions {
+		policy, err := s.policyForConversation(ctx, tx, state.conversation, state.topic.ID)
+		if err != nil {
+			return err
+		}
+		if !policy.AllowReactions {
+			return ErrForbidden
+		}
+		checkPolicy := policy
+		checkPolicy.SlowModeInterval = 0
+		checkPolicy.AntiSpamWindow = 0
+		checkPolicy.AntiSpamBurstLimit = 0
+		targetKind, targetID := moderationTarget(state.conversation, state.topic.ID)
+		decision, err := s.CheckModerationWrite(ctx, CheckModerationWriteParams{
+			TargetKind:     targetKind,
+			TargetID:       targetID,
+			ActorAccountID: params.ActorAccountID,
+			ActorRole:      state.member.Role,
+			BasePolicy:     checkPolicy,
+			CreatedAt:      now,
+		})
+		if err != nil {
+			return err
+		}
+		if !decision.Allowed {
 			return ErrForbidden
 		}
 		if !state.message.DeletedAt.IsZero() || state.message.Status == MessageStatusDeleted {
@@ -162,7 +185,30 @@ func (s *Service) RemoveMessageReaction(ctx context.Context, params RemoveMessag
 		if err != nil {
 			return err
 		}
-		if !state.conversation.Settings.AllowReactions {
+		policy, err := s.policyForConversation(ctx, tx, state.conversation, state.topic.ID)
+		if err != nil {
+			return err
+		}
+		if !policy.AllowReactions {
+			return ErrForbidden
+		}
+		checkPolicy := policy
+		checkPolicy.SlowModeInterval = 0
+		checkPolicy.AntiSpamWindow = 0
+		checkPolicy.AntiSpamBurstLimit = 0
+		targetKind, targetID := moderationTarget(state.conversation, state.topic.ID)
+		decision, err := s.CheckModerationWrite(ctx, CheckModerationWriteParams{
+			TargetKind:     targetKind,
+			TargetID:       targetID,
+			ActorAccountID: params.ActorAccountID,
+			ActorRole:      state.member.Role,
+			BasePolicy:     checkPolicy,
+			CreatedAt:      now,
+		})
+		if err != nil {
+			return err
+		}
+		if !decision.Allowed {
 			return ErrForbidden
 		}
 		if !state.message.DeletedAt.IsZero() || state.message.Status == MessageStatusDeleted {

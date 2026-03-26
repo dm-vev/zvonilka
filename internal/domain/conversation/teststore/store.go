@@ -9,30 +9,40 @@ import (
 // NewMemoryStore builds a concurrency-safe in-memory conversation store for tests.
 func NewMemoryStore() conversation.Store {
 	return &memoryStore{
-		conversationsByID:  make(map[string]conversation.Conversation),
-		topicsByKey:        make(map[string]conversation.ConversationTopic),
-		membersByKey:       make(map[string]conversation.ConversationMember),
-		messagesByID:       make(map[string]conversation.Message),
-		reactionsByKey:     make(map[string]conversation.MessageReaction),
-		readStatesByKey:    make(map[string]conversation.ReadState),
-		syncStatesByDevice: make(map[string]conversation.SyncState),
-		eventsByID:         make(map[string]conversation.EventEnvelope),
+		conversationsByID:       make(map[string]conversation.Conversation),
+		topicsByKey:             make(map[string]conversation.ConversationTopic),
+		membersByKey:            make(map[string]conversation.ConversationMember),
+		messagesByID:            make(map[string]conversation.Message),
+		reactionsByKey:          make(map[string]conversation.MessageReaction),
+		readStatesByKey:         make(map[string]conversation.ReadState),
+		syncStatesByDevice:      make(map[string]conversation.SyncState),
+		eventsByID:              make(map[string]conversation.EventEnvelope),
+		moderationPoliciesByKey: make(map[string]conversation.ModerationPolicy),
+		moderationReportsByID:   make(map[string]conversation.ModerationReport),
+		moderationActionsByID:   make(map[string]conversation.ModerationAction),
+		moderationRestrictions:  make(map[string]conversation.ModerationRestriction),
+		moderationRateStates:    make(map[string]conversation.ModerationRateState),
 	}
 }
 
 type memoryStore struct {
 	mu sync.RWMutex
 
-	conversationsByID  map[string]conversation.Conversation
-	topicsByKey        map[string]conversation.ConversationTopic
-	membersByKey       map[string]conversation.ConversationMember
-	messagesByID       map[string]conversation.Message
-	reactionsByKey     map[string]conversation.MessageReaction
-	readStatesByKey    map[string]conversation.ReadState
-	syncStatesByDevice map[string]conversation.SyncState
-	eventsByID         map[string]conversation.EventEnvelope
-	eventOrder         []string
-	nextSequence       uint64
+	conversationsByID       map[string]conversation.Conversation
+	topicsByKey             map[string]conversation.ConversationTopic
+	membersByKey            map[string]conversation.ConversationMember
+	messagesByID            map[string]conversation.Message
+	reactionsByKey          map[string]conversation.MessageReaction
+	readStatesByKey         map[string]conversation.ReadState
+	syncStatesByDevice      map[string]conversation.SyncState
+	eventsByID              map[string]conversation.EventEnvelope
+	moderationPoliciesByKey map[string]conversation.ModerationPolicy
+	moderationReportsByID   map[string]conversation.ModerationReport
+	moderationActionsByID   map[string]conversation.ModerationAction
+	moderationRestrictions  map[string]conversation.ModerationRestriction
+	moderationRateStates    map[string]conversation.ModerationRateState
+	eventOrder              []string
+	nextSequence            uint64
 }
 
 func conversationMemberKey(conversationID, accountID string) string {

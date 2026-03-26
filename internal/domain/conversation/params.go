@@ -211,3 +211,84 @@ type CloseTopicParams struct {
 	Closed         bool
 	UpdatedAt      time.Time
 }
+
+// SetModerationPolicyParams describes a moderation policy override write.
+type SetModerationPolicyParams struct {
+	TargetKind               ModerationTargetKind
+	TargetID                 string
+	ActorAccountID           string
+	OnlyAdminsCanWrite       bool
+	OnlyAdminsCanAddMembers  bool
+	AllowReactions           bool
+	AllowForwards            bool
+	AllowThreads             bool
+	RequireEncryptedMessages bool
+	RequireJoinApproval      bool
+	PinnedMessagesOnlyAdmins bool
+	SlowModeInterval         time.Duration
+	AntiSpamWindow           time.Duration
+	AntiSpamBurstLimit       int
+	ShadowMode               bool
+	CreatedAt                time.Time
+}
+
+// SubmitModerationReportParams describes a complaint submission.
+type SubmitModerationReportParams struct {
+	TargetKind        ModerationTargetKind
+	TargetID          string
+	ReporterAccountID string
+	TargetAccountID   string
+	Reason            string
+	Details           string
+	CreatedAt         time.Time
+}
+
+// ResolveModerationReportParams describes a moderation report resolution.
+type ResolveModerationReportParams struct {
+	ReportID          string
+	ResolverAccountID string
+	Resolved          bool
+	Resolution        string
+	ReviewedAt        time.Time
+}
+
+// ApplyModerationRestrictionParams describes a moderation restriction write.
+type ApplyModerationRestrictionParams struct {
+	TargetKind      ModerationTargetKind
+	TargetID        string
+	ActorAccountID  string
+	TargetAccountID string
+	State           ModerationRestrictionState
+	Reason          string
+	Duration        time.Duration
+	CreatedAt       time.Time
+}
+
+// LiftModerationRestrictionParams removes an active moderation restriction.
+type LiftModerationRestrictionParams struct {
+	TargetKind      ModerationTargetKind
+	TargetID        string
+	ActorAccountID  string
+	TargetAccountID string
+	Reason          string
+	CreatedAt       time.Time
+}
+
+// CheckModerationWriteParams evaluates whether a message may be accepted.
+type CheckModerationWriteParams struct {
+	TargetKind     ModerationTargetKind
+	TargetID       string
+	ActorAccountID string
+	ActorRole      MemberRole
+	BasePolicy     ModerationPolicy
+	CreatedAt      time.Time
+}
+
+// RecordModerationWriteParams records a successful write for slow-mode tracking.
+type RecordModerationWriteParams struct {
+	TargetKind     ModerationTargetKind
+	TargetID       string
+	ActorAccountID string
+	AntiSpamWindow time.Duration
+	CreatedAt      time.Time
+}
