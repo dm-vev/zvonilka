@@ -16,3 +16,8 @@ func NormalizeQueueEntry(entry QueueEntry, now time.Time) (QueueEntry, error) {
 func NormalizeCursor(cursor Cursor, now time.Time) (Cursor, error) {
 	return cursor.normalize(now)
 }
+
+// NormalizeCallback validates and normalizes one callback query record.
+func NormalizeCallback(callback Callback, now time.Time) (Callback, error) {
+	return callback.normalize(now)
+}

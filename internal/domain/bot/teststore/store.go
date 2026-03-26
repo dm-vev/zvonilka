@@ -16,6 +16,7 @@ func NewMemoryStore() bot.Store {
 		updatesByID:    make(map[int64]bot.QueueEntry),
 		updateIDsByBot: make(map[string][]int64),
 		updateIDByKey:  make(map[string]int64),
+		callbacksByID:  make(map[string]bot.Callback),
 		cursorsByName:  make(map[string]bot.Cursor),
 		nextUpdateID:   1,
 	}
@@ -28,6 +29,7 @@ type memoryStore struct {
 	updatesByID    map[int64]bot.QueueEntry
 	updateIDsByBot map[string][]int64
 	updateIDByKey  map[string]int64
+	callbacksByID  map[string]bot.Callback
 	cursorsByName  map[string]bot.Cursor
 	nextUpdateID   int64
 }
@@ -276,6 +278,47 @@ func (s *memoryStore) SaveCursor(_ context.Context, cursor bot.Cursor) (bot.Curs
 	return cloneCursor(value), nil
 }
 
+func (s *memoryStore) SaveCallback(_ context.Context, callback bot.Callback) (bot.Callback, error) {
+	value, err := bot.NormalizeCallback(callback, time.Now().UTC())
+	if err != nil {
+		return bot.Callback{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.callbacksByID[value.ID] = cloneCallback(value)
+
+	return cloneCallback(value), nil
+}
+
+func (s *memoryStore) CallbackByID(_ context.Context, callbackID string) (bot.Callback, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	value, ok := s.callbacksByID[callbackID]
+	if !ok {
+		return bot.Callback{}, bot.ErrNotFound
+	}
+
+	return cloneCallback(value), nil
+}
+
+func (s *memoryStore) AnswerCallback(_ context.Context, callback bot.Callback) (bot.Callback, error) {
+	value, err := bot.NormalizeCallback(callback, time.Now().UTC())
+	if err != nil {
+		return bot.Callback{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.callbacksByID[value.ID]; !ok {
+		return bot.Callback{}, bot.ErrNotFound
+	}
+	s.callbacksByID[value.ID] = cloneCallback(value)
+
+	return cloneCallback(value), nil
+}
+
 func (s *memoryStore) CursorByName(_ context.Context, name string) (bot.Cursor, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -303,6 +346,9 @@ func (s *memoryStore) cloneLocked() *memoryStore {
 	for key, value := range s.updateIDByKey {
 		clone.updateIDByKey[key] = value
 	}
+	for key, value := range s.callbacksByID {
+		clone.callbacksByID[key] = cloneCallback(value)
+	}
 	for key, value := range s.cursorsByName {
 		clone.cursorsByName[key] = cloneCursor(value)
 	}
@@ -315,6 +361,7 @@ func (s *memoryStore) replaceLocked(snapshot *memoryStore) {
 	s.updatesByID = snapshot.updatesByID
 	s.updateIDsByBot = snapshot.updateIDsByBot
 	s.updateIDByKey = snapshot.updateIDByKey
+	s.callbacksByID = snapshot.callbacksByID
 	s.cursorsByName = snapshot.cursorsByName
 	s.nextUpdateID = snapshot.nextUpdateID
 }
@@ -365,10 +412,18 @@ func cloneUpdate(value bot.Update) bot.Update {
 		message := cloneMessage(*value.EditedChannelPost)
 		value.EditedChannelPost = &message
 	}
+	if value.CallbackQuery != nil {
+		query := cloneCallbackQuery(*value.CallbackQuery)
+		value.CallbackQuery = &query
+	}
 	return value
 }
 
 func cloneMessage(value bot.Message) bot.Message {
+	if value.ReplyMarkup != nil {
+		markup := cloneMarkup(*value.ReplyMarkup)
+		value.ReplyMarkup = &markup
+	}
 	value.Photo = append([]bot.PhotoSize(nil), value.Photo...)
 	if value.Document != nil {
 		document := *value.Document
@@ -394,5 +449,27 @@ func cloneMessage(value bot.Message) bot.Message {
 }
 
 func cloneCursor(value bot.Cursor) bot.Cursor {
+	return value
+}
+
+func cloneCallback(value bot.Callback) bot.Callback {
+	return value
+}
+
+func cloneCallbackQuery(value bot.CallbackQuery) bot.CallbackQuery {
+	if value.Message != nil {
+		message := cloneMessage(*value.Message)
+		value.Message = &message
+	}
+
+	return value
+}
+
+func cloneMarkup(value bot.InlineKeyboardMarkup) bot.InlineKeyboardMarkup {
+	value.InlineKeyboard = append([][]bot.InlineKeyboardButton(nil), value.InlineKeyboard...)
+	for i := range value.InlineKeyboard {
+		value.InlineKeyboard[i] = append([]bot.InlineKeyboardButton(nil), value.InlineKeyboard[i]...)
+	}
+
 	return value
 }

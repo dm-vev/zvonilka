@@ -12,6 +12,7 @@ type normalizedMediaRequest struct {
 	MediaID             string
 	Caption             string
 	ReplyToMessageID    textID
+	ReplyMarkup         *domainbot.InlineKeyboardMarkup
 	DisableNotification bool
 }
 
@@ -28,6 +29,7 @@ func (a *api) sendMessage(writer http.ResponseWriter, request *http.Request, tok
 		MessageThreadID:       string(payload.MessageThreadID),
 		Text:                  payload.Text,
 		ReplyToMessageID:      string(payload.ReplyToMessageID),
+		ReplyMarkup:           payload.ReplyMarkup,
 		DisableNotification:   payload.DisableNotification,
 		DisableWebPagePreview: payload.DisableWebPagePreview,
 	})
@@ -49,6 +51,7 @@ func (a *api) sendPhoto(writer http.ResponseWriter, request *http.Request, token
 			MediaID:             payload.Photo,
 			Caption:             payload.Caption,
 			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		}
 	}, func(payload normalizedMediaRequest) (domainbot.Message, error) {
@@ -59,6 +62,7 @@ func (a *api) sendPhoto(writer http.ResponseWriter, request *http.Request, token
 			MediaID:             payload.MediaID,
 			Caption:             payload.Caption,
 			ReplyToMessageID:    string(payload.ReplyToMessageID),
+			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		})
 	})
@@ -73,6 +77,7 @@ func (a *api) sendDocument(writer http.ResponseWriter, request *http.Request, to
 			MediaID:             payload.Document,
 			Caption:             payload.Caption,
 			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		}
 	}, func(payload normalizedMediaRequest) (domainbot.Message, error) {
@@ -83,6 +88,7 @@ func (a *api) sendDocument(writer http.ResponseWriter, request *http.Request, to
 			MediaID:             payload.MediaID,
 			Caption:             payload.Caption,
 			ReplyToMessageID:    string(payload.ReplyToMessageID),
+			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		})
 	})
@@ -97,6 +103,7 @@ func (a *api) sendVideo(writer http.ResponseWriter, request *http.Request, token
 			MediaID:             payload.Video,
 			Caption:             payload.Caption,
 			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		}
 	}, func(payload normalizedMediaRequest) (domainbot.Message, error) {
@@ -107,6 +114,7 @@ func (a *api) sendVideo(writer http.ResponseWriter, request *http.Request, token
 			MediaID:             payload.MediaID,
 			Caption:             payload.Caption,
 			ReplyToMessageID:    string(payload.ReplyToMessageID),
+			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		})
 	})
@@ -121,6 +129,7 @@ func (a *api) sendVoice(writer http.ResponseWriter, request *http.Request, token
 			MediaID:             payload.Voice,
 			Caption:             payload.Caption,
 			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		}
 	}, func(payload normalizedMediaRequest) (domainbot.Message, error) {
@@ -131,6 +140,7 @@ func (a *api) sendVoice(writer http.ResponseWriter, request *http.Request, token
 			MediaID:             payload.MediaID,
 			Caption:             payload.Caption,
 			ReplyToMessageID:    string(payload.ReplyToMessageID),
+			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		})
 	})
@@ -144,6 +154,7 @@ func (a *api) sendSticker(writer http.ResponseWriter, request *http.Request, tok
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.Sticker,
 			ReplyToMessageID:    payload.ReplyToMessageID,
+			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		}
 	}, func(payload normalizedMediaRequest) (domainbot.Message, error) {
@@ -153,6 +164,7 @@ func (a *api) sendSticker(writer http.ResponseWriter, request *http.Request, tok
 			MessageThreadID:     string(payload.MessageThreadID),
 			MediaID:             payload.MediaID,
 			ReplyToMessageID:    string(payload.ReplyToMessageID),
+			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
 		})
 	})
@@ -192,6 +204,7 @@ func (a *api) editMessageText(writer http.ResponseWriter, request *http.Request,
 		ChatID:                string(payload.ChatID),
 		MessageID:             string(payload.MessageID),
 		Text:                  payload.Text,
+		ReplyMarkup:           payload.ReplyMarkup,
 		DisableWebPagePreview: payload.DisableWebPagePreview,
 	})
 	if err != nil {

@@ -147,6 +147,80 @@ func TestHTTPSendDocument(t *testing.T) {
 	require.Contains(t, recorder.Body.String(), `"file_id":"media-doc"`)
 }
 
+func TestHTTPAnswerCallbackQuery(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+
+	userAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "frank",
+		DisplayName: "Frank",
+		AccountKind: identity.AccountKindUser,
+		Email:       "frank@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "callbackbot",
+		DisplayName: "Callback Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	conv, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   userAccount.ID,
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{botAccount.ID},
+	})
+	require.NoError(t, err)
+
+	botService, err := domainbot.NewService(
+		bottest.NewMemoryStore(),
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaFixture{},
+	)
+	require.NoError(t, err)
+
+	message, err := botService.SendMessage(ctx, domainbot.SendMessageParams{
+		BotToken: botToken,
+		ChatID:   conv.ID,
+		Text:     "tap",
+		ReplyMarkup: &domainbot.InlineKeyboardMarkup{
+			InlineKeyboard: [][]domainbot.InlineKeyboardButton{{
+				{Text: "Tap", CallbackData: "tap"},
+			}},
+		},
+	})
+	require.NoError(t, err)
+	callback, err := botService.TriggerCallbackQuery(ctx, domainbot.TriggerCallbackParams{
+		ConversationID: conv.ID,
+		MessageID:      message.MessageID,
+		FromAccountID:  userAccount.ID,
+		Data:           "tap",
+	})
+	require.NoError(t, err)
+
+	boundary := &api{bot: botService}
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/bot"+botToken+"/answerCallbackQuery",
+		strings.NewReader(`{"callback_query_id":"`+callback.ID+`","text":"done"}`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	boundary.routes().ServeHTTP(recorder, request)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Contains(t, recorder.Body.String(), `"ok":true`)
+	require.Contains(t, recorder.Body.String(), `"result":true`)
+}
+
 type mediaFixture struct {
 	assets map[string]domainmedia.MediaAsset
 }

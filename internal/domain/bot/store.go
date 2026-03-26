@@ -29,6 +29,10 @@ type Store interface {
 	PendingUpdateCount(ctx context.Context, botAccountID string) (int, error)
 	RetryUpdate(ctx context.Context, params RetryParams) (QueueEntry, error)
 
+	SaveCallback(ctx context.Context, callback Callback) (Callback, error)
+	CallbackByID(ctx context.Context, callbackID string) (Callback, error)
+	AnswerCallback(ctx context.Context, callback Callback) (Callback, error)
+
 	SaveCursor(ctx context.Context, cursor Cursor) (Cursor, error)
 	CursorByName(ctx context.Context, name string) (Cursor, error)
 }

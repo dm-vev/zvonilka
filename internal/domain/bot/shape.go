@@ -204,12 +204,13 @@ func (s *Service) messageForConversation(
 	}
 
 	result := Message{
-		MessageID: msg.ID,
-		Date:      msg.CreatedAt.UTC().Unix(),
-		Chat:      chat,
-		From:      pointer(userFromAccount(sender)),
-		Text:      plainText(msg),
-		Caption:   messageCaption(msg),
+		MessageID:   msg.ID,
+		Date:        msg.CreatedAt.UTC().Unix(),
+		Chat:        chat,
+		From:        pointer(userFromAccount(sender)),
+		Text:        plainText(msg),
+		Caption:     messageCaption(msg),
+		ReplyMarkup: messageReplyMarkup(msg.Metadata),
 	}
 	if msg.ThreadID != "" {
 		result.MessageThreadID = msg.ThreadID

@@ -22,6 +22,10 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 	if params.ChatID == "" || params.Text == "" {
 		return Message{}, ErrInvalidInput
 	}
+	metadata, err := markupMetadata(nil, params.ReplyMarkup)
+	if err != nil {
+		return Message{}, err
+	}
 
 	draft := conversation.MessageDraft{
 		Kind: conversation.MessageKindText,
@@ -31,6 +35,7 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 		ThreadID:            params.MessageThreadID,
 		Silent:              params.DisableNotification,
 		DisableLinkPreviews: params.DisableWebPagePreview,
+		Metadata:            metadata,
 	}
 
 	var message conversation.Message
@@ -73,6 +78,10 @@ func (s *Service) EditMessageText(ctx context.Context, params EditMessageTextPar
 	if params.ChatID == "" || params.MessageID == "" || params.Text == "" {
 		return Message{}, ErrInvalidInput
 	}
+	metadata, err := markupMetadata(nil, params.ReplyMarkup)
+	if err != nil {
+		return Message{}, err
+	}
 
 	message, _, err := s.conversations.EditMessage(ctx, conversation.EditMessageParams{
 		ConversationID: params.ChatID,
@@ -85,6 +94,7 @@ func (s *Service) EditMessageText(ctx context.Context, params EditMessageTextPar
 				Ciphertext: []byte(params.Text),
 			},
 			DisableLinkPreviews: params.DisableWebPagePreview,
+			Metadata:            metadata,
 		},
 	})
 	if err != nil {

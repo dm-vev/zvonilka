@@ -15,6 +15,7 @@ const (
 	UpdateTypeEditedMessage     UpdateType = "edited_message"
 	UpdateTypeChannelPost       UpdateType = "channel_post"
 	UpdateTypeEditedChannelPost UpdateType = "edited_channel_post"
+	UpdateTypeCallbackQuery     UpdateType = "callback_query"
 )
 
 // ChatType identifies a Bot API chat kind.
@@ -69,6 +70,18 @@ type ChatMember struct {
 	Status MemberStatus `json:"status"`
 }
 
+// InlineKeyboardButton describes one Telegram-shaped inline keyboard button.
+type InlineKeyboardButton struct {
+	Text         string `json:"text"`
+	CallbackData string `json:"callback_data,omitempty"`
+	URL          string `json:"url,omitempty"`
+}
+
+// InlineKeyboardMarkup describes a Telegram-shaped inline keyboard layout.
+type InlineKeyboardMarkup struct {
+	InlineKeyboard [][]InlineKeyboardButton `json:"inline_keyboard"`
+}
+
 // File describes one bot-visible file projection.
 type File struct {
 	FileID       string `json:"file_id"`
@@ -118,29 +131,41 @@ type Sticker struct {
 
 // Message describes a Telegram-shaped message projection.
 type Message struct {
-	MessageID       string      `json:"message_id"`
-	MessageThreadID string      `json:"message_thread_id,omitempty"`
-	Date            int64       `json:"date"`
-	EditDate        int64       `json:"edit_date,omitempty"`
-	Chat            Chat        `json:"chat"`
-	From            *User       `json:"from,omitempty"`
-	Text            string      `json:"text,omitempty"`
-	Caption         string      `json:"caption,omitempty"`
-	Photo           []PhotoSize `json:"photo,omitempty"`
-	Document        *Document   `json:"document,omitempty"`
-	Video           *Video      `json:"video,omitempty"`
-	Voice           *Voice      `json:"voice,omitempty"`
-	Sticker         *Sticker    `json:"sticker,omitempty"`
-	ReplyToMessage  *Message    `json:"reply_to_message,omitempty"`
+	MessageID       string                `json:"message_id"`
+	MessageThreadID string                `json:"message_thread_id,omitempty"`
+	Date            int64                 `json:"date"`
+	EditDate        int64                 `json:"edit_date,omitempty"`
+	Chat            Chat                  `json:"chat"`
+	From            *User                 `json:"from,omitempty"`
+	Text            string                `json:"text,omitempty"`
+	Caption         string                `json:"caption,omitempty"`
+	Photo           []PhotoSize           `json:"photo,omitempty"`
+	Document        *Document             `json:"document,omitempty"`
+	Video           *Video                `json:"video,omitempty"`
+	Voice           *Voice                `json:"voice,omitempty"`
+	Sticker         *Sticker              `json:"sticker,omitempty"`
+	ReplyMarkup     *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+	ReplyToMessage  *Message              `json:"reply_to_message,omitempty"`
+}
+
+// CallbackQuery describes one Telegram-shaped callback query.
+type CallbackQuery struct {
+	ID              string   `json:"id"`
+	From            User     `json:"from"`
+	Message         *Message `json:"message,omitempty"`
+	ChatInstance    string   `json:"chat_instance"`
+	Data            string   `json:"data,omitempty"`
+	InlineMessageID string   `json:"inline_message_id,omitempty"`
 }
 
 // Update describes a Telegram-shaped update payload.
 type Update struct {
-	UpdateID          int64    `json:"update_id"`
-	Message           *Message `json:"message,omitempty"`
-	EditedMessage     *Message `json:"edited_message,omitempty"`
-	ChannelPost       *Message `json:"channel_post,omitempty"`
-	EditedChannelPost *Message `json:"edited_channel_post,omitempty"`
+	UpdateID          int64          `json:"update_id"`
+	Message           *Message       `json:"message,omitempty"`
+	EditedMessage     *Message       `json:"edited_message,omitempty"`
+	ChannelPost       *Message       `json:"channel_post,omitempty"`
+	EditedChannelPost *Message       `json:"edited_channel_post,omitempty"`
+	CallbackQuery     *CallbackQuery `json:"callback_query,omitempty"`
 }
 
 // Webhook stores one bot webhook configuration row.
@@ -176,6 +201,25 @@ type Cursor struct {
 	Name         string
 	LastSequence uint64
 	UpdatedAt    time.Time
+}
+
+// Callback stores one pending or answered callback query state.
+type Callback struct {
+	ID              string
+	BotAccountID    string
+	FromAccountID   string
+	ConversationID  string
+	MessageID       string
+	MessageThreadID string
+	ChatInstance    string
+	Data            string
+	AnsweredText    string
+	AnsweredURL     string
+	ShowAlert       bool
+	CacheTime       int
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	AnsweredAt      time.Time
 }
 
 // WebhookInfo describes the bot-visible webhook state.
@@ -239,6 +283,72 @@ func (c Cursor) normalize(now time.Time) (Cursor, error) {
 	}
 	if c.UpdatedAt.IsZero() {
 		c.UpdatedAt = now.UTC()
+	}
+
+	return c, nil
+}
+
+func (m InlineKeyboardMarkup) normalize() (InlineKeyboardMarkup, error) {
+	if len(m.InlineKeyboard) == 0 {
+		return InlineKeyboardMarkup{}, ErrInvalidInput
+	}
+
+	result := InlineKeyboardMarkup{
+		InlineKeyboard: make([][]InlineKeyboardButton, 0, len(m.InlineKeyboard)),
+	}
+	for _, row := range m.InlineKeyboard {
+		if len(row) == 0 {
+			continue
+		}
+		nextRow := make([]InlineKeyboardButton, 0, len(row))
+		for _, button := range row {
+			button.Text = strings.TrimSpace(button.Text)
+			button.CallbackData = strings.TrimSpace(button.CallbackData)
+			button.URL = strings.TrimSpace(button.URL)
+			if button.Text == "" {
+				return InlineKeyboardMarkup{}, ErrInvalidInput
+			}
+			if (button.CallbackData == "") == (button.URL == "") {
+				return InlineKeyboardMarkup{}, ErrInvalidInput
+			}
+			nextRow = append(nextRow, button)
+		}
+		if len(nextRow) > 0 {
+			result.InlineKeyboard = append(result.InlineKeyboard, nextRow)
+		}
+	}
+	if len(result.InlineKeyboard) == 0 {
+		return InlineKeyboardMarkup{}, ErrInvalidInput
+	}
+
+	return result, nil
+}
+
+func (c Callback) normalize(now time.Time) (Callback, error) {
+	c.ID = strings.TrimSpace(c.ID)
+	c.BotAccountID = strings.TrimSpace(c.BotAccountID)
+	c.FromAccountID = strings.TrimSpace(c.FromAccountID)
+	c.ConversationID = strings.TrimSpace(c.ConversationID)
+	c.MessageID = strings.TrimSpace(c.MessageID)
+	c.MessageThreadID = strings.TrimSpace(c.MessageThreadID)
+	c.ChatInstance = strings.TrimSpace(c.ChatInstance)
+	c.Data = strings.TrimSpace(c.Data)
+	c.AnsweredText = strings.TrimSpace(c.AnsweredText)
+	c.AnsweredURL = strings.TrimSpace(c.AnsweredURL)
+	if c.ID == "" || c.BotAccountID == "" || c.FromAccountID == "" || c.ConversationID == "" || c.MessageID == "" || c.ChatInstance == "" {
+		return Callback{}, ErrInvalidInput
+	}
+	if c.CreatedAt.IsZero() {
+		c.CreatedAt = now.UTC()
+	}
+	if c.UpdatedAt.IsZero() {
+		c.UpdatedAt = c.CreatedAt
+	}
+	if c.CacheTime < 0 {
+		return Callback{}, ErrInvalidInput
+	}
+	if c.AnsweredText == "" && c.AnsweredURL == "" && c.ShowAlert {
+		return Callback{}, ErrInvalidInput
 	}
 
 	return c, nil

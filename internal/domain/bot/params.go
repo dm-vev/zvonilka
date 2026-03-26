@@ -39,6 +39,7 @@ type SendMessageParams struct {
 	MessageThreadID       string
 	Text                  string
 	ReplyToMessageID      string
+	ReplyMarkup           *InlineKeyboardMarkup
 	DisableNotification   bool
 	DisableWebPagePreview bool
 }
@@ -51,6 +52,7 @@ type SendPhotoParams struct {
 	MediaID             string
 	Caption             string
 	ReplyToMessageID    string
+	ReplyMarkup         *InlineKeyboardMarkup
 	DisableNotification bool
 }
 
@@ -62,6 +64,7 @@ type SendDocumentParams struct {
 	MediaID             string
 	Caption             string
 	ReplyToMessageID    string
+	ReplyMarkup         *InlineKeyboardMarkup
 	DisableNotification bool
 }
 
@@ -73,6 +76,7 @@ type SendVideoParams struct {
 	MediaID             string
 	Caption             string
 	ReplyToMessageID    string
+	ReplyMarkup         *InlineKeyboardMarkup
 	DisableNotification bool
 }
 
@@ -84,6 +88,7 @@ type SendVoiceParams struct {
 	MediaID             string
 	Caption             string
 	ReplyToMessageID    string
+	ReplyMarkup         *InlineKeyboardMarkup
 	DisableNotification bool
 }
 
@@ -94,6 +99,7 @@ type SendStickerParams struct {
 	MessageThreadID     string
 	MediaID             string
 	ReplyToMessageID    string
+	ReplyMarkup         *InlineKeyboardMarkup
 	DisableNotification bool
 }
 
@@ -103,6 +109,7 @@ type EditMessageTextParams struct {
 	ChatID                string
 	MessageID             string
 	Text                  string
+	ReplyMarkup           *InlineKeyboardMarkup
 	DisableWebPagePreview bool
 }
 
@@ -131,6 +138,24 @@ type GetMessageParams struct {
 	BotToken  string
 	ChatID    string
 	MessageID string
+}
+
+// TriggerCallbackParams describes one internally generated callback query.
+type TriggerCallbackParams struct {
+	ConversationID string
+	MessageID      string
+	FromAccountID  string
+	Data           string
+}
+
+// AnswerCallbackQueryParams describes one answerCallbackQuery request.
+type AnswerCallbackQueryParams struct {
+	BotToken         string
+	CallbackQueryID  string
+	Text             string
+	ShowAlert        bool
+	URL              string
+	CacheTimeSeconds int
 }
 
 // RetryParams describes one webhook retry update.

@@ -195,3 +195,81 @@ func TestSaveCursorMonotonicUpsert(t *testing.T) {
 	require.EqualValues(t, 42, saved.LastSequence)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestSaveCallbackRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	store, mock, db := newMockStore(t)
+	defer db.Close()
+
+	now := time.Date(2026, time.March, 26, 12, 0, 0, 0, time.UTC)
+	mock.ExpectBegin()
+	mock.ExpectQuery(`(?s)INSERT INTO "bot"\."bot_callbacks".*RETURNING id, bot_account_id, from_account_id, conversation_id, message_id, message_thread_id, chat_instance, data, answered_text, answered_url, show_alert, cache_time_seconds, created_at, updated_at, answered_at`).
+		WithArgs(
+			"cbq-1",
+			"acc-bot",
+			"acc-user",
+			"conv-1",
+			"msg-1",
+			"",
+			"conv-1",
+			"ok",
+			"",
+			"",
+			false,
+			0,
+			now.UTC(),
+			now.UTC(),
+			sqlmock.AnyArg(),
+		).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id",
+			"bot_account_id",
+			"from_account_id",
+			"conversation_id",
+			"message_id",
+			"message_thread_id",
+			"chat_instance",
+			"data",
+			"answered_text",
+			"answered_url",
+			"show_alert",
+			"cache_time_seconds",
+			"created_at",
+			"updated_at",
+			"answered_at",
+		}).AddRow(
+			"cbq-1",
+			"acc-bot",
+			"acc-user",
+			"conv-1",
+			"msg-1",
+			"",
+			"conv-1",
+			"ok",
+			"",
+			"",
+			false,
+			0,
+			now.UTC(),
+			now.UTC(),
+			nil,
+		))
+	mock.ExpectCommit()
+
+	saved, err := store.SaveCallback(context.Background(), bot.Callback{
+		ID:             "cbq-1",
+		BotAccountID:   "acc-bot",
+		FromAccountID:  "acc-user",
+		ConversationID: "conv-1",
+		MessageID:      "msg-1",
+		ChatInstance:   "conv-1",
+		Data:           "ok",
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "cbq-1", saved.ID)
+	require.Equal(t, "ok", saved.Data)
+	require.NoError(t, mock.ExpectationsWereMet())
+}

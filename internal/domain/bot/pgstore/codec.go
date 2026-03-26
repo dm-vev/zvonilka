@@ -107,3 +107,36 @@ func scanCursor(row rowScanner) (bot.Cursor, error) {
 
 	return cursor, nil
 }
+
+func scanCallback(row rowScanner) (bot.Callback, error) {
+	var (
+		callback   bot.Callback
+		answeredAt sql.NullTime
+	)
+
+	if err := row.Scan(
+		&callback.ID,
+		&callback.BotAccountID,
+		&callback.FromAccountID,
+		&callback.ConversationID,
+		&callback.MessageID,
+		&callback.MessageThreadID,
+		&callback.ChatInstance,
+		&callback.Data,
+		&callback.AnsweredText,
+		&callback.AnsweredURL,
+		&callback.ShowAlert,
+		&callback.CacheTime,
+		&callback.CreatedAt,
+		&callback.UpdatedAt,
+		&answeredAt,
+	); err != nil {
+		return bot.Callback{}, err
+	}
+
+	callback.AnsweredAt = decodeTime(answeredAt)
+	callback.CreatedAt = callback.CreatedAt.UTC()
+	callback.UpdatedAt = callback.UpdatedAt.UTC()
+
+	return callback, nil
+}

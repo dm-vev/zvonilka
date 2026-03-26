@@ -60,6 +60,8 @@ func (a *api) serve(writer http.ResponseWriter, request *http.Request) {
 		a.getChat(writer, request, token)
 	case "getChatMember":
 		a.getChatMember(writer, request, token)
+	case "answerCallbackQuery":
+		a.answerCallbackQuery(writer, request, token)
 	default:
 		writeError(writer, http.StatusNotFound, "method not found")
 	}

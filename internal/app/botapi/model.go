@@ -3,6 +3,8 @@ package botapi
 import (
 	"encoding/json"
 	"strconv"
+
+	domainbot "github.com/dm-vev/zvonilka/internal/domain/bot"
 )
 
 type textID string
@@ -48,63 +50,78 @@ type deleteWebhookRequest struct {
 }
 
 type sendMessageRequest struct {
-	ChatID                textID `json:"chat_id"`
-	MessageThreadID       textID `json:"message_thread_id"`
-	Text                  string `json:"text"`
-	ReplyToMessageID      textID `json:"reply_to_message_id"`
-	DisableNotification   bool   `json:"disable_notification"`
-	DisableWebPagePreview bool   `json:"disable_web_page_preview"`
+	ChatID                textID                          `json:"chat_id"`
+	MessageThreadID       textID                          `json:"message_thread_id"`
+	Text                  string                          `json:"text"`
+	ReplyToMessageID      textID                          `json:"reply_to_message_id"`
+	ReplyMarkup           *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+	DisableNotification   bool                            `json:"disable_notification"`
+	DisableWebPagePreview bool                            `json:"disable_web_page_preview"`
 }
 
 type sendPhotoRequest struct {
-	ChatID              textID `json:"chat_id"`
-	MessageThreadID     textID `json:"message_thread_id"`
-	Photo               string `json:"photo"`
-	Caption             string `json:"caption"`
-	ReplyToMessageID    textID `json:"reply_to_message_id"`
-	DisableNotification bool   `json:"disable_notification"`
+	ChatID              textID                          `json:"chat_id"`
+	MessageThreadID     textID                          `json:"message_thread_id"`
+	Photo               string                          `json:"photo"`
+	Caption             string                          `json:"caption"`
+	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+	DisableNotification bool                            `json:"disable_notification"`
 }
 
 type sendDocumentRequest struct {
-	ChatID              textID `json:"chat_id"`
-	MessageThreadID     textID `json:"message_thread_id"`
-	Document            string `json:"document"`
-	Caption             string `json:"caption"`
-	ReplyToMessageID    textID `json:"reply_to_message_id"`
-	DisableNotification bool   `json:"disable_notification"`
+	ChatID              textID                          `json:"chat_id"`
+	MessageThreadID     textID                          `json:"message_thread_id"`
+	Document            string                          `json:"document"`
+	Caption             string                          `json:"caption"`
+	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+	DisableNotification bool                            `json:"disable_notification"`
 }
 
 type sendVideoRequest struct {
-	ChatID              textID `json:"chat_id"`
-	MessageThreadID     textID `json:"message_thread_id"`
-	Video               string `json:"video"`
-	Caption             string `json:"caption"`
-	ReplyToMessageID    textID `json:"reply_to_message_id"`
-	DisableNotification bool   `json:"disable_notification"`
+	ChatID              textID                          `json:"chat_id"`
+	MessageThreadID     textID                          `json:"message_thread_id"`
+	Video               string                          `json:"video"`
+	Caption             string                          `json:"caption"`
+	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+	DisableNotification bool                            `json:"disable_notification"`
 }
 
 type sendVoiceRequest struct {
-	ChatID              textID `json:"chat_id"`
-	MessageThreadID     textID `json:"message_thread_id"`
-	Voice               string `json:"voice"`
-	Caption             string `json:"caption"`
-	ReplyToMessageID    textID `json:"reply_to_message_id"`
-	DisableNotification bool   `json:"disable_notification"`
+	ChatID              textID                          `json:"chat_id"`
+	MessageThreadID     textID                          `json:"message_thread_id"`
+	Voice               string                          `json:"voice"`
+	Caption             string                          `json:"caption"`
+	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+	DisableNotification bool                            `json:"disable_notification"`
 }
 
 type sendStickerRequest struct {
-	ChatID              textID `json:"chat_id"`
-	MessageThreadID     textID `json:"message_thread_id"`
-	Sticker             string `json:"sticker"`
-	ReplyToMessageID    textID `json:"reply_to_message_id"`
-	DisableNotification bool   `json:"disable_notification"`
+	ChatID              textID                          `json:"chat_id"`
+	MessageThreadID     textID                          `json:"message_thread_id"`
+	Sticker             string                          `json:"sticker"`
+	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+	DisableNotification bool                            `json:"disable_notification"`
 }
 
 type editMessageTextRequest struct {
-	ChatID                textID `json:"chat_id"`
-	MessageID             textID `json:"message_id"`
-	Text                  string `json:"text"`
-	DisableWebPagePreview bool   `json:"disable_web_page_preview"`
+	ChatID                textID                          `json:"chat_id"`
+	MessageID             textID                          `json:"message_id"`
+	Text                  string                          `json:"text"`
+	ReplyMarkup           *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+	DisableWebPagePreview bool                            `json:"disable_web_page_preview"`
+}
+
+type answerCallbackQueryRequest struct {
+	CallbackQueryID textID `json:"callback_query_id"`
+	Text            string `json:"text"`
+	ShowAlert       bool   `json:"show_alert"`
+	URL             string `json:"url"`
+	CacheTime       int    `json:"cache_time"`
 }
 
 type deleteMessageRequest struct {

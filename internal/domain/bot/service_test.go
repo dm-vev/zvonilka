@@ -287,6 +287,87 @@ func TestBotSendPhoto(t *testing.T) {
 	require.Empty(t, message.Text)
 }
 
+func TestBotCallbackQueryLifecycle(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+
+	userAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "erin",
+		DisplayName: "Erin",
+		AccountKind: identity.AccountKindUser,
+		Email:       "erin@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "buttonsbot",
+		DisplayName: "Buttons Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	conv, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   userAccount.ID,
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{botAccount.ID},
+	})
+	require.NoError(t, err)
+
+	service, err := domainbot.NewService(
+		bottest.NewMemoryStore(),
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaFixture{},
+	)
+	require.NoError(t, err)
+
+	message, err := service.SendMessage(ctx, domainbot.SendMessageParams{
+		BotToken: botToken,
+		ChatID:   conv.ID,
+		Text:     "pick one",
+		ReplyMarkup: &domainbot.InlineKeyboardMarkup{
+			InlineKeyboard: [][]domainbot.InlineKeyboardButton{{
+				{Text: "OK", CallbackData: "ok"},
+			}},
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, message.ReplyMarkup)
+
+	callback, err := service.TriggerCallbackQuery(ctx, domainbot.TriggerCallbackParams{
+		ConversationID: conv.ID,
+		MessageID:      message.MessageID,
+		FromAccountID:  userAccount.ID,
+		Data:           "ok",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "ok", callback.Data)
+
+	updates, err := service.GetUpdates(ctx, domainbot.GetUpdatesParams{BotToken: botToken})
+	require.NoError(t, err)
+	require.Len(t, updates, 1)
+	require.NotNil(t, updates[0].CallbackQuery)
+	require.Equal(t, callback.ID, updates[0].CallbackQuery.ID)
+	require.Equal(t, "ok", updates[0].CallbackQuery.Data)
+	require.NotNil(t, updates[0].CallbackQuery.Message)
+	require.NotNil(t, updates[0].CallbackQuery.Message.ReplyMarkup)
+
+	err = service.AnswerCallbackQuery(ctx, domainbot.AnswerCallbackQueryParams{
+		BotToken:        botToken,
+		CallbackQueryID: callback.ID,
+		Text:            "done",
+	})
+	require.NoError(t, err)
+}
+
 type mediaFixture struct {
 	assets map[string]domainmedia.MediaAsset
 }
