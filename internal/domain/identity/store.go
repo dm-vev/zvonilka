@@ -33,4 +33,12 @@ type Store interface {
 	SessionByID(ctx context.Context, sessionID string) (Session, error)
 	SessionsByAccountID(ctx context.Context, accountID string) ([]Session, error)
 	UpdateSession(ctx context.Context, session Session) (Session, error)
+
+	SaveSessionCredential(ctx context.Context, credential SessionCredential) (SessionCredential, error)
+	SessionCredentialByTokenHash(
+		ctx context.Context,
+		tokenHash string,
+		kind SessionCredentialKind,
+	) (SessionCredential, error)
+	DeleteSessionCredentialsBySessionID(ctx context.Context, sessionID string) error
 }

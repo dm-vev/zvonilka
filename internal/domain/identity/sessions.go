@@ -66,26 +66,42 @@ func (s *Service) RevokeSession(ctx context.Context, params RevokeSessionParams)
 		return Session{}, ErrInvalidInput
 	}
 
-	session, err := s.store.SessionByID(ctx, params.SessionID)
-	if err != nil {
-		return Session{}, fmt.Errorf("load session %s: %w", params.SessionID, err)
-	}
-	if session.Status == SessionStatusRevoked {
-		return session, nil
-	}
-
 	now := params.RequestedAt
 	if now.IsZero() {
 		now = s.currentTime()
 	}
 
-	session.Status = SessionStatusRevoked
-	session.RevokedAt = now
-	session.Current = false
+	var updatedSession Session
+	err := s.store.WithinTx(ctx, func(tx Store) error {
+		session, loadErr := tx.SessionByID(ctx, params.SessionID)
+		if loadErr != nil {
+			return fmt.Errorf("load session %s: %w", params.SessionID, loadErr)
+		}
+		if session.Status == SessionStatusRevoked {
+			if deleteErr := tx.DeleteSessionCredentialsBySessionID(ctx, session.ID); deleteErr != nil && !isNotFound(deleteErr) {
+				return fmt.Errorf("delete credentials for revoked session %s: %w", session.ID, deleteErr)
+			}
+			updatedSession = session
+			return nil
+		}
 
-	updatedSession, err := s.store.UpdateSession(ctx, session)
+		session.Status = SessionStatusRevoked
+		session.RevokedAt = now
+		session.Current = false
+
+		updated, updateErr := tx.UpdateSession(ctx, session)
+		if updateErr != nil {
+			return fmt.Errorf("revoke session %s: %w", session.ID, updateErr)
+		}
+		if deleteErr := tx.DeleteSessionCredentialsBySessionID(ctx, session.ID); deleteErr != nil && !isNotFound(deleteErr) {
+			return fmt.Errorf("delete credentials for revoked session %s: %w", session.ID, deleteErr)
+		}
+
+		updatedSession = updated
+		return nil
+	})
 	if err != nil {
-		return Session{}, fmt.Errorf("revoke session %s: %w", session.ID, err)
+		return Session{}, err
 	}
 
 	if params.IdempotencyKey != "" {
@@ -144,6 +160,9 @@ func (s *Service) RevokeAllSessions(ctx context.Context, accountID string, param
 			session.Current = false
 			if _, loadErr := tx.UpdateSession(ctx, session); loadErr != nil {
 				return fmt.Errorf("revoke session %s for account %s: %w", session.ID, accountID, loadErr)
+			}
+			if deleteErr := tx.DeleteSessionCredentialsBySessionID(ctx, session.ID); deleteErr != nil && !isNotFound(deleteErr) {
+				return fmt.Errorf("delete credentials for revoked session %s: %w", session.ID, deleteErr)
 			}
 			revoked++
 		}

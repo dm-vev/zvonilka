@@ -9,3 +9,5 @@ const loginChallengeColumnList = `id, account_id, account_kind, code_hash, deliv
 const deviceColumnList = `id, account_id, session_id, name, platform, status, public_key, push_token, created_at, last_seen_at, revoked_at, last_rotated_at`
 
 const sessionColumnList = `id, account_id, device_id, device_name, device_platform, ip_address, user_agent, status, current, created_at, last_seen_at, revoked_at`
+
+const credentialColumnList = `session_id, account_id, device_id, kind, token_hash, expires_at, created_at, updated_at`

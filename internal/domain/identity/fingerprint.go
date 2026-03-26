@@ -134,6 +134,15 @@ func authenticateBotFingerprint(params AuthenticateBotParams) string {
 	)
 }
 
+// refreshSessionFingerprint captures the fields that define a refresh-token rotation attempt.
+func refreshSessionFingerprint(params RefreshSessionParams) string {
+	return idempotencyFingerprint(
+		"refresh-session",
+		hashSecret(params.RefreshToken),
+		params.DeviceID,
+	)
+}
+
 // idempotencyFingerprint builds a length-prefixed fingerprint from ordered parts.
 //
 // Length-prefixing keeps the serialization unambiguous even when a field contains the

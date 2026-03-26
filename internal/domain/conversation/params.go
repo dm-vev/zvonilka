@@ -20,6 +20,13 @@ type GetConversationParams struct {
 	AccountID      string
 }
 
+// GetMessageParams identifies a single-message lookup.
+type GetMessageParams struct {
+	ConversationID string
+	MessageID      string
+	AccountID      string
+}
+
 // ListConversationsParams filters a member's conversation list.
 type ListConversationsParams struct {
 	AccountID       string

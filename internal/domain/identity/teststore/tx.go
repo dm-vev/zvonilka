@@ -56,6 +56,8 @@ func (s *memoryStore) cloneLocked() memoryStore {
 		deviceIDsByAccount:       cloneStringSetMap(s.deviceIDsByAccount),
 		sessionsByID:             cloneSessions(s.sessionsByID),
 		sessionIDsByAccount:      cloneStringSetMap(s.sessionIDsByAccount),
+		credentialsByHash:        cloneCredentials(s.credentialsByHash),
+		credentialHashesByKey:    cloneStringMap(s.credentialHashesByKey),
 	}
 }
 
@@ -75,6 +77,8 @@ func (s *memoryStore) replaceLocked(tx *memoryStore) {
 	s.deviceIDsByAccount = cloneStringSetMap(tx.deviceIDsByAccount)
 	s.sessionsByID = cloneSessions(tx.sessionsByID)
 	s.sessionIDsByAccount = cloneStringSetMap(tx.sessionIDsByAccount)
+	s.credentialsByHash = cloneCredentials(tx.credentialsByHash)
+	s.credentialHashesByKey = cloneStringMap(tx.credentialHashesByKey)
 }
 
 func cloneStringMap(src map[string]string) map[string]string {
@@ -167,6 +171,19 @@ func cloneSessions(src map[string]identity.Session) map[string]identity.Session 
 	dst := make(map[string]identity.Session, len(src))
 	for key, session := range src {
 		dst[key] = session
+	}
+
+	return dst
+}
+
+func cloneCredentials(src map[string]identity.SessionCredential) map[string]identity.SessionCredential {
+	if len(src) == 0 {
+		return make(map[string]identity.SessionCredential)
+	}
+
+	dst := make(map[string]identity.SessionCredential, len(src))
+	for key, credential := range src {
+		dst[key] = credential
 	}
 
 	return dst

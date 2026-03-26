@@ -82,9 +82,7 @@ func (s *Service) ListMessages(ctx context.Context, params ListMessagesParams) (
 			continue
 		}
 		if _, shadowed := shadowedAccounts[message.SenderAccountID]; shadowed && message.SenderAccountID != params.AccountID {
-			if member.Role != MemberRoleOwner && member.Role != MemberRoleAdmin {
-				continue
-			}
+			continue
 		}
 		filtered = append(filtered, message)
 	}

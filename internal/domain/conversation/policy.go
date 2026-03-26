@@ -103,6 +103,63 @@ func (s *Service) policyForConversation(
 	return policy, nil
 }
 
+func (s *Service) existingModerationPolicy(
+	ctx context.Context,
+	store Store,
+	conversation Conversation,
+	targetKind ModerationTargetKind,
+	targetID string,
+) (ModerationPolicy, bool, error) {
+	policy, err := store.ModerationPolicyByTarget(ctx, targetKind, targetID)
+	if err == nil {
+		return policy, true, nil
+	}
+	if !errors.Is(err, ErrNotFound) {
+		return ModerationPolicy{}, false, fmt.Errorf(
+			"load moderation policy for %s:%s: %w",
+			targetKind,
+			targetID,
+			err,
+		)
+	}
+
+	switch targetKind {
+	case ModerationTargetKindTopic:
+		_, topicID := splitModerationKey(targetID)
+		inherited, inheritedErr := s.policyForConversation(ctx, store, conversation, topicID)
+		if inheritedErr != nil {
+			return ModerationPolicy{}, false, inheritedErr
+		}
+
+		return inherited, false, nil
+	case ModerationTargetKindConversation, ModerationTargetKindChannel:
+		return baseModerationPolicy(conversation, targetKind, targetID), false, nil
+	default:
+		return ModerationPolicy{}, false, ErrInvalidInput
+	}
+}
+
+func preserveInheritedTopicThreads(params SetModerationPolicyParams, inherited ModerationPolicy) bool {
+	if params.TargetKind != ModerationTargetKindTopic {
+		return false
+	}
+	if params.AllowThreads || !inherited.AllowThreads {
+		return false
+	}
+
+	return params.OnlyAdminsCanWrite ||
+		params.OnlyAdminsCanAddMembers ||
+		params.AllowReactions ||
+		params.AllowForwards ||
+		params.RequireEncryptedMessages ||
+		params.RequireJoinApproval ||
+		params.PinnedMessagesOnlyAdmins ||
+		params.SlowModeInterval != 0 ||
+		params.AntiSpamWindow != 0 ||
+		params.AntiSpamBurstLimit != 0 ||
+		params.ShadowMode
+}
+
 // SetModerationPolicy persists a moderation policy override.
 func (s *Service) SetModerationPolicy(
 	ctx context.Context,
@@ -129,6 +186,10 @@ func (s *Service) SetModerationPolicy(
 		if err != nil {
 			return err
 		}
+		inherited, existing, err := s.existingModerationPolicy(ctx, tx, conversation, params.TargetKind, params.TargetID)
+		if err != nil {
+			return err
+		}
 		member, err := tx.ConversationMemberByConversationAndAccount(ctx, conversation.ID, params.ActorAccountID)
 		if err != nil {
 			return fmt.Errorf(
@@ -142,6 +203,11 @@ func (s *Service) SetModerationPolicy(
 			return ErrForbidden
 		}
 
+		allowThreads := params.AllowThreads
+		if preserveInheritedTopicThreads(params, inherited) {
+			allowThreads = inherited.AllowThreads
+		}
+
 		policy := ModerationPolicy{
 			TargetKind:               params.TargetKind,
 			TargetID:                 params.TargetID,
@@ -149,7 +215,7 @@ func (s *Service) SetModerationPolicy(
 			OnlyAdminsCanAddMembers:  params.OnlyAdminsCanAddMembers,
 			AllowReactions:           params.AllowReactions,
 			AllowForwards:            params.AllowForwards,
-			AllowThreads:             params.AllowThreads,
+			AllowThreads:             allowThreads,
 			RequireEncryptedMessages: params.RequireEncryptedMessages,
 			RequireJoinApproval:      params.RequireJoinApproval,
 			PinnedMessagesOnlyAdmins: params.PinnedMessagesOnlyAdmins,
@@ -159,6 +225,9 @@ func (s *Service) SetModerationPolicy(
 			ShadowMode:               params.ShadowMode,
 			CreatedAt:                now,
 			UpdatedAt:                now,
+		}
+		if existing {
+			policy.CreatedAt = inherited.CreatedAt
 		}
 		saved, err = tx.SaveModerationPolicy(ctx, policy)
 		if err != nil {

@@ -258,3 +258,26 @@ func scanSession(row rowScanner) (identity.Session, error) {
 
 	return session, nil
 }
+
+func scanCredential(row rowScanner) (identity.SessionCredential, error) {
+	var credential identity.SessionCredential
+
+	if err := row.Scan(
+		&credential.SessionID,
+		&credential.AccountID,
+		&credential.DeviceID,
+		&credential.Kind,
+		&credential.TokenHash,
+		&credential.ExpiresAt,
+		&credential.CreatedAt,
+		&credential.UpdatedAt,
+	); err != nil {
+		return identity.SessionCredential{}, err
+	}
+
+	credential.ExpiresAt = credential.ExpiresAt.UTC()
+	credential.CreatedAt = credential.CreatedAt.UTC()
+	credential.UpdatedAt = credential.UpdatedAt.UTC()
+
+	return credential, nil
+}

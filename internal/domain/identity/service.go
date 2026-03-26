@@ -269,26 +269,13 @@ func (s *Service) issueSession(
 		return
 	}
 
-	accessToken, err := randomToken(32)
+	tokens, err := s.rotateCredentials(ctx, store, account, savedDevice, savedSession, now)
 	if err != nil {
-		err = fmt.Errorf("generate access token for account %s: %w", account.ID, err)
-		return
-	}
-
-	refreshToken, err := randomToken(32)
-	if err != nil {
-		err = fmt.Errorf("generate refresh token for account %s: %w", account.ID, err)
 		return
 	}
 
 	result = LoginResult{
-		Tokens: Tokens{
-			AccessToken:      accessToken,
-			RefreshToken:     refreshToken,
-			TokenType:        "Bearer",
-			ExpiresAt:        now.Add(s.accessTokenTTL),
-			RefreshExpiresAt: now.Add(s.refreshTokenTTL),
-		},
+		Tokens:  tokens,
 		Session: savedSession,
 		Device:  savedDevice,
 	}

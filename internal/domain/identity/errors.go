@@ -13,6 +13,8 @@ var (
 	ErrUnauthorized = errors.New("unauthorized")
 	// ErrForbidden indicates the caller is not allowed to perform the operation.
 	ErrForbidden = errors.New("forbidden")
+	// ErrExpiredToken indicates a bearer token expired before it could be used.
+	ErrExpiredToken = errors.New("expired token")
 	// ErrExpiredChallenge indicates a login challenge has expired.
 	ErrExpiredChallenge = errors.New("expired challenge")
 	// ErrExpiredJoinRequest indicates a join request expired before review.

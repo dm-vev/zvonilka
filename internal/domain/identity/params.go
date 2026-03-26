@@ -88,6 +88,14 @@ type AuthenticateBotParams struct {
 	RequestedAt    time.Time
 }
 
+// RefreshSessionParams contains the refresh-token rotation payload.
+type RefreshSessionParams struct {
+	RefreshToken   string
+	DeviceID       string
+	IdempotencyKey string
+	RequestedAt    time.Time
+}
+
 // RegisterDeviceParams contains the device registration payload.
 type RegisterDeviceParams struct {
 	SessionID      string
