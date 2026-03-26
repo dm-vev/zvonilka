@@ -23,6 +23,8 @@ func NewMemoryStore() bot.Store {
 		inlineByID:     make(map[string]bot.InlineQueryState),
 		commandsByKey:  make(map[string]bot.CommandSet),
 		menusByKey:     make(map[string]bot.MenuState),
+		profilesByKey:  make(map[string]bot.ProfileValue),
+		rightsByKey:    make(map[string]bot.AdminRightsState),
 		cursorsByName:  make(map[string]bot.Cursor),
 		nextPublicID:   1,
 		nextUpdateID:   1,
@@ -42,6 +44,8 @@ type memoryStore struct {
 	inlineByID     map[string]bot.InlineQueryState
 	commandsByKey  map[string]bot.CommandSet
 	menusByKey     map[string]bot.MenuState
+	profilesByKey  map[string]bot.ProfileValue
+	rightsByKey    map[string]bot.AdminRightsState
 	cursorsByName  map[string]bot.Cursor
 	nextPublicID   int64
 	nextUpdateID   int64
@@ -596,6 +600,12 @@ func (s *memoryStore) cloneLocked() *memoryStore {
 	for key, value := range s.menusByKey {
 		clone.menusByKey[key] = cloneMenuState(value)
 	}
+	for key, value := range s.profilesByKey {
+		clone.profilesByKey[key] = cloneProfileValue(value)
+	}
+	for key, value := range s.rightsByKey {
+		clone.rightsByKey[key] = cloneRightsState(value)
+	}
 	for key, value := range s.cursorsByName {
 		clone.cursorsByName[key] = cloneCursor(value)
 	}
@@ -614,6 +624,8 @@ func (s *memoryStore) replaceLocked(snapshot *memoryStore) {
 	s.inlineByID = snapshot.inlineByID
 	s.commandsByKey = snapshot.commandsByKey
 	s.menusByKey = snapshot.menusByKey
+	s.profilesByKey = snapshot.profilesByKey
+	s.rightsByKey = snapshot.rightsByKey
 	s.cursorsByName = snapshot.cursorsByName
 	s.nextPublicID = snapshot.nextPublicID
 	s.nextUpdateID = snapshot.nextUpdateID
@@ -647,8 +659,28 @@ func menuKey(botAccountID string, chatID string) string {
 	return botAccountID + ":" + chatID
 }
 
+func profileKey(botAccountID string, kind bot.ProfileKind, languageCode string) string {
+	return botAccountID + ":" + string(kind) + ":" + languageCode
+}
+
+func rightsKey(botAccountID string, forChannels bool) string {
+	if forChannels {
+		return botAccountID + ":channels"
+	}
+
+	return botAccountID + ":groups"
+}
+
 func cloneWebhook(value bot.Webhook) bot.Webhook {
 	value.AllowedUpdates = append([]bot.UpdateType(nil), value.AllowedUpdates...)
+	return value
+}
+
+func cloneProfileValue(value bot.ProfileValue) bot.ProfileValue {
+	return value
+}
+
+func cloneRightsState(value bot.AdminRightsState) bot.AdminRightsState {
 	return value
 }
 

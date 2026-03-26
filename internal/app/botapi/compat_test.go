@@ -227,6 +227,89 @@ func TestGoTelegramClientCommandAndMenuSuite(t *testing.T) {
 	require.Equal(t, "https://example.org/app", chatMenu.WebApp.WebApp.URL)
 }
 
+func TestGoTelegramClientProfileSuite(t *testing.T) {
+	t.Parallel()
+
+	world := newCompatWorld(t)
+	server := httptestServer(t, world)
+	client := world.client(t, server)
+	ctx := context.Background()
+
+	ok, err := client.SetMyName(ctx, &telegrambot.SetMyNameParams{
+		Name:         "Помощник",
+		LanguageCode: "ru",
+	})
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	name, err := client.GetMyName(ctx, &telegrambot.GetMyNameParams{
+		LanguageCode: "ru",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "Помощник", name.Name)
+
+	ok, err = client.SetMyDescription(ctx, &telegrambot.SetMyDescriptionParams{
+		Description:  "Long bot description",
+		LanguageCode: "en",
+	})
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	description, err := client.GetMyDescription(ctx, &telegrambot.GetMyDescriptionParams{
+		LanguageCode: "en",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "Long bot description", description.Description)
+
+	ok, err = client.SetMyShortDescription(ctx, &telegrambot.SetMyShortDescriptionParams{
+		ShortDescription: "Short bio",
+		LanguageCode:     "en",
+	})
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	shortDescription, err := client.GetMyShortDescription(ctx, &telegrambot.GetMyShortDescriptionParams{
+		LanguageCode: "en",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "Short bio", shortDescription.ShortDescription)
+
+	ok, err = client.SetMyDefaultAdministratorRights(ctx, &telegrambot.SetMyDefaultAdministratorRightsParams{
+		Rights: &tgmodels.ChatAdministratorRights{
+			CanManageChat:     true,
+			CanDeleteMessages: true,
+			CanPostMessages:   true,
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	rights, err := client.GetMyDefaultAdministratorRights(ctx, &telegrambot.GetMyDefaultAdministratorRightsParams{})
+	require.NoError(t, err)
+	require.NotNil(t, rights)
+	require.True(t, rights.CanManageChat)
+	require.True(t, rights.CanDeleteMessages)
+	require.True(t, rights.CanPostMessages)
+
+	ok, err = client.SetMyDefaultAdministratorRights(ctx, &telegrambot.SetMyDefaultAdministratorRightsParams{
+		ForChannels: true,
+		Rights: &tgmodels.ChatAdministratorRights{
+			CanManageChat:   true,
+			CanEditMessages: true,
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	channelRights, err := client.GetMyDefaultAdministratorRights(ctx, &telegrambot.GetMyDefaultAdministratorRightsParams{
+		ForChannels: true,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, channelRights)
+	require.True(t, channelRights.CanManageChat)
+	require.True(t, channelRights.CanEditMessages)
+}
+
 func httptestServer(t *testing.T, world *compatWorld) *httptest.Server {
 	t.Helper()
 

@@ -47,6 +47,19 @@ type Store interface {
 	SaveMenu(ctx context.Context, state MenuState) (MenuState, error)
 	MenuByChat(ctx context.Context, botAccountID string, chatID string) (MenuState, error)
 
+	SaveProfile(ctx context.Context, value ProfileValue) (ProfileValue, error)
+	ProfileByLanguage(
+		ctx context.Context,
+		botAccountID string,
+		kind ProfileKind,
+		languageCode string,
+	) (ProfileValue, error)
+	DeleteProfile(ctx context.Context, botAccountID string, kind ProfileKind, languageCode string) error
+
+	SaveRights(ctx context.Context, state AdminRightsState) (AdminRightsState, error)
+	RightsByScope(ctx context.Context, botAccountID string, forChannels bool) (AdminRightsState, error)
+	DeleteRights(ctx context.Context, botAccountID string, forChannels bool) error
+
 	SaveCursor(ctx context.Context, cursor Cursor) (Cursor, error)
 	CursorByName(ctx context.Context, name string) (Cursor, error)
 }

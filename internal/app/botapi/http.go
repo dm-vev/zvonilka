@@ -92,10 +92,26 @@ func (a *api) serve(writer http.ResponseWriter, request *http.Request) {
 		a.getMyCommands(writer, request, token)
 	case "deleteMyCommands":
 		a.deleteMyCommands(writer, request, token)
+	case "setMyName":
+		a.setMyName(writer, request, token)
+	case "getMyName":
+		a.getMyName(writer, request, token)
+	case "setMyDescription":
+		a.setMyDescription(writer, request, token)
+	case "getMyDescription":
+		a.getMyDescription(writer, request, token)
+	case "setMyShortDescription":
+		a.setMyShortDescription(writer, request, token)
+	case "getMyShortDescription":
+		a.getMyShortDescription(writer, request, token)
 	case "setChatMenuButton":
 		a.setChatMenuButton(writer, request, token)
 	case "getChatMenuButton":
 		a.getChatMenuButton(writer, request, token)
+	case "setMyDefaultAdministratorRights":
+		a.setMyDefaultAdministratorRights(writer, request, token)
+	case "getMyDefaultAdministratorRights":
+		a.getMyDefaultAdministratorRights(writer, request, token)
 	case "answerCallbackQuery":
 		a.answerCallbackQuery(writer, request, token)
 	case "answerInlineQuery":

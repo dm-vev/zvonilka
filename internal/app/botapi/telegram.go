@@ -608,6 +608,50 @@ func telegramFile(value domainbot.File) tgmodels.File {
 	}
 }
 
+func telegramAdminRights(value domainbot.AdminRights) *tgmodels.ChatAdministratorRights {
+	return &tgmodels.ChatAdministratorRights{
+		IsAnonymous:             value.IsAnonymous,
+		CanManageChat:           value.CanManageChat,
+		CanDeleteMessages:       value.CanDeleteMessages,
+		CanManageVideoChats:     value.CanManageVideoChats,
+		CanRestrictMembers:      value.CanRestrictMembers,
+		CanPromoteMembers:       value.CanPromoteMembers,
+		CanChangeInfo:           value.CanChangeInfo,
+		CanInviteUsers:          value.CanInviteUsers,
+		CanPostMessages:         value.CanPostMessages,
+		CanEditMessages:         value.CanEditMessages,
+		CanPinMessages:          value.CanPinMessages,
+		CanPostStories:          value.CanPostStories,
+		CanEditStories:          value.CanEditStories,
+		CanDeleteStories:        value.CanDeleteStories,
+		CanManageTopics:         value.CanManageTopics,
+		CanManageDirectMessages: value.CanManageDirectMessages,
+		CanManageTags:           value.CanManageTags,
+	}
+}
+
+func botAdminRights(value tgmodels.ChatAdministratorRights) *domainbot.AdminRights {
+	return &domainbot.AdminRights{
+		IsAnonymous:             value.IsAnonymous,
+		CanManageChat:           value.CanManageChat,
+		CanDeleteMessages:       value.CanDeleteMessages,
+		CanManageVideoChats:     value.CanManageVideoChats,
+		CanRestrictMembers:      value.CanRestrictMembers,
+		CanPromoteMembers:       value.CanPromoteMembers,
+		CanChangeInfo:           value.CanChangeInfo,
+		CanInviteUsers:          value.CanInviteUsers,
+		CanPostMessages:         value.CanPostMessages,
+		CanEditMessages:         value.CanEditMessages,
+		CanPinMessages:          value.CanPinMessages,
+		CanPostStories:          value.CanPostStories,
+		CanEditStories:          value.CanEditStories,
+		CanDeleteStories:        value.CanDeleteStories,
+		CanManageTopics:         value.CanManageTopics,
+		CanManageDirectMessages: value.CanManageDirectMessages,
+		CanManageTags:           value.CanManageTags,
+	}
+}
+
 func (a *api) internalChatID(ctx context.Context, value textID) (string, error) {
 	return a.bot.ResolveChatID(ctx, string(value))
 }
