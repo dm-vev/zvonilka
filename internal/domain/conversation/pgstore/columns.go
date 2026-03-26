@@ -20,6 +20,16 @@ const syncStateColumnList = `device_id, account_id, last_applied_sequence, last_
 
 const eventColumnList = `sequence, event_id, event_type, conversation_id, actor_account_id, actor_device_id, causation_id, correlation_id, message_id, payload_type, payload_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_aad, payload_metadata, read_through_sequence, metadata, created_at`
 
+const moderationPolicyColumnList = `target_kind, target_id, only_admins_can_write, only_admins_can_add_members, allow_reactions, allow_forwards, allow_threads, require_encrypted_messages, require_join_approval, pinned_messages_only_admins, slow_mode_interval_nanos, anti_spam_window_nanos, anti_spam_burst_limit, shadow_mode, created_at, updated_at`
+
+const moderationReportColumnList = `id, target_kind, target_id, reporter_account_id, target_account_id, reason, details, status, reviewed_by_account_id, reviewed_at, resolution, created_at, updated_at`
+
+const moderationActionColumnList = `id, target_kind, target_id, actor_account_id, target_account_id, type, duration_seconds, reason, metadata, created_at`
+
+const moderationRestrictionColumnList = `target_kind, target_id, account_id, state, applied_by_account_id, reason, expires_at, created_at, updated_at`
+
+const moderationRateStateColumnList = `target_kind, target_id, account_id, last_write_at, window_started_at, window_count, updated_at`
+
 func qualifyColumns(alias string, columnList string) string {
 	parts := strings.Split(columnList, ", ")
 	for idx, column := range parts {

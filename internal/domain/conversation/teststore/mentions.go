@@ -82,6 +82,19 @@ func (s *memoryStore) ConversationCountersByAccount(ctx context.Context, account
 		if message.CreatedAt.Before(member.JoinedAt) {
 			continue
 		}
+		if s.isShadowed(conversation.ModerationTargetKindConversation, message.ConversationID, message.SenderAccountID) {
+			if member.Role != conversation.MemberRoleOwner && member.Role != conversation.MemberRoleAdmin && message.SenderAccountID != accountID {
+				continue
+			}
+		}
+		if threadID := strings.TrimSpace(message.ThreadID); threadID != "" {
+			targetID := topicModerationTargetID(message.ConversationID, threadID)
+			if s.isShadowed(conversation.ModerationTargetKindTopic, targetID, message.SenderAccountID) {
+				if member.Role != conversation.MemberRoleOwner && member.Role != conversation.MemberRoleAdmin && message.SenderAccountID != accountID {
+					continue
+				}
+			}
+		}
 		if message.Sequence <= watermarks[message.ConversationID] {
 			continue
 		}

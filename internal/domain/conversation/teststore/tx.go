@@ -38,16 +38,21 @@ func (s *memoryStore) WithinTx(ctx context.Context, fn func(conversation.Store) 
 
 func (s *memoryStore) cloneLocked() memoryStore {
 	return memoryStore{
-		conversationsByID:  cloneConversations(s.conversationsByID),
-		topicsByKey:        cloneTopics(s.topicsByKey),
-		membersByKey:       cloneMembers(s.membersByKey),
-		messagesByID:       cloneMessages(s.messagesByID),
-		reactionsByKey:     cloneReactions(s.reactionsByKey),
-		readStatesByKey:    cloneReadStates(s.readStatesByKey),
-		syncStatesByDevice: cloneSyncStates(s.syncStatesByDevice),
-		eventsByID:         cloneEvents(s.eventsByID),
-		eventOrder:         append([]string(nil), s.eventOrder...),
-		nextSequence:       s.nextSequence,
+		conversationsByID:       cloneConversations(s.conversationsByID),
+		topicsByKey:             cloneTopics(s.topicsByKey),
+		membersByKey:            cloneMembers(s.membersByKey),
+		messagesByID:            cloneMessages(s.messagesByID),
+		reactionsByKey:          cloneReactions(s.reactionsByKey),
+		readStatesByKey:         cloneReadStates(s.readStatesByKey),
+		syncStatesByDevice:      cloneSyncStates(s.syncStatesByDevice),
+		eventsByID:              cloneEvents(s.eventsByID),
+		moderationPoliciesByKey: cloneModerationPolicies(s.moderationPoliciesByKey),
+		moderationReportsByID:   cloneModerationReports(s.moderationReportsByID),
+		moderationActionsByID:   cloneModerationActions(s.moderationActionsByID),
+		moderationRestrictions:  cloneModerationRestrictions(s.moderationRestrictions),
+		moderationRateStates:    cloneModerationRateStates(s.moderationRateStates),
+		eventOrder:              append([]string(nil), s.eventOrder...),
+		nextSequence:            s.nextSequence,
 	}
 }
 
@@ -60,6 +65,11 @@ func (s *memoryStore) replaceLocked(tx *memoryStore) {
 	s.readStatesByKey = cloneReadStates(tx.readStatesByKey)
 	s.syncStatesByDevice = cloneSyncStates(tx.syncStatesByDevice)
 	s.eventsByID = cloneEvents(tx.eventsByID)
+	s.moderationPoliciesByKey = cloneModerationPolicies(tx.moderationPoliciesByKey)
+	s.moderationReportsByID = cloneModerationReports(tx.moderationReportsByID)
+	s.moderationActionsByID = cloneModerationActions(tx.moderationActionsByID)
+	s.moderationRestrictions = cloneModerationRestrictions(tx.moderationRestrictions)
+	s.moderationRateStates = cloneModerationRateStates(tx.moderationRateStates)
 	s.eventOrder = append([]string(nil), tx.eventOrder...)
 	s.nextSequence = tx.nextSequence
 }

@@ -93,6 +93,71 @@ func cloneSyncStates(src map[string]conversation.SyncState) map[string]conversat
 	return dst
 }
 
+func cloneModerationPolicies(src map[string]conversation.ModerationPolicy) map[string]conversation.ModerationPolicy {
+	if len(src) == 0 {
+		return make(map[string]conversation.ModerationPolicy)
+	}
+
+	dst := make(map[string]conversation.ModerationPolicy, len(src))
+	for key, value := range src {
+		dst[key] = value
+	}
+
+	return dst
+}
+
+func cloneModerationReports(src map[string]conversation.ModerationReport) map[string]conversation.ModerationReport {
+	if len(src) == 0 {
+		return make(map[string]conversation.ModerationReport)
+	}
+
+	dst := make(map[string]conversation.ModerationReport, len(src))
+	for key, value := range src {
+		dst[key] = value
+	}
+
+	return dst
+}
+
+func cloneModerationActions(src map[string]conversation.ModerationAction) map[string]conversation.ModerationAction {
+	if len(src) == 0 {
+		return make(map[string]conversation.ModerationAction)
+	}
+
+	dst := make(map[string]conversation.ModerationAction, len(src))
+	for key, value := range src {
+		dst[key] = cloneModerationAction(value)
+	}
+
+	return dst
+}
+
+func cloneModerationRestrictions(src map[string]conversation.ModerationRestriction) map[string]conversation.ModerationRestriction {
+	if len(src) == 0 {
+		return make(map[string]conversation.ModerationRestriction)
+	}
+
+	dst := make(map[string]conversation.ModerationRestriction, len(src))
+	for key, value := range src {
+		dst[key] = value
+	}
+
+	return dst
+}
+
+func cloneModerationRateStates(src map[string]conversation.ModerationRateState) map[string]conversation.ModerationRateState {
+	if len(src) == 0 {
+		return make(map[string]conversation.ModerationRateState)
+	}
+
+	dst := make(map[string]conversation.ModerationRateState, len(src))
+	for key, value := range src {
+		dst[key] = value
+	}
+
+	return dst
+}
+
 func cloneEvents(src map[string]conversation.EventEnvelope) map[string]conversation.EventEnvelope {
 	if len(src) == 0 {
 		return make(map[string]conversation.EventEnvelope)
@@ -148,6 +213,11 @@ func cloneSyncState(value conversation.SyncState) conversation.SyncState {
 }
 
 func cloneReaction(value conversation.MessageReaction) conversation.MessageReaction {
+	return value
+}
+
+func cloneModerationAction(value conversation.ModerationAction) conversation.ModerationAction {
+	value.Metadata = cloneStringMap(value.Metadata)
 	return value
 }
 

@@ -36,6 +36,7 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 		"0010.sql",
 		"0011.sql",
 		"0012.sql",
+		"0016.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -201,6 +202,7 @@ func TestConversationSchemaConstraints(t *testing.T) {
 		"0010.sql",
 		"0011.sql",
 		"0012.sql",
+		"0016.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -239,6 +241,97 @@ INSERT INTO tenant.conversation_conversations (
 	}
 }
 
+func TestModerationPolicySchemaRejectsAntiSpamMismatch(t *testing.T) {
+	db := openDockerPostgres(t)
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	migrationsPath := repoMigrationsPath(t,
+		"0001.sql",
+		"0002_identity_hardening.sql",
+		"0003_identity_account_boundaries.sql",
+		"0004_identity_session_device_deferrable.sql",
+		"0005.sql",
+		"0006.sql",
+		"0009.sql",
+		"0010.sql",
+		"0011.sql",
+		"0012.sql",
+		"0016.sql",
+	)
+	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	_, err := db.ExecContext(context.Background(), `
+INSERT INTO tenant.conversation_moderation_policies (
+	target_kind, target_id, anti_spam_window_nanos, anti_spam_burst_limit, created_at, updated_at
+) VALUES (
+	$1, $2, $3, $4, $5, $6
+)`,
+		"conversation",
+		"conv-anti-spam",
+		time.Hour.Nanoseconds(),
+		0,
+		time.Now().UTC(),
+		time.Now().UTC(),
+	)
+	if err == nil {
+		t.Fatal("expected anti-spam mismatch to fail")
+	}
+}
+
+func TestModerationReportSchemaRejectsReviewMismatch(t *testing.T) {
+	db := openDockerPostgres(t)
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	migrationsPath := repoMigrationsPath(t,
+		"0001.sql",
+		"0002_identity_hardening.sql",
+		"0003_identity_account_boundaries.sql",
+		"0004_identity_session_device_deferrable.sql",
+		"0005.sql",
+		"0006.sql",
+		"0009.sql",
+		"0010.sql",
+		"0011.sql",
+		"0012.sql",
+		"0016.sql",
+	)
+	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	seedIdentity(t, db, "tenant",
+		"acc-owner", "owner", "owner@example.com", "dev-owner", "sess-owner",
+	)
+
+	_, err := db.ExecContext(context.Background(), `
+INSERT INTO tenant.conversation_moderation_reports (
+	id, target_kind, target_id, reporter_account_id, target_account_id, reason, status, reviewed_by_account_id, reviewed_at, created_at, updated_at
+) VALUES (
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+)`,
+		"rep-invalid",
+		"conversation",
+		"conv-1",
+		"acc-owner",
+		"acc-owner",
+		"spam",
+		"resolved",
+		"",
+		nil,
+		time.Now().UTC(),
+		time.Now().UTC(),
+	)
+	if err == nil {
+		t.Fatal("expected review mismatch to fail")
+	}
+}
+
 func TestConversationTopicSchemaLifecycle(t *testing.T) {
 	db := openDockerPostgres(t)
 	t.Cleanup(func() {
@@ -256,6 +349,7 @@ func TestConversationTopicSchemaLifecycle(t *testing.T) {
 		"0010.sql",
 		"0011.sql",
 		"0012.sql",
+		"0016.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -465,6 +559,7 @@ func TestConversationMessageActionSchemaLifecycle(t *testing.T) {
 		"0010.sql",
 		"0011.sql",
 		"0012.sql",
+		"0016.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)

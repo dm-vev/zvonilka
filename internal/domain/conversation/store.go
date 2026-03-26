@@ -34,4 +34,18 @@ type Store interface {
 
 	SaveEvent(ctx context.Context, event EventEnvelope) (EventEnvelope, error)
 	EventsAfterSequence(ctx context.Context, fromSequence uint64, limit int, conversationIDs []string) ([]EventEnvelope, error)
+
+	SaveModerationPolicy(ctx context.Context, policy ModerationPolicy) (ModerationPolicy, error)
+	ModerationPolicyByTarget(ctx context.Context, targetKind ModerationTargetKind, targetID string) (ModerationPolicy, error)
+	SaveModerationReport(ctx context.Context, report ModerationReport) (ModerationReport, error)
+	ModerationReportByID(ctx context.Context, reportID string) (ModerationReport, error)
+	ModerationReportsByTarget(ctx context.Context, targetKind ModerationTargetKind, targetID string) ([]ModerationReport, error)
+	SaveModerationAction(ctx context.Context, action ModerationAction) (ModerationAction, error)
+	ModerationActionsByTarget(ctx context.Context, targetKind ModerationTargetKind, targetID string) ([]ModerationAction, error)
+	SaveModerationRestriction(ctx context.Context, restriction ModerationRestriction) (ModerationRestriction, error)
+	ModerationRestrictionByTargetAndAccount(ctx context.Context, targetKind ModerationTargetKind, targetID string, accountID string) (ModerationRestriction, error)
+	ModerationRestrictionsByTarget(ctx context.Context, targetKind ModerationTargetKind, targetID string) ([]ModerationRestriction, error)
+	DeleteModerationRestriction(ctx context.Context, targetKind ModerationTargetKind, targetID string, accountID string) error
+	SaveModerationRateState(ctx context.Context, state ModerationRateState) (ModerationRateState, error)
+	ModerationRateStateByTargetAndAccount(ctx context.Context, targetKind ModerationTargetKind, targetID string, accountID string) (ModerationRateState, error)
 }

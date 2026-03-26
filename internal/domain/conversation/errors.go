@@ -11,4 +11,6 @@ var (
 	ErrInvalidInput = errors.New("invalid input")
 	// ErrForbidden indicates that the caller cannot perform the requested action.
 	ErrForbidden = errors.New("forbidden")
+	// ErrRateLimited indicates that the caller must slow down before retrying.
+	ErrRateLimited = errors.New("rate limited")
 )

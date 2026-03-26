@@ -103,8 +103,8 @@ func canDeleteMessage(member ConversationMember, message Message) bool {
 	return canEditMessage(member, message)
 }
 
-func canPinMessage(member ConversationMember, conversation Conversation) bool {
-	if conversation.Settings.PinnedMessagesOnlyAdmins {
+func canPinMessage(member ConversationMember, policy ModerationPolicy) bool {
+	if policy.PinnedMessagesOnlyAdmins {
 		return member.Role == MemberRoleOwner || member.Role == MemberRoleAdmin
 	}
 
@@ -323,7 +323,11 @@ func (s *Service) PinMessage(ctx context.Context, params PinMessageParams) (Mess
 		if err != nil {
 			return err
 		}
-		if !canPinMessage(state.member, state.conversation) {
+		policy, err := s.policyForConversation(ctx, tx, state.conversation, state.topic.ID)
+		if err != nil {
+			return err
+		}
+		if !canPinMessage(state.member, policy) {
 			return ErrForbidden
 		}
 		if !state.message.DeletedAt.IsZero() || state.message.Status == MessageStatusDeleted {
