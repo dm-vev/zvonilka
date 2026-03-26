@@ -53,7 +53,7 @@ func plainText(message conversation.Message) string {
 		return ""
 	}
 	switch messageShape(message) {
-	case "location", "contact", "poll":
+	case "location", "contact", "poll", "game":
 		return ""
 	}
 	if strings.TrimSpace(message.Payload.KeyID) != "" || strings.TrimSpace(message.Payload.Algorithm) != "" {
@@ -224,6 +224,19 @@ func messagePoll(message conversation.Message) *Poll {
 	return &poll
 }
 
+func messageGame(message conversation.Message) *Game {
+	if messageShape(message) != "game" {
+		return nil
+	}
+
+	var game Game
+	if !decodeStructured(message, &game) {
+		return nil
+	}
+
+	return &game
+}
+
 func messageVenue(message conversation.Message) *Venue {
 	if messageShape(message) != "venue" {
 		return nil
@@ -351,6 +364,7 @@ func (s *Service) messageForConversation(
 	result.Location = messageLocation(msg)
 	result.Contact = messageContact(msg)
 	result.Poll = messagePoll(msg)
+	result.Game = messageGame(msg)
 	result.Venue = messageVenue(msg)
 	result.Dice = messageDice(msg)
 	if !includeReply || msg.ReplyTo.MessageID == "" {

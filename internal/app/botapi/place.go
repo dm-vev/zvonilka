@@ -137,3 +137,38 @@ func (a *api) sendDice(writer http.ResponseWriter, request *http.Request, token 
 
 	writeResult(writer, result)
 }
+
+func (a *api) stopPoll(writer http.ResponseWriter, request *http.Request, token string) {
+	var payload stopPollRequest
+	if err := decodeRequest(request, &payload); err != nil {
+		writeError(writer, http.StatusBadRequest, "Bad Request")
+		return
+	}
+
+	chatID, err := a.internalChatID(request.Context(), payload.ChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	messageID, err := a.internalMessageID(request.Context(), payload.MessageID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	poll, err := a.bot.StopPoll(request.Context(), domainbot.StopPollParams{
+		BotToken:    token,
+		ChatID:      chatID,
+		MessageID:   messageID,
+		ReplyMarkup: payload.ReplyMarkup,
+	})
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, a.telegramPoll(&poll))
+}

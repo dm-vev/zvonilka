@@ -205,6 +205,15 @@ type Poll struct {
 	AllowsMultipleAnswers bool         `json:"allows_multiple_answers,omitempty"`
 }
 
+// Game describes one Telegram-shaped game projection.
+type Game struct {
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	Photo       []PhotoSize `json:"photo"`
+	Text        string      `json:"text,omitempty"`
+	ShortName   string      `json:"game_short_name,omitempty"`
+}
+
 // InlineQuery describes one Telegram-shaped inline query update.
 type InlineQuery struct {
 	ID       string `json:"id"`
@@ -267,6 +276,7 @@ type Message struct {
 	Location        *Location             `json:"location,omitempty"`
 	Contact         *Contact              `json:"contact,omitempty"`
 	Poll            *Poll                 `json:"poll,omitempty"`
+	Game            *Game                 `json:"game,omitempty"`
 	Venue           *Venue                `json:"venue,omitempty"`
 	Dice            *Dice                 `json:"dice,omitempty"`
 	ReplyMarkup     *InlineKeyboardMarkup `json:"reply_markup,omitempty"`

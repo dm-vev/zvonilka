@@ -133,6 +133,129 @@ type structuredParams struct {
 	Value               any
 }
 
+// EditLiveLocation edits one live location message as the authenticated bot.
+func (s *Service) EditLiveLocation(ctx context.Context, params EditLiveLocationParams) (Message, error) {
+	accountID, conv, _, raw, err := s.loadRawMessage(ctx, params.BotToken, params.ChatID, params.MessageID)
+	if err != nil {
+		return Message{}, err
+	}
+	if messageShape(raw) != "location" {
+		return Message{}, ErrInvalidInput
+	}
+
+	location := Location{
+		Latitude:             params.Latitude,
+		Longitude:            params.Longitude,
+		HorizontalAccuracy:   params.HorizontalAccuracy,
+		LivePeriod:           params.LivePeriod,
+		Heading:              params.Heading,
+		ProximityAlertRadius: params.ProximityAlertRadius,
+	}
+	if !validCoordinate(location.Latitude, -90, 90) || !validCoordinate(location.Longitude, -180, 180) {
+		return Message{}, ErrInvalidInput
+	}
+	if location.HorizontalAccuracy < 0 || location.LivePeriod < 0 || location.Heading < 0 || location.ProximityAlertRadius < 0 {
+		return Message{}, ErrInvalidInput
+	}
+
+	replyMarkup := params.ReplyMarkup
+	if replyMarkup == nil {
+		replyMarkup = messageReplyMarkup(raw.Metadata)
+	}
+
+	payload, err := json.Marshal(location)
+	if err != nil {
+		return Message{}, fmt.Errorf("marshal edited live location: %w", err)
+	}
+	metadata, err := markupMetadata(map[string]string{
+		metadataShapeKey: "location",
+		metadataJSONKey:  string(payload),
+	}, replyMarkup)
+	if err != nil {
+		return Message{}, err
+	}
+
+	message, _, err := s.conversations.EditMessage(ctx, conversation.EditMessageParams{
+		ConversationID: conv.ID,
+		MessageID:      raw.ID,
+		ActorAccountID: accountID,
+		ActorDeviceID:  botDeviceID,
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				Ciphertext: []byte(fmt.Sprintf("%.6f,%.6f", location.Latitude, location.Longitude)),
+			},
+			ThreadID: raw.ThreadID,
+			Silent:   raw.Silent,
+			Metadata: metadata,
+		},
+	})
+	if err != nil {
+		return Message{}, fmt.Errorf("edit bot live location: %w", mapConversationError(err))
+	}
+
+	return s.GetMessage(ctx, GetMessageParams{
+		BotToken:  params.BotToken,
+		ChatID:    conv.ID,
+		MessageID: message.ID,
+	})
+}
+
+// StopPoll closes one poll and returns the final poll state.
+func (s *Service) StopPoll(ctx context.Context, params StopPollParams) (Poll, error) {
+	accountID, conv, _, raw, err := s.loadRawMessage(ctx, params.BotToken, params.ChatID, params.MessageID)
+	if err != nil {
+		return Poll{}, err
+	}
+	if messageShape(raw) != "poll" {
+		return Poll{}, ErrInvalidInput
+	}
+
+	poll := messagePoll(raw)
+	if poll == nil {
+		return Poll{}, ErrInvalidInput
+	}
+	poll.IsClosed = true
+
+	replyMarkup := params.ReplyMarkup
+	if replyMarkup == nil {
+		replyMarkup = messageReplyMarkup(raw.Metadata)
+	}
+
+	payload, err := json.Marshal(poll)
+	if err != nil {
+		return Poll{}, fmt.Errorf("marshal stopped poll: %w", err)
+	}
+	metadata, err := markupMetadata(map[string]string{
+		metadataShapeKey: "poll",
+		metadataJSONKey:  string(payload),
+	}, replyMarkup)
+	if err != nil {
+		return Poll{}, err
+	}
+
+	_, _, err = s.conversations.EditMessage(ctx, conversation.EditMessageParams{
+		ConversationID: conv.ID,
+		MessageID:      raw.ID,
+		ActorAccountID: accountID,
+		ActorDeviceID:  botDeviceID,
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				Ciphertext: []byte(strings.TrimSpace(poll.Question)),
+			},
+			ThreadID: raw.ThreadID,
+			Silent:   raw.Silent,
+			Metadata: metadata,
+		},
+	})
+	if err != nil {
+		return Poll{}, fmt.Errorf("stop bot poll: %w", mapConversationError(err))
+	}
+
+	return *poll, nil
+}
+
 func (s *Service) sendStructured(ctx context.Context, params structuredParams) (Message, error) {
 	account, err := s.botAccount(ctx, params.BotToken)
 	if err != nil {

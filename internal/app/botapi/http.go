@@ -62,6 +62,8 @@ func (a *api) serve(writer http.ResponseWriter, request *http.Request) {
 		a.sendContact(writer, request, token)
 	case "sendPoll":
 		a.sendPoll(writer, request, token)
+	case "sendGame":
+		a.sendGame(writer, request, token)
 	case "sendDice":
 		a.sendDice(writer, request, token)
 	case "sendVoice":
@@ -82,8 +84,12 @@ func (a *api) serve(writer http.ResponseWriter, request *http.Request) {
 		a.editMessageCaption(writer, request, token)
 	case "editMessageMedia":
 		a.editMessageMedia(writer, request, token)
+	case "editMessageLiveLocation":
+		a.editMessageLiveLocation(writer, request, token)
 	case "editMessageReplyMarkup":
 		a.editMessageReplyMarkup(writer, request, token)
+	case "stopPoll":
+		a.stopPoll(writer, request, token)
 	case "deleteMessage":
 		a.deleteMessage(writer, request, token)
 	case "getChat":

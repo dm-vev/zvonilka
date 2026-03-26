@@ -56,6 +56,54 @@ func (a *api) editMessageCaption(writer http.ResponseWriter, request *http.Reque
 	writeResult(writer, result)
 }
 
+func (a *api) editMessageLiveLocation(writer http.ResponseWriter, request *http.Request, token string) {
+	var payload editLiveLocationRequest
+	if err := decodeRequest(request, &payload); err != nil {
+		writeError(writer, http.StatusBadRequest, "Bad Request")
+		return
+	}
+
+	chatID, err := a.internalChatID(request.Context(), payload.ChatID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+	messageID, err := a.internalMessageID(request.Context(), payload.MessageID)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	message, err := a.bot.EditLiveLocation(request.Context(), domainbot.EditLiveLocationParams{
+		BotToken:             token,
+		ChatID:               chatID,
+		MessageID:            messageID,
+		Latitude:             payload.Latitude,
+		Longitude:            payload.Longitude,
+		LivePeriod:           payload.LivePeriod,
+		HorizontalAccuracy:   payload.HorizontalAccuracy,
+		Heading:              payload.Heading,
+		ProximityAlertRadius: payload.ProximityAlertRadius,
+		ReplyMarkup:          payload.ReplyMarkup,
+	})
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	result, err := a.telegramMessage(request.Context(), message)
+	if err != nil {
+		code, description := botError(err)
+		writeError(writer, code, description)
+		return
+	}
+
+	writeResult(writer, result)
+}
+
 func (a *api) editMessageMedia(writer http.ResponseWriter, request *http.Request, token string) {
 	var payload editMessageMediaRequest
 	if err := decodeRequest(request, &payload); err != nil {

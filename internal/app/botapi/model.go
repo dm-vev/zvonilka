@@ -190,6 +190,16 @@ type sendPollRequest struct {
 	DisableNotification   bool                            `json:"disable_notification"`
 }
 
+type sendGameRequest struct {
+	ChatID              textID                          `json:"chat_id"`
+	MessageThreadID     textID                          `json:"message_thread_id"`
+	GameShortName       string                          `json:"game_short_name"`
+	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
+	ReplyParameters     *replyData                      `json:"reply_parameters"`
+	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+	DisableNotification bool                            `json:"disable_notification"`
+}
+
 type forwardMessagesRequest struct {
 	ChatID              textID   `json:"chat_id"`
 	MessageThreadID     textID   `json:"message_thread_id"`
@@ -226,6 +236,24 @@ type editMessageMediaRequest struct {
 	ChatID      textID                          `json:"chat_id"`
 	MessageID   textID                          `json:"message_id"`
 	Media       editMediaData                   `json:"media"`
+	ReplyMarkup *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+}
+
+type editLiveLocationRequest struct {
+	ChatID               textID                          `json:"chat_id"`
+	MessageID            textID                          `json:"message_id"`
+	Latitude             float64                         `json:"latitude"`
+	Longitude            float64                         `json:"longitude"`
+	LivePeriod           int                             `json:"live_period"`
+	HorizontalAccuracy   float64                         `json:"horizontal_accuracy"`
+	Heading              int                             `json:"heading"`
+	ProximityAlertRadius int                             `json:"proximity_alert_radius"`
+	ReplyMarkup          *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+}
+
+type stopPollRequest struct {
+	ChatID      textID                          `json:"chat_id"`
+	MessageID   textID                          `json:"message_id"`
 	ReplyMarkup *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 }
 

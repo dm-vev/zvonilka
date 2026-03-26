@@ -482,6 +482,37 @@ func TestBotSendLocationContactAndPoll(t *testing.T) {
 	require.Len(t, poll.Poll.Options, 2)
 	require.Equal(t, "yes", poll.Poll.Options[0].Text)
 	require.Empty(t, poll.Text)
+
+	editedLocation, err := service.EditLiveLocation(ctx, domainbot.EditLiveLocationParams{
+		BotToken:  botToken,
+		ChatID:    chat.ID,
+		MessageID: location.MessageID,
+		Latitude:  59.9391,
+		Longitude: 30.3158,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, editedLocation.Location)
+	require.InDelta(t, 59.9391, editedLocation.Location.Latitude, 0.000001)
+	require.InDelta(t, 30.3158, editedLocation.Location.Longitude, 0.000001)
+
+	stoppedPoll, err := service.StopPoll(ctx, domainbot.StopPollParams{
+		BotToken:  botToken,
+		ChatID:    chat.ID,
+		MessageID: poll.MessageID,
+	})
+	require.NoError(t, err)
+	require.True(t, stoppedPoll.IsClosed)
+	require.Equal(t, "ship it?", stoppedPoll.Question)
+
+	game, err := service.SendGame(ctx, domainbot.SendGameParams{
+		BotToken:      botToken,
+		ChatID:        chat.ID,
+		GameShortName: "runner",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, game.Game)
+	require.Equal(t, "runner", game.Game.Title)
+	require.Empty(t, game.Text)
 }
 
 func TestBotCallbackQueryLifecycle(t *testing.T) {

@@ -223,6 +223,14 @@ func TestGoTelegramClientUtilitySuite(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Empty(t, copiedBatchMessage.Caption)
+
+	game, err := client.SendGame(ctx, &telegrambot.SendGameParams{
+		ChatID:       directChatID,
+		GameShorName: "runner",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, game.Game)
+	require.Equal(t, "runner", game.Game.Title)
 }
 
 func TestGoTelegramClientCommandAndMenuSuite(t *testing.T) {
@@ -391,6 +399,57 @@ func TestGoTelegramClientProfileSuite(t *testing.T) {
 	require.NotNil(t, channelRights)
 	require.True(t, channelRights.CanManageChat)
 	require.True(t, channelRights.CanEditMessages)
+}
+
+func TestGoTelegramClientStructuredEditSuite(t *testing.T) {
+	t.Parallel()
+
+	world := newCompatWorld(t)
+	server := httptestServer(t, world)
+	client := world.client(t, server)
+	ctx := context.Background()
+	directChatID := world.publicChatID(t, world.directID)
+
+	location, err := client.SendLocation(ctx, &telegrambot.SendLocationParams{
+		ChatID:     directChatID,
+		Latitude:   55.75,
+		Longitude:  37.61,
+		LivePeriod: 60,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, location.Location)
+
+	editedLocation, err := client.EditMessageLiveLocation(ctx, &telegrambot.EditMessageLiveLocationParams{
+		ChatID:     directChatID,
+		MessageID:  location.ID,
+		Latitude:   59.93,
+		Longitude:  30.31,
+		LivePeriod: 120,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, editedLocation.Location)
+	require.Equal(t, 59.93, editedLocation.Location.Latitude)
+	require.Equal(t, 30.31, editedLocation.Location.Longitude)
+
+	poll, err := client.SendPoll(ctx, &telegrambot.SendPollParams{
+		ChatID:   directChatID,
+		Question: "Ship it?",
+		Options: []tgmodels.InputPollOption{
+			{Text: "Yes"},
+			{Text: "No"},
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, poll.Poll)
+	require.False(t, poll.Poll.IsClosed)
+
+	stopped, err := client.StopPoll(ctx, &telegrambot.StopPollParams{
+		ChatID:    directChatID,
+		MessageID: poll.ID,
+	})
+	require.NoError(t, err)
+	require.True(t, stopped.IsClosed)
+	require.Equal(t, "Ship it?", stopped.Question)
 }
 
 func httptestServer(t *testing.T, world *compatWorld) *httptest.Server {

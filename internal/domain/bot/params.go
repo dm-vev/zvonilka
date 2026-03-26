@@ -184,6 +184,17 @@ type SendPollParams struct {
 	DisableNotification   bool
 }
 
+// SendGameParams describes one sendGame request.
+type SendGameParams struct {
+	BotToken            string
+	ChatID              string
+	MessageThreadID     string
+	GameShortName       string
+	ReplyToMessageID    string
+	ReplyMarkup         *InlineKeyboardMarkup
+	DisableNotification bool
+}
+
 // EditMediaParams describes one editMessageMedia request.
 type EditMediaParams struct {
 	BotToken    string
@@ -193,6 +204,20 @@ type EditMediaParams struct {
 	Shape       string
 	Caption     *string
 	ReplyMarkup *InlineKeyboardMarkup
+}
+
+// EditLiveLocationParams describes one editMessageLiveLocation request.
+type EditLiveLocationParams struct {
+	BotToken             string
+	ChatID               string
+	MessageID            string
+	Latitude             float64
+	Longitude            float64
+	LivePeriod           int
+	HorizontalAccuracy   float64
+	Heading              int
+	ProximityAlertRadius int
+	ReplyMarkup          *InlineKeyboardMarkup
 }
 
 // EditMessageTextParams describes one editMessageText request.
@@ -224,6 +249,14 @@ type CopyMessagesParams struct {
 	MessageIDs          []string
 	DisableNotification bool
 	RemoveCaption       bool
+}
+
+// StopPollParams describes one stopPoll request.
+type StopPollParams struct {
+	BotToken    string
+	ChatID      string
+	MessageID   string
+	ReplyMarkup *InlineKeyboardMarkup
 }
 
 // DeleteMessageParams describes one deleteMessage request.

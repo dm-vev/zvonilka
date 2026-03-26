@@ -73,6 +73,7 @@ func (a *api) telegramMessage(ctx context.Context, value domainbot.Message) (*tg
 		Location:       a.telegramLocation(value.Location),
 		Contact:        a.telegramContact(ctx, value.Contact),
 		Poll:           a.telegramPoll(value.Poll),
+		Game:           a.telegramGame(value.Game),
 		Venue:          a.telegramVenue(value.Venue),
 		Dice:           a.telegramDice(value.Dice),
 		ReplyMarkup:    telegramReplyMarkup(value.ReplyMarkup),
@@ -504,6 +505,30 @@ func (a *api) telegramPoll(value *domainbot.Poll) *tgmodels.Poll {
 		IsAnonymous:           value.IsAnonymous,
 		Type:                  value.Type,
 		AllowsMultipleAnswers: value.AllowsMultipleAnswers,
+	}
+}
+
+func (a *api) telegramGame(value *domainbot.Game) *tgmodels.Game {
+	if value == nil {
+		return nil
+	}
+
+	photo := make([]tgmodels.PhotoSize, 0, len(value.Photo))
+	for _, item := range value.Photo {
+		photo = append(photo, tgmodels.PhotoSize{
+			FileID:       item.FileID,
+			FileUniqueID: item.FileUniqueID,
+			Width:        int(item.Width),
+			Height:       int(item.Height),
+			FileSize:     int(item.FileSize),
+		})
+	}
+
+	return &tgmodels.Game{
+		Title:       value.Title,
+		Description: value.Description,
+		Photo:       photo,
+		Text:        value.Text,
 	}
 }
 
