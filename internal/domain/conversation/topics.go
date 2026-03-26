@@ -37,7 +37,11 @@ func (s *Service) CreateTopic(ctx context.Context, params CreateTopicParams) (Co
 		if err != nil {
 			return fmt.Errorf("load conversation %s: %w", params.ConversationID, err)
 		}
-		if conversation.Kind != ConversationKindGroup || !conversation.Settings.AllowThreads {
+		policy, err := s.policyForConversation(ctx, tx, conversation, "")
+		if err != nil {
+			return err
+		}
+		if conversation.Kind != ConversationKindGroup || !policy.AllowThreads {
 			return ErrForbidden
 		}
 
@@ -134,6 +138,14 @@ func (s *Service) GetTopic(ctx context.Context, params GetTopicParams) (Conversa
 		return ConversationTopic{}, ErrForbidden
 	}
 
+	policy, err := s.policyForConversation(ctx, s.store, conversation, params.TopicID)
+	if err != nil {
+		return ConversationTopic{}, err
+	}
+	if !policy.AllowThreads {
+		return ConversationTopic{}, ErrForbidden
+	}
+
 	topic, err := s.store.TopicByConversationAndID(ctx, conversation.ID, params.TopicID)
 	if err != nil {
 		return ConversationTopic{}, fmt.Errorf("load topic %s in conversation %s: %w", params.TopicID, conversation.ID, err)
@@ -166,6 +178,14 @@ func (s *Service) ListTopics(ctx context.Context, params ListTopicsParams) ([]Co
 		return nil, fmt.Errorf("authorize conversation %s for account %s: %w", conversation.ID, params.AccountID, err)
 	}
 	if !isActiveMember(member) {
+		return nil, ErrForbidden
+	}
+
+	policy, err := s.policyForConversation(ctx, s.store, conversation, "")
+	if err != nil {
+		return nil, err
+	}
+	if !policy.AllowThreads {
 		return nil, ErrForbidden
 	}
 
@@ -348,6 +368,14 @@ func (s *Service) updateTopic(
 			return fmt.Errorf("load conversation %s: %w", conversationID, err)
 		}
 		if conversation.Kind != ConversationKindGroup {
+			return ErrForbidden
+		}
+
+		policy, err := s.policyForConversation(ctx, tx, conversation, topicID)
+		if err != nil {
+			return err
+		}
+		if !policy.AllowThreads {
 			return ErrForbidden
 		}
 

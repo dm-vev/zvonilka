@@ -303,6 +303,37 @@ func TestModerationPolicyBlocksThreadedMessages(t *testing.T) {
 	require.ErrorIs(t, err, conversation.ErrForbidden)
 }
 
+func TestModerationPolicyRejectsAntiSpamMismatch(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 25, 10, 55, 0, 0, time.UTC)
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time {
+		return now
+	}))
+	require.NoError(t, err)
+
+	created, _, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-owner",
+		Kind:             conversation.ConversationKindDirect,
+		Title:            "Direct",
+		MemberAccountIDs: []string{"acc-peer"},
+		CreatedAt:        now,
+	})
+	require.NoError(t, err)
+
+	_, err = svc.SetModerationPolicy(ctx, conversation.SetModerationPolicyParams{
+		TargetKind:     conversation.ModerationTargetKindConversation,
+		TargetID:       created.ID,
+		ActorAccountID: "acc-owner",
+		AntiSpamWindow: time.Hour,
+		CreatedAt:      now,
+	})
+	require.ErrorIs(t, err, conversation.ErrInvalidInput)
+}
+
 func TestModerationPolicyRestrictsPinsToAdmins(t *testing.T) {
 	t.Parallel()
 
@@ -440,6 +471,78 @@ func TestTopicModerationPolicyBlocksReactionsAndPins(t *testing.T) {
 		ActorDeviceID:  "dev-peer",
 		Pinned:         true,
 		UpdatedAt:      now.Add(4 * time.Minute),
+	})
+	require.ErrorIs(t, err, conversation.ErrForbidden)
+}
+
+func TestModerationPolicyDisablesThreadManagement(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 25, 11, 10, 0, 0, time.UTC)
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time {
+		return now
+	}))
+	require.NoError(t, err)
+
+	created, _, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-owner",
+		Kind:             conversation.ConversationKindGroup,
+		Title:            "Group",
+		MemberAccountIDs: []string{"acc-peer"},
+		Settings: conversation.ConversationSettings{
+			AllowThreads: true,
+		},
+		CreatedAt: now,
+	})
+	require.NoError(t, err)
+
+	topic, _, err := svc.CreateTopic(ctx, conversation.CreateTopicParams{
+		ConversationID:   created.ID,
+		CreatorAccountID: "acc-owner",
+		Title:            "Announcements",
+		CreatedAt:        now.Add(time.Minute),
+	})
+	require.NoError(t, err)
+
+	_, err = svc.SetModerationPolicy(ctx, conversation.SetModerationPolicyParams{
+		TargetKind:     conversation.ModerationTargetKindConversation,
+		TargetID:       created.ID,
+		ActorAccountID: "acc-owner",
+		AllowThreads:   false,
+		CreatedAt:      now,
+	})
+	require.NoError(t, err)
+
+	_, _, err = svc.CreateTopic(ctx, conversation.CreateTopicParams{
+		ConversationID:   created.ID,
+		CreatorAccountID: "acc-owner",
+		Title:            "Updates",
+		CreatedAt:        now.Add(2 * time.Minute),
+	})
+	require.ErrorIs(t, err, conversation.ErrForbidden)
+
+	_, err = svc.GetTopic(ctx, conversation.GetTopicParams{
+		ConversationID: created.ID,
+		TopicID:        topic.ID,
+		AccountID:      "acc-owner",
+	})
+	require.ErrorIs(t, err, conversation.ErrForbidden)
+
+	_, err = svc.ListTopics(ctx, conversation.ListTopicsParams{
+		ConversationID: created.ID,
+		AccountID:      "acc-owner",
+	})
+	require.ErrorIs(t, err, conversation.ErrForbidden)
+
+	_, _, err = svc.RenameTopic(ctx, conversation.RenameTopicParams{
+		ConversationID: created.ID,
+		TopicID:        topic.ID,
+		ActorAccountID: "acc-owner",
+		Title:          "New title",
+		UpdatedAt:      now.Add(3 * time.Minute),
 	})
 	require.ErrorIs(t, err, conversation.ErrForbidden)
 }

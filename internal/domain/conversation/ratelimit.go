@@ -92,7 +92,7 @@ func (s *Service) CheckModerationWrite(
 			nextAllowed := rateState.LastWriteAt.Add(params.BasePolicy.SlowModeInterval)
 			if now.Before(nextAllowed) {
 				return ModerationDecision{
-					RetryAfter: time.Until(nextAllowed),
+					RetryAfter: nextAllowed.Sub(now),
 				}, ErrRateLimited
 			}
 		}
@@ -105,7 +105,7 @@ func (s *Service) CheckModerationWrite(
 			if rateState.WindowCount >= uint64(params.BasePolicy.AntiSpamBurstLimit) {
 				nextAllowed := rateState.WindowStartedAt.Add(params.BasePolicy.AntiSpamWindow)
 				return ModerationDecision{
-					RetryAfter: time.Until(nextAllowed),
+					RetryAfter: nextAllowed.Sub(now),
 				}, ErrRateLimited
 			}
 		}

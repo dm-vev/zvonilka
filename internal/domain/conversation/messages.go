@@ -32,7 +32,11 @@ func (s *Service) ListMessages(ctx context.Context, params ListMessagesParams) (
 		return nil, fmt.Errorf("load conversation %s: %w", params.ConversationID, err)
 	}
 	if params.ThreadID != "" {
-		if conversation.Kind != ConversationKindGroup || !conversation.Settings.AllowThreads {
+		policy, err := s.policyForConversation(ctx, s.store, conversation, params.ThreadID)
+		if err != nil {
+			return nil, err
+		}
+		if conversation.Kind != ConversationKindGroup || !policy.AllowThreads {
 			return nil, ErrForbidden
 		}
 		if _, err := s.store.TopicByConversationAndID(ctx, params.ConversationID, params.ThreadID); err != nil {
@@ -72,20 +76,17 @@ func (s *Service) ListMessages(ctx context.Context, params ListMessagesParams) (
 		return nil, fmt.Errorf("load messages for conversation %s: %w", params.ConversationID, err)
 	}
 
-	if params.IncludeDeleted {
-		return messages, nil
-	}
-
 	filtered := messages[:0]
 	for _, message := range messages {
-		if message.DeletedAt.IsZero() {
-			if _, shadowed := shadowedAccounts[message.SenderAccountID]; shadowed && message.SenderAccountID != params.AccountID {
-				if member.Role != MemberRoleOwner && member.Role != MemberRoleAdmin {
-					continue
-				}
-			}
-			filtered = append(filtered, message)
+		if !params.IncludeDeleted && !message.DeletedAt.IsZero() {
+			continue
 		}
+		if _, shadowed := shadowedAccounts[message.SenderAccountID]; shadowed && message.SenderAccountID != params.AccountID {
+			if member.Role != MemberRoleOwner && member.Role != MemberRoleAdmin {
+				continue
+			}
+		}
+		filtered = append(filtered, message)
 	}
 
 	return filtered, nil
@@ -149,7 +150,11 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 
 		topicID := draft.ThreadID
 		if topicID != "" {
-			if conversation.Kind != ConversationKindGroup || !conversation.Settings.AllowThreads {
+			policy, policyErr := s.policyForConversation(ctx, tx, conversation, topicID)
+			if policyErr != nil {
+				return policyErr
+			}
+			if conversation.Kind != ConversationKindGroup || !policy.AllowThreads {
 				return ErrForbidden
 			}
 		}
@@ -164,6 +169,9 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 		policy, err := s.policyForConversation(ctx, tx, conversation, topic.ID)
 		if err != nil {
 			return err
+		}
+		if draft.ThreadID != "" && !policy.AllowThreads {
+			return ErrForbidden
 		}
 		if err := ValidateMessagePayload(draft.Payload, policy.RequireEncryptedMessages); err != nil {
 			return ErrInvalidInput
