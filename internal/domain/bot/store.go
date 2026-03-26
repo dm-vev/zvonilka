@@ -60,6 +60,10 @@ type Store interface {
 	RightsByScope(ctx context.Context, botAccountID string, forChannels bool) (AdminRightsState, error)
 	DeleteRights(ctx context.Context, botAccountID string, forChannels bool) error
 
+	SaveScore(ctx context.Context, state GameScore) (GameScore, error)
+	ScoreByMessageAndAccount(ctx context.Context, botAccountID string, messageID string, accountID string) (GameScore, error)
+	ListScoresByMessage(ctx context.Context, botAccountID string, messageID string) ([]GameScore, error)
+
 	SaveCursor(ctx context.Context, cursor Cursor) (Cursor, error)
 	CursorByName(ctx context.Context, name string) (Cursor, error)
 }

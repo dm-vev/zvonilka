@@ -96,6 +96,10 @@ func (a *api) serve(writer http.ResponseWriter, request *http.Request) {
 		a.getChat(writer, request, token)
 	case "getChatMember":
 		a.getChatMember(writer, request, token)
+	case "setGameScore":
+		a.setGameScore(writer, request, token)
+	case "getGameHighScores":
+		a.getGameHighScores(writer, request, token)
 	case "getFile":
 		a.getFile(writer, request, token)
 	case "setMyCommands":

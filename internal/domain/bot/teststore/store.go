@@ -25,6 +25,7 @@ func NewMemoryStore() bot.Store {
 		menusByKey:     make(map[string]bot.MenuState),
 		profilesByKey:  make(map[string]bot.ProfileValue),
 		rightsByKey:    make(map[string]bot.AdminRightsState),
+		scoresByKey:    make(map[string]bot.GameScore),
 		cursorsByName:  make(map[string]bot.Cursor),
 		nextPublicID:   1,
 		nextUpdateID:   1,
@@ -46,6 +47,7 @@ type memoryStore struct {
 	menusByKey     map[string]bot.MenuState
 	profilesByKey  map[string]bot.ProfileValue
 	rightsByKey    map[string]bot.AdminRightsState
+	scoresByKey    map[string]bot.GameScore
 	cursorsByName  map[string]bot.Cursor
 	nextPublicID   int64
 	nextUpdateID   int64
@@ -543,6 +545,74 @@ func (s *memoryStore) MenuByChat(_ context.Context, botAccountID string, chatID 
 	return cloneMenuState(value), nil
 }
 
+func (s *memoryStore) SaveScore(_ context.Context, state bot.GameScore) (bot.GameScore, error) {
+	value, err := bot.NormalizeGameScore(state, time.Now().UTC())
+	if err != nil {
+		return bot.GameScore{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.scoresByKey[scoreKey(value.BotAccountID, value.MessageID, value.AccountID)] = cloneScore(value)
+	s.version++
+
+	return cloneScore(value), nil
+}
+
+func (s *memoryStore) ScoreByMessageAndAccount(
+	_ context.Context,
+	botAccountID string,
+	messageID string,
+	accountID string,
+) (bot.GameScore, error) {
+	botAccountID = strings.TrimSpace(botAccountID)
+	messageID = strings.TrimSpace(messageID)
+	accountID = strings.TrimSpace(accountID)
+	if botAccountID == "" || messageID == "" || accountID == "" {
+		return bot.GameScore{}, bot.ErrInvalidInput
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	value, ok := s.scoresByKey[scoreKey(botAccountID, messageID, accountID)]
+	if !ok {
+		return bot.GameScore{}, bot.ErrNotFound
+	}
+
+	return cloneScore(value), nil
+}
+
+func (s *memoryStore) ListScoresByMessage(_ context.Context, botAccountID string, messageID string) ([]bot.GameScore, error) {
+	botAccountID = strings.TrimSpace(botAccountID)
+	messageID = strings.TrimSpace(messageID)
+	if botAccountID == "" || messageID == "" {
+		return nil, bot.ErrInvalidInput
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]bot.GameScore, 0)
+	for _, value := range s.scoresByKey {
+		if value.BotAccountID != botAccountID || value.MessageID != messageID {
+			continue
+		}
+		result = append(result, cloneScore(value))
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Score != result[j].Score {
+			return result[i].Score > result[j].Score
+		}
+		if !result[i].UpdatedAt.Equal(result[j].UpdatedAt) {
+			return result[i].UpdatedAt.Before(result[j].UpdatedAt)
+		}
+		return result[i].AccountID < result[j].AccountID
+	})
+
+	return result, nil
+}
+
 func (s *memoryStore) CursorByName(_ context.Context, name string) (bot.Cursor, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -606,6 +676,9 @@ func (s *memoryStore) cloneLocked() *memoryStore {
 	for key, value := range s.rightsByKey {
 		clone.rightsByKey[key] = cloneRightsState(value)
 	}
+	for key, value := range s.scoresByKey {
+		clone.scoresByKey[key] = cloneScore(value)
+	}
 	for key, value := range s.cursorsByName {
 		clone.cursorsByName[key] = cloneCursor(value)
 	}
@@ -626,6 +699,7 @@ func (s *memoryStore) replaceLocked(snapshot *memoryStore) {
 	s.menusByKey = snapshot.menusByKey
 	s.profilesByKey = snapshot.profilesByKey
 	s.rightsByKey = snapshot.rightsByKey
+	s.scoresByKey = snapshot.scoresByKey
 	s.cursorsByName = snapshot.cursorsByName
 	s.nextPublicID = snapshot.nextPublicID
 	s.nextUpdateID = snapshot.nextUpdateID
@@ -671,6 +745,10 @@ func rightsKey(botAccountID string, forChannels bool) string {
 	return botAccountID + ":groups"
 }
 
+func scoreKey(botAccountID string, messageID string, accountID string) string {
+	return botAccountID + ":" + messageID + ":" + accountID
+}
+
 func cloneWebhook(value bot.Webhook) bot.Webhook {
 	value.AllowedUpdates = append([]bot.UpdateType(nil), value.AllowedUpdates...)
 	return value
@@ -681,6 +759,10 @@ func cloneProfileValue(value bot.ProfileValue) bot.ProfileValue {
 }
 
 func cloneRightsState(value bot.AdminRightsState) bot.AdminRightsState {
+	return value
+}
+
+func cloneScore(value bot.GameScore) bot.GameScore {
 	return value
 }
 
@@ -742,6 +824,11 @@ func cloneMessage(value bot.Message) bot.Message {
 	if value.Dice != nil {
 		dice := *value.Dice
 		value.Dice = &dice
+	}
+	if value.Game != nil {
+		game := *value.Game
+		game.Photo = append([]bot.PhotoSize(nil), game.Photo...)
+		value.Game = &game
 	}
 	if value.ReplyToMessage != nil {
 		reply := cloneMessage(*value.ReplyToMessage)

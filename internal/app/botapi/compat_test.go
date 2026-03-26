@@ -231,6 +231,41 @@ func TestGoTelegramClientUtilitySuite(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, game.Game)
 	require.Equal(t, "runner", game.Game.Title)
+
+	ownerUserID := world.publicAccountID(t, world.owner.ID)
+	peerUserID := world.publicAccountID(t, world.peer.ID)
+
+	scoredGame, err := client.SetGameScore(ctx, &telegrambot.SetGameScoreParams{
+		UserID:    ownerUserID,
+		Score:     10,
+		ChatID:    directChatID,
+		MessageID: game.ID,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, scoredGame.Game)
+	require.Equal(t, game.ID, scoredGame.ID)
+
+	_, err = client.SetGameScore(ctx, &telegrambot.SetGameScoreParams{
+		UserID:    peerUserID,
+		Score:     25,
+		ChatID:    directChatID,
+		MessageID: game.ID,
+	})
+	require.NoError(t, err)
+
+	scores, err := client.GetGameHighScores(ctx, &telegrambot.GetGameHighScoresParams{
+		UserID:    ownerUserID,
+		ChatID:    directChatID,
+		MessageID: game.ID,
+	})
+	require.NoError(t, err)
+	require.Len(t, scores, 2)
+	require.Equal(t, 1, scores[0].Position)
+	require.Equal(t, peerUserID, scores[0].User.ID)
+	require.Equal(t, 25, scores[0].Score)
+	require.Equal(t, 2, scores[1].Position)
+	require.Equal(t, ownerUserID, scores[1].User.ID)
+	require.Equal(t, 10, scores[1].Score)
 }
 
 func TestGoTelegramClientCommandAndMenuSuite(t *testing.T) {

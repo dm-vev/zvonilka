@@ -428,6 +428,13 @@ func TestBotSendLocationContactAndPoll(t *testing.T) {
 		AccountKind: identity.AccountKindBot,
 	})
 	require.NoError(t, err)
+	peerAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "peter",
+		DisplayName: "Peter",
+		AccountKind: identity.AccountKindUser,
+		Email:       "peter@example.org",
+	})
+	require.NoError(t, err)
 
 	chat, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
 		OwnerAccountID:   userAccount.ID,
@@ -513,6 +520,48 @@ func TestBotSendLocationContactAndPoll(t *testing.T) {
 	require.NotNil(t, game.Game)
 	require.Equal(t, "runner", game.Game.Title)
 	require.Empty(t, game.Text)
+
+	updatedGame, err := service.SetGameScore(ctx, domainbot.SetGameScoreParams{
+		BotToken:  botToken,
+		ChatID:    chat.ID,
+		MessageID: game.MessageID,
+		UserID:    userAccount.ID,
+		Score:     10,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, updatedGame.Game)
+
+	_, err = service.SetGameScore(ctx, domainbot.SetGameScoreParams{
+		BotToken:  botToken,
+		ChatID:    chat.ID,
+		MessageID: game.MessageID,
+		UserID:    peerAccount.ID,
+		Score:     20,
+	})
+	require.NoError(t, err)
+
+	_, err = service.SetGameScore(ctx, domainbot.SetGameScoreParams{
+		BotToken:  botToken,
+		ChatID:    chat.ID,
+		MessageID: game.MessageID,
+		UserID:    userAccount.ID,
+		Score:     5,
+	})
+	require.ErrorIs(t, err, domainbot.ErrInvalidInput)
+
+	scores, err := service.GetGameHighScores(ctx, domainbot.GetGameHighScoresParams{
+		BotToken:  botToken,
+		ChatID:    chat.ID,
+		MessageID: game.MessageID,
+		UserID:    userAccount.ID,
+	})
+	require.NoError(t, err)
+	require.Len(t, scores, 2)
+	require.Equal(t, 1, scores[0].Position)
+	require.Equal(t, 20, scores[0].Score)
+	require.Equal(t, peerAccount.ID, scores[0].User.ID)
+	require.Equal(t, 2, scores[1].Position)
+	require.Equal(t, 10, scores[1].Score)
 }
 
 func TestBotCallbackQueryLifecycle(t *testing.T) {

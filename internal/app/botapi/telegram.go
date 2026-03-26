@@ -187,6 +187,23 @@ func (a *api) telegramUpdates(ctx context.Context, values []domainbot.Update) ([
 	return result, nil
 }
 
+func (a *api) telegramHighScores(ctx context.Context, values []domainbot.HighScore) ([]tgmodels.GameHighScore, error) {
+	result := make([]tgmodels.GameHighScore, 0, len(values))
+	for _, value := range values {
+		user, err := a.telegramUser(ctx, value.User)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, tgmodels.GameHighScore{
+			Position: value.Position,
+			User:     user,
+			Score:    value.Score,
+		})
+	}
+
+	return result, nil
+}
+
 func (a *api) telegramCallback(ctx context.Context, value domainbot.CallbackQuery) (*tgmodels.CallbackQuery, error) {
 	from, err := a.telegramUser(ctx, value.From)
 	if err != nil {

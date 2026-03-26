@@ -202,3 +202,23 @@ func scanInlineQuery(row rowScanner) (bot.InlineQueryState, error) {
 
 	return query, nil
 }
+
+func scanScore(row rowScanner) (bot.GameScore, error) {
+	var score bot.GameScore
+
+	if err := row.Scan(
+		&score.BotAccountID,
+		&score.MessageID,
+		&score.AccountID,
+		&score.Score,
+		&score.CreatedAt,
+		&score.UpdatedAt,
+	); err != nil {
+		return bot.GameScore{}, err
+	}
+
+	score.CreatedAt = score.CreatedAt.UTC()
+	score.UpdatedAt = score.UpdatedAt.UTC()
+
+	return score, nil
+}
