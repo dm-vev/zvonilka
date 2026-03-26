@@ -224,6 +224,32 @@ func messagePoll(message conversation.Message) *Poll {
 	return &poll
 }
 
+func messageVenue(message conversation.Message) *Venue {
+	if messageShape(message) != "venue" {
+		return nil
+	}
+
+	var venue Venue
+	if !decodeStructured(message, &venue) {
+		return nil
+	}
+
+	return &venue
+}
+
+func messageDice(message conversation.Message) *Dice {
+	if messageShape(message) != "dice" {
+		return nil
+	}
+
+	var dice Dice
+	if !decodeStructured(message, &dice) {
+		return nil
+	}
+
+	return &dice
+}
+
 func decodeStructured(message conversation.Message, target any) bool {
 	raw := strings.TrimSpace(message.Metadata[metadataJSONKey])
 	if raw == "" {
@@ -325,6 +351,8 @@ func (s *Service) messageForConversation(
 	result.Location = messageLocation(msg)
 	result.Contact = messageContact(msg)
 	result.Poll = messagePoll(msg)
+	result.Venue = messageVenue(msg)
+	result.Dice = messageDice(msg)
 	if !includeReply || msg.ReplyTo.MessageID == "" {
 		return result, nil
 	}

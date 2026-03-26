@@ -40,6 +40,13 @@ type Store interface {
 	InlineQueryByID(ctx context.Context, queryID string) (InlineQueryState, error)
 	AnswerInlineQuery(ctx context.Context, query InlineQueryState) (InlineQueryState, error)
 
+	SaveCommands(ctx context.Context, set CommandSet) (CommandSet, error)
+	CommandsByScope(ctx context.Context, botAccountID string, scope CommandScope, languageCode string) (CommandSet, error)
+	DeleteCommands(ctx context.Context, botAccountID string, scope CommandScope, languageCode string) error
+
+	SaveMenu(ctx context.Context, state MenuState) (MenuState, error)
+	MenuByChat(ctx context.Context, botAccountID string, chatID string) (MenuState, error)
+
 	SaveCursor(ctx context.Context, cursor Cursor) (Cursor, error)
 	CursorByName(ctx context.Context, name string) (Cursor, error)
 }

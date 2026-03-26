@@ -73,6 +73,9 @@ func (a *api) telegramMessage(ctx context.Context, value domainbot.Message) (*tg
 		Location:       a.telegramLocation(value.Location),
 		Contact:        a.telegramContact(ctx, value.Contact),
 		Poll:           a.telegramPoll(value.Poll),
+		Venue:          a.telegramVenue(value.Venue),
+		Dice:           a.telegramDice(value.Dice),
+		ReplyMarkup:    telegramReplyMarkup(value.ReplyMarkup),
 		IsTopicMessage: value.MessageThreadID != "",
 	}
 	if value.EditDate > 0 {
@@ -501,6 +504,107 @@ func (a *api) telegramPoll(value *domainbot.Poll) *tgmodels.Poll {
 		IsAnonymous:           value.IsAnonymous,
 		Type:                  value.Type,
 		AllowsMultipleAnswers: value.AllowsMultipleAnswers,
+	}
+}
+
+func (a *api) telegramVenue(value *domainbot.Venue) *tgmodels.Venue {
+	if value == nil {
+		return nil
+	}
+
+	location := a.telegramLocation(&value.Location)
+	if location == nil {
+		return nil
+	}
+
+	return &tgmodels.Venue{
+		Location:        *location,
+		Title:           value.Title,
+		Address:         value.Address,
+		FoursquareID:    value.FoursquareID,
+		FoursquareType:  value.FoursquareType,
+		GooglePlaceID:   value.GooglePlaceID,
+		GooglePlaceType: value.GooglePlaceType,
+	}
+}
+
+func (a *api) telegramDice(value *domainbot.Dice) *tgmodels.Dice {
+	if value == nil {
+		return nil
+	}
+
+	return &tgmodels.Dice{
+		Emoji: value.Emoji,
+		Value: value.Value,
+	}
+}
+
+func telegramReplyMarkup(value *domainbot.InlineKeyboardMarkup) *tgmodels.InlineKeyboardMarkup {
+	if value == nil {
+		return nil
+	}
+
+	result := &tgmodels.InlineKeyboardMarkup{
+		InlineKeyboard: make([][]tgmodels.InlineKeyboardButton, 0, len(value.InlineKeyboard)),
+	}
+	for _, row := range value.InlineKeyboard {
+		buttons := make([]tgmodels.InlineKeyboardButton, 0, len(row))
+		for _, button := range row {
+			buttons = append(buttons, tgmodels.InlineKeyboardButton{
+				Text:         button.Text,
+				URL:          button.URL,
+				CallbackData: button.CallbackData,
+			})
+		}
+		result.InlineKeyboard = append(result.InlineKeyboard, buttons)
+	}
+
+	return result
+}
+
+func telegramCommands(values []domainbot.Command) []tgmodels.BotCommand {
+	result := make([]tgmodels.BotCommand, 0, len(values))
+	for _, value := range values {
+		result = append(result, tgmodels.BotCommand{
+			Command:     value.Command,
+			Description: value.Description,
+		})
+	}
+
+	return result
+}
+
+func telegramMenu(value domainbot.MenuButton) *tgmodels.MenuButton {
+	switch value.Type {
+	case domainbot.MenuButtonCommands:
+		return &tgmodels.MenuButton{
+			Type:     tgmodels.MenuButtonTypeCommands,
+			Commands: &tgmodels.MenuButtonCommands{},
+		}
+	case domainbot.MenuButtonWebApp:
+		return &tgmodels.MenuButton{
+			Type: tgmodels.MenuButtonTypeWebApp,
+			WebApp: &tgmodels.MenuButtonWebApp{
+				Text: value.Text,
+				WebApp: tgmodels.WebAppInfo{
+					URL: value.WebAppURL,
+				},
+			},
+		}
+	default:
+		return &tgmodels.MenuButton{
+			Type:    tgmodels.MenuButtonTypeDefault,
+			Default: &tgmodels.MenuButtonDefault{},
+		}
+	}
+}
+
+func telegramFile(value domainbot.File) tgmodels.File {
+	return tgmodels.File{
+		FileID:       value.FileID,
+		FileUniqueID: value.FileUniqueID,
+		FileSize:     int64(value.FileSize),
+		FilePath:     value.FilePath,
 	}
 }
 

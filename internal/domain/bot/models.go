@@ -100,6 +100,7 @@ type File struct {
 	FileID       string `json:"file_id"`
 	FileUniqueID string `json:"file_unique_id,omitempty"`
 	FileSize     uint64 `json:"file_size,omitempty"`
+	FilePath     string `json:"file_path,omitempty"`
 }
 
 // PhotoSize describes one Telegram-shaped photo size projection.
@@ -266,6 +267,8 @@ type Message struct {
 	Location        *Location             `json:"location,omitempty"`
 	Contact         *Contact              `json:"contact,omitempty"`
 	Poll            *Poll                 `json:"poll,omitempty"`
+	Venue           *Venue                `json:"venue,omitempty"`
+	Dice            *Dice                 `json:"dice,omitempty"`
 	ReplyMarkup     *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 	ReplyToMessage  *Message              `json:"reply_to_message,omitempty"`
 }

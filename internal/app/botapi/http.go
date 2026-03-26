@@ -56,22 +56,46 @@ func (a *api) serve(writer http.ResponseWriter, request *http.Request) {
 		a.sendVideoNote(writer, request, token)
 	case "sendLocation":
 		a.sendLocation(writer, request, token)
+	case "sendVenue":
+		a.sendVenue(writer, request, token)
 	case "sendContact":
 		a.sendContact(writer, request, token)
 	case "sendPoll":
 		a.sendPoll(writer, request, token)
+	case "sendDice":
+		a.sendDice(writer, request, token)
 	case "sendVoice":
 		a.sendVoice(writer, request, token)
 	case "sendSticker":
 		a.sendSticker(writer, request, token)
+	case "forwardMessage":
+		a.forwardMessage(writer, request, token)
+	case "copyMessage":
+		a.copyMessage(writer, request, token)
 	case "editMessageText":
 		a.editMessageText(writer, request, token)
+	case "editMessageCaption":
+		a.editMessageCaption(writer, request, token)
+	case "editMessageReplyMarkup":
+		a.editMessageReplyMarkup(writer, request, token)
 	case "deleteMessage":
 		a.deleteMessage(writer, request, token)
 	case "getChat":
 		a.getChat(writer, request, token)
 	case "getChatMember":
 		a.getChatMember(writer, request, token)
+	case "getFile":
+		a.getFile(writer, request, token)
+	case "setMyCommands":
+		a.setMyCommands(writer, request, token)
+	case "getMyCommands":
+		a.getMyCommands(writer, request, token)
+	case "deleteMyCommands":
+		a.deleteMyCommands(writer, request, token)
+	case "setChatMenuButton":
+		a.setChatMenuButton(writer, request, token)
+	case "getChatMenuButton":
+		a.getChatMenuButton(writer, request, token)
 	case "answerCallbackQuery":
 		a.answerCallbackQuery(writer, request, token)
 	case "answerInlineQuery":

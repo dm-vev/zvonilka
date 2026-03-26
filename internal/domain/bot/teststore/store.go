@@ -3,6 +3,7 @@ package teststore
 import (
 	"context"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,6 +21,8 @@ func NewMemoryStore() bot.Store {
 		updateIDByKey:  make(map[string]int64),
 		callbacksByID:  make(map[string]bot.Callback),
 		inlineByID:     make(map[string]bot.InlineQueryState),
+		commandsByKey:  make(map[string]bot.CommandSet),
+		menusByKey:     make(map[string]bot.MenuState),
 		cursorsByName:  make(map[string]bot.Cursor),
 		nextPublicID:   1,
 		nextUpdateID:   1,
@@ -37,6 +40,8 @@ type memoryStore struct {
 	updateIDByKey  map[string]int64
 	callbacksByID  map[string]bot.Callback
 	inlineByID     map[string]bot.InlineQueryState
+	commandsByKey  map[string]bot.CommandSet
+	menusByKey     map[string]bot.MenuState
 	cursorsByName  map[string]bot.Cursor
 	nextPublicID   int64
 	nextUpdateID   int64
@@ -442,6 +447,98 @@ func (s *memoryStore) AnswerInlineQuery(_ context.Context, query bot.InlineQuery
 	return cloneInlineQuery(value), nil
 }
 
+func (s *memoryStore) SaveCommands(_ context.Context, set bot.CommandSet) (bot.CommandSet, error) {
+	value, err := normalizeCommands(set)
+	if err != nil {
+		return bot.CommandSet{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.commandsByKey[commandKey(value.BotAccountID, value.Scope, value.LanguageCode)] = cloneCommandSet(value)
+	s.version++
+
+	return cloneCommandSet(value), nil
+}
+
+func (s *memoryStore) CommandsByScope(
+	_ context.Context,
+	botAccountID string,
+	scope bot.CommandScope,
+	languageCode string,
+) (bot.CommandSet, error) {
+	botAccountID = strings.TrimSpace(botAccountID)
+	scope, languageCode, err := bot.NormalizeCommandLookup(scope, languageCode)
+	if err != nil {
+		return bot.CommandSet{}, err
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	value, ok := s.commandsByKey[commandKey(botAccountID, scope, languageCode)]
+	if !ok {
+		return bot.CommandSet{}, bot.ErrNotFound
+	}
+
+	return cloneCommandSet(value), nil
+}
+
+func (s *memoryStore) DeleteCommands(
+	_ context.Context,
+	botAccountID string,
+	scope bot.CommandScope,
+	languageCode string,
+) error {
+	botAccountID = strings.TrimSpace(botAccountID)
+	scope, languageCode, err := bot.NormalizeCommandLookup(scope, languageCode)
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := commandKey(botAccountID, scope, languageCode)
+	if _, ok := s.commandsByKey[key]; !ok {
+		return bot.ErrNotFound
+	}
+	delete(s.commandsByKey, key)
+	s.version++
+	return nil
+}
+
+func (s *memoryStore) SaveMenu(_ context.Context, state bot.MenuState) (bot.MenuState, error) {
+	value, err := normalizeMenu(state)
+	if err != nil {
+		return bot.MenuState{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.menusByKey[menuKey(value.BotAccountID, value.ChatID)] = cloneMenuState(value)
+	s.version++
+
+	return cloneMenuState(value), nil
+}
+
+func (s *memoryStore) MenuByChat(_ context.Context, botAccountID string, chatID string) (bot.MenuState, error) {
+	botAccountID = strings.TrimSpace(botAccountID)
+	chatID = strings.TrimSpace(chatID)
+	if botAccountID == "" {
+		return bot.MenuState{}, bot.ErrInvalidInput
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	value, ok := s.menusByKey[menuKey(botAccountID, chatID)]
+	if !ok {
+		return bot.MenuState{}, bot.ErrNotFound
+	}
+
+	return cloneMenuState(value), nil
+}
+
 func (s *memoryStore) CursorByName(_ context.Context, name string) (bot.Cursor, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -493,6 +590,12 @@ func (s *memoryStore) cloneLocked() *memoryStore {
 	for key, value := range s.inlineByID {
 		clone.inlineByID[key] = cloneInlineQuery(value)
 	}
+	for key, value := range s.commandsByKey {
+		clone.commandsByKey[key] = cloneCommandSet(value)
+	}
+	for key, value := range s.menusByKey {
+		clone.menusByKey[key] = cloneMenuState(value)
+	}
 	for key, value := range s.cursorsByName {
 		clone.cursorsByName[key] = cloneCursor(value)
 	}
@@ -509,6 +612,8 @@ func (s *memoryStore) replaceLocked(snapshot *memoryStore) {
 	s.updateIDByKey = snapshot.updateIDByKey
 	s.callbacksByID = snapshot.callbacksByID
 	s.inlineByID = snapshot.inlineByID
+	s.commandsByKey = snapshot.commandsByKey
+	s.menusByKey = snapshot.menusByKey
 	s.cursorsByName = snapshot.cursorsByName
 	s.nextPublicID = snapshot.nextPublicID
 	s.nextUpdateID = snapshot.nextUpdateID
@@ -532,6 +637,14 @@ func (s *memoryStore) deleteBotUpdateIDLocked(botAccountID string, updateID int6
 
 func updateKey(botAccountID string, eventID string, updateType bot.UpdateType) string {
 	return botAccountID + ":" + eventID + ":" + string(updateType)
+}
+
+func commandKey(botAccountID string, scope bot.CommandScope, languageCode string) string {
+	return botAccountID + ":" + string(scope.Type) + ":" + scope.ChatID + ":" + scope.UserID + ":" + languageCode
+}
+
+func menuKey(botAccountID string, chatID string) string {
+	return botAccountID + ":" + chatID
 }
 
 func cloneWebhook(value bot.Webhook) bot.Webhook {
@@ -590,6 +703,14 @@ func cloneMessage(value bot.Message) bot.Message {
 		sticker := *value.Sticker
 		value.Sticker = &sticker
 	}
+	if value.Venue != nil {
+		venue := *value.Venue
+		value.Venue = &venue
+	}
+	if value.Dice != nil {
+		dice := *value.Dice
+		value.Dice = &dice
+	}
 	if value.ReplyToMessage != nil {
 		reply := cloneMessage(*value.ReplyToMessage)
 		value.ReplyToMessage = &reply
@@ -622,6 +743,15 @@ func cloneInlineQuery(value bot.InlineQueryState) bot.InlineQueryState {
 	return value
 }
 
+func cloneCommandSet(value bot.CommandSet) bot.CommandSet {
+	value.Commands = append([]bot.Command(nil), value.Commands...)
+	return value
+}
+
+func cloneMenuState(value bot.MenuState) bot.MenuState {
+	return value
+}
+
 func cloneInlineKeyboard(rows [][]bot.InlineKeyboardButton) [][]bot.InlineKeyboardButton {
 	result := make([][]bot.InlineKeyboardButton, 0, len(rows))
 	for _, row := range rows {
@@ -647,4 +777,12 @@ func cloneMarkup(value bot.InlineKeyboardMarkup) bot.InlineKeyboardMarkup {
 	}
 
 	return value
+}
+
+func normalizeCommands(set bot.CommandSet) (bot.CommandSet, error) {
+	return bot.NormalizeCommandSet(set, time.Now().UTC())
+}
+
+func normalizeMenu(state bot.MenuState) (bot.MenuState, error) {
+	return bot.NormalizeMenuState(state, time.Now().UTC())
 }
