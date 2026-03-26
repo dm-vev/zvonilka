@@ -21,3 +21,8 @@ func NormalizeCursor(cursor Cursor, now time.Time) (Cursor, error) {
 func NormalizeCallback(callback Callback, now time.Time) (Callback, error) {
 	return callback.normalize(now)
 }
+
+// NormalizeInlineQuery validates and normalizes one inline query state record.
+func NormalizeInlineQuery(query InlineQueryState, now time.Time) (InlineQueryState, error) {
+	return query.normalize(now)
+}

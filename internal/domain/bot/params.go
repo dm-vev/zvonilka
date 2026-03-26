@@ -229,6 +229,15 @@ type TriggerCallbackParams struct {
 	Data           string
 }
 
+// TriggerInlineQueryParams describes one internally generated inline query.
+type TriggerInlineQueryParams struct {
+	BotAccountID  string
+	FromAccountID string
+	Query         string
+	Offset        string
+	ChatType      string
+}
+
 // AnswerCallbackQueryParams describes one answerCallbackQuery request.
 type AnswerCallbackQueryParams struct {
 	BotToken         string
@@ -237,6 +246,18 @@ type AnswerCallbackQueryParams struct {
 	ShowAlert        bool
 	URL              string
 	CacheTimeSeconds int
+}
+
+// AnswerInlineQueryParams describes one answerInlineQuery request.
+type AnswerInlineQueryParams struct {
+	BotToken      string
+	InlineQueryID string
+	Results       []InlineQueryResultArticle
+	CacheTime     int
+	IsPersonal    bool
+	NextOffset    string
+	SwitchPMText  string
+	SwitchPMParam string
 }
 
 // RetryParams describes one webhook retry update.

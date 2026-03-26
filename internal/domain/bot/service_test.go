@@ -565,6 +565,86 @@ func TestBotCallbackQueryLifecycle(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestBotInlineQueryLifecycle(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+
+	userAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "rita",
+		DisplayName: "Rita",
+		AccountKind: identity.AccountKindUser,
+		Email:       "rita@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "inlinebot",
+		DisplayName: "Inline Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	botStore := bottest.NewMemoryStore()
+	service, err := domainbot.NewService(
+		botStore,
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaFixture{},
+	)
+	require.NoError(t, err)
+
+	query, err := service.TriggerInlineQuery(ctx, domainbot.TriggerInlineQueryParams{
+		BotAccountID:  botAccount.ID,
+		FromAccountID: userAccount.ID,
+		Query:         "help",
+		Offset:        "0",
+		ChatType:      "private",
+	})
+	require.NoError(t, err)
+
+	updates, err := service.GetUpdates(ctx, domainbot.GetUpdatesParams{BotToken: botToken})
+	require.NoError(t, err)
+	require.Len(t, updates, 1)
+	require.NotNil(t, updates[0].InlineQuery)
+	require.Equal(t, query.ID, updates[0].InlineQuery.ID)
+	require.Equal(t, "help", updates[0].InlineQuery.Query)
+
+	err = service.AnswerInlineQuery(ctx, domainbot.AnswerInlineQueryParams{
+		BotToken:      botToken,
+		InlineQueryID: query.ID,
+		Results: []domainbot.InlineQueryResultArticle{{
+			Type:        "article",
+			ID:          "article-1",
+			Title:       "Answer",
+			Description: "Inline answer",
+			InputMessageContent: domainbot.InputTextMessageContent{
+				MessageText: "hello from inline",
+			},
+		}},
+		CacheTime:  30,
+		IsPersonal: true,
+		NextOffset: "next",
+	})
+	require.NoError(t, err)
+
+	state, err := botStore.InlineQueryByID(ctx, query.ID)
+	require.NoError(t, err)
+	require.True(t, state.Answered)
+	require.Equal(t, 30, state.CacheTime)
+	require.True(t, state.IsPersonal)
+	require.Equal(t, "next", state.NextOffset)
+	require.Len(t, state.Results, 1)
+	require.Equal(t, "hello from inline", state.Results[0].InputMessageContent.MessageText)
+}
+
 type mediaFixture struct {
 	assets map[string]domainmedia.MediaAsset
 }

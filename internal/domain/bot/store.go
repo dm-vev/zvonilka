@@ -33,6 +33,10 @@ type Store interface {
 	CallbackByID(ctx context.Context, callbackID string) (Callback, error)
 	AnswerCallback(ctx context.Context, callback Callback) (Callback, error)
 
+	SaveInlineQuery(ctx context.Context, query InlineQueryState) (InlineQueryState, error)
+	InlineQueryByID(ctx context.Context, queryID string) (InlineQueryState, error)
+	AnswerInlineQuery(ctx context.Context, query InlineQueryState) (InlineQueryState, error)
+
 	SaveCursor(ctx context.Context, cursor Cursor) (Cursor, error)
 	CursorByName(ctx context.Context, name string) (Cursor, error)
 }

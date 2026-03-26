@@ -2,6 +2,7 @@ package pgstore
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/bot"
@@ -139,4 +140,65 @@ func scanCallback(row rowScanner) (bot.Callback, error) {
 	callback.UpdatedAt = callback.UpdatedAt.UTC()
 
 	return callback, nil
+}
+
+func encodeInlineResults(values []bot.InlineQueryResultArticle) ([]byte, error) {
+	if len(values) == 0 {
+		return []byte("[]"), nil
+	}
+
+	return json.Marshal(values)
+}
+
+func decodeInlineResults(raw []byte) ([]bot.InlineQueryResultArticle, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+
+	var values []bot.InlineQueryResultArticle
+	if err := json.Unmarshal(raw, &values); err != nil {
+		return nil, err
+	}
+
+	return values, nil
+}
+
+func scanInlineQuery(row rowScanner) (bot.InlineQueryState, error) {
+	var (
+		query      bot.InlineQueryState
+		rawResults []byte
+		answeredAt sql.NullTime
+	)
+
+	if err := row.Scan(
+		&query.ID,
+		&query.BotAccountID,
+		&query.FromAccountID,
+		&query.Query,
+		&query.Offset,
+		&query.ChatType,
+		&query.Answered,
+		&rawResults,
+		&query.CacheTime,
+		&query.IsPersonal,
+		&query.NextOffset,
+		&query.SwitchPMText,
+		&query.SwitchPMParam,
+		&query.CreatedAt,
+		&query.UpdatedAt,
+		&answeredAt,
+	); err != nil {
+		return bot.InlineQueryState{}, err
+	}
+
+	results, err := decodeInlineResults(rawResults)
+	if err != nil {
+		return bot.InlineQueryState{}, err
+	}
+	query.Results = results
+	query.AnsweredAt = decodeTime(answeredAt)
+	query.CreatedAt = query.CreatedAt.UTC()
+	query.UpdatedAt = query.UpdatedAt.UTC()
+
+	return query, nil
 }

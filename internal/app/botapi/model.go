@@ -193,6 +193,29 @@ type answerCallbackQueryRequest struct {
 	CacheTime       int    `json:"cache_time"`
 }
 
+type inlineQueryResultArticleRequest struct {
+	Type                string                          `json:"type"`
+	ID                  string                          `json:"id"`
+	Title               string                          `json:"title"`
+	Description         string                          `json:"description"`
+	InputMessageContent inlineTextMessageContentRequest `json:"input_message_content"`
+	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+}
+
+type inlineTextMessageContentRequest struct {
+	MessageText string `json:"message_text"`
+}
+
+type answerInlineQueryRequest struct {
+	InlineQueryID textID                            `json:"inline_query_id"`
+	Results       []inlineQueryResultArticleRequest `json:"results"`
+	CacheTime     int                               `json:"cache_time"`
+	IsPersonal    bool                              `json:"is_personal"`
+	NextOffset    string                            `json:"next_offset"`
+	SwitchPMText  string                            `json:"switch_pm_text"`
+	SwitchPMParam string                            `json:"switch_pm_parameter"`
+}
+
 type deleteMessageRequest struct {
 	ChatID    textID `json:"chat_id"`
 	MessageID textID `json:"message_id"`

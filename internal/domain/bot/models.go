@@ -16,6 +16,7 @@ const (
 	UpdateTypeChannelPost       UpdateType = "channel_post"
 	UpdateTypeEditedChannelPost UpdateType = "edited_channel_post"
 	UpdateTypeCallbackQuery     UpdateType = "callback_query"
+	UpdateTypeInlineQuery       UpdateType = "inline_query"
 )
 
 // ChatType identifies a Bot API chat kind.
@@ -191,6 +192,30 @@ type Poll struct {
 	AllowsMultipleAnswers bool         `json:"allows_multiple_answers,omitempty"`
 }
 
+// InlineQuery describes one Telegram-shaped inline query update.
+type InlineQuery struct {
+	ID       string `json:"id"`
+	From     User   `json:"from"`
+	Query    string `json:"query"`
+	Offset   string `json:"offset,omitempty"`
+	ChatType string `json:"chat_type,omitempty"`
+}
+
+// InputTextMessageContent describes text content for one inline result.
+type InputTextMessageContent struct {
+	MessageText string `json:"message_text"`
+}
+
+// InlineQueryResultArticle describes one supported inline result shape.
+type InlineQueryResultArticle struct {
+	Type                string                  `json:"type"`
+	ID                  string                  `json:"id"`
+	Title               string                  `json:"title"`
+	Description         string                  `json:"description,omitempty"`
+	InputMessageContent InputTextMessageContent `json:"input_message_content"`
+	ReplyMarkup         *InlineKeyboardMarkup   `json:"reply_markup,omitempty"`
+}
+
 // Message describes a Telegram-shaped message projection.
 type Message struct {
 	MessageID       string                `json:"message_id"`
@@ -234,6 +259,7 @@ type Update struct {
 	ChannelPost       *Message       `json:"channel_post,omitempty"`
 	EditedChannelPost *Message       `json:"edited_channel_post,omitempty"`
 	CallbackQuery     *CallbackQuery `json:"callback_query,omitempty"`
+	InlineQuery       *InlineQuery   `json:"inline_query,omitempty"`
 }
 
 // Webhook stores one bot webhook configuration row.
@@ -288,6 +314,26 @@ type Callback struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	AnsweredAt      time.Time
+}
+
+// InlineQueryState stores one pending or answered inline query state.
+type InlineQueryState struct {
+	ID            string
+	BotAccountID  string
+	FromAccountID string
+	Query         string
+	Offset        string
+	ChatType      string
+	Answered      bool
+	Results       []InlineQueryResultArticle
+	CacheTime     int
+	IsPersonal    bool
+	NextOffset    string
+	SwitchPMText  string
+	SwitchPMParam string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	AnsweredAt    time.Time
 }
 
 // WebhookInfo describes the bot-visible webhook state.
@@ -420,4 +466,57 @@ func (c Callback) normalize(now time.Time) (Callback, error) {
 	}
 
 	return c, nil
+}
+
+func (q InlineQueryState) normalize(now time.Time) (InlineQueryState, error) {
+	q.ID = strings.TrimSpace(q.ID)
+	q.BotAccountID = strings.TrimSpace(q.BotAccountID)
+	q.FromAccountID = strings.TrimSpace(q.FromAccountID)
+	q.Query = strings.TrimSpace(q.Query)
+	q.Offset = strings.TrimSpace(q.Offset)
+	q.ChatType = strings.TrimSpace(q.ChatType)
+	q.NextOffset = strings.TrimSpace(q.NextOffset)
+	q.SwitchPMText = strings.TrimSpace(q.SwitchPMText)
+	q.SwitchPMParam = strings.TrimSpace(q.SwitchPMParam)
+	if q.ID == "" || q.BotAccountID == "" || q.FromAccountID == "" {
+		return InlineQueryState{}, ErrInvalidInput
+	}
+	if q.CacheTime < 0 {
+		return InlineQueryState{}, ErrInvalidInput
+	}
+	for index, result := range q.Results {
+		result.Type = strings.TrimSpace(result.Type)
+		result.ID = strings.TrimSpace(result.ID)
+		result.Title = strings.TrimSpace(result.Title)
+		result.Description = strings.TrimSpace(result.Description)
+		result.InputMessageContent.MessageText = strings.TrimSpace(result.InputMessageContent.MessageText)
+		if result.Type == "" {
+			result.Type = "article"
+		}
+		if result.Type != "article" || result.ID == "" || result.Title == "" || result.InputMessageContent.MessageText == "" {
+			return InlineQueryState{}, ErrInvalidInput
+		}
+		if result.ReplyMarkup != nil {
+			markup, err := result.ReplyMarkup.normalize()
+			if err != nil {
+				return InlineQueryState{}, ErrInvalidInput
+			}
+			result.ReplyMarkup = &markup
+		}
+		q.Results[index] = result
+	}
+	if q.Answered && len(q.Results) == 0 {
+		return InlineQueryState{}, ErrInvalidInput
+	}
+	if q.CreatedAt.IsZero() {
+		q.CreatedAt = now.UTC()
+	}
+	if q.UpdatedAt.IsZero() {
+		q.UpdatedAt = q.CreatedAt
+	}
+	if q.Answered && q.AnsweredAt.IsZero() {
+		q.AnsweredAt = q.UpdatedAt
+	}
+
+	return q, nil
 }

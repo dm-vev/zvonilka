@@ -273,3 +273,110 @@ func TestSaveCallbackRoundTrip(t *testing.T) {
 	require.Equal(t, "ok", saved.Data)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestSaveInlineQueryRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	store, mock, db := newMockStore(t)
+	defer db.Close()
+
+	now := time.Date(2026, time.March, 26, 12, 0, 0, 0, time.UTC)
+	results, err := encodeInlineResults([]bot.InlineQueryResultArticle{{
+		Type:        "article",
+		ID:          "result-1",
+		Title:       "Result",
+		Description: "Inline result",
+		InputMessageContent: bot.InputTextMessageContent{
+			MessageText: "hello",
+		},
+	}})
+	require.NoError(t, err)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`(?s)INSERT INTO "bot"\."bot_inline_queries".*RETURNING id, bot_account_id, from_account_id, query_text, query_offset, chat_type, answered, results_json, cache_time_seconds, is_personal, next_offset, switch_pm_text, switch_pm_param, created_at, updated_at, answered_at`).
+		WithArgs(
+			"inq-1",
+			"acc-bot",
+			"acc-user",
+			"help",
+			"0",
+			"private",
+			true,
+			results,
+			30,
+			true,
+			"next",
+			"",
+			"",
+			now.UTC(),
+			now.UTC(),
+			sqlmock.AnyArg(),
+		).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id",
+			"bot_account_id",
+			"from_account_id",
+			"query_text",
+			"query_offset",
+			"chat_type",
+			"answered",
+			"results_json",
+			"cache_time_seconds",
+			"is_personal",
+			"next_offset",
+			"switch_pm_text",
+			"switch_pm_param",
+			"created_at",
+			"updated_at",
+			"answered_at",
+		}).AddRow(
+			"inq-1",
+			"acc-bot",
+			"acc-user",
+			"help",
+			"0",
+			"private",
+			true,
+			results,
+			30,
+			true,
+			"next",
+			"",
+			"",
+			now.UTC(),
+			now.UTC(),
+			now.UTC(),
+		))
+	mock.ExpectCommit()
+
+	saved, err := store.SaveInlineQuery(context.Background(), bot.InlineQueryState{
+		ID:            "inq-1",
+		BotAccountID:  "acc-bot",
+		FromAccountID: "acc-user",
+		Query:         "help",
+		Offset:        "0",
+		ChatType:      "private",
+		Answered:      true,
+		Results: []bot.InlineQueryResultArticle{{
+			Type:        "article",
+			ID:          "result-1",
+			Title:       "Result",
+			Description: "Inline result",
+			InputMessageContent: bot.InputTextMessageContent{
+				MessageText: "hello",
+			},
+		}},
+		CacheTime:  30,
+		IsPersonal: true,
+		NextOffset: "next",
+		CreatedAt:  now,
+		UpdatedAt:  now,
+		AnsweredAt: now,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "inq-1", saved.ID)
+	require.True(t, saved.Answered)
+	require.Len(t, saved.Results, 1)
+	require.Equal(t, "hello", saved.Results[0].InputMessageContent.MessageText)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
