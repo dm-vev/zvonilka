@@ -85,6 +85,118 @@ func TestCreateThreadAcceptsRootMessageID(t *testing.T) {
 	}
 }
 
+func TestConversationMembershipAndInviteRPC(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	owner, ownerCtx := fixture.mustCreateUserAndLogin(t, "membership-owner", "membership-owner@example.com")
+	peer, _ := fixture.mustCreateUserAndLogin(t, "membership-peer", "membership-peer@example.com")
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:  commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title: "Members",
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	title := "Updated Members"
+	updated, err := fixture.api.UpdateConversation(ownerCtx, &conversationv1.UpdateConversationRequest{
+		Conversation: &conversationv1.Conversation{
+			ConversationId: created.Conversation.ConversationId,
+			Title:          title,
+			Settings: &conversationv1.ConversationSettings{
+				OnlyAdminsCanAddMembers: true,
+				AllowReactions:          false,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("update conversation: %v", err)
+	}
+	if updated.Conversation.Title != title || !updated.Conversation.Settings.OnlyAdminsCanAddMembers {
+		t.Fatalf("unexpected updated conversation: %+v", updated.Conversation)
+	}
+
+	added, err := fixture.api.AddMembers(ownerCtx, &conversationv1.AddMembersRequest{
+		ConversationId: created.Conversation.ConversationId,
+		UserIds:        []string{peer.ID},
+		Role:           commonv1.MemberRole_MEMBER_ROLE_MEMBER,
+	})
+	if err != nil {
+		t.Fatalf("add members: %v", err)
+	}
+	if len(added.Members) != 1 || added.Members[0].UserId != peer.ID {
+		t.Fatalf("unexpected added members: %+v", added.Members)
+	}
+
+	roleUpdated, err := fixture.api.UpdateMemberRole(ownerCtx, &conversationv1.UpdateMemberRoleRequest{
+		ConversationId: created.Conversation.ConversationId,
+		UserId:         peer.ID,
+		Role:           commonv1.MemberRole_MEMBER_ROLE_ADMIN,
+	})
+	if err != nil {
+		t.Fatalf("update member role: %v", err)
+	}
+	if roleUpdated.Member.Role != commonv1.MemberRole_MEMBER_ROLE_ADMIN {
+		t.Fatalf("unexpected updated member: %+v", roleUpdated.Member)
+	}
+
+	listed, err := fixture.api.ListMembers(ownerCtx, &conversationv1.ListMembersRequest{
+		ConversationId: created.Conversation.ConversationId,
+	})
+	if err != nil {
+		t.Fatalf("list members: %v", err)
+	}
+	if len(listed.Members) != 2 {
+		t.Fatalf("expected owner and peer in member list, got %+v", listed.Members)
+	}
+
+	invite, err := fixture.api.CreateInvite(ownerCtx, &conversationv1.CreateInviteRequest{
+		ConversationId: created.Conversation.ConversationId,
+		AllowedRoles:   []commonv1.MemberRole{commonv1.MemberRole_MEMBER_ROLE_MEMBER},
+		MaxUses:        5,
+	})
+	if err != nil {
+		t.Fatalf("create invite: %v", err)
+	}
+	if invite.Invite == nil || invite.Invite.InviteId == "" || invite.Invite.Code == "" {
+		t.Fatalf("unexpected invite: %+v", invite.Invite)
+	}
+
+	invites, err := fixture.api.ListInvites(ownerCtx, &conversationv1.ListInvitesRequest{
+		ConversationId: created.Conversation.ConversationId,
+	})
+	if err != nil {
+		t.Fatalf("list invites: %v", err)
+	}
+	if len(invites.Invites) != 1 || invites.Invites[0].InviteId != invite.Invite.InviteId {
+		t.Fatalf("unexpected invites: %+v", invites.Invites)
+	}
+
+	revoked, err := fixture.api.RevokeInvite(ownerCtx, &conversationv1.RevokeInviteRequest{
+		ConversationId: created.Conversation.ConversationId,
+		InviteId:       invite.Invite.InviteId,
+	})
+	if err != nil {
+		t.Fatalf("revoke invite: %v", err)
+	}
+	if revoked.Invite == nil || !revoked.Invite.Revoked {
+		t.Fatalf("expected revoked invite, got %+v", revoked.Invite)
+	}
+
+	removed, err := fixture.api.RemoveMembers(ownerCtx, &conversationv1.RemoveMembersRequest{
+		ConversationId: created.Conversation.ConversationId,
+		UserIds:        []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("remove members: %v", err)
+	}
+	if removed.RemovedMembers != 1 || owner.ID == "" {
+		t.Fatalf("unexpected remove result: %+v", removed)
+	}
+}
+
 func TestMediaFiltersVariantAndHardDelete(t *testing.T) {
 	t.Parallel()
 

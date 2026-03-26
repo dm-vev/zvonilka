@@ -83,7 +83,7 @@ func (s *Service) RecordDelivery(ctx context.Context, params RecordDeliveryParam
 			DeviceID:            params.DeviceID,
 			AccountID:           params.AccountID,
 			LastAppliedSequence: savedEvent.Sequence,
-			LastAckedSequence:    savedState.LastAckedSequence,
+			LastAckedSequence:   savedState.LastAckedSequence,
 			ServerTime:          now,
 		}
 		if _, err := tx.SaveSyncState(ctx, syncState); err != nil {
@@ -172,7 +172,7 @@ func (s *Service) MarkRead(ctx context.Context, params MarkReadParams) (ReadStat
 			DeviceID:            params.DeviceID,
 			AccountID:           params.AccountID,
 			LastAppliedSequence: savedEvent.Sequence,
-			LastAckedSequence:    maxUint64(savedState.LastAckedSequence, params.ReadThroughSequence),
+			LastAckedSequence:   maxUint64(savedState.LastAckedSequence, params.ReadThroughSequence),
 			ServerTime:          now,
 		}
 		if _, err := tx.SaveSyncState(ctx, syncState); err != nil {

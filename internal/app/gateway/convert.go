@@ -7,6 +7,7 @@ import (
 
 	authv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/auth/v1"
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
+	conversationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1"
 	mediav1 "github.com/dm-vev/zvonilka/gen/proto/contracts/media/v1"
 	searchv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/search/v1"
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
@@ -127,6 +128,21 @@ func memberRoleToProto(role domainconversation.MemberRole) commonv1.MemberRole {
 		return commonv1.MemberRole_MEMBER_ROLE_GUEST
 	default:
 		return commonv1.MemberRole_MEMBER_ROLE_UNSPECIFIED
+	}
+}
+
+func memberRoleFromProto(role commonv1.MemberRole) domainconversation.MemberRole {
+	switch role {
+	case commonv1.MemberRole_MEMBER_ROLE_OWNER:
+		return domainconversation.MemberRoleOwner
+	case commonv1.MemberRole_MEMBER_ROLE_ADMIN:
+		return domainconversation.MemberRoleAdmin
+	case commonv1.MemberRole_MEMBER_ROLE_MEMBER:
+		return domainconversation.MemberRoleMember
+	case commonv1.MemberRole_MEMBER_ROLE_GUEST:
+		return domainconversation.MemberRoleGuest
+	default:
+		return domainconversation.MemberRoleUnspecified
 	}
 }
 
@@ -756,6 +772,30 @@ func canViewVisibility(visibility domainuser.Visibility, relation domainuser.Rel
 		return relation.IsContact
 	default:
 		return false
+	}
+}
+
+func inviteProto(invite domainconversation.ConversationInvite) *conversationv1.Invite {
+	if invite.ID == "" {
+		return nil
+	}
+
+	allowedRoles := make([]commonv1.MemberRole, 0, len(invite.AllowedRoles))
+	for _, role := range invite.AllowedRoles {
+		allowedRoles = append(allowedRoles, memberRoleToProto(role))
+	}
+
+	return &conversationv1.Invite{
+		InviteId:        invite.ID,
+		ConversationId:  invite.ConversationID,
+		Code:            invite.Code,
+		CreatedByUserId: invite.CreatedByAccountID,
+		AllowedRoles:    allowedRoles,
+		ExpiresAt:       protoTime(invite.ExpiresAt),
+		MaxUses:         invite.MaxUses,
+		UseCount:        invite.UseCount,
+		Revoked:         invite.Revoked,
+		RevokedAt:       protoTime(invite.RevokedAt),
 	}
 }
 

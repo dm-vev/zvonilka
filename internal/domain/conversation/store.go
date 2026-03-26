@@ -18,6 +18,10 @@ type Store interface {
 	ConversationMemberByConversationAndAccount(ctx context.Context, conversationID string, accountID string) (ConversationMember, error)
 	ConversationMembersByConversationID(ctx context.Context, conversationID string) ([]ConversationMember, error)
 
+	SaveConversationInvite(ctx context.Context, invite ConversationInvite) (ConversationInvite, error)
+	ConversationInviteByConversationAndID(ctx context.Context, conversationID string, inviteID string) (ConversationInvite, error)
+	ConversationInvitesByConversationID(ctx context.Context, conversationID string) ([]ConversationInvite, error)
+
 	SaveMessage(ctx context.Context, message Message) (Message, error)
 	MessageByID(ctx context.Context, conversationID string, messageID string) (Message, error)
 	MessagesByConversationID(ctx context.Context, conversationID string, threadID string, fromSequence uint64, limit int) ([]Message, error)

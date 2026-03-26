@@ -35,6 +35,71 @@ type ListConversationsParams struct {
 	IncludeHidden   bool
 }
 
+// UpdateConversationParams describes one mutable conversation update.
+type UpdateConversationParams struct {
+	ConversationID string
+	ActorAccountID string
+	Title          *string
+	Description    *string
+	AvatarMediaID  *string
+	Settings       *ConversationSettings
+	UpdatedAt      time.Time
+}
+
+// AddMembersParams describes one membership-add operation.
+type AddMembersParams struct {
+	ConversationID     string
+	ActorAccountID     string
+	InvitedByAccountID string
+	AccountIDs         []string
+	Role               MemberRole
+	CreatedAt          time.Time
+}
+
+// RemoveMembersParams describes one membership-removal operation.
+type RemoveMembersParams struct {
+	ConversationID string
+	ActorAccountID string
+	AccountIDs     []string
+	Reason         string
+	RemovedAt      time.Time
+}
+
+// UpdateMemberRoleParams describes one membership role change.
+type UpdateMemberRoleParams struct {
+	ConversationID  string
+	ActorAccountID  string
+	TargetAccountID string
+	Role            MemberRole
+	Reason          string
+	UpdatedAt       time.Time
+}
+
+// CreateInviteParams describes one invite creation request.
+type CreateInviteParams struct {
+	ConversationID string
+	ActorAccountID string
+	AllowedRoles   []MemberRole
+	ExpiresAt      time.Time
+	MaxUses        uint32
+	CreatedAt      time.Time
+}
+
+// ListInvitesParams describes one invite list request.
+type ListInvitesParams struct {
+	ConversationID string
+	AccountID      string
+}
+
+// RevokeInviteParams describes one invite revocation request.
+type RevokeInviteParams struct {
+	ConversationID string
+	InviteID       string
+	ActorAccountID string
+	Reason         string
+	RevokedAt      time.Time
+}
+
 // ListMessagesParams filters a message list request.
 type ListMessagesParams struct {
 	AccountID      string

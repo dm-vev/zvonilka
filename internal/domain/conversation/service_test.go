@@ -188,6 +188,133 @@ func TestCreateConversationRejectsDirectWithoutPeer(t *testing.T) {
 	}
 }
 
+func TestConversationMembershipAndInviteLifecycle(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	fixedNow := time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC)
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time { return fixedNow }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	created, members, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID: "acc-owner",
+		Kind:           conversation.ConversationKindGroup,
+		Title:          "Moderated Group",
+		CreatedAt:      fixedNow,
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+	if len(members) != 1 {
+		t.Fatalf("expected owner-only membership, got %d", len(members))
+	}
+
+	title := "Updated Group"
+	settings := conversation.ConversationSettings{
+		OnlyAdminsCanWrite:      true,
+		OnlyAdminsCanAddMembers: true,
+		AllowReactions:          false,
+		AllowForwards:           true,
+		AllowThreads:            true,
+	}
+	updated, err := svc.UpdateConversation(ctx, conversation.UpdateConversationParams{
+		ConversationID: created.ID,
+		ActorAccountID: "acc-owner",
+		Title:          &title,
+		Settings:       &settings,
+		UpdatedAt:      fixedNow.Add(time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("update conversation: %v", err)
+	}
+	if updated.Title != title || !updated.Settings.OnlyAdminsCanAddMembers || updated.Settings.AllowReactions {
+		t.Fatalf("unexpected updated conversation: %+v", updated)
+	}
+
+	added, err := svc.AddMembers(ctx, conversation.AddMembersParams{
+		ConversationID: created.ID,
+		ActorAccountID: "acc-owner",
+		AccountIDs:     []string{"acc-peer"},
+		Role:           conversation.MemberRoleMember,
+		CreatedAt:      fixedNow.Add(2 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("add member: %v", err)
+	}
+	if len(added) != 1 || added[0].AccountID != "acc-peer" {
+		t.Fatalf("unexpected added members: %+v", added)
+	}
+
+	updatedMember, err := svc.UpdateMemberRole(ctx, conversation.UpdateMemberRoleParams{
+		ConversationID:  created.ID,
+		ActorAccountID:  "acc-owner",
+		TargetAccountID: "acc-peer",
+		Role:            conversation.MemberRoleAdmin,
+		UpdatedAt:       fixedNow.Add(3 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("promote member: %v", err)
+	}
+	if updatedMember.Role != conversation.MemberRoleAdmin {
+		t.Fatalf("expected admin role, got %+v", updatedMember)
+	}
+
+	invite, err := svc.CreateInvite(ctx, conversation.CreateInviteParams{
+		ConversationID: created.ID,
+		ActorAccountID: "acc-owner",
+		AllowedRoles:   []conversation.MemberRole{conversation.MemberRoleMember},
+		MaxUses:        10,
+		CreatedAt:      fixedNow.Add(4 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("create invite: %v", err)
+	}
+	if invite.ID == "" || invite.Code == "" {
+		t.Fatalf("expected invite identifiers, got %+v", invite)
+	}
+
+	invites, err := svc.ListInvites(ctx, conversation.ListInvitesParams{
+		ConversationID: created.ID,
+		AccountID:      "acc-owner",
+	})
+	if err != nil {
+		t.Fatalf("list invites: %v", err)
+	}
+	if len(invites) != 1 || invites[0].ID != invite.ID {
+		t.Fatalf("unexpected invites: %+v", invites)
+	}
+
+	revoked, err := svc.RevokeInvite(ctx, conversation.RevokeInviteParams{
+		ConversationID: created.ID,
+		InviteID:       invite.ID,
+		ActorAccountID: "acc-owner",
+		RevokedAt:      fixedNow.Add(5 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("revoke invite: %v", err)
+	}
+	if !revoked.Revoked || revoked.RevokedAt.IsZero() {
+		t.Fatalf("expected revoked invite, got %+v", revoked)
+	}
+
+	removed, err := svc.RemoveMembers(ctx, conversation.RemoveMembersParams{
+		ConversationID: created.ID,
+		ActorAccountID: "acc-owner",
+		AccountIDs:     []string{"acc-peer"},
+		RemovedAt:      fixedNow.Add(6 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("remove member: %v", err)
+	}
+	if removed != 1 {
+		t.Fatalf("expected one removed member, got %d", removed)
+	}
+}
+
 func TestTopicLifecycleRequiresThreadsEnabled(t *testing.T) {
 	t.Parallel()
 

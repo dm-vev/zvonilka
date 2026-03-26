@@ -8,6 +8,8 @@ const topicColumnList = `conversation_id, id, root_message_id, title, created_by
 
 const conversationMemberColumnList = `conversation_id, account_id, role, invited_by_account_id, muted, banned, joined_at, left_at`
 
+const conversationInviteColumnList = `id, conversation_id, code, created_by_account_id, allowed_roles, expires_at, max_uses, use_count, revoked, revoked_at, created_at, updated_at`
+
 const messageColumnList = `id, conversation_id, sender_account_id, sender_device_id, client_message_id, sequence, kind, status, payload_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_aad, payload_metadata, reply_conversation_id, reply_message_id, reply_sender_account_id, reply_kind, reply_snippet, thread_id, silent, pinned, disable_link_previews, view_count, metadata, created_at, updated_at, edited_at, deleted_at`
 
 const attachmentColumnList = `message_id, attachment_index, media_id, kind, file_name, mime_type, size_bytes, sha256_hex, width, height, duration_seconds, caption`

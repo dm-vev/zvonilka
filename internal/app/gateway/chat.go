@@ -135,6 +135,42 @@ func (a *api) ListConversations(
 	}, nil
 }
 
+// UpdateConversation updates mutable conversation metadata and settings.
+func (a *api) UpdateConversation(
+	ctx context.Context,
+	req *conversationv1.UpdateConversationRequest,
+) (*conversationv1.UpdateConversationResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if req.GetConversation() == nil {
+		return nil, grpcError(domainconversation.ErrInvalidInput)
+	}
+
+	currentConversation, _, err := a.conversation.GetConversation(ctx, domainconversation.GetConversationParams{
+		ConversationID: req.GetConversation().GetConversationId(),
+		AccountID:      authContext.Account.ID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	params, err := conversationUpdateParamsFromRequest(req, authContext.Account.ID, currentConversation.Settings)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	conversationRow, err := a.conversation.UpdateConversation(ctx, params)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.notifySyncSubscribers()
+
+	return &conversationv1.UpdateConversationResponse{
+		Conversation: conversationProto(conversationRow),
+	}, nil
+}
+
 // ListMembers returns the conversation member roster visible to the caller.
 func (a *api) ListMembers(
 	ctx context.Context,
@@ -182,6 +218,205 @@ func (a *api) ListMembers(
 			TotalSize:     uint64(len(members)),
 		},
 	}, nil
+}
+
+// AddMembers adds one or more members to a conversation.
+func (a *api) AddMembers(
+	ctx context.Context,
+	req *conversationv1.AddMembersRequest,
+) (*conversationv1.AddMembersResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if inviter := strings.TrimSpace(req.GetInviterUserId()); inviter != "" && inviter != authContext.Account.ID {
+		return nil, grpcError(domainconversation.ErrInvalidInput)
+	}
+
+	members, err := a.conversation.AddMembers(ctx, domainconversation.AddMembersParams{
+		ConversationID:     req.GetConversationId(),
+		ActorAccountID:     authContext.Account.ID,
+		InvitedByAccountID: authContext.Account.ID,
+		AccountIDs:         req.GetUserIds(),
+		Role:               memberRoleFromProto(req.GetRole()),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	memberProfiles, err := a.memberProfiles(ctx, members, authContext.Account.ID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.notifySyncSubscribers()
+
+	return &conversationv1.AddMembersResponse{
+		Members: membersProto(members, memberProfiles),
+	}, nil
+}
+
+// RemoveMembers removes one or more members from a conversation.
+func (a *api) RemoveMembers(
+	ctx context.Context,
+	req *conversationv1.RemoveMembersRequest,
+) (*conversationv1.RemoveMembersResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	removed, err := a.conversation.RemoveMembers(ctx, domainconversation.RemoveMembersParams{
+		ConversationID: req.GetConversationId(),
+		ActorAccountID: authContext.Account.ID,
+		AccountIDs:     req.GetUserIds(),
+		Reason:         req.GetReason(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.notifySyncSubscribers()
+
+	return &conversationv1.RemoveMembersResponse{RemovedMembers: removed}, nil
+}
+
+// UpdateMemberRole updates one conversation member role.
+func (a *api) UpdateMemberRole(
+	ctx context.Context,
+	req *conversationv1.UpdateMemberRoleRequest,
+) (*conversationv1.UpdateMemberRoleResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	member, err := a.conversation.UpdateMemberRole(ctx, domainconversation.UpdateMemberRoleParams{
+		ConversationID:  req.GetConversationId(),
+		ActorAccountID:  authContext.Account.ID,
+		TargetAccountID: req.GetUserId(),
+		Role:            memberRoleFromProto(req.GetRole()),
+		Reason:          req.GetReason(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	memberProfiles, err := a.memberProfiles(ctx, []domainconversation.ConversationMember{member}, authContext.Account.ID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.notifySyncSubscribers()
+
+	return &conversationv1.UpdateMemberRoleResponse{
+		Member: membersProto([]domainconversation.ConversationMember{member}, memberProfiles)[0],
+	}, nil
+}
+
+// CreateInvite creates one reusable invite for a conversation.
+func (a *api) CreateInvite(
+	ctx context.Context,
+	req *conversationv1.CreateInviteRequest,
+) (*conversationv1.CreateInviteResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	allowedRoles := make([]domainconversation.MemberRole, 0, len(req.GetAllowedRoles()))
+	for _, role := range req.GetAllowedRoles() {
+		allowedRoles = append(allowedRoles, memberRoleFromProto(role))
+	}
+
+	invite, err := a.conversation.CreateInvite(ctx, domainconversation.CreateInviteParams{
+		ConversationID: req.GetConversationId(),
+		ActorAccountID: authContext.Account.ID,
+		AllowedRoles:   allowedRoles,
+		ExpiresAt:      zeroTime(req.GetExpiresAt()),
+		MaxUses:        req.GetMaxUses(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.notifySyncSubscribers()
+
+	return &conversationv1.CreateInviteResponse{Invite: inviteProto(invite)}, nil
+}
+
+// ListInvites lists conversation invites visible to the caller.
+func (a *api) ListInvites(
+	ctx context.Context,
+	req *conversationv1.ListInvitesRequest,
+) (*conversationv1.ListInvitesResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	invites, err := a.conversation.ListInvites(ctx, domainconversation.ListInvitesParams{
+		ConversationID: req.GetConversationId(),
+		AccountID:      authContext.Account.ID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	offset, err := decodeOffset(req.GetPage(), "invites")
+	if err != nil {
+		return nil, grpcError(domainconversation.ErrInvalidInput)
+	}
+	size := pageSize(req.GetPage())
+	end := offset + size
+	if end > len(invites) {
+		end = len(invites)
+	}
+
+	page := invites
+	if offset < len(invites) {
+		page = invites[offset:end]
+	} else {
+		page = nil
+	}
+
+	result := make([]*conversationv1.Invite, 0, len(page))
+	for _, invite := range page {
+		result = append(result, inviteProto(invite))
+	}
+
+	nextToken := ""
+	if end < len(invites) {
+		nextToken = offsetToken("invites", end)
+	}
+
+	return &conversationv1.ListInvitesResponse{
+		Invites: result,
+		Page: &commonv1.PageResponse{
+			NextPageToken: nextToken,
+			TotalSize:     uint64(len(invites)),
+		},
+	}, nil
+}
+
+// RevokeInvite revokes one reusable invite.
+func (a *api) RevokeInvite(
+	ctx context.Context,
+	req *conversationv1.RevokeInviteRequest,
+) (*conversationv1.RevokeInviteResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	invite, err := a.conversation.RevokeInvite(ctx, domainconversation.RevokeInviteParams{
+		ConversationID: req.GetConversationId(),
+		InviteID:       req.GetInviteId(),
+		ActorAccountID: authContext.Account.ID,
+		Reason:         req.GetReason(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.notifySyncSubscribers()
+
+	return &conversationv1.RevokeInviteResponse{Invite: inviteProto(invite)}, nil
 }
 
 // ListMessages returns one page of messages ordered by sequence.
@@ -842,4 +1077,119 @@ func timeDuration(value interface{ AsDuration() time.Duration }) time.Duration {
 	}
 
 	return value.AsDuration()
+}
+
+func conversationUpdateParamsFromRequest(
+	req *conversationv1.UpdateConversationRequest,
+	actorAccountID string,
+	baseSettings domainconversation.ConversationSettings,
+) (domainconversation.UpdateConversationParams, error) {
+	if req.GetConversation() == nil {
+		return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
+	}
+
+	row := req.GetConversation()
+	maskPaths := req.GetUpdateMask().GetPaths()
+	if len(maskPaths) == 0 {
+		maskPaths = []string{
+			"title",
+			"description",
+			"avatar_media_id",
+			"settings",
+		}
+	}
+
+	currentSettings := baseSettings
+	settingsChanged := false
+	var (
+		title       *string
+		description *string
+		avatarID    *string
+	)
+
+	for _, path := range maskPaths {
+		switch strings.TrimSpace(path) {
+		case "title":
+			value := row.GetTitle()
+			title = &value
+		case "description":
+			value := row.GetDescription()
+			description = &value
+		case "avatar_media_id":
+			value := row.GetAvatarMediaId()
+			avatarID = &value
+		case "settings":
+			currentSettings = conversationSettingsFromProto(row.GetSettings())
+			settingsChanged = true
+		case "settings.only_admins_can_write":
+			if row.GetSettings() == nil {
+				return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
+			}
+			currentSettings.OnlyAdminsCanWrite = row.GetSettings().GetOnlyAdminsCanWrite()
+			settingsChanged = true
+		case "settings.only_admins_can_add_members":
+			if row.GetSettings() == nil {
+				return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
+			}
+			currentSettings.OnlyAdminsCanAddMembers = row.GetSettings().GetOnlyAdminsCanAddMembers()
+			settingsChanged = true
+		case "settings.allow_reactions":
+			if row.GetSettings() == nil {
+				return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
+			}
+			currentSettings.AllowReactions = row.GetSettings().GetAllowReactions()
+			settingsChanged = true
+		case "settings.allow_forwards":
+			if row.GetSettings() == nil {
+				return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
+			}
+			currentSettings.AllowForwards = row.GetSettings().GetAllowForwards()
+			settingsChanged = true
+		case "settings.allow_threads":
+			if row.GetSettings() == nil {
+				return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
+			}
+			currentSettings.AllowThreads = row.GetSettings().GetAllowThreads()
+			settingsChanged = true
+		case "settings.require_join_approval":
+			if row.GetSettings() == nil {
+				return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
+			}
+			currentSettings.RequireJoinApproval = row.GetSettings().GetRequireJoinApproval()
+			settingsChanged = true
+		case "settings.pinned_messages_only_admins":
+			if row.GetSettings() == nil {
+				return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
+			}
+			currentSettings.PinnedMessagesOnlyAdmins = row.GetSettings().GetPinnedMessagesOnlyAdmins()
+			settingsChanged = true
+		case "settings.slow_mode_interval":
+			if row.GetSettings() == nil {
+				return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
+			}
+			currentSettings.SlowModeInterval = timeDuration(row.GetSettings().GetSlowModeInterval())
+			settingsChanged = true
+		case "settings.require_encrypted_messages":
+			if row.GetSettings() == nil {
+				return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
+			}
+			currentSettings.RequireEncryptedMessages = row.GetSettings().GetRequireEncryptedMessages()
+			settingsChanged = true
+		default:
+			return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
+		}
+	}
+
+	params := domainconversation.UpdateConversationParams{
+		ConversationID: row.GetConversationId(),
+		ActorAccountID: actorAccountID,
+		Title:          title,
+		Description:    description,
+		AvatarMediaID:  avatarID,
+	}
+	if settingsChanged {
+		params.Settings = &currentSettings
+	}
+
+	return params, nil
 }

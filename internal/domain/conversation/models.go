@@ -166,6 +166,22 @@ type ConversationMember struct {
 	LeftAt             time.Time
 }
 
+// ConversationInvite describes one reusable invite link for a conversation.
+type ConversationInvite struct {
+	ID                 string
+	ConversationID     string
+	Code               string
+	CreatedByAccountID string
+	AllowedRoles       []MemberRole
+	ExpiresAt          time.Time
+	MaxUses            uint32
+	UseCount           uint32
+	Revoked            bool
+	RevokedAt          time.Time
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
 // AttachmentRef describes a media attachment in a message draft or stored message.
 type AttachmentRef struct {
 	MediaID   string
