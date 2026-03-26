@@ -13,17 +13,27 @@ func (a *api) answerInlineQuery(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 
-	results := make([]domainbot.InlineQueryResultArticle, 0, len(payload.Results))
+	results := make([]domainbot.InlineQueryResult, 0, len(payload.Results))
 	for _, result := range payload.Results {
-		results = append(results, domainbot.InlineQueryResultArticle{
-			Type:        result.Type,
-			ID:          result.ID,
-			Title:       result.Title,
-			Description: result.Description,
-			InputMessageContent: domainbot.InputTextMessageContent{
+		var input *domainbot.InputTextMessageContent
+		if result.InputMessageContent != nil {
+			input = &domainbot.InputTextMessageContent{
 				MessageText: result.InputMessageContent.MessageText,
-			},
-			ReplyMarkup: result.ReplyMarkup,
+			}
+		}
+		results = append(results, domainbot.InlineQueryResult{
+			Type:                result.Type,
+			ID:                  result.ID,
+			Title:               result.Title,
+			Description:         result.Description,
+			Caption:             result.Caption,
+			InputMessageContent: input,
+			ReplyMarkup:         result.ReplyMarkup,
+			PhotoURL:            result.PhotoURL,
+			DocumentURL:         result.DocumentURL,
+			VideoURL:            result.VideoURL,
+			MimeType:            result.MimeType,
+			ThumbURL:            result.ThumbURL,
 		})
 	}
 

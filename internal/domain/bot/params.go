@@ -238,6 +238,13 @@ type TriggerInlineQueryParams struct {
 	ChatType      string
 }
 
+// TriggerChosenInlineResultParams describes one internally generated chosen inline result.
+type TriggerChosenInlineResultParams struct {
+	InlineQueryID string
+	FromAccountID string
+	ResultID      string
+}
+
 // AnswerCallbackQueryParams describes one answerCallbackQuery request.
 type AnswerCallbackQueryParams struct {
 	BotToken         string
@@ -252,7 +259,7 @@ type AnswerCallbackQueryParams struct {
 type AnswerInlineQueryParams struct {
 	BotToken      string
 	InlineQueryID string
-	Results       []InlineQueryResultArticle
+	Results       []InlineQueryResult
 	CacheTime     int
 	IsPersonal    bool
 	NextOffset    string

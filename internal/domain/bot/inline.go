@@ -127,3 +127,76 @@ func (s *Service) AnswerInlineQuery(ctx context.Context, params AnswerInlineQuer
 
 	return nil
 }
+
+// TriggerChosenInlineResult enqueues one chosen inline result update.
+func (s *Service) TriggerChosenInlineResult(ctx context.Context, params TriggerChosenInlineResultParams) (ChosenInlineResult, error) {
+	if err := s.validateContext(ctx, "trigger chosen inline result"); err != nil {
+		return ChosenInlineResult{}, err
+	}
+
+	params.InlineQueryID = strings.TrimSpace(params.InlineQueryID)
+	params.FromAccountID = strings.TrimSpace(params.FromAccountID)
+	params.ResultID = strings.TrimSpace(params.ResultID)
+	if params.InlineQueryID == "" || params.FromAccountID == "" || params.ResultID == "" {
+		return ChosenInlineResult{}, ErrInvalidInput
+	}
+
+	query, err := s.store.InlineQueryByID(ctx, params.InlineQueryID)
+	if err != nil {
+		return ChosenInlineResult{}, fmt.Errorf("load inline query %s: %w", params.InlineQueryID, err)
+	}
+	if !query.Answered {
+		return ChosenInlineResult{}, ErrConflict
+	}
+	if query.FromAccountID != params.FromAccountID {
+		return ChosenInlineResult{}, ErrForbidden
+	}
+	if !inlineResultExists(query.Results, params.ResultID) {
+		return ChosenInlineResult{}, ErrNotFound
+	}
+
+	actor, err := s.identity.AccountByID(ctx, params.FromAccountID)
+	if err != nil {
+		return ChosenInlineResult{}, mapIdentityError(err)
+	}
+
+	update := ChosenInlineResult{
+		ResultID:        params.ResultID,
+		From:            userFromAccount(actor),
+		Query:           query.Query,
+		InlineMessageID: query.ID + ":" + params.ResultID,
+	}
+	now := s.currentTime()
+
+	err = s.runTx(ctx, func(tx Store) error {
+		_, err := tx.SaveUpdate(ctx, QueueEntry{
+			BotAccountID:  query.BotAccountID,
+			EventID:       query.ID + ":" + params.ResultID + ":chosen",
+			UpdateType:    UpdateTypeChosenInlineResult,
+			Payload:       Update{ChosenInlineResult: &update},
+			NextAttemptAt: now,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		})
+		if err != nil {
+			return fmt.Errorf("save chosen inline result update %s: %w", query.ID, err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return ChosenInlineResult{}, err
+	}
+
+	return update, nil
+}
+
+func inlineResultExists(results []InlineQueryResult, resultID string) bool {
+	for _, result := range results {
+		if result.ID == resultID {
+			return true
+		}
+	}
+
+	return false
+}

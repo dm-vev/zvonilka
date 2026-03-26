@@ -142,7 +142,7 @@ func scanCallback(row rowScanner) (bot.Callback, error) {
 	return callback, nil
 }
 
-func encodeInlineResults(values []bot.InlineQueryResultArticle) ([]byte, error) {
+func encodeInlineResults(values []bot.InlineQueryResult) ([]byte, error) {
 	if len(values) == 0 {
 		return []byte("[]"), nil
 	}
@@ -150,12 +150,12 @@ func encodeInlineResults(values []bot.InlineQueryResultArticle) ([]byte, error) 
 	return json.Marshal(values)
 }
 
-func decodeInlineResults(raw []byte) ([]bot.InlineQueryResultArticle, error) {
+func decodeInlineResults(raw []byte) ([]bot.InlineQueryResult, error) {
 	if len(raw) == 0 {
 		return nil, nil
 	}
 
-	var values []bot.InlineQueryResultArticle
+	var values []bot.InlineQueryResult
 	if err := json.Unmarshal(raw, &values); err != nil {
 		return nil, err
 	}

@@ -620,12 +620,12 @@ func TestBotInlineQueryLifecycle(t *testing.T) {
 	err = service.AnswerInlineQuery(ctx, domainbot.AnswerInlineQueryParams{
 		BotToken:      botToken,
 		InlineQueryID: query.ID,
-		Results: []domainbot.InlineQueryResultArticle{{
+		Results: []domainbot.InlineQueryResult{{
 			Type:        "article",
 			ID:          "article-1",
 			Title:       "Answer",
 			Description: "Inline answer",
-			InputMessageContent: domainbot.InputTextMessageContent{
+			InputMessageContent: &domainbot.InputTextMessageContent{
 				MessageText: "hello from inline",
 			},
 		}},
@@ -642,7 +642,90 @@ func TestBotInlineQueryLifecycle(t *testing.T) {
 	require.True(t, state.IsPersonal)
 	require.Equal(t, "next", state.NextOffset)
 	require.Len(t, state.Results, 1)
+	require.NotNil(t, state.Results[0].InputMessageContent)
 	require.Equal(t, "hello from inline", state.Results[0].InputMessageContent.MessageText)
+}
+
+func TestBotChosenInlineResultLifecycle(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+
+	userAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "sasha",
+		DisplayName: "Sasha",
+		AccountKind: identity.AccountKindUser,
+		Email:       "sasha@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "chosenbot",
+		DisplayName: "Chosen Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	botStore := bottest.NewMemoryStore()
+	service, err := domainbot.NewService(
+		botStore,
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaFixture{},
+	)
+	require.NoError(t, err)
+
+	query, err := service.TriggerInlineQuery(ctx, domainbot.TriggerInlineQueryParams{
+		BotAccountID:  botAccount.ID,
+		FromAccountID: userAccount.ID,
+		Query:         "choose",
+	})
+	require.NoError(t, err)
+
+	err = service.AnswerInlineQuery(ctx, domainbot.AnswerInlineQueryParams{
+		BotToken:      botToken,
+		InlineQueryID: query.ID,
+		Results: []domainbot.InlineQueryResult{
+			{
+				Type:        "article",
+				ID:          "article-1",
+				Title:       "Article",
+				Description: "Article result",
+				InputMessageContent: &domainbot.InputTextMessageContent{
+					MessageText: "article body",
+				},
+			},
+			{
+				Type:     "photo",
+				ID:       "photo-1",
+				PhotoURL: "https://cdn.example.org/photo.jpg",
+				ThumbURL: "https://cdn.example.org/thumb.jpg",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	chosen, err := service.TriggerChosenInlineResult(ctx, domainbot.TriggerChosenInlineResultParams{
+		InlineQueryID: query.ID,
+		FromAccountID: userAccount.ID,
+		ResultID:      "photo-1",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "photo-1", chosen.ResultID)
+
+	updates, err := service.GetUpdates(ctx, domainbot.GetUpdatesParams{BotToken: botToken, Offset: 2})
+	require.NoError(t, err)
+	require.Len(t, updates, 1)
+	require.NotNil(t, updates[0].ChosenInlineResult)
+	require.Equal(t, "photo-1", updates[0].ChosenInlineResult.ResultID)
+	require.Equal(t, "choose", updates[0].ChosenInlineResult.Query)
 }
 
 type mediaFixture struct {

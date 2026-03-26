@@ -281,12 +281,12 @@ func TestSaveInlineQueryRoundTrip(t *testing.T) {
 	defer db.Close()
 
 	now := time.Date(2026, time.March, 26, 12, 0, 0, 0, time.UTC)
-	results, err := encodeInlineResults([]bot.InlineQueryResultArticle{{
+	results, err := encodeInlineResults([]bot.InlineQueryResult{{
 		Type:        "article",
 		ID:          "result-1",
 		Title:       "Result",
 		Description: "Inline result",
-		InputMessageContent: bot.InputTextMessageContent{
+		InputMessageContent: &bot.InputTextMessageContent{
 			MessageText: "hello",
 		},
 	}})
@@ -357,12 +357,12 @@ func TestSaveInlineQueryRoundTrip(t *testing.T) {
 		Offset:        "0",
 		ChatType:      "private",
 		Answered:      true,
-		Results: []bot.InlineQueryResultArticle{{
+		Results: []bot.InlineQueryResult{{
 			Type:        "article",
 			ID:          "result-1",
 			Title:       "Result",
 			Description: "Inline result",
-			InputMessageContent: bot.InputTextMessageContent{
+			InputMessageContent: &bot.InputTextMessageContent{
 				MessageText: "hello",
 			},
 		}},

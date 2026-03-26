@@ -504,8 +504,12 @@ func cloneCallback(value bot.Callback) bot.Callback {
 }
 
 func cloneInlineQuery(value bot.InlineQueryState) bot.InlineQueryState {
-	value.Results = append([]bot.InlineQueryResultArticle(nil), value.Results...)
+	value.Results = append([]bot.InlineQueryResult(nil), value.Results...)
 	for index := range value.Results {
+		if value.Results[index].InputMessageContent != nil {
+			input := *value.Results[index].InputMessageContent
+			value.Results[index].InputMessageContent = &input
+		}
 		if value.Results[index].ReplyMarkup != nil {
 			markup := *value.Results[index].ReplyMarkup
 			markup.InlineKeyboard = cloneInlineKeyboard(markup.InlineKeyboard)

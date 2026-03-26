@@ -283,7 +283,69 @@ func TestHTTPAnswerInlineQuery(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, state.Answered)
 	require.Len(t, state.Results, 1)
+	require.NotNil(t, state.Results[0].InputMessageContent)
 	require.Equal(t, "hello", state.Results[0].InputMessageContent.MessageText)
+}
+
+func TestHTTPAnswerInlineQueryWithPhotoResult(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+
+	userAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "tema",
+		DisplayName: "Tema",
+		AccountKind: identity.AccountKindUser,
+		Email:       "tema@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "photoinlinebot",
+		DisplayName: "Photo Inline Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	botStore := bottest.NewMemoryStore()
+	botService, err := domainbot.NewService(
+		botStore,
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaFixture{},
+	)
+	require.NoError(t, err)
+
+	query, err := botService.TriggerInlineQuery(ctx, domainbot.TriggerInlineQueryParams{
+		BotAccountID:  botAccount.ID,
+		FromAccountID: userAccount.ID,
+		Query:         "pics",
+	})
+	require.NoError(t, err)
+
+	boundary := &api{bot: botService}
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/bot"+botToken+"/answerInlineQuery",
+		strings.NewReader(`{"inline_query_id":"`+query.ID+`","results":[{"type":"photo","id":"p1","photo_url":"https://cdn.example.org/p.jpg","thumb_url":"https://cdn.example.org/t.jpg","caption":"pic"}]}`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	boundary.routes().ServeHTTP(recorder, request)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Contains(t, recorder.Body.String(), `"ok":true`)
+
+	state, err := botStore.InlineQueryByID(ctx, query.ID)
+	require.NoError(t, err)
+	require.Len(t, state.Results, 1)
+	require.Equal(t, "photo", state.Results[0].Type)
+	require.Equal(t, "https://cdn.example.org/p.jpg", state.Results[0].PhotoURL)
 }
 
 func TestHTTPSendPhotoMultipartUpload(t *testing.T) {

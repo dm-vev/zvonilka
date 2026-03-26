@@ -10,15 +10,16 @@ type UpdateType string
 
 // Supported bot update types.
 const (
-	UpdateTypeUnspecified       UpdateType = ""
-	UpdateTypeMessage           UpdateType = "message"
-	UpdateTypeEditedMessage     UpdateType = "edited_message"
-	UpdateTypeChannelPost       UpdateType = "channel_post"
-	UpdateTypeEditedChannelPost UpdateType = "edited_channel_post"
-	UpdateTypeCallbackQuery     UpdateType = "callback_query"
-	UpdateTypeInlineQuery       UpdateType = "inline_query"
-	UpdateTypeChatMember        UpdateType = "chat_member"
-	UpdateTypeMyChatMember      UpdateType = "my_chat_member"
+	UpdateTypeUnspecified        UpdateType = ""
+	UpdateTypeMessage            UpdateType = "message"
+	UpdateTypeEditedMessage      UpdateType = "edited_message"
+	UpdateTypeChannelPost        UpdateType = "channel_post"
+	UpdateTypeEditedChannelPost  UpdateType = "edited_channel_post"
+	UpdateTypeCallbackQuery      UpdateType = "callback_query"
+	UpdateTypeInlineQuery        UpdateType = "inline_query"
+	UpdateTypeChosenInlineResult UpdateType = "chosen_inline_result"
+	UpdateTypeChatMember         UpdateType = "chat_member"
+	UpdateTypeMyChatMember       UpdateType = "my_chat_member"
 )
 
 // ChatType identifies a Bot API chat kind.
@@ -217,14 +218,28 @@ type InputTextMessageContent struct {
 	MessageText string `json:"message_text"`
 }
 
-// InlineQueryResultArticle describes one supported inline result shape.
-type InlineQueryResultArticle struct {
-	Type                string                  `json:"type"`
-	ID                  string                  `json:"id"`
-	Title               string                  `json:"title"`
-	Description         string                  `json:"description,omitempty"`
-	InputMessageContent InputTextMessageContent `json:"input_message_content"`
-	ReplyMarkup         *InlineKeyboardMarkup   `json:"reply_markup,omitempty"`
+// InlineQueryResult describes one supported inline result shape.
+type InlineQueryResult struct {
+	Type                string                   `json:"type"`
+	ID                  string                   `json:"id"`
+	Title               string                   `json:"title,omitempty"`
+	Description         string                   `json:"description,omitempty"`
+	Caption             string                   `json:"caption,omitempty"`
+	InputMessageContent *InputTextMessageContent `json:"input_message_content,omitempty"`
+	ReplyMarkup         *InlineKeyboardMarkup    `json:"reply_markup,omitempty"`
+	PhotoURL            string                   `json:"photo_url,omitempty"`
+	DocumentURL         string                   `json:"document_url,omitempty"`
+	VideoURL            string                   `json:"video_url,omitempty"`
+	MimeType            string                   `json:"mime_type,omitempty"`
+	ThumbURL            string                   `json:"thumb_url,omitempty"`
+}
+
+// ChosenInlineResult describes one Telegram-shaped chosen inline result update.
+type ChosenInlineResult struct {
+	ResultID        string `json:"result_id"`
+	From            User   `json:"from"`
+	Query           string `json:"query"`
+	InlineMessageID string `json:"inline_message_id,omitempty"`
 }
 
 // Message describes a Telegram-shaped message projection.
@@ -264,15 +279,16 @@ type CallbackQuery struct {
 
 // Update describes a Telegram-shaped update payload.
 type Update struct {
-	UpdateID          int64              `json:"update_id"`
-	Message           *Message           `json:"message,omitempty"`
-	EditedMessage     *Message           `json:"edited_message,omitempty"`
-	ChannelPost       *Message           `json:"channel_post,omitempty"`
-	EditedChannelPost *Message           `json:"edited_channel_post,omitempty"`
-	CallbackQuery     *CallbackQuery     `json:"callback_query,omitempty"`
-	InlineQuery       *InlineQuery       `json:"inline_query,omitempty"`
-	ChatMember        *ChatMemberUpdated `json:"chat_member,omitempty"`
-	MyChatMember      *ChatMemberUpdated `json:"my_chat_member,omitempty"`
+	UpdateID           int64               `json:"update_id"`
+	Message            *Message            `json:"message,omitempty"`
+	EditedMessage      *Message            `json:"edited_message,omitempty"`
+	ChannelPost        *Message            `json:"channel_post,omitempty"`
+	EditedChannelPost  *Message            `json:"edited_channel_post,omitempty"`
+	CallbackQuery      *CallbackQuery      `json:"callback_query,omitempty"`
+	InlineQuery        *InlineQuery        `json:"inline_query,omitempty"`
+	ChosenInlineResult *ChosenInlineResult `json:"chosen_inline_result,omitempty"`
+	ChatMember         *ChatMemberUpdated  `json:"chat_member,omitempty"`
+	MyChatMember       *ChatMemberUpdated  `json:"my_chat_member,omitempty"`
 }
 
 // Webhook stores one bot webhook configuration row.
@@ -338,7 +354,7 @@ type InlineQueryState struct {
 	Offset        string
 	ChatType      string
 	Answered      bool
-	Results       []InlineQueryResultArticle
+	Results       []InlineQueryResult
 	CacheTime     int
 	IsPersonal    bool
 	NextOffset    string
@@ -502,11 +518,19 @@ func (q InlineQueryState) normalize(now time.Time) (InlineQueryState, error) {
 		result.ID = strings.TrimSpace(result.ID)
 		result.Title = strings.TrimSpace(result.Title)
 		result.Description = strings.TrimSpace(result.Description)
-		result.InputMessageContent.MessageText = strings.TrimSpace(result.InputMessageContent.MessageText)
+		result.Caption = strings.TrimSpace(result.Caption)
+		result.PhotoURL = strings.TrimSpace(result.PhotoURL)
+		result.DocumentURL = strings.TrimSpace(result.DocumentURL)
+		result.VideoURL = strings.TrimSpace(result.VideoURL)
+		result.MimeType = strings.TrimSpace(result.MimeType)
+		result.ThumbURL = strings.TrimSpace(result.ThumbURL)
+		if result.InputMessageContent != nil {
+			result.InputMessageContent.MessageText = strings.TrimSpace(result.InputMessageContent.MessageText)
+		}
 		if result.Type == "" {
 			result.Type = "article"
 		}
-		if result.Type != "article" || result.ID == "" || result.Title == "" || result.InputMessageContent.MessageText == "" {
+		if !validInlineResult(result) {
 			return InlineQueryState{}, ErrInvalidInput
 		}
 		if result.ReplyMarkup != nil {
@@ -532,4 +556,23 @@ func (q InlineQueryState) normalize(now time.Time) (InlineQueryState, error) {
 	}
 
 	return q, nil
+}
+
+func validInlineResult(result InlineQueryResult) bool {
+	if result.ID == "" {
+		return false
+	}
+
+	switch result.Type {
+	case "article":
+		return result.Title != "" && result.InputMessageContent != nil && result.InputMessageContent.MessageText != ""
+	case "photo":
+		return result.PhotoURL != ""
+	case "document":
+		return result.Title != "" && result.DocumentURL != ""
+	case "video":
+		return result.Title != "" && result.VideoURL != ""
+	default:
+		return false
+	}
 }
