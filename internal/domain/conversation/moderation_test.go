@@ -846,3 +846,40 @@ func TestModerationReportLifecycle(t *testing.T) {
 	require.Equal(t, conversation.ModerationReportStatusResolved, resolved.Status)
 	require.Equal(t, "acc-owner", resolved.ReviewedByAccountID)
 }
+
+func TestModerationActionIDsAreImmutable(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 25, 14, 30, 0, 0, time.UTC)
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time {
+		return now
+	}))
+	require.NoError(t, err)
+
+	first, err := svc.LogModerationAction(ctx, conversation.ModerationAction{
+		ID:             "mod-1",
+		TargetKind:     conversation.ModerationTargetKindConversation,
+		TargetID:       "conv-1",
+		ActorAccountID: "acc-owner",
+		Type:           conversation.ModerationActionTypePolicySet,
+		Metadata: map[string]string{
+			"scope": "conversation",
+		},
+		CreatedAt: now,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "mod-1", first.ID)
+
+	_, err = svc.LogModerationAction(ctx, conversation.ModerationAction{
+		ID:             "mod-1",
+		TargetKind:     conversation.ModerationTargetKindConversation,
+		TargetID:       "conv-1",
+		ActorAccountID: "acc-owner",
+		Type:           conversation.ModerationActionTypePolicySet,
+		CreatedAt:      now.Add(time.Minute),
+	})
+	require.ErrorIs(t, err, conversation.ErrConflict)
+}

@@ -137,6 +137,17 @@ func TestModerationSchemaLifecycle(t *testing.T) {
 	})
 	require.ErrorIs(t, err, conversation.ErrConflict)
 
+	_, err = store.SaveModerationAction(context.Background(), conversation.ModerationAction{
+		ID:              "mod-1",
+		TargetKind:      conversation.ModerationTargetKindConversation,
+		TargetID:        "conv-1",
+		ActorAccountID:  "acc-owner",
+		TargetAccountID: "acc-peer",
+		Type:            conversation.ModerationActionTypeMute,
+		CreatedAt:       now.Add(time.Minute),
+	})
+	require.ErrorIs(t, err, conversation.ErrConflict)
+
 	actions, err := store.ModerationActionsByTarget(context.Background(), conversation.ModerationTargetKindConversation, "conv-1")
 	require.NoError(t, err)
 	require.Len(t, actions, 1)
