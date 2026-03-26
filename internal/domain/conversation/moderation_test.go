@@ -199,6 +199,110 @@ func TestModerationPolicyBlocksReactionRemoval(t *testing.T) {
 	require.ErrorIs(t, err, conversation.ErrForbidden)
 }
 
+func TestModerationPolicyBlocksTopicCreation(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 25, 10, 40, 0, 0, time.UTC)
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time {
+		return now
+	}))
+	require.NoError(t, err)
+
+	created, _, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-owner",
+		Kind:             conversation.ConversationKindGroup,
+		Title:            "Group",
+		MemberAccountIDs: []string{"acc-peer"},
+		CreatedAt:        now,
+	})
+	require.NoError(t, err)
+
+	_, err = svc.SetModerationPolicy(ctx, conversation.SetModerationPolicyParams{
+		TargetKind:     conversation.ModerationTargetKindConversation,
+		TargetID:       created.ID,
+		ActorAccountID: "acc-owner",
+		AllowThreads:   false,
+		CreatedAt:      now,
+	})
+	require.NoError(t, err)
+
+	_, _, err = svc.CreateTopic(ctx, conversation.CreateTopicParams{
+		ConversationID:   created.ID,
+		CreatorAccountID: "acc-owner",
+		Title:            "Announcements",
+		CreatedAt:        now.Add(time.Minute),
+	})
+	require.ErrorIs(t, err, conversation.ErrForbidden)
+}
+
+func TestModerationPolicyBlocksThreadedMessages(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 25, 10, 50, 0, 0, time.UTC)
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time {
+		return now
+	}))
+	require.NoError(t, err)
+
+	created, _, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-owner",
+		Kind:             conversation.ConversationKindGroup,
+		Title:            "Group",
+		MemberAccountIDs: []string{"acc-peer"},
+		CreatedAt:        now,
+	})
+	require.NoError(t, err)
+
+	topic, _, err := svc.CreateTopic(ctx, conversation.CreateTopicParams{
+		ConversationID:   created.ID,
+		CreatorAccountID: "acc-owner",
+		Title:            "Announcements",
+		CreatedAt:        now.Add(time.Minute),
+	})
+	require.NoError(t, err)
+
+	_, err = svc.SetModerationPolicy(ctx, conversation.SetModerationPolicyParams{
+		TargetKind:     conversation.ModerationTargetKindTopic,
+		TargetID:       created.ID + "\x1f" + topic.ID,
+		ActorAccountID: "acc-owner",
+		AllowThreads:   false,
+		CreatedAt:      now.Add(2 * time.Minute),
+	})
+	require.NoError(t, err)
+
+	_, _, err = svc.SendMessage(ctx, conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "acc-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind:     conversation.MessageKindText,
+			ThreadID: topic.ID,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-1",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+				AAD:        []byte("aad"),
+			},
+		},
+		CreatedAt: now.Add(3 * time.Minute),
+	})
+	require.ErrorIs(t, err, conversation.ErrForbidden)
+
+	_, err = svc.ListMessages(ctx, conversation.ListMessagesParams{
+		AccountID:      "acc-owner",
+		ConversationID: created.ID,
+		ThreadID:       topic.ID,
+	})
+	require.ErrorIs(t, err, conversation.ErrForbidden)
+}
+
 func TestModerationPolicyRestrictsPinsToAdmins(t *testing.T) {
 	t.Parallel()
 
@@ -254,6 +358,88 @@ func TestModerationPolicyRestrictsPinsToAdmins(t *testing.T) {
 		ActorDeviceID:  "dev-peer",
 		Pinned:         true,
 		UpdatedAt:      now.Add(2 * time.Minute),
+	})
+	require.ErrorIs(t, err, conversation.ErrForbidden)
+}
+
+func TestTopicModerationPolicyBlocksReactionsAndPins(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 25, 10, 50, 0, 0, time.UTC)
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time {
+		return now
+	}))
+	require.NoError(t, err)
+
+	created, _, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-owner",
+		Kind:             conversation.ConversationKindGroup,
+		Title:            "Group",
+		MemberAccountIDs: []string{"acc-peer"},
+		Settings: conversation.ConversationSettings{
+			AllowThreads: true,
+		},
+		CreatedAt: now,
+	})
+	require.NoError(t, err)
+
+	topic, _, err := svc.CreateTopic(ctx, conversation.CreateTopicParams{
+		ConversationID:   created.ID,
+		CreatorAccountID: "acc-owner",
+		Title:            "Announcements",
+		CreatedAt:        now.Add(time.Minute),
+	})
+	require.NoError(t, err)
+
+	_, err = svc.SetModerationPolicy(ctx, conversation.SetModerationPolicyParams{
+		TargetKind:               conversation.ModerationTargetKindTopic,
+		TargetID:                 created.ID + "\x1f" + topic.ID,
+		ActorAccountID:           "acc-owner",
+		AllowReactions:           false,
+		PinnedMessagesOnlyAdmins: true,
+		CreatedAt:                now,
+	})
+	require.NoError(t, err)
+
+	message, _, err := svc.SendMessage(ctx, conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "acc-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind:     conversation.MessageKindText,
+			ThreadID: topic.ID,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-1",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+				AAD:        []byte("aad"),
+			},
+		},
+		CreatedAt: now.Add(2 * time.Minute),
+	})
+	require.NoError(t, err)
+
+	_, _, err = svc.AddMessageReaction(ctx, conversation.AddMessageReactionParams{
+		ConversationID: created.ID,
+		MessageID:      message.ID,
+		ActorAccountID: "acc-peer",
+		ActorDeviceID:  "dev-peer",
+		Reaction:       "🔥",
+		CreatedAt:      now.Add(3 * time.Minute),
+	})
+	require.ErrorIs(t, err, conversation.ErrForbidden)
+
+	_, _, err = svc.PinMessage(ctx, conversation.PinMessageParams{
+		ConversationID: created.ID,
+		MessageID:      message.ID,
+		ActorAccountID: "acc-peer",
+		ActorDeviceID:  "dev-peer",
+		Pinned:         true,
+		UpdatedAt:      now.Add(4 * time.Minute),
 	})
 	require.ErrorIs(t, err, conversation.ErrForbidden)
 }
@@ -366,6 +552,14 @@ func TestShadowRestrictionHidesMessagesFromOtherMembers(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, ownerMessages)
 
+	ownerMessagesWithDeleted, err := svc.ListMessages(ctx, conversation.ListMessagesParams{
+		AccountID:      "acc-owner",
+		ConversationID: created.ID,
+		IncludeDeleted: true,
+	})
+	require.NoError(t, err)
+	require.Empty(t, ownerMessagesWithDeleted)
+
 	peerMessages, err := svc.ListMessages(ctx, conversation.ListMessagesParams{
 		AccountID:      "acc-peer",
 		ConversationID: created.ID,
@@ -439,6 +633,70 @@ func TestModerationSlowModeRejectsRapidWrites(t *testing.T) {
 		CreatedAt: now.Add(2 * time.Minute),
 	})
 	require.ErrorIs(t, err, conversation.ErrRateLimited)
+}
+
+func TestModerationSlowModeRetryAfterUsesDomainClock(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 25, 13, 30, 0, 0, time.UTC)
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time {
+		return now
+	}))
+	require.NoError(t, err)
+
+	created, _, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-owner",
+		Kind:             conversation.ConversationKindDirect,
+		Title:            "Direct",
+		MemberAccountIDs: []string{"acc-peer"},
+		CreatedAt:        now,
+	})
+	require.NoError(t, err)
+
+	_, err = svc.SetModerationPolicy(ctx, conversation.SetModerationPolicyParams{
+		TargetKind:       conversation.ModerationTargetKindConversation,
+		TargetID:         created.ID,
+		ActorAccountID:   "acc-owner",
+		SlowModeInterval: 3 * time.Minute,
+		CreatedAt:        now,
+	})
+	require.NoError(t, err)
+
+	_, _, err = svc.SendMessage(ctx, conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "acc-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			Kind: conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				KeyID:      "key-1",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+				AAD:        []byte("aad"),
+			},
+		},
+		CreatedAt: now,
+	})
+	require.NoError(t, err)
+
+	decision, err := svc.CheckModerationWrite(ctx, conversation.CheckModerationWriteParams{
+		TargetKind:     conversation.ModerationTargetKindConversation,
+		TargetID:       created.ID,
+		ActorAccountID: "acc-owner",
+		ActorRole:      conversation.MemberRoleOwner,
+		BasePolicy: conversation.ModerationPolicy{
+			TargetKind:       conversation.ModerationTargetKindConversation,
+			TargetID:         created.ID,
+			SlowModeInterval: 3 * time.Minute,
+		},
+		CreatedAt: now.Add(time.Minute),
+	})
+	require.ErrorIs(t, err, conversation.ErrRateLimited)
+	require.Equal(t, 2*time.Minute, decision.RetryAfter)
 }
 
 func TestModerationReportLifecycle(t *testing.T) {
