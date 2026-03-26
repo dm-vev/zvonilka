@@ -8,7 +8,12 @@ import (
 
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
+	"github.com/dm-vev/zvonilka/internal/domain/media"
 )
+
+type mediaReader interface {
+	MediaAssetByID(ctx context.Context, mediaID string) (media.MediaAsset, error)
+}
 
 // Service coordinates bot-facing HTTP semantics over messenger domains.
 type Service struct {
@@ -16,6 +21,7 @@ type Service struct {
 	identity       *identity.Service
 	conversations  *conversation.Service
 	conversationDB conversation.Store
+	media          mediaReader
 	settings       Settings
 	now            func() time.Time
 }
@@ -26,9 +32,10 @@ func NewService(
 	identityService *identity.Service,
 	conversationService *conversation.Service,
 	conversationStore conversation.Store,
+	mediaStore mediaReader,
 	opts ...Option,
 ) (*Service, error) {
-	if store == nil || identityService == nil || conversationService == nil || conversationStore == nil {
+	if store == nil || identityService == nil || conversationService == nil || conversationStore == nil || mediaStore == nil {
 		return nil, ErrInvalidInput
 	}
 
@@ -37,6 +44,7 @@ func NewService(
 		identity:       identityService,
 		conversations:  conversationService,
 		conversationDB: conversationStore,
+		media:          mediaStore,
 		settings:       DefaultSettings(),
 		now:            func() time.Time { return time.Now().UTC() },
 	}

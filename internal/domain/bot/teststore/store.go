@@ -369,6 +369,23 @@ func cloneUpdate(value bot.Update) bot.Update {
 }
 
 func cloneMessage(value bot.Message) bot.Message {
+	value.Photo = append([]bot.PhotoSize(nil), value.Photo...)
+	if value.Document != nil {
+		document := *value.Document
+		value.Document = &document
+	}
+	if value.Video != nil {
+		video := *value.Video
+		value.Video = &video
+	}
+	if value.Voice != nil {
+		voice := *value.Voice
+		value.Voice = &voice
+	}
+	if value.Sticker != nil {
+		sticker := *value.Sticker
+		value.Sticker = &sticker
+	}
 	if value.ReplyToMessage != nil {
 		reply := cloneMessage(*value.ReplyToMessage)
 		value.ReplyToMessage = &reply

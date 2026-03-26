@@ -69,16 +69,69 @@ type ChatMember struct {
 	Status MemberStatus `json:"status"`
 }
 
+// File describes one bot-visible file projection.
+type File struct {
+	FileID       string `json:"file_id"`
+	FileUniqueID string `json:"file_unique_id,omitempty"`
+	FileSize     uint64 `json:"file_size,omitempty"`
+}
+
+// PhotoSize describes one Telegram-shaped photo size projection.
+type PhotoSize struct {
+	File
+	Width  uint32 `json:"width"`
+	Height uint32 `json:"height"`
+}
+
+// Document describes one Telegram-shaped document projection.
+type Document struct {
+	File
+	FileName string `json:"file_name,omitempty"`
+	MimeType string `json:"mime_type,omitempty"`
+}
+
+// Video describes one Telegram-shaped video projection.
+type Video struct {
+	File
+	Width    uint32 `json:"width,omitempty"`
+	Height   uint32 `json:"height,omitempty"`
+	Duration int    `json:"duration,omitempty"`
+	MimeType string `json:"mime_type,omitempty"`
+}
+
+// Voice describes one Telegram-shaped voice projection.
+type Voice struct {
+	File
+	Duration int    `json:"duration,omitempty"`
+	MimeType string `json:"mime_type,omitempty"`
+}
+
+// Sticker describes one Telegram-shaped sticker projection.
+type Sticker struct {
+	File
+	Width    uint32 `json:"width,omitempty"`
+	Height   uint32 `json:"height,omitempty"`
+	Emoji    string `json:"emoji,omitempty"`
+	SetName  string `json:"set_name,omitempty"`
+	MimeType string `json:"mime_type,omitempty"`
+}
+
 // Message describes a Telegram-shaped message projection.
 type Message struct {
-	MessageID       string   `json:"message_id"`
-	MessageThreadID string   `json:"message_thread_id,omitempty"`
-	Date            int64    `json:"date"`
-	EditDate        int64    `json:"edit_date,omitempty"`
-	Chat            Chat     `json:"chat"`
-	From            *User    `json:"from,omitempty"`
-	Text            string   `json:"text,omitempty"`
-	ReplyToMessage  *Message `json:"reply_to_message,omitempty"`
+	MessageID       string      `json:"message_id"`
+	MessageThreadID string      `json:"message_thread_id,omitempty"`
+	Date            int64       `json:"date"`
+	EditDate        int64       `json:"edit_date,omitempty"`
+	Chat            Chat        `json:"chat"`
+	From            *User       `json:"from,omitempty"`
+	Text            string      `json:"text,omitempty"`
+	Caption         string      `json:"caption,omitempty"`
+	Photo           []PhotoSize `json:"photo,omitempty"`
+	Document        *Document   `json:"document,omitempty"`
+	Video           *Video      `json:"video,omitempty"`
+	Voice           *Voice      `json:"voice,omitempty"`
+	Sticker         *Sticker    `json:"sticker,omitempty"`
+	ReplyToMessage  *Message    `json:"reply_to_message,omitempty"`
 }
 
 // Update describes a Telegram-shaped update payload.

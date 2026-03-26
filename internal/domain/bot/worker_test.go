@@ -38,6 +38,7 @@ func TestWebhookDeliveryAcknowledgesUpdate(t *testing.T) {
 		identityService,
 		conversationService,
 		conversationStore,
+		mediaFixture{},
 		domainbot.WithSettings(settings),
 	)
 	require.NoError(t, err)

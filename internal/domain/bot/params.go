@@ -43,6 +43,60 @@ type SendMessageParams struct {
 	DisableWebPagePreview bool
 }
 
+// SendPhotoParams describes one sendPhoto request.
+type SendPhotoParams struct {
+	BotToken            string
+	ChatID              string
+	MessageThreadID     string
+	MediaID             string
+	Caption             string
+	ReplyToMessageID    string
+	DisableNotification bool
+}
+
+// SendDocumentParams describes one sendDocument request.
+type SendDocumentParams struct {
+	BotToken            string
+	ChatID              string
+	MessageThreadID     string
+	MediaID             string
+	Caption             string
+	ReplyToMessageID    string
+	DisableNotification bool
+}
+
+// SendVideoParams describes one sendVideo request.
+type SendVideoParams struct {
+	BotToken            string
+	ChatID              string
+	MessageThreadID     string
+	MediaID             string
+	Caption             string
+	ReplyToMessageID    string
+	DisableNotification bool
+}
+
+// SendVoiceParams describes one sendVoice request.
+type SendVoiceParams struct {
+	BotToken            string
+	ChatID              string
+	MessageThreadID     string
+	MediaID             string
+	Caption             string
+	ReplyToMessageID    string
+	DisableNotification bool
+}
+
+// SendStickerParams describes one sendSticker request.
+type SendStickerParams struct {
+	BotToken            string
+	ChatID              string
+	MessageThreadID     string
+	MediaID             string
+	ReplyToMessageID    string
+	DisableNotification bool
+}
+
 // EditMessageTextParams describes one editMessageText request.
 type EditMessageTextParams struct {
 	BotToken              string

@@ -64,6 +64,72 @@ func plainText(message conversation.Message) string {
 	return string(message.Payload.Ciphertext)
 }
 
+func messageCaption(message conversation.Message) string {
+	return strings.TrimSpace(message.Metadata[metadataCaptionKey])
+}
+
+func messageMediaID(message conversation.Message) string {
+	if mediaID := strings.TrimSpace(message.Metadata[metadataMediaIDKey]); mediaID != "" {
+		return mediaID
+	}
+	if len(message.Attachments) == 0 {
+		return ""
+	}
+
+	return strings.TrimSpace(message.Attachments[0].MediaID)
+}
+
+func messageMedia(message conversation.Message) ([]PhotoSize, *Document, *Video, *Voice, *Sticker) {
+	if len(message.Attachments) == 0 {
+		return nil, nil, nil, nil, nil
+	}
+
+	attachment := message.Attachments[0]
+	file := File{
+		FileID:       messageMediaID(message),
+		FileUniqueID: messageMediaID(message),
+		FileSize:     attachment.SizeBytes,
+	}
+
+	switch message.Kind {
+	case conversation.MessageKindImage:
+		return []PhotoSize{{
+			File:   file,
+			Width:  attachment.Width,
+			Height: attachment.Height,
+		}}, nil, nil, nil, nil
+	case conversation.MessageKindDocument:
+		return nil, &Document{
+			File:     file,
+			FileName: attachment.FileName,
+			MimeType: attachment.MimeType,
+		}, nil, nil, nil
+	case conversation.MessageKindVideo:
+		return nil, nil, &Video{
+			File:     file,
+			Width:    attachment.Width,
+			Height:   attachment.Height,
+			Duration: int(attachment.Duration.Seconds()),
+			MimeType: attachment.MimeType,
+		}, nil, nil
+	case conversation.MessageKindVoice:
+		return nil, nil, nil, &Voice{
+			File:     file,
+			Duration: int(attachment.Duration.Seconds()),
+			MimeType: attachment.MimeType,
+		}, nil
+	case conversation.MessageKindSticker:
+		return nil, nil, nil, nil, &Sticker{
+			File:     file,
+			Width:    attachment.Width,
+			Height:   attachment.Height,
+			MimeType: attachment.MimeType,
+		}
+	default:
+		return nil, nil, nil, nil, nil
+	}
+}
+
 func (s *Service) chatForConversation(
 	ctx context.Context,
 	botAccountID string,
@@ -143,6 +209,7 @@ func (s *Service) messageForConversation(
 		Chat:      chat,
 		From:      pointer(userFromAccount(sender)),
 		Text:      plainText(msg),
+		Caption:   messageCaption(msg),
 	}
 	if msg.ThreadID != "" {
 		result.MessageThreadID = msg.ThreadID
@@ -150,6 +217,7 @@ func (s *Service) messageForConversation(
 	if !msg.EditedAt.IsZero() {
 		result.EditDate = msg.EditedAt.UTC().Unix()
 	}
+	result.Photo, result.Document, result.Video, result.Voice, result.Sticker = messageMedia(msg)
 	if !includeReply || msg.ReplyTo.MessageID == "" {
 		return result, nil
 	}

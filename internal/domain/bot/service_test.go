@@ -15,6 +15,7 @@ import (
 	conversationtest "github.com/dm-vev/zvonilka/internal/domain/conversation/teststore"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	identitytest "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
+	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
 )
 
 func TestBotDirectUpdatesAndWebhookConflict(t *testing.T) {
@@ -38,6 +39,7 @@ func TestBotDirectUpdatesAndWebhookConflict(t *testing.T) {
 		identityService,
 		conversationService,
 		conversationStore,
+		mediaFixture{},
 		domainbot.WithSettings(settings),
 	)
 	require.NoError(t, err)
@@ -132,6 +134,7 @@ func TestBotGroupPrivacyMode(t *testing.T) {
 		identityService,
 		conversationService,
 		conversationStore,
+		mediaFixture{},
 		domainbot.WithSettings(settings),
 	)
 	require.NoError(t, err)
@@ -212,4 +215,86 @@ func tokenOrFail(t *testing.T, token string) string {
 	t.Helper()
 	require.NotEmpty(t, token)
 	return token
+}
+
+func TestBotSendPhoto(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+
+	userAccount, _, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "carol",
+		DisplayName: "Carol",
+		AccountKind: identity.AccountKindUser,
+		Email:       "carol@example.org",
+	})
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "photobot",
+		DisplayName: "Photo Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	group, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   userAccount.ID,
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{botAccount.ID},
+	})
+	require.NoError(t, err)
+
+	service, err := domainbot.NewService(
+		bottest.NewMemoryStore(),
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaFixture{
+			assets: map[string]domainmedia.MediaAsset{
+				"media-photo": {
+					ID:             "media-photo",
+					OwnerAccountID: botAccount.ID,
+					Kind:           domainmedia.MediaKindImage,
+					Status:         domainmedia.MediaStatusReady,
+					FileName:       "photo.jpg",
+					ContentType:    "image/jpeg",
+					SizeBytes:      1024,
+					Width:          640,
+					Height:         480,
+				},
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	message, err := service.SendPhoto(ctx, domainbot.SendPhotoParams{
+		BotToken: botToken,
+		ChatID:   group.ID,
+		MediaID:  "media-photo",
+		Caption:  "hello photo",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "hello photo", message.Caption)
+	require.Len(t, message.Photo, 1)
+	require.Equal(t, "media-photo", message.Photo[0].FileID)
+	require.Equal(t, uint32(640), message.Photo[0].Width)
+	require.Empty(t, message.Text)
+}
+
+type mediaFixture struct {
+	assets map[string]domainmedia.MediaAsset
+}
+
+func (f mediaFixture) MediaAssetByID(_ context.Context, mediaID string) (domainmedia.MediaAsset, error) {
+	if asset, ok := f.assets[mediaID]; ok {
+		return asset, nil
+	}
+
+	return domainmedia.MediaAsset{}, domainmedia.ErrNotFound
 }

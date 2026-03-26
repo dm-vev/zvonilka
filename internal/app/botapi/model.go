@@ -56,6 +56,50 @@ type sendMessageRequest struct {
 	DisableWebPagePreview bool   `json:"disable_web_page_preview"`
 }
 
+type sendPhotoRequest struct {
+	ChatID              textID `json:"chat_id"`
+	MessageThreadID     textID `json:"message_thread_id"`
+	Photo               string `json:"photo"`
+	Caption             string `json:"caption"`
+	ReplyToMessageID    textID `json:"reply_to_message_id"`
+	DisableNotification bool   `json:"disable_notification"`
+}
+
+type sendDocumentRequest struct {
+	ChatID              textID `json:"chat_id"`
+	MessageThreadID     textID `json:"message_thread_id"`
+	Document            string `json:"document"`
+	Caption             string `json:"caption"`
+	ReplyToMessageID    textID `json:"reply_to_message_id"`
+	DisableNotification bool   `json:"disable_notification"`
+}
+
+type sendVideoRequest struct {
+	ChatID              textID `json:"chat_id"`
+	MessageThreadID     textID `json:"message_thread_id"`
+	Video               string `json:"video"`
+	Caption             string `json:"caption"`
+	ReplyToMessageID    textID `json:"reply_to_message_id"`
+	DisableNotification bool   `json:"disable_notification"`
+}
+
+type sendVoiceRequest struct {
+	ChatID              textID `json:"chat_id"`
+	MessageThreadID     textID `json:"message_thread_id"`
+	Voice               string `json:"voice"`
+	Caption             string `json:"caption"`
+	ReplyToMessageID    textID `json:"reply_to_message_id"`
+	DisableNotification bool   `json:"disable_notification"`
+}
+
+type sendStickerRequest struct {
+	ChatID              textID `json:"chat_id"`
+	MessageThreadID     textID `json:"message_thread_id"`
+	Sticker             string `json:"sticker"`
+	ReplyToMessageID    textID `json:"reply_to_message_id"`
+	DisableNotification bool   `json:"disable_notification"`
+}
+
 type editMessageTextRequest struct {
 	ChatID                textID `json:"chat_id"`
 	MessageID             textID `json:"message_id"`

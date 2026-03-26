@@ -42,6 +42,16 @@ func (a *api) serve(writer http.ResponseWriter, request *http.Request) {
 		a.getWebhookInfo(writer, request, token)
 	case "sendMessage":
 		a.sendMessage(writer, request, token)
+	case "sendPhoto":
+		a.sendPhoto(writer, request, token)
+	case "sendDocument":
+		a.sendDocument(writer, request, token)
+	case "sendVideo":
+		a.sendVideo(writer, request, token)
+	case "sendVoice":
+		a.sendVoice(writer, request, token)
+	case "sendSticker":
+		a.sendSticker(writer, request, token)
 	case "editMessageText":
 		a.editMessageText(writer, request, token)
 	case "deleteMessage":

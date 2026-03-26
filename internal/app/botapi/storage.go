@@ -12,6 +12,8 @@ import (
 	conversationpg "github.com/dm-vev/zvonilka/internal/domain/conversation/pgstore"
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
 	identitypg "github.com/dm-vev/zvonilka/internal/domain/identity/pgstore"
+	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
+	mediapg "github.com/dm-vev/zvonilka/internal/domain/media/pgstore"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
 	platformstorage "github.com/dm-vev/zvonilka/internal/platform/storage"
@@ -39,6 +41,10 @@ var newIdentityStore = func(db *sql.DB, schema string) (domainidentity.Store, er
 
 var newConversationStore = func(db *sql.DB, schema string) (domainconversation.Store, error) {
 	return conversationpg.New(db, schema)
+}
+
+var newMediaStore = func(db *sql.DB, schema string) (domainmedia.Store, error) {
+	return mediapg.New(db, schema)
 }
 
 var newBotStore = func(db *sql.DB, schema string) (domainbot.Store, error) {
@@ -115,6 +121,13 @@ func buildAppStorage(
 			catalog.Close(ctx),
 		)
 	}
+	mediaStore, err := newMediaStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres media store: %w", err),
+			catalog.Close(ctx),
+		)
+	}
 	botStore, err := newBotStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
 	if err != nil {
 		return nil, nil, nil, nil, joinStorageError(
@@ -146,6 +159,7 @@ func buildAppStorage(
 		identityService,
 		conversationService,
 		conversationStore,
+		mediaStore,
 		domainbot.WithSettings(cfg.Bot.ToSettings()),
 	)
 	if err != nil {
