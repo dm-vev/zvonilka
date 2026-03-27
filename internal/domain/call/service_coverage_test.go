@@ -579,6 +579,82 @@ func TestUpdateCallMediaStatePropagatesScreenShareToRuntime(t *testing.T) {
 	require.True(t, runtime.updated[0].WithVideo)
 }
 
+func TestHandoffCallMovesJoinedDeviceWithinSameAccount(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 27, 17, 0, 0, 0, time.UTC)
+	runtime := newFakeRuntime(now)
+	service := newTestService(t, now, runtime)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-direct",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+	_, _, err = service.AcceptCall(context.Background(), domaincall.AcceptParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.NoError(t, err)
+	_, _, _, err = service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+	_, _, _, err = service.UpdateCallMediaState(context.Background(), domaincall.UpdateParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		Media: domaincall.MediaState{
+			AudioMuted:         true,
+			VideoMuted:         false,
+			CameraEnabled:      true,
+			ScreenShareEnabled: true,
+		},
+	})
+	require.NoError(t, err)
+
+	callRow, participant, details, events, err := service.HandoffCall(context.Background(), domaincall.HandoffParams{
+		CallID:       started.ID,
+		AccountID:    "acc-b",
+		FromDeviceID: "dev-b",
+		ToDeviceID:   "dev-b-2",
+	})
+	require.NoError(t, err)
+	require.Equal(t, started.ID, callRow.ID)
+	require.Equal(t, "dev-b-2", participant.DeviceID)
+	require.True(t, participant.MediaState.AudioMuted)
+	require.True(t, participant.MediaState.ScreenShareEnabled)
+	require.Equal(t, details.SessionID, callRow.ActiveSessionID)
+	require.Len(t, events, 2)
+	require.Equal(t, domaincall.EventTypeJoined, events[0].EventType)
+	require.Equal(t, "true", events[0].Metadata["handoff"])
+	require.Equal(t, "dev-b", events[0].Metadata["from_device_id"])
+	require.Equal(t, domaincall.EventTypeLeft, events[1].EventType)
+	require.Equal(t, "dev-b-2", events[1].Metadata["to_device_id"])
+	require.Contains(t, runtime.left, details.SessionID+"|acc-b|dev-b")
+}
+
+func TestHandoffCallRejectsSameDeviceTarget(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 27, 17, 30, 0, 0, time.UTC)
+	service := newTestService(t, now, newFakeRuntime(now))
+
+	_, _, _, _, err := service.HandoffCall(context.Background(), domaincall.HandoffParams{
+		CallID:       "call-1",
+		AccountID:    "acc-a",
+		FromDeviceID: "dev-a",
+		ToDeviceID:   "dev-a",
+	})
+	require.ErrorIs(t, err, domaincall.ErrInvalidInput)
+}
+
 func TestAcknowledgeAdaptationPropagatesRuntimeError(t *testing.T) {
 	t.Parallel()
 

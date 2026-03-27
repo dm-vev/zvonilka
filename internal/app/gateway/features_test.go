@@ -785,6 +785,40 @@ func (f *gatewayFeatureFixture) mustCreateUserAndLogin(
 	return account, authCtx
 }
 
+func (f *gatewayFeatureFixture) mustLoginAccountOnNewDevice(
+	t *testing.T,
+	account identity.Account,
+	deviceName string,
+) context.Context {
+	t.Helper()
+
+	begin, err := f.api.BeginLogin(context.Background(), &authv1.BeginLoginRequest{
+		Identifier:      &authv1.BeginLoginRequest_Username{Username: account.Username},
+		DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+		DeviceName:      deviceName,
+		DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+	})
+	if err != nil {
+		t.Fatalf("begin login on new device: %v", err)
+	}
+
+	verify, err := f.api.VerifyLoginCode(context.Background(), &authv1.VerifyLoginCodeRequest{
+		ChallengeId:    begin.ChallengeId,
+		Code:           f.sender.code(begin.Targets[0].DestinationMask),
+		DeviceName:     deviceName,
+		DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte("device-key-" + deviceName)},
+	})
+	if err != nil {
+		t.Fatalf("verify login on new device: %v", err)
+	}
+
+	return metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		"authorization",
+		"Bearer "+verify.Tokens.AccessToken,
+	))
+}
+
 func testMessageDraft(id string) *commonv1.MessageDraft {
 	return &commonv1.MessageDraft{
 		ClientMessageId: id,

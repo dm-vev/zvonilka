@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	authv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/auth/v1"
 	callv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1"
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
 	conversationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1"
@@ -93,6 +94,87 @@ func TestCallLifecycleRPC(t *testing.T) {
 	}
 	if ended.Call.State != callv1.CallState_CALL_STATE_ENDED {
 		t.Fatalf("unexpected ended call: %+v", ended.Call)
+	}
+}
+
+func TestCallHandoffRPC(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	owner, ownerCtx := fixture.mustCreateUserAndLogin(t, "call-handoff-owner", "call-handoff-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "call-handoff-peer", "call-handoff-peer@example.com")
+	peerSecondCtx := fixture.mustLoginAccountOnNewDevice(t, peer, "peer-second-device")
+
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	started, err := fixture.api.StartCall(ownerCtx, &callv1.StartCallRequest{
+		ConversationId: created.Conversation.ConversationId,
+		WithVideo:      true,
+	})
+	if err != nil {
+		t.Fatalf("start call: %v", err)
+	}
+	if _, err := fixture.api.AcceptCall(peerCtx, &callv1.AcceptCallRequest{CallId: started.Call.CallId}); err != nil {
+		t.Fatalf("accept call: %v", err)
+	}
+	if _, err := fixture.api.JoinCall(peerCtx, &callv1.JoinCallRequest{
+		CallId:    started.Call.CallId,
+		WithVideo: true,
+	}); err != nil {
+		t.Fatalf("join call: %v", err)
+	}
+	if _, err := fixture.api.UpdateCallMediaState(peerCtx, &callv1.UpdateCallMediaStateRequest{
+		CallId: started.Call.CallId,
+		MediaState: &callv1.CallMediaState{
+			AudioMuted:         true,
+			VideoMuted:         false,
+			CameraEnabled:      true,
+			ScreenShareEnabled: true,
+		},
+	}); err != nil {
+		t.Fatalf("update media state: %v", err)
+	}
+
+	devices, err := fixture.api.ListDevices(peerCtx, &authv1.ListDevicesRequest{})
+	if err != nil {
+		t.Fatalf("list devices: %v", err)
+	}
+	if len(devices.Devices) < 2 {
+		t.Fatalf("expected at least two devices, got %+v", devices.Devices)
+	}
+	var oldDeviceID string
+	for _, device := range devices.Devices {
+		if device.DeviceName == "test-device" {
+			oldDeviceID = device.DeviceId
+			break
+		}
+	}
+	if oldDeviceID == "" {
+		t.Fatalf("expected old device in %+v", devices.Devices)
+	}
+
+	handoff, err := fixture.api.HandoffCall(peerSecondCtx, &callv1.HandoffCallRequest{
+		CallId:       started.Call.CallId,
+		FromDeviceId: oldDeviceID,
+	})
+	if err != nil {
+		t.Fatalf("handoff call: %v", err)
+	}
+	if handoff.Transport == nil || handoff.Transport.SessionId == "" {
+		t.Fatalf("unexpected handoff transport: %+v", handoff.Transport)
+	}
+	if handoff.Participant == nil || !handoff.Participant.MediaState.ScreenShareEnabled || !handoff.Participant.MediaState.AudioMuted {
+		t.Fatalf("unexpected handoff participant: %+v", handoff.Participant)
+	}
+	if owner.ID == "" {
+		t.Fatal("expected owner account")
 	}
 }
 

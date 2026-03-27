@@ -225,6 +225,31 @@ func (a *api) JoinCall(ctx context.Context, req *callv1.JoinCallRequest) (*callv
 	}, nil
 }
 
+// HandoffCall transfers one active call from another device of the same account to the current device.
+func (a *api) HandoffCall(ctx context.Context, req *callv1.HandoffCallRequest) (*callv1.HandoffCallResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	callRow, participant, details, events, err := a.call.HandoffCall(ctx, domaincall.HandoffParams{
+		CallID:       req.GetCallId(),
+		AccountID:    authContext.Account.ID,
+		FromDeviceID: req.GetFromDeviceId(),
+		ToDeviceID:   authContext.Device.ID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(events...)
+
+	return &callv1.HandoffCallResponse{
+		Call:        callProto(callRow),
+		Participant: callParticipantProto(participant),
+		Transport:   joinDetailsProto(details),
+	}, nil
+}
+
 // PublishCallDescription publishes one SDP description for the joined device.
 func (a *api) PublishCallDescription(
 	ctx context.Context,

@@ -45,6 +45,14 @@ type JoinParams struct {
 	WithVideo bool
 }
 
+// HandoffParams describes one device handoff for the same account.
+type HandoffParams struct {
+	CallID       string
+	AccountID    string
+	FromDeviceID string
+	ToDeviceID   string
+}
+
 // PublishDescriptionParams describes one SDP publication for a joined participant.
 type PublishDescriptionParams struct {
 	CallID      string

@@ -457,6 +457,160 @@ func (s *Service) JoinCall(ctx context.Context, params JoinParams) (Call, JoinDe
 	return result, details, cloneEvents(events), nil
 }
 
+// HandoffCall transfers one active call from another device of the same account to the current device.
+func (s *Service) HandoffCall(
+	ctx context.Context,
+	params HandoffParams,
+) (Call, Participant, JoinDetails, []Event, error) {
+	if err := s.validateContext(ctx, "handoff call"); err != nil {
+		return Call{}, Participant{}, JoinDetails{}, nil, err
+	}
+	params.CallID = strings.TrimSpace(params.CallID)
+	params.AccountID = strings.TrimSpace(params.AccountID)
+	params.FromDeviceID = strings.TrimSpace(params.FromDeviceID)
+	params.ToDeviceID = strings.TrimSpace(params.ToDeviceID)
+	if params.CallID == "" || params.AccountID == "" || params.FromDeviceID == "" || params.ToDeviceID == "" {
+		return Call{}, Participant{}, JoinDetails{}, nil, ErrInvalidInput
+	}
+	if params.FromDeviceID == params.ToDeviceID {
+		return Call{}, Participant{}, JoinDetails{}, nil, ErrInvalidInput
+	}
+
+	now := s.currentTime()
+	var result Call
+	var saved Participant
+	var details JoinDetails
+	var events []Event
+	var leaveSessionID string
+	err := s.runTx(ctx, func(store Store) error {
+		callRow, loadErr := s.visibleCall(ctx, store, params.CallID, params.AccountID)
+		if loadErr != nil {
+			return loadErr
+		}
+		if callRow.State != StateActive {
+			return ErrConflict
+		}
+
+		source, loadErr := store.ParticipantByCallAndDevice(ctx, callRow.ID, params.FromDeviceID)
+		if loadErr != nil {
+			if loadErr == ErrNotFound {
+				return ErrConflict
+			}
+			return fmt.Errorf("load source participant %s/%s: %w", callRow.ID, params.FromDeviceID, loadErr)
+		}
+		if source.AccountID != params.AccountID || source.State != ParticipantStateJoined {
+			return ErrForbidden
+		}
+
+		target, loadErr := store.ParticipantByCallAndDevice(ctx, callRow.ID, params.ToDeviceID)
+		if loadErr != nil && loadErr != ErrNotFound {
+			return fmt.Errorf("load target participant %s/%s: %w", callRow.ID, params.ToDeviceID, loadErr)
+		}
+		if loadErr == nil && target.AccountID != params.AccountID {
+			return ErrForbidden
+		}
+		if loadErr == nil && target.State == ParticipantStateJoined {
+			return ErrConflict
+		}
+
+		runtimeJoin, runtimeErr := s.runtime.JoinSession(ctx, callRow.ActiveSessionID, RuntimeParticipant{
+			CallID:    callRow.ID,
+			AccountID: params.AccountID,
+			DeviceID:  params.ToDeviceID,
+			WithVideo: source.MediaState.CameraEnabled,
+			Media:     source.MediaState,
+		})
+		if runtimeErr != nil {
+			return fmt.Errorf("join runtime session %s for handoff: %w", callRow.ActiveSessionID, runtimeErr)
+		}
+
+		if loadErr == ErrNotFound {
+			target = Participant{
+				CallID:    callRow.ID,
+				AccountID: params.AccountID,
+				DeviceID:  params.ToDeviceID,
+				JoinedAt:  now,
+			}
+		}
+		if target.JoinedAt.IsZero() {
+			target.JoinedAt = now
+		}
+		target.State = ParticipantStateJoined
+		target.MediaState = source.MediaState
+		target.LeftAt = timeZero()
+		target.UpdatedAt = now
+		savedTarget, saveErr := store.SaveParticipant(ctx, target)
+		if saveErr != nil {
+			return fmt.Errorf("save target participant %s/%s: %w", target.CallID, target.DeviceID, saveErr)
+		}
+		saved = savedTarget
+
+		joinedEvent, appendErr := s.appendEvent(ctx, store, callRow, EventTypeJoined, params.AccountID, params.ToDeviceID, map[string]string{
+			"handoff":        "true",
+			"from_device_id": params.FromDeviceID,
+			"with_video":     boolString(source.MediaState.CameraEnabled),
+		}, now)
+		if appendErr != nil {
+			return appendErr
+		}
+		events = append(events, joinedEvent)
+
+		source.State = ParticipantStateLeft
+		source.LeftAt = now
+		source.UpdatedAt = now
+		if _, saveErr := store.SaveParticipant(ctx, source); saveErr != nil {
+			return fmt.Errorf("save source participant %s/%s: %w", source.CallID, source.DeviceID, saveErr)
+		}
+		leftEvent, appendErr := s.appendEvent(ctx, store, callRow, EventTypeLeft, params.AccountID, params.FromDeviceID, map[string]string{
+			"handoff":      "true",
+			"to_device_id": params.ToDeviceID,
+		}, now)
+		if appendErr != nil {
+			return appendErr
+		}
+		events = append(events, leftEvent)
+
+		result, loadErr = s.hydrateCall(ctx, store, callRow.ID)
+		if loadErr != nil {
+			return loadErr
+		}
+
+		iceServers, expiresAt, iceErr := s.iceServersForAccount(params.AccountID, runtimeJoin.ExpiresAt)
+		if iceErr != nil {
+			return iceErr
+		}
+		details = JoinDetails{
+			SessionID:       runtimeJoin.SessionID,
+			SessionToken:    runtimeJoin.SessionToken,
+			RuntimeEndpoint: s.resolveRuntimeEndpoint(runtimeJoin.RuntimeEndpoint),
+			ExpiresAt:       expiresAt,
+			IceUfrag:        runtimeJoin.IceUfrag,
+			IcePwd:          runtimeJoin.IcePwd,
+			DTLSFingerprint: runtimeJoin.DTLSFingerprint,
+			CandidateHost:   runtimeJoin.CandidateHost,
+			CandidatePort:   runtimeJoin.CandidatePort,
+			IceServers:      iceServers,
+		}
+		leaveSessionID = callRow.ActiveSessionID
+		return nil
+	})
+	if err != nil {
+		return Call{}, Participant{}, JoinDetails{}, nil, err
+	}
+
+	if leaveSessionID != "" {
+		if leaveErr := s.runtime.LeaveSession(ctx, leaveSessionID, params.AccountID, params.FromDeviceID); leaveErr != nil {
+			return Call{}, Participant{}, JoinDetails{}, nil, fmt.Errorf("leave runtime session %s: %w", leaveSessionID, leaveErr)
+		}
+	}
+
+	for i := range events {
+		events[i].Call = cloneCall(result)
+	}
+
+	return result, cloneParticipant(saved), details, cloneEvents(events), nil
+}
+
 // LeaveCall removes one device from the active participant set.
 func (s *Service) LeaveCall(ctx context.Context, params LeaveParams) (Call, []Event, error) {
 	if err := s.validateContext(ctx, "leave call"); err != nil {

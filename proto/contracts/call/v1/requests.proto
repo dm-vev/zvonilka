@@ -87,6 +87,17 @@ message JoinCallResponse {
   JoinTransport transport = 2;
 }
 
+message HandoffCallRequest {
+  string call_id = 1;
+  string from_device_id = 2;
+}
+
+message HandoffCallResponse {
+  Call call = 1;
+  CallParticipant participant = 2;
+  JoinTransport transport = 3;
+}
+
 message PublishCallDescriptionRequest {
   string call_id = 1;
   string session_id = 2;

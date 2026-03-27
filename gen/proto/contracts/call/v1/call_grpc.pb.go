@@ -28,6 +28,7 @@ const (
 	CallService_CancelCall_FullMethodName                = "/zvonilka.call.v1.CallService/CancelCall"
 	CallService_EndCall_FullMethodName                   = "/zvonilka.call.v1.CallService/EndCall"
 	CallService_JoinCall_FullMethodName                  = "/zvonilka.call.v1.CallService/JoinCall"
+	CallService_HandoffCall_FullMethodName               = "/zvonilka.call.v1.CallService/HandoffCall"
 	CallService_PublishCallDescription_FullMethodName    = "/zvonilka.call.v1.CallService/PublishCallDescription"
 	CallService_PublishCallIceCandidate_FullMethodName   = "/zvonilka.call.v1.CallService/PublishCallIceCandidate"
 	CallService_LeaveCall_FullMethodName                 = "/zvonilka.call.v1.CallService/LeaveCall"
@@ -50,6 +51,7 @@ type CallServiceClient interface {
 	CancelCall(ctx context.Context, in *CancelCallRequest, opts ...grpc.CallOption) (*CancelCallResponse, error)
 	EndCall(ctx context.Context, in *EndCallRequest, opts ...grpc.CallOption) (*EndCallResponse, error)
 	JoinCall(ctx context.Context, in *JoinCallRequest, opts ...grpc.CallOption) (*JoinCallResponse, error)
+	HandoffCall(ctx context.Context, in *HandoffCallRequest, opts ...grpc.CallOption) (*HandoffCallResponse, error)
 	PublishCallDescription(ctx context.Context, in *PublishCallDescriptionRequest, opts ...grpc.CallOption) (*PublishCallDescriptionResponse, error)
 	PublishCallIceCandidate(ctx context.Context, in *PublishCallIceCandidateRequest, opts ...grpc.CallOption) (*PublishCallIceCandidateResponse, error)
 	LeaveCall(ctx context.Context, in *LeaveCallRequest, opts ...grpc.CallOption) (*LeaveCallResponse, error)
@@ -142,6 +144,15 @@ func (c *callServiceClient) EndCall(ctx context.Context, in *EndCallRequest, opt
 func (c *callServiceClient) JoinCall(ctx context.Context, in *JoinCallRequest, opts ...grpc.CallOption) (*JoinCallResponse, error) {
 	out := new(JoinCallResponse)
 	err := c.cc.Invoke(ctx, CallService_JoinCall_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *callServiceClient) HandoffCall(ctx context.Context, in *HandoffCallRequest, opts ...grpc.CallOption) (*HandoffCallResponse, error) {
+	out := new(HandoffCallResponse)
+	err := c.cc.Invoke(ctx, CallService_HandoffCall_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -247,6 +258,7 @@ type CallServiceServer interface {
 	CancelCall(context.Context, *CancelCallRequest) (*CancelCallResponse, error)
 	EndCall(context.Context, *EndCallRequest) (*EndCallResponse, error)
 	JoinCall(context.Context, *JoinCallRequest) (*JoinCallResponse, error)
+	HandoffCall(context.Context, *HandoffCallRequest) (*HandoffCallResponse, error)
 	PublishCallDescription(context.Context, *PublishCallDescriptionRequest) (*PublishCallDescriptionResponse, error)
 	PublishCallIceCandidate(context.Context, *PublishCallIceCandidateRequest) (*PublishCallIceCandidateResponse, error)
 	LeaveCall(context.Context, *LeaveCallRequest) (*LeaveCallResponse, error)
@@ -287,6 +299,9 @@ func (UnimplementedCallServiceServer) EndCall(context.Context, *EndCallRequest) 
 }
 func (UnimplementedCallServiceServer) JoinCall(context.Context, *JoinCallRequest) (*JoinCallResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method JoinCall not implemented")
+}
+func (UnimplementedCallServiceServer) HandoffCall(context.Context, *HandoffCallRequest) (*HandoffCallResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandoffCall not implemented")
 }
 func (UnimplementedCallServiceServer) PublishCallDescription(context.Context, *PublishCallDescriptionRequest) (*PublishCallDescriptionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PublishCallDescription not implemented")
@@ -484,6 +499,24 @@ func _CallService_JoinCall_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CallService_HandoffCall_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HandoffCallRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).HandoffCall(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_HandoffCall_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).HandoffCall(ctx, req.(*HandoffCallRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CallService_PublishCallDescription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PublishCallDescriptionRequest)
 	if err := dec(in); err != nil {
@@ -655,6 +688,10 @@ var CallService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "JoinCall",
 			Handler:    _CallService_JoinCall_Handler,
+		},
+		{
+			MethodName: "HandoffCall",
+			Handler:    _CallService_HandoffCall_Handler,
 		},
 		{
 			MethodName: "PublishCallDescription",
