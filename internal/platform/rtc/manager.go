@@ -80,19 +80,23 @@ type relayTrack struct {
 }
 
 const (
-	telemetryKindKey             = "telemetry_kind"
-	telemetryKindTransport       = "transport_state"
-	telemetryPCStateKey          = "peer_connection_state"
-	telemetryICEStateKey         = "ice_connection_state"
-	telemetrySignalingKey        = "signaling_state"
-	telemetryQualityKey          = "transport_quality"
-	telemetryProfileKey          = "recommended_profile"
-	telemetryReasonKey           = "recommendation_reason"
-	telemetryVideoKey            = "video_fallback_recommended"
-	telemetryReconnectKey        = "reconnect_recommended"
-	telemetryReconnectAttemptKey = "reconnect_attempt"
-	telemetryReconnectBackoffKey = "reconnect_backoff_until"
-	maxQualitySamples            = 8
+	telemetryKindKey                  = "telemetry_kind"
+	telemetryKindTransport            = "transport_state"
+	telemetryPCStateKey               = "peer_connection_state"
+	telemetryICEStateKey              = "ice_connection_state"
+	telemetrySignalingKey             = "signaling_state"
+	telemetryQualityKey               = "transport_quality"
+	telemetryProfileKey               = "recommended_profile"
+	telemetryReasonKey                = "recommendation_reason"
+	telemetryVideoKey                 = "video_fallback_recommended"
+	telemetryReconnectKey             = "reconnect_recommended"
+	telemetrySuppressOutgoingVideoKey = "suppress_outgoing_video"
+	telemetrySuppressIncomingVideoKey = "suppress_incoming_video"
+	telemetrySuppressOutgoingAudioKey = "suppress_outgoing_audio"
+	telemetrySuppressIncomingAudioKey = "suppress_incoming_audio"
+	telemetryReconnectAttemptKey      = "reconnect_attempt"
+	telemetryReconnectBackoffKey      = "reconnect_backoff_until"
+	maxQualitySamples                 = 8
 )
 
 // NewManager constructs an in-process RTC session manager.
@@ -1025,6 +1029,10 @@ func (p *peer) updateTelemetry(key string, value string) map[string]string {
 	metadata[telemetryReasonKey] = p.stats.RecommendationReason
 	metadata[telemetryVideoKey] = boolString(p.stats.VideoFallbackRecommended)
 	metadata[telemetryReconnectKey] = boolString(p.stats.ReconnectRecommended)
+	metadata[telemetrySuppressOutgoingVideoKey] = boolString(p.stats.SuppressOutgoingVideo)
+	metadata[telemetrySuppressIncomingVideoKey] = boolString(p.stats.SuppressIncomingVideo)
+	metadata[telemetrySuppressOutgoingAudioKey] = boolString(p.stats.SuppressOutgoingAudio)
+	metadata[telemetrySuppressIncomingAudioKey] = boolString(p.stats.SuppressIncomingAudio)
 	metadata[telemetryReconnectAttemptKey] = fmt.Sprintf("%d", p.stats.ReconnectAttempt)
 	if !p.stats.ReconnectBackoffUntil.IsZero() {
 		metadata[telemetryReconnectBackoffKey] = p.stats.ReconnectBackoffUntil.Format(time.RFC3339Nano)
@@ -1069,14 +1077,18 @@ func (p *peer) recordRelayWrite(size uint64, failed bool) map[string]string {
 	}
 
 	return map[string]string{
-		telemetryKindKey:             telemetryKindTransport,
-		telemetryQualityKey:          p.stats.Quality,
-		telemetryProfileKey:          p.stats.RecommendedProfile,
-		telemetryReasonKey:           p.stats.RecommendationReason,
-		telemetryVideoKey:            boolString(p.stats.VideoFallbackRecommended),
-		telemetryReconnectKey:        boolString(p.stats.ReconnectRecommended),
-		telemetryReconnectAttemptKey: fmt.Sprintf("%d", p.stats.ReconnectAttempt),
-		telemetryReconnectBackoffKey: p.stats.ReconnectBackoffUntil.Format(time.RFC3339Nano),
+		telemetryKindKey:                  telemetryKindTransport,
+		telemetryQualityKey:               p.stats.Quality,
+		telemetryProfileKey:               p.stats.RecommendedProfile,
+		telemetryReasonKey:                p.stats.RecommendationReason,
+		telemetryVideoKey:                 boolString(p.stats.VideoFallbackRecommended),
+		telemetryReconnectKey:             boolString(p.stats.ReconnectRecommended),
+		telemetrySuppressOutgoingVideoKey: boolString(p.stats.SuppressOutgoingVideo),
+		telemetrySuppressIncomingVideoKey: boolString(p.stats.SuppressIncomingVideo),
+		telemetrySuppressOutgoingAudioKey: boolString(p.stats.SuppressOutgoingAudio),
+		telemetrySuppressIncomingAudioKey: boolString(p.stats.SuppressIncomingAudio),
+		telemetryReconnectAttemptKey:      fmt.Sprintf("%d", p.stats.ReconnectAttempt),
+		telemetryReconnectBackoffKey:      p.stats.ReconnectBackoffUntil.Format(time.RFC3339Nano),
 	}
 }
 
@@ -1108,6 +1120,10 @@ func (p *peer) applyRecommendationsLocked() {
 	p.stats.RecommendationReason = reason
 	p.stats.VideoFallbackRecommended = videoFallback
 	p.stats.ReconnectRecommended = reconnect
+	p.stats.SuppressOutgoingVideo = videoFallback
+	p.stats.SuppressIncomingVideo = videoFallback
+	p.stats.SuppressOutgoingAudio = reconnect
+	p.stats.SuppressIncomingAudio = reconnect
 	if !reconnect {
 		p.reconnectAttempts = 0
 		p.stats.ReconnectAttempt = 0

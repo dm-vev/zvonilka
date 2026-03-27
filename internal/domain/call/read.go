@@ -316,6 +316,18 @@ func summarizeCallQuality(participants []Participant) QualitySummary {
 		if stats.ReconnectRecommended {
 			summary.ReconnectParticipants++
 		}
+		if stats.SuppressOutgoingVideo {
+			summary.OutgoingVideoSuppressed++
+		}
+		if stats.SuppressIncomingVideo {
+			summary.IncomingVideoSuppressed++
+		}
+		if stats.SuppressOutgoingAudio {
+			summary.OutgoingAudioSuppressed++
+		}
+		if stats.SuppressIncomingAudio {
+			summary.IncomingAudioSuppressed++
+		}
 		summary.DegradedTransitions += stats.DegradedTransitions
 		summary.RecoveredTransitions += stats.RecoveredTransitions
 		if stats.LastQualityChangeAt.After(summary.LastChangedAt) {
@@ -352,6 +364,10 @@ func applyEndedCallQualitySummary(callRow *Call, events []Event) {
 	summary := callRow.QualitySummary
 	videoFallbackParticipants := make(map[string]struct{})
 	reconnectParticipants := make(map[string]struct{})
+	outgoingVideoParticipants := make(map[string]struct{})
+	incomingVideoParticipants := make(map[string]struct{})
+	outgoingAudioParticipants := make(map[string]struct{})
+	incomingAudioParticipants := make(map[string]struct{})
 	for _, event := range events {
 		if event.EventType != EventTypeMediaUpdated {
 			continue
@@ -368,6 +384,18 @@ func applyEndedCallQualitySummary(callRow *Call, events []Event) {
 		if event.Metadata["reconnect_recommended"] == "true" && participantKey != "|" {
 			reconnectParticipants[participantKey] = struct{}{}
 		}
+		if event.Metadata["suppress_outgoing_video"] == "true" && participantKey != "|" {
+			outgoingVideoParticipants[participantKey] = struct{}{}
+		}
+		if event.Metadata["suppress_incoming_video"] == "true" && participantKey != "|" {
+			incomingVideoParticipants[participantKey] = struct{}{}
+		}
+		if event.Metadata["suppress_outgoing_audio"] == "true" && participantKey != "|" {
+			outgoingAudioParticipants[participantKey] = struct{}{}
+		}
+		if event.Metadata["suppress_incoming_audio"] == "true" && participantKey != "|" {
+			incomingAudioParticipants[participantKey] = struct{}{}
+		}
 		if value := parseUint32Metadata(event.Metadata["reconnect_attempt"]); value > 0 && event.CreatedAt.After(summary.LastChangedAt) {
 			summary.LastChangedAt = event.CreatedAt
 		}
@@ -377,6 +405,18 @@ func applyEndedCallQualitySummary(callRow *Call, events []Event) {
 	}
 	if uint32(len(reconnectParticipants)) > summary.ReconnectParticipants {
 		summary.ReconnectParticipants = uint32(len(reconnectParticipants))
+	}
+	if uint32(len(outgoingVideoParticipants)) > summary.OutgoingVideoSuppressed {
+		summary.OutgoingVideoSuppressed = uint32(len(outgoingVideoParticipants))
+	}
+	if uint32(len(incomingVideoParticipants)) > summary.IncomingVideoSuppressed {
+		summary.IncomingVideoSuppressed = uint32(len(incomingVideoParticipants))
+	}
+	if uint32(len(outgoingAudioParticipants)) > summary.OutgoingAudioSuppressed {
+		summary.OutgoingAudioSuppressed = uint32(len(outgoingAudioParticipants))
+	}
+	if uint32(len(incomingAudioParticipants)) > summary.IncomingAudioSuppressed {
+		summary.IncomingAudioSuppressed = uint32(len(incomingAudioParticipants))
 	}
 	callRow.QualitySummary = summary
 }

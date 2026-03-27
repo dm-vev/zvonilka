@@ -116,6 +116,10 @@ type TransportStats struct {
 	RecommendationReason     string
 	VideoFallbackRecommended bool
 	ReconnectRecommended     bool
+	SuppressOutgoingVideo    bool
+	SuppressIncomingVideo    bool
+	SuppressOutgoingAudio    bool
+	SuppressIncomingAudio    bool
 	ReconnectAttempt         uint32
 	ReconnectBackoffUntil    time.Time
 	QualityTrend             string
@@ -137,6 +141,10 @@ type QualitySummary struct {
 	ParticipantCount          uint32
 	VideoFallbackParticipants uint32
 	ReconnectParticipants     uint32
+	OutgoingVideoSuppressed   uint32
+	IncomingVideoSuppressed   uint32
+	OutgoingAudioSuppressed   uint32
+	IncomingAudioSuppressed   uint32
 	DegradedTransitions       uint32
 	RecoveredTransitions      uint32
 	LastChangedAt             time.Time
