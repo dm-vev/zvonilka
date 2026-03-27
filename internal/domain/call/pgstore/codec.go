@@ -98,8 +98,9 @@ func scanInvite(row rowScanner) (call.Invite, error) {
 
 func scanParticipant(row rowScanner) (call.Participant, error) {
 	var (
-		value  call.Participant
-		leftAt sql.NullTime
+		value        call.Participant
+		raisedHandAt sql.NullTime
+		leftAt       sql.NullTime
 	)
 	if err := row.Scan(
 		&value.CallID,
@@ -110,6 +111,10 @@ func scanParticipant(row rowScanner) (call.Participant, error) {
 		&value.MediaState.VideoMuted,
 		&value.MediaState.CameraEnabled,
 		&value.MediaState.ScreenShareEnabled,
+		&value.HandRaised,
+		&raisedHandAt,
+		&value.HostMutedAudio,
+		&value.HostMutedVideo,
 		&value.JoinedAt,
 		&leftAt,
 		&value.UpdatedAt,
@@ -117,6 +122,7 @@ func scanParticipant(row rowScanner) (call.Participant, error) {
 		return call.Participant{}, err
 	}
 	value.JoinedAt = value.JoinedAt.UTC()
+	value.RaisedHandAt = decodeTime(raisedHandAt)
 	value.LeftAt = decodeTime(leftAt)
 	value.UpdatedAt = value.UpdatedAt.UTC()
 	return value, nil

@@ -136,6 +136,29 @@ message UpdateCallMediaStateResponse {
   CallParticipant participant = 2;
 }
 
+message RaiseCallHandRequest {
+  string call_id = 1;
+  bool raised = 2;
+}
+
+message RaiseCallHandResponse {
+  Call call = 1;
+  CallParticipant participant = 2;
+}
+
+message ModerateCallParticipantRequest {
+  string call_id = 1;
+  string target_device_id = 2;
+  bool host_muted_audio = 3;
+  bool host_muted_video = 4;
+  bool lower_hand = 5;
+}
+
+message ModerateCallParticipantResponse {
+  Call call = 1;
+  CallParticipant participant = 2;
+}
+
 message AcknowledgeCallAdaptationRequest {
   string call_id = 1;
   string session_id = 2;

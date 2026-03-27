@@ -235,6 +235,78 @@ func TestGroupCallScreenShareRPC(t *testing.T) {
 	}
 }
 
+func TestGroupCallModerationRPC(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	_, ownerCtx := fixture.mustCreateUserAndLogin(t, "group-mod-owner", "group-mod-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "group-mod-peer", "group-mod-peer@example.com")
+	extra, extraCtx := fixture.mustCreateUserAndLogin(t, "group-mod-extra", "group-mod-extra@example.com")
+
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Moderated Group Call",
+		MemberUserIds: []string{peer.ID, extra.ID},
+	})
+	if err != nil {
+		t.Fatalf("create group conversation: %v", err)
+	}
+
+	started, err := fixture.api.StartCall(ownerCtx, &callv1.StartCallRequest{
+		ConversationId: created.Conversation.ConversationId,
+		WithVideo:      true,
+	})
+	if err != nil {
+		t.Fatalf("start group call: %v", err)
+	}
+	if _, err := fixture.api.JoinCall(peerCtx, &callv1.JoinCallRequest{
+		CallId:    started.Call.CallId,
+		WithVideo: true,
+	}); err != nil {
+		t.Fatalf("join peer: %v", err)
+	}
+	if _, err := fixture.api.JoinCall(extraCtx, &callv1.JoinCallRequest{
+		CallId:    started.Call.CallId,
+		WithVideo: true,
+	}); err != nil {
+		t.Fatalf("join extra: %v", err)
+	}
+
+	raised, err := fixture.api.RaiseCallHand(peerCtx, &callv1.RaiseCallHandRequest{
+		CallId: started.Call.CallId,
+		Raised: true,
+	})
+	if err != nil {
+		t.Fatalf("raise hand: %v", err)
+	}
+	if raised.Participant == nil || !raised.Participant.HandRaised {
+		t.Fatalf("expected raised hand participant, got %+v", raised.Participant)
+	}
+
+	moderated, err := fixture.api.ModerateCallParticipant(ownerCtx, &callv1.ModerateCallParticipantRequest{
+		CallId:         started.Call.CallId,
+		TargetDeviceId: raised.Participant.DeviceId,
+		HostMutedAudio: true,
+		HostMutedVideo: true,
+		LowerHand:      true,
+	})
+	if err != nil {
+		t.Fatalf("moderate participant: %v", err)
+	}
+	if moderated.Participant == nil || !moderated.Participant.HostMutedAudio || !moderated.Participant.HostMutedVideo || moderated.Participant.HandRaised {
+		t.Fatalf("unexpected moderated participant: %+v", moderated.Participant)
+	}
+
+	if _, err := fixture.api.ModerateCallParticipant(peerCtx, &callv1.ModerateCallParticipantRequest{
+		CallId:         started.Call.CallId,
+		TargetDeviceId: moderated.Participant.DeviceId,
+		HostMutedAudio: true,
+	}); err == nil {
+		t.Fatal("expected member moderation to fail")
+	}
+}
+
 func TestGetCallDiagnosticsRPC(t *testing.T) {
 	t.Parallel()
 

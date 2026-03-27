@@ -109,7 +109,10 @@ message CallTransportStats {
   uint64 relay_packets = 36;
   uint64 relay_bytes = 37;
   uint64 relay_write_errors = 38;
-  google.protobuf.Timestamp last_updated_at = 39;
+  bool active_speaker = 39;
+  bool dominant_speaker = 40;
+  google.protobuf.Timestamp last_spoke_at = 41;
+  google.protobuf.Timestamp last_updated_at = 42;
 }
 
 message CallTransportQualitySample {
@@ -148,23 +151,30 @@ message CallParticipant {
   google.protobuf.Timestamp left_at = 6;
   google.protobuf.Timestamp updated_at = 7;
   CallTransportStats transport_stats = 8;
+  bool hand_raised = 9;
+  google.protobuf.Timestamp raised_hand_at = 10;
+  bool host_muted_audio = 11;
+  bool host_muted_video = 12;
 }
 
 message CallQualitySummary {
   string worst_quality = 1;
   string dominant_profile = 2;
   uint32 participant_count = 3;
-  uint32 video_fallback_participants = 4;
-  uint32 screen_share_priority_participants = 5;
-  uint32 reconnect_participants = 6;
-  uint32 camera_video_suppressed = 7;
-  uint32 outgoing_video_suppressed = 8;
-  uint32 incoming_video_suppressed = 9;
-  uint32 outgoing_audio_suppressed = 10;
-  uint32 incoming_audio_suppressed = 11;
-  uint32 degraded_transitions = 12;
-  uint32 recovered_transitions = 13;
-  google.protobuf.Timestamp last_changed_at = 14;
+  uint32 active_speaker_count = 4;
+  uint32 video_fallback_participants = 5;
+  uint32 screen_share_priority_participants = 6;
+  uint32 reconnect_participants = 7;
+  uint32 camera_video_suppressed = 8;
+  uint32 outgoing_video_suppressed = 9;
+  uint32 incoming_video_suppressed = 10;
+  uint32 outgoing_audio_suppressed = 11;
+  uint32 incoming_audio_suppressed = 12;
+  string dominant_speaker_user_id = 13;
+  string dominant_speaker_device_id = 14;
+  uint32 degraded_transitions = 15;
+  uint32 recovered_transitions = 16;
+  google.protobuf.Timestamp last_changed_at = 17;
 }
 
 message CallDiagnostics {

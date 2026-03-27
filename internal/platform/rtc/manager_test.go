@@ -221,6 +221,62 @@ func TestManagerNegotiatesOfferWithPionClient(t *testing.T) {
 	require.Equal(t, joined.SessionID, session.SessionID)
 }
 
+func TestManagerSessionStatsMarksActiveAndDominantSpeaker(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 27, 12, 0, 0, 0, time.UTC)
+	manager := NewManager(
+		"webrtc://gateway/calls",
+		15*time.Minute,
+	)
+	manager.now = func() time.Time { return now }
+
+	manager.sessions["rtc-call-speaker"] = &session{
+		id:           "rtc-call-speaker",
+		callID:       "call-speaker",
+		conversation: "conv-speaker",
+		participants: map[string]participant{},
+		peers: map[string]*peer{
+			participantKey("acc-a", "dev-a"): {
+				accountID: "acc-a",
+				deviceID:  "dev-a",
+				stats: domaincall.TransportStats{
+					LastSpokeAt: now.Add(-1500 * time.Millisecond),
+				},
+			},
+			participantKey("acc-b", "dev-b"): {
+				accountID: "acc-b",
+				deviceID:  "dev-b",
+				stats: domaincall.TransportStats{
+					LastSpokeAt: now.Add(-500 * time.Millisecond),
+				},
+			},
+			participantKey("acc-c", "dev-c"): {
+				accountID: "acc-c",
+				deviceID:  "dev-c",
+				stats: domaincall.TransportStats{
+					LastSpokeAt: now.Add(-5 * time.Second),
+				},
+			},
+		},
+	}
+
+	stats, err := manager.SessionStats(context.Background(), "rtc-call-speaker")
+	require.NoError(t, err)
+	require.Len(t, stats, 3)
+
+	byKey := make(map[string]domaincall.TransportStats, len(stats))
+	for _, item := range stats {
+		byKey[item.AccountID+"|"+item.DeviceID] = item.Transport
+	}
+
+	require.True(t, byKey["acc-a|dev-a"].ActiveSpeaker)
+	require.True(t, byKey["acc-b|dev-b"].ActiveSpeaker)
+	require.False(t, byKey["acc-c|dev-c"].ActiveSpeaker)
+	require.True(t, byKey["acc-b|dev-b"].DominantSpeaker)
+	require.False(t, byKey["acc-a|dev-a"].DominantSpeaker)
+}
+
 func TestManagerRenegotiatesWhenRelayTrackAdded(t *testing.T) {
 	t.Parallel()
 

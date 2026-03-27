@@ -286,6 +286,165 @@ func TestGroupCallLifecycleWithScreenShare(t *testing.T) {
 	require.Len(t, events, 1)
 }
 
+func TestGroupCallModerationLifecycle(t *testing.T) {
+	t.Parallel()
+
+	conversations := conversationtest.NewMemoryStore()
+	require.NoError(t, seedGroupConversation(conversations))
+
+	service, err := domaincall.NewService(
+		calltest.NewMemoryStore(),
+		conversations,
+		platformrtc.NewManager("webrtc://test/calls", 15*time.Minute),
+	)
+	require.NoError(t, err)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-group",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+
+	_, _, _, err = service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	callRow, participant, _, err := service.RaiseHand(context.Background(), domaincall.RaiseHandParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		Raised:    true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, started.ID, callRow.ID)
+	require.True(t, participant.HandRaised)
+	require.False(t, participant.RaisedHandAt.IsZero())
+
+	callRow, participant, _, err = service.ModerateParticipant(context.Background(), domaincall.ModerateParticipantParams{
+		CallID:         started.ID,
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		TargetDeviceID: "dev-b",
+		HostMutedAudio: true,
+		HostMutedVideo: true,
+		LowerHand:      true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, started.ID, callRow.ID)
+	require.True(t, participant.HostMutedAudio)
+	require.True(t, participant.HostMutedVideo)
+	require.False(t, participant.HandRaised)
+
+	_, _, _, err = service.ModerateParticipant(context.Background(), domaincall.ModerateParticipantParams{
+		CallID:         started.ID,
+		AccountID:      "acc-b",
+		DeviceID:       "dev-b",
+		TargetDeviceID: "dev-a",
+		HostMutedAudio: true,
+	})
+	require.ErrorIs(t, err, domaincall.ErrForbidden)
+}
+
+func TestGroupCallJoinRespectsParticipantLimit(t *testing.T) {
+	t.Parallel()
+
+	conversations := conversationtest.NewMemoryStore()
+	require.NoError(t, seedGroupConversation(conversations))
+
+	service, err := domaincall.NewService(
+		calltest.NewMemoryStore(),
+		conversations,
+		platformrtc.NewManager("webrtc://test/calls", 15*time.Minute),
+		domaincall.WithSettings(domaincall.Settings{
+			MaxGroupParticipants: 2,
+			MaxVideoParticipants: 2,
+		}),
+	)
+	require.NoError(t, err)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-group",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+
+	_, _, _, err = service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	_, _, _, err = service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-c",
+		DeviceID:  "dev-c",
+		WithVideo: true,
+	})
+	require.ErrorIs(t, err, domaincall.ErrConflict)
+}
+
+func TestGroupCallAppliesVideoScaling(t *testing.T) {
+	t.Parallel()
+
+	conversations := conversationtest.NewMemoryStore()
+	require.NoError(t, seedGroupConversation(conversations))
+
+	service, err := domaincall.NewService(
+		calltest.NewMemoryStore(),
+		conversations,
+		platformrtc.NewManager("webrtc://test/calls", 15*time.Minute),
+		domaincall.WithSettings(domaincall.Settings{
+			MaxGroupParticipants: 8,
+			MaxVideoParticipants: 1,
+		}),
+	)
+	require.NoError(t, err)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-group",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+
+	_, _, _, err = service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	callRow, err := service.GetCall(context.Background(), domaincall.GetParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+	})
+	require.NoError(t, err)
+
+	scaled := false
+	for _, participant := range callRow.Participants {
+		if participant.Transport.RecommendationReason != "group_call_scaling" {
+			continue
+		}
+		require.Equal(t, "audio_only", participant.Transport.RecommendedProfile)
+		require.True(t, participant.Transport.SuppressOutgoingVideo)
+		require.True(t, participant.Transport.SuppressIncomingVideo)
+		scaled = true
+	}
+	require.True(t, scaled)
+}
+
 func TestCallExpiresAfterMaxDuration(t *testing.T) {
 	t.Parallel()
 

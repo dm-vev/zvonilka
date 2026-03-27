@@ -403,6 +403,20 @@ func (s *Service) JoinCall(ctx context.Context, params JoinParams) (Call, JoinDe
 			}
 		}
 
+		participants, loadErr := store.ParticipantsByCall(ctx, callRow.ID)
+		if loadErr != nil {
+			return fmt.Errorf("load participants for call %s: %w", callRow.ID, loadErr)
+		}
+		existingParticipant, loadErr := store.ParticipantByCallAndDevice(ctx, callRow.ID, params.DeviceID)
+		if loadErr != nil && loadErr != ErrNotFound {
+			return fmt.Errorf("load participant %s/%s: %w", callRow.ID, params.DeviceID, loadErr)
+		}
+		if conversationRow.Kind == conversation.ConversationKindGroup &&
+			(loadErr == ErrNotFound || existingParticipant.State != ParticipantStateJoined) &&
+			joinedParticipants(participants) >= int(s.settings.MaxGroupParticipants) {
+			return ErrConflict
+		}
+
 		if callRow.ActiveSessionID == "" {
 			runtimeSession, runtimeErr := s.runtime.EnsureSession(ctx, callRow)
 			if runtimeErr != nil {
@@ -428,10 +442,7 @@ func (s *Service) JoinCall(ctx context.Context, params JoinParams) (Call, JoinDe
 			return fmt.Errorf("join runtime session %s: %w", callRow.ActiveSessionID, runtimeErr)
 		}
 
-		participant, loadErr := store.ParticipantByCallAndDevice(ctx, callRow.ID, params.DeviceID)
-		if loadErr != nil && loadErr != ErrNotFound {
-			return fmt.Errorf("load participant %s/%s: %w", callRow.ID, params.DeviceID, loadErr)
-		}
+		participant := existingParticipant
 		if loadErr == ErrNotFound {
 			participant = Participant{
 				CallID:    callRow.ID,

@@ -155,6 +155,9 @@ type TransportStats struct {
 	RelayPackets             uint64
 	RelayBytes               uint64
 	RelayWriteErrors         uint64
+	ActiveSpeaker            bool
+	DominantSpeaker          bool
+	LastSpokeAt              time.Time
 	LastUpdatedAt            time.Time
 }
 
@@ -163,6 +166,7 @@ type QualitySummary struct {
 	WorstQuality                    string
 	DominantProfile                 string
 	ParticipantCount                uint32
+	ActiveSpeakerCount              uint32
 	VideoFallbackParticipants       uint32
 	ScreenSharePriorityParticipants uint32
 	ReconnectParticipants           uint32
@@ -171,6 +175,8 @@ type QualitySummary struct {
 	IncomingVideoSuppressed         uint32
 	OutgoingAudioSuppressed         uint32
 	IncomingAudioSuppressed         uint32
+	DominantSpeakerAccountID        string
+	DominantSpeakerDeviceID         string
 	DegradedTransitions             uint32
 	RecoveredTransitions            uint32
 	LastChangedAt                   time.Time
@@ -209,15 +215,19 @@ type Invite struct {
 
 // Participant describes one joined device in a call.
 type Participant struct {
-	CallID     string
-	AccountID  string
-	DeviceID   string
-	State      ParticipantState
-	MediaState MediaState
-	Transport  TransportStats
-	JoinedAt   time.Time
-	LeftAt     time.Time
-	UpdatedAt  time.Time
+	CallID         string
+	AccountID      string
+	DeviceID       string
+	State          ParticipantState
+	MediaState     MediaState
+	HandRaised     bool
+	RaisedHandAt   time.Time
+	HostMutedAudio bool
+	HostMutedVideo bool
+	Transport      TransportStats
+	JoinedAt       time.Time
+	LeftAt         time.Time
+	UpdatedAt      time.Time
 }
 
 // Call describes one direct call and its current state.

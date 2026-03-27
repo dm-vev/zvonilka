@@ -97,11 +97,14 @@ func TestScanHelpers(t *testing.T) {
 	require.Equal(t, call.InviteStateAccepted, inviteRow.State)
 
 	participantRow, err := scanParticipant(scanRow{values: []any{
-		"call-1", "acc-b", "dev-b", call.ParticipantStateJoined, false, true, false, true, now, nil, now,
+		"call-1", "acc-b", "dev-b", call.ParticipantStateJoined, false, true, false, true,
+		true, now, false, true, now, nil, now,
 	}})
 	require.NoError(t, err)
 	require.Equal(t, "dev-b", participantRow.DeviceID)
 	require.True(t, participantRow.MediaState.ScreenShareEnabled)
+	require.True(t, participantRow.HandRaised)
+	require.True(t, participantRow.HostMutedVideo)
 
 	eventRow, err := scanEvent(scanRow{values: []any{
 		"evt-1", "call-1", "conv-1", call.EventTypeStarted, "acc-a", "dev-a", uint64(1), []byte(`{"with_video":"true"}`), now,
@@ -202,11 +205,12 @@ func TestCallInviteParticipantQueries(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(`(?s)INSERT INTO "call"\."call_participants".*RETURNING`).
-		WithArgs("call-1", "acc-b", "dev-b", call.ParticipantStateJoined, false, false, true, false, now, nil, now).
+		WithArgs("call-1", "acc-b", "dev-b", call.ParticipantStateJoined, false, false, true, false, false, nil, false, false, now, nil, now).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"call_id", "account_id", "device_id", "state", "audio_muted", "video_muted", "camera_enabled", "screen_share_enabled", "joined_at", "left_at", "updated_at",
+			"call_id", "account_id", "device_id", "state", "audio_muted", "video_muted", "camera_enabled", "screen_share_enabled",
+			"hand_raised", "raised_hand_at", "host_muted_audio", "host_muted_video", "joined_at", "left_at", "updated_at",
 		}).AddRow(
-			"call-1", "acc-b", "dev-b", call.ParticipantStateJoined, false, false, true, false, now, nil, now,
+			"call-1", "acc-b", "dev-b", call.ParticipantStateJoined, false, false, true, false, false, nil, false, false, now, nil, now,
 		))
 	mock.ExpectCommit()
 
@@ -226,9 +230,10 @@ func TestCallInviteParticipantQueries(t *testing.T) {
 	mock.ExpectQuery(`SELECT .* FROM "call"\."call_participants" WHERE call_id = \$1 AND device_id = \$2`).
 		WithArgs("call-1", "dev-b").
 		WillReturnRows(sqlmock.NewRows([]string{
-			"call_id", "account_id", "device_id", "state", "audio_muted", "video_muted", "camera_enabled", "screen_share_enabled", "joined_at", "left_at", "updated_at",
+			"call_id", "account_id", "device_id", "state", "audio_muted", "video_muted", "camera_enabled", "screen_share_enabled",
+			"hand_raised", "raised_hand_at", "host_muted_audio", "host_muted_video", "joined_at", "left_at", "updated_at",
 		}).AddRow(
-			"call-1", "acc-b", "dev-b", call.ParticipantStateJoined, false, false, true, false, now, nil, now,
+			"call-1", "acc-b", "dev-b", call.ParticipantStateJoined, false, false, true, false, false, nil, false, false, now, nil, now,
 		))
 
 	participant, err := store.ParticipantByCallAndDevice(context.Background(), "call-1", "dev-b")
@@ -238,9 +243,10 @@ func TestCallInviteParticipantQueries(t *testing.T) {
 	mock.ExpectQuery(`SELECT .* FROM "call"\."call_participants" WHERE call_id = \$1 ORDER BY device_id ASC`).
 		WithArgs("call-1").
 		WillReturnRows(sqlmock.NewRows([]string{
-			"call_id", "account_id", "device_id", "state", "audio_muted", "video_muted", "camera_enabled", "screen_share_enabled", "joined_at", "left_at", "updated_at",
+			"call_id", "account_id", "device_id", "state", "audio_muted", "video_muted", "camera_enabled", "screen_share_enabled",
+			"hand_raised", "raised_hand_at", "host_muted_audio", "host_muted_video", "joined_at", "left_at", "updated_at",
 		}).AddRow(
-			"call-1", "acc-b", "dev-b", call.ParticipantStateJoined, false, false, true, false, now, nil, now,
+			"call-1", "acc-b", "dev-b", call.ParticipantStateJoined, false, false, true, false, false, nil, false, false, now, nil, now,
 		))
 
 	participants, err := store.ParticipantsByCall(context.Background(), "call-1")

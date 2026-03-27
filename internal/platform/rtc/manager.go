@@ -482,6 +482,7 @@ func (m *Manager) SessionStats(_ context.Context, sessionID string) ([]domaincal
 			Transport: value.snapshotStats(),
 		})
 	}
+	markActiveAndDominantSpeakers(stats, m.now())
 
 	return stats, nil
 }
@@ -762,6 +763,9 @@ func (m *Manager) handleRemoteTrack(sessionID string, sourceKey string, track *w
 		if err != nil {
 			return
 		}
+		if track.Kind() == webrtc.RTPCodecTypeAudio {
+			m.recordAudioActivity(sessionID, sourceKey)
+		}
 		rawPacket, err := packet.Marshal()
 		if err != nil {
 			continue
@@ -791,6 +795,28 @@ func (m *Manager) handleRemoteTrack(sessionID string, sourceKey string, track *w
 			}
 		}
 	}
+}
+
+func (m *Manager) recordAudioActivity(sessionID string, sourceKey string) {
+	sessionID = strings.TrimSpace(sessionID)
+	sourceKey = strings.TrimSpace(sourceKey)
+	if sessionID == "" || sourceKey == "" {
+		return
+	}
+
+	m.mu.Lock()
+	active := m.sessions[sessionID]
+	if active == nil {
+		m.mu.Unlock()
+		return
+	}
+	source := active.peers[sourceKey]
+	m.mu.Unlock()
+	if source == nil {
+		return
+	}
+
+	source.recordAudioActivity(m.now())
 }
 
 func (m *Manager) prepareRelayTargets(
@@ -1189,6 +1215,24 @@ func (p *peer) recordRelayWrite(size uint64, failed bool) map[string]string {
 	}
 }
 
+func (p *peer) recordAudioActivity(now time.Time) {
+	if p == nil {
+		return
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if !p.stats.LastSpokeAt.IsZero() && now.Sub(p.stats.LastSpokeAt) < 250*time.Millisecond {
+		return
+	}
+	p.stats.LastSpokeAt = now
+	p.stats.LastUpdatedAt = now
+}
+
 func (p *peer) recordQoSFeedback(packets []rtcp.Packet) map[string]string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -1493,6 +1537,34 @@ func (p *peer) snapshotStats() domaincall.TransportStats {
 	stats.ScreenShareRelayTracks = uint32(countScreenShareRelayTracks(p.tracks))
 
 	return stats
+}
+
+func markActiveAndDominantSpeakers(stats []domaincall.RuntimeStats, now time.Time) {
+	if len(stats) == 0 {
+		return
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+
+	activeWindow := 2 * time.Second
+	dominant := -1
+	for i := range stats {
+		stats[i].Transport.ActiveSpeaker = false
+		stats[i].Transport.DominantSpeaker = false
+		if stats[i].Transport.LastSpokeAt.IsZero() {
+			continue
+		}
+		if now.Sub(stats[i].Transport.LastSpokeAt) <= activeWindow {
+			stats[i].Transport.ActiveSpeaker = true
+		}
+		if dominant == -1 || stats[i].Transport.LastSpokeAt.After(stats[dominant].Transport.LastSpokeAt) {
+			dominant = i
+		}
+	}
+	if dominant >= 0 && !stats[dominant].Transport.LastSpokeAt.IsZero() {
+		stats[dominant].Transport.DominantSpeaker = true
+	}
 }
 
 func boolString(value bool) string {

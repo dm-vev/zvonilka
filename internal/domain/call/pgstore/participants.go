@@ -10,7 +10,8 @@ import (
 )
 
 const participantColumnList = `
-call_id, account_id, device_id, state, audio_muted, video_muted, camera_enabled, screen_share_enabled, joined_at, left_at, updated_at
+call_id, account_id, device_id, state, audio_muted, video_muted, camera_enabled, screen_share_enabled,
+hand_raised, raised_hand_at, host_muted_audio, host_muted_video, joined_at, left_at, updated_at
 `
 
 func (s *Store) SaveParticipant(ctx context.Context, value call.Participant) (call.Participant, error) {
@@ -46,9 +47,10 @@ func (s *Store) saveParticipant(ctx context.Context, value call.Participant) (ca
 
 	query := fmt.Sprintf(`
 INSERT INTO %s (
-	call_id, account_id, device_id, state, audio_muted, video_muted, camera_enabled, screen_share_enabled, joined_at, left_at, updated_at
+	call_id, account_id, device_id, state, audio_muted, video_muted, camera_enabled, screen_share_enabled,
+	hand_raised, raised_hand_at, host_muted_audio, host_muted_video, joined_at, left_at, updated_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
 )
 ON CONFLICT (call_id, device_id) DO UPDATE SET
 	account_id = EXCLUDED.account_id,
@@ -57,6 +59,10 @@ ON CONFLICT (call_id, device_id) DO UPDATE SET
 	video_muted = EXCLUDED.video_muted,
 	camera_enabled = EXCLUDED.camera_enabled,
 	screen_share_enabled = EXCLUDED.screen_share_enabled,
+	hand_raised = EXCLUDED.hand_raised,
+	raised_hand_at = EXCLUDED.raised_hand_at,
+	host_muted_audio = EXCLUDED.host_muted_audio,
+	host_muted_video = EXCLUDED.host_muted_video,
 	joined_at = EXCLUDED.joined_at,
 	left_at = EXCLUDED.left_at,
 	updated_at = EXCLUDED.updated_at
@@ -73,6 +79,10 @@ RETURNING %s
 		value.MediaState.VideoMuted,
 		value.MediaState.CameraEnabled,
 		value.MediaState.ScreenShareEnabled,
+		value.HandRaised,
+		nullTime(value.RaisedHandAt),
+		value.HostMutedAudio,
+		value.HostMutedVideo,
 		value.JoinedAt.UTC(),
 		nullTime(value.LeftAt),
 		value.UpdatedAt.UTC(),

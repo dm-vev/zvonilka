@@ -356,6 +356,63 @@ func (a *api) UpdateCallMediaState(
 	}, nil
 }
 
+// RaiseCallHand updates the caller's hand state in one active group call.
+func (a *api) RaiseCallHand(
+	ctx context.Context,
+	req *callv1.RaiseCallHandRequest,
+) (*callv1.RaiseCallHandResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	callRow, participant, events, err := a.call.RaiseHand(ctx, domaincall.RaiseHandParams{
+		CallID:    req.GetCallId(),
+		AccountID: authContext.Account.ID,
+		DeviceID:  authContext.Device.ID,
+		Raised:    req.GetRaised(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(events...)
+
+	return &callv1.RaiseCallHandResponse{
+		Call:        callProto(callRow),
+		Participant: callParticipantProto(participant),
+	}, nil
+}
+
+// ModerateCallParticipant applies host controls to one participant in an active group call.
+func (a *api) ModerateCallParticipant(
+	ctx context.Context,
+	req *callv1.ModerateCallParticipantRequest,
+) (*callv1.ModerateCallParticipantResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	callRow, participant, events, err := a.call.ModerateParticipant(ctx, domaincall.ModerateParticipantParams{
+		CallID:         req.GetCallId(),
+		AccountID:      authContext.Account.ID,
+		DeviceID:       authContext.Device.ID,
+		TargetDeviceID: req.GetTargetDeviceId(),
+		HostMutedAudio: req.GetHostMutedAudio(),
+		HostMutedVideo: req.GetHostMutedVideo(),
+		LowerHand:      req.GetLowerHand(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(events...)
+
+	return &callv1.ModerateCallParticipantResponse{
+		Call:        callProto(callRow),
+		Participant: callParticipantProto(participant),
+	}, nil
+}
+
 // AcknowledgeCallAdaptation confirms application of a server-issued adaptation revision.
 func (a *api) AcknowledgeCallAdaptation(
 	ctx context.Context,

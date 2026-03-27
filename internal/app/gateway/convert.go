@@ -222,6 +222,9 @@ func callTransportStatsProto(value domaincall.TransportStats) *callv1.CallTransp
 		RelayPackets:             value.RelayPackets,
 		RelayBytes:               value.RelayBytes,
 		RelayWriteErrors:         value.RelayWriteErrors,
+		ActiveSpeaker:            value.ActiveSpeaker,
+		DominantSpeaker:          value.DominantSpeaker,
+		LastSpokeAt:              protoTime(value.LastSpokeAt),
 		LastUpdatedAt:            protoTime(value.LastUpdatedAt),
 	}
 }
@@ -231,6 +234,7 @@ func callQualitySummaryProto(value domaincall.QualitySummary) *callv1.CallQualit
 		WorstQuality:                    value.WorstQuality,
 		DominantProfile:                 value.DominantProfile,
 		ParticipantCount:                value.ParticipantCount,
+		ActiveSpeakerCount:              value.ActiveSpeakerCount,
 		VideoFallbackParticipants:       value.VideoFallbackParticipants,
 		ScreenSharePriorityParticipants: value.ScreenSharePriorityParticipants,
 		ReconnectParticipants:           value.ReconnectParticipants,
@@ -239,6 +243,8 @@ func callQualitySummaryProto(value domaincall.QualitySummary) *callv1.CallQualit
 		IncomingVideoSuppressed:         value.IncomingVideoSuppressed,
 		OutgoingAudioSuppressed:         value.OutgoingAudioSuppressed,
 		IncomingAudioSuppressed:         value.IncomingAudioSuppressed,
+		DominantSpeakerUserId:           value.DominantSpeakerAccountID,
+		DominantSpeakerDeviceId:         value.DominantSpeakerDeviceID,
 		DegradedTransitions:             value.DegradedTransitions,
 		RecoveredTransitions:            value.RecoveredTransitions,
 		LastChangedAt:                   protoTime(value.LastChangedAt),
@@ -314,6 +320,10 @@ func callParticipantProto(value domaincall.Participant) *callv1.CallParticipant 
 		LeftAt:         protoTime(value.LeftAt),
 		UpdatedAt:      protoTime(value.UpdatedAt),
 		TransportStats: callTransportStatsProto(value.Transport),
+		HandRaised:     value.HandRaised,
+		RaisedHandAt:   protoTime(value.RaisedHandAt),
+		HostMutedAudio: value.HostMutedAudio,
+		HostMutedVideo: value.HostMutedVideo,
 	}
 }
 

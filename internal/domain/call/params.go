@@ -86,6 +86,25 @@ type UpdateParams struct {
 	Media     MediaState
 }
 
+// RaiseHandParams describes one raise-hand update for a joined participant.
+type RaiseHandParams struct {
+	CallID    string
+	AccountID string
+	DeviceID  string
+	Raised    bool
+}
+
+// ModerateParticipantParams describes one moderator-issued participant control update.
+type ModerateParticipantParams struct {
+	CallID         string
+	AccountID      string
+	DeviceID       string
+	TargetDeviceID string
+	HostMutedAudio bool
+	HostMutedVideo bool
+	LowerHand      bool
+}
+
 // AcknowledgeAdaptationParams describes one acknowledged server-issued adaptation revision.
 type AcknowledgeAdaptationParams struct {
 	CallID             string

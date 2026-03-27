@@ -262,6 +262,10 @@ func (s *Service) hydrateCall(ctx context.Context, store Store, callID string) (
 		}
 		applyRuntimeStats(callRow.Participants, stats)
 	}
+	conversationRow, conversationErr := s.conversations.ConversationByID(ctx, callRow.ConversationID)
+	if conversationErr == nil {
+		applyParticipantPolicies(callRow.Participants, conversationRow.Kind, s.settings)
+	}
 	callRow.QualitySummary = summarizeCallQuality(callRow.Participants)
 	if callRow.State == StateEnded {
 		events, eventsErr := store.EventsAfterSequence(ctx, 0, callID, "", 1000)
@@ -293,6 +297,84 @@ func callParticipantKey(accountID string, deviceID string) string {
 	return strings.TrimSpace(accountID) + "|" + strings.TrimSpace(deviceID)
 }
 
+func applyParticipantPolicies(
+	participants []Participant,
+	kind conversation.ConversationKind,
+	settings Settings,
+) {
+	if len(participants) == 0 {
+		return
+	}
+
+	applyHostMutePolicies(participants)
+	if kind != conversation.ConversationKindGroup {
+		return
+	}
+	applyGroupVideoScaling(participants, settings)
+}
+
+func applyHostMutePolicies(participants []Participant) {
+	for i := range participants {
+		if participants[i].HostMutedAudio {
+			participants[i].Transport.SuppressOutgoingAudio = true
+		}
+		if participants[i].HostMutedVideo {
+			participants[i].Transport.SuppressOutgoingVideo = true
+			participants[i].Transport.SuppressCameraVideo = true
+		}
+	}
+}
+
+func applyGroupVideoScaling(participants []Participant, settings Settings) {
+	if settings.MaxVideoParticipants == 0 {
+		return
+	}
+
+	videoParticipants := 0
+	for _, participant := range participants {
+		if participant.State != ParticipantStateJoined {
+			continue
+		}
+		if !participantWantsVideo(participant) {
+			continue
+		}
+		videoParticipants++
+	}
+	if videoParticipants <= int(settings.MaxVideoParticipants) {
+		return
+	}
+
+	for i := range participants {
+		participant := &participants[i]
+		if participant.State != ParticipantStateJoined {
+			continue
+		}
+		if !participantWantsVideo(*participant) {
+			continue
+		}
+		if participant.Transport.ScreenSharePriority || participant.Transport.DominantSpeaker {
+			continue
+		}
+
+		participant.Transport.RecommendedProfile = "audio_only"
+		participant.Transport.RecommendationReason = "group_call_scaling"
+		participant.Transport.VideoFallbackRecommended = true
+		participant.Transport.SuppressOutgoingVideo = true
+		participant.Transport.SuppressIncomingVideo = true
+	}
+}
+
+func participantWantsVideo(participant Participant) bool {
+	if participant.MediaState.ScreenShareEnabled {
+		return true
+	}
+	if participant.MediaState.VideoMuted {
+		return false
+	}
+
+	return participant.MediaState.CameraEnabled
+}
+
 func summarizeCallQuality(participants []Participant) QualitySummary {
 	summary := QualitySummary{
 		WorstQuality:    "unknown",
@@ -310,6 +392,13 @@ func summarizeCallQuality(participants []Participant) QualitySummary {
 		}
 		summary.ParticipantCount++
 		stats := participant.Transport
+		if stats.ActiveSpeaker {
+			summary.ActiveSpeakerCount++
+		}
+		if stats.DominantSpeaker {
+			summary.DominantSpeakerAccountID = participant.AccountID
+			summary.DominantSpeakerDeviceID = participant.DeviceID
+		}
 		if stats.VideoFallbackRecommended {
 			summary.VideoFallbackParticipants++
 		}
