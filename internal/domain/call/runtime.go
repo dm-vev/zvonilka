@@ -42,6 +42,15 @@ type RuntimeJoin struct {
 	CandidatePort   int
 }
 
+// RuntimeSignal describes one server-generated signaling payload.
+type RuntimeSignal struct {
+	TargetAccountID string
+	TargetDeviceID  string
+	SessionID       string
+	Description     *SessionDescription
+	IceCandidate    *Candidate
+}
+
 // RuntimeParticipant describes one participant join request for the media plane.
 type RuntimeParticipant struct {
 	CallID    string
@@ -54,6 +63,18 @@ type RuntimeParticipant struct {
 type Runtime interface {
 	EnsureSession(ctx context.Context, call Call) (RuntimeSession, error)
 	JoinSession(ctx context.Context, sessionID string, participant RuntimeParticipant) (RuntimeJoin, error)
+	PublishDescription(
+		ctx context.Context,
+		sessionID string,
+		participant RuntimeParticipant,
+		description SessionDescription,
+	) ([]RuntimeSignal, error)
+	PublishCandidate(
+		ctx context.Context,
+		sessionID string,
+		participant RuntimeParticipant,
+		candidate Candidate,
+	) ([]RuntimeSignal, error)
 	LeaveSession(ctx context.Context, sessionID string, accountID string, deviceID string) error
 	CloseSession(ctx context.Context, sessionID string) error
 }

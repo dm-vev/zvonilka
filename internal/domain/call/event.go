@@ -15,8 +15,7 @@ func trimMetadata(metadata map[string]string) map[string]string {
 	result := make(map[string]string, len(metadata))
 	for key, value := range metadata {
 		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-		if key == "" || value == "" {
+		if key == "" || strings.TrimSpace(value) == "" {
 			continue
 		}
 		result[key] = value

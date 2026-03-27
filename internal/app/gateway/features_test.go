@@ -835,7 +835,7 @@ func newTestSubscribeCallEventsStream(ctx context.Context) *testSubscribeCallEve
 	return &testSubscribeCallEventsStream{
 		ctx:       streamCtx,
 		cancel:    cancel,
-		responses: make(chan *callv1.SubscribeCallEventsResponse, 4),
+		responses: make(chan *callv1.SubscribeCallEventsResponse, 64),
 	}
 }
 

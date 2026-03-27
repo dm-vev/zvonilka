@@ -7,6 +7,7 @@ import (
 	callv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1"
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
 	conversationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1"
+	"github.com/pion/webrtc/v4"
 )
 
 func TestCallLifecycleRPC(t *testing.T) {
@@ -191,12 +192,14 @@ func TestCallSignalingRPC(t *testing.T) {
 
 	time.Sleep(20 * time.Millisecond)
 
+	offer := mustCreateGatewayCallOffer(t)
+
 	description, err := fixture.api.PublishCallDescription(peerCtx, &callv1.PublishCallDescriptionRequest{
 		CallId:    started.Call.CallId,
 		SessionId: joined.Transport.SessionId,
 		Description: &callv1.SessionDescription{
 			Type: "offer",
-			Sdp:  "v=0\r\ns=test\r\n",
+			Sdp:  offer,
 		},
 	})
 	if err != nil {
@@ -236,8 +239,11 @@ func TestCallSignalingRPC(t *testing.T) {
 			switch event.GetEventType() {
 			case callv1.CallEventType_CALL_EVENT_TYPE_SIGNAL_DESCRIPTION:
 				sawDescription = true
-				if event.GetSessionId() != joined.Transport.SessionId || event.GetDescription().GetType() != "offer" {
+				if event.GetSessionId() != joined.Transport.SessionId {
 					t.Fatalf("unexpected streamed description event: %+v", event)
+				}
+				if event.GetDescription().GetType() != "offer" && event.GetDescription().GetType() != "answer" {
+					t.Fatalf("unexpected streamed description type: %+v", event)
 				}
 			case callv1.CallEventType_CALL_EVENT_TYPE_SIGNAL_CANDIDATE:
 				sawCandidate = true
@@ -263,4 +269,35 @@ func TestCallSignalingRPC(t *testing.T) {
 	if owner.ID == "" {
 		t.Fatal("expected owner account")
 	}
+}
+
+func mustCreateGatewayCallOffer(t *testing.T) string {
+	t.Helper()
+
+	client, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	if err != nil {
+		t.Fatalf("new peer connection: %v", err)
+	}
+	defer func() {
+		if err := client.Close(); err != nil {
+			t.Fatalf("close peer connection: %v", err)
+		}
+	}()
+
+	if _, err := client.AddTransceiverFromKind(webrtc.RTPCodecTypeAudio); err != nil {
+		t.Fatalf("add transceiver: %v", err)
+	}
+
+	offer, err := client.CreateOffer(nil)
+	if err != nil {
+		t.Fatalf("create offer: %v", err)
+	}
+	if err := client.SetLocalDescription(offer); err != nil {
+		t.Fatalf("set local description: %v", err)
+	}
+	if client.LocalDescription() == nil || client.LocalDescription().SDP == "" {
+		t.Fatal("expected local description sdp")
+	}
+
+	return client.LocalDescription().SDP
 }

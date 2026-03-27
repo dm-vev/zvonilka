@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/webrtc/v4"
 	"github.com/stretchr/testify/require"
 
 	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
@@ -93,6 +94,8 @@ func TestCallLifecycle(t *testing.T) {
 	require.True(t, participant.MediaState.AudioMuted)
 	require.Len(t, events, 1)
 
+	offer := mustCreateCallOffer(t)
+
 	descriptionEvent, err := service.PublishDescription(context.Background(), domaincall.PublishDescriptionParams{
 		CallID:    started.ID,
 		SessionID: transport.SessionID,
@@ -100,7 +103,7 @@ func TestCallLifecycle(t *testing.T) {
 		DeviceID:  "dev-b",
 		Description: domaincall.SessionDescription{
 			Type: "offer",
-			SDP:  "v=0\r\ns=test\r\n",
+			SDP:  offer,
 		},
 	})
 	require.NoError(t, err)
@@ -133,6 +136,27 @@ func TestCallLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, domaincall.StateEnded, left.State)
 	require.Len(t, events, 2)
+}
+
+func mustCreateCallOffer(t *testing.T) string {
+	t.Helper()
+
+	client, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, client.Close())
+	}()
+
+	_, err = client.AddTransceiverFromKind(webrtc.RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	offer, err := client.CreateOffer(nil)
+	require.NoError(t, err)
+	require.NoError(t, client.SetLocalDescription(offer))
+	require.NotNil(t, client.LocalDescription())
+	require.NotEmpty(t, client.LocalDescription().SDP)
+
+	return client.LocalDescription().SDP
 }
 
 func TestStartCallRejectsNonDirectConversation(t *testing.T) {

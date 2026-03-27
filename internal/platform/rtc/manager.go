@@ -10,9 +10,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pion/interceptor"
+	"github.com/pion/webrtc/v4"
 
 	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 )
@@ -20,6 +24,7 @@ import (
 // Manager keeps RTC sessions inside the server process.
 type Manager struct {
 	mu       sync.Mutex
+	api      *webrtc.API
 	endpoint string
 	tokenTTL time.Duration
 	host     string
@@ -40,12 +45,21 @@ type session struct {
 	host         string
 	port         int
 	participants map[string]participant
+	peers        map[string]*peer
 }
 
 type participant struct {
 	accountID string
 	deviceID  string
 	withVideo bool
+}
+
+type peer struct {
+	accountID string
+	deviceID  string
+	withVideo bool
+	pc        *webrtc.PeerConnection
+	signals   chan domaincall.RuntimeSignal
 }
 
 // NewManager constructs an in-process RTC session manager.
@@ -83,6 +97,7 @@ func NewManager(endpoint string, tokenTTL time.Duration, opts ...Option) *Manage
 	if manager.nextPort < manager.portMin || manager.nextPort > manager.portMax {
 		manager.nextPort = manager.portMin
 	}
+	manager.api = manager.newAPI()
 
 	return manager
 }
@@ -161,6 +176,7 @@ func (m *Manager) EnsureSession(_ context.Context, callRow domaincall.Call) (dom
 		host:         m.host,
 		port:         port,
 		participants: make(map[string]participant),
+		peers:        make(map[string]*peer),
 	}
 
 	return domaincall.RuntimeSession{
@@ -218,6 +234,104 @@ func (m *Manager) JoinSession(
 	}, nil
 }
 
+// PublishDescription applies one remote SDP description and returns server-generated signals.
+func (m *Manager) PublishDescription(
+	_ context.Context,
+	sessionID string,
+	participantRow domaincall.RuntimeParticipant,
+	description domaincall.SessionDescription,
+) ([]domaincall.RuntimeSignal, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	participantRow.AccountID = strings.TrimSpace(participantRow.AccountID)
+	participantRow.DeviceID = strings.TrimSpace(participantRow.DeviceID)
+	description.Type = strings.ToLower(strings.TrimSpace(description.Type))
+
+	if sessionID == "" || participantRow.AccountID == "" || participantRow.DeviceID == "" {
+		return nil, domaincall.ErrInvalidInput
+	}
+	if description.Type != "offer" || strings.TrimSpace(description.SDP) == "" {
+		return nil, domaincall.ErrInvalidInput
+	}
+
+	active, peerConn, err := m.ensurePeer(sessionID, participantRow)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := peerConn.pc.SetRemoteDescription(webrtc.SessionDescription{
+		Type: webrtc.SDPTypeOffer,
+		SDP:  description.SDP,
+	}); err != nil {
+		return nil, fmt.Errorf("set remote description: %w", err)
+	}
+
+	answer, err := peerConn.pc.CreateAnswer(nil)
+	if err != nil {
+		return nil, fmt.Errorf("create answer: %w", err)
+	}
+	gatherComplete := webrtc.GatheringCompletePromise(peerConn.pc)
+	if err := peerConn.pc.SetLocalDescription(answer); err != nil {
+		return nil, fmt.Errorf("set local description: %w", err)
+	}
+	<-gatherComplete
+
+	signals := m.drainSignals(peerConn)
+	local := peerConn.pc.LocalDescription()
+	if local == nil {
+		return signals, nil
+	}
+
+	signals = append([]domaincall.RuntimeSignal{{
+		TargetAccountID: participantRow.AccountID,
+		TargetDeviceID:  participantRow.DeviceID,
+		SessionID:       active.id,
+		Description: &domaincall.SessionDescription{
+			Type: "answer",
+			SDP:  local.SDP,
+		},
+	}}, signals...)
+
+	return signals, nil
+}
+
+// PublishCandidate applies one remote ICE candidate.
+func (m *Manager) PublishCandidate(
+	_ context.Context,
+	sessionID string,
+	participantRow domaincall.RuntimeParticipant,
+	candidate domaincall.Candidate,
+) ([]domaincall.RuntimeSignal, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	participantRow.AccountID = strings.TrimSpace(participantRow.AccountID)
+	participantRow.DeviceID = strings.TrimSpace(participantRow.DeviceID)
+	candidate.Candidate = strings.TrimSpace(candidate.Candidate)
+	candidate.SDPMid = strings.TrimSpace(candidate.SDPMid)
+	candidate.UsernameFragment = strings.TrimSpace(candidate.UsernameFragment)
+
+	if sessionID == "" || participantRow.AccountID == "" || participantRow.DeviceID == "" {
+		return nil, domaincall.ErrInvalidInput
+	}
+	if candidate.Candidate == "" {
+		return nil, domaincall.ErrInvalidInput
+	}
+
+	_, peerConn, err := m.ensurePeer(sessionID, participantRow)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := peerConn.pc.AddICECandidate(webrtc.ICECandidateInit{
+		Candidate:        candidate.Candidate,
+		SDPMid:           stringPtr(candidate.SDPMid),
+		SDPMLineIndex:    uint16Ptr(uint16(candidate.SDPMLineIndex)),
+		UsernameFragment: stringPtr(candidate.UsernameFragment),
+	}); err != nil {
+		return nil, fmt.Errorf("add ice candidate: %w", err)
+	}
+
+	return m.drainSignals(peerConn), nil
+}
+
 // LeaveSession removes one device from a running session.
 func (m *Manager) LeaveSession(_ context.Context, sessionID string, accountID string, deviceID string) error {
 	sessionID = strings.TrimSpace(sessionID)
@@ -227,14 +341,25 @@ func (m *Manager) LeaveSession(_ context.Context, sessionID string, accountID st
 		return domaincall.ErrInvalidInput
 	}
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	var peerConn *peer
 
+	m.mu.Lock()
 	active, ok := m.sessions[sessionID]
 	if !ok {
+		m.mu.Unlock()
 		return domaincall.ErrNotFound
 	}
 	delete(active.participants, participantKey(accountID, deviceID))
+	peerConn = active.peers[participantKey(accountID, deviceID)]
+	delete(active.peers, participantKey(accountID, deviceID))
+	m.mu.Unlock()
+
+	if peerConn != nil && peerConn.pc != nil {
+		if err := peerConn.pc.Close(); err != nil {
+			return fmt.Errorf("close participant peer: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -246,13 +371,159 @@ func (m *Manager) CloseSession(_ context.Context, sessionID string) error {
 	}
 
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if _, ok := m.sessions[sessionID]; !ok {
+	active, ok := m.sessions[sessionID]
+	if !ok {
+		m.mu.Unlock()
 		return domaincall.ErrNotFound
 	}
 	delete(m.sessions, sessionID)
-	return nil
+	peers := make([]*peer, 0, len(active.peers))
+	for _, peerConn := range active.peers {
+		peers = append(peers, peerConn)
+	}
+	m.mu.Unlock()
+
+	var firstErr error
+	for _, peerConn := range peers {
+		if peerConn == nil || peerConn.pc == nil {
+			continue
+		}
+		if err := peerConn.pc.Close(); err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("close peer connection: %w", err)
+		}
+	}
+
+	return firstErr
+}
+
+func (m *Manager) ensurePeer(sessionID string, participantRow domaincall.RuntimeParticipant) (*session, *peer, error) {
+	key := participantKey(participantRow.AccountID, participantRow.DeviceID)
+
+	m.mu.Lock()
+	active, ok := m.sessions[sessionID]
+	if !ok {
+		m.mu.Unlock()
+		return nil, nil, domaincall.ErrNotFound
+	}
+	if joined, ok := active.participants[key]; !ok || joined.accountID != participantRow.AccountID {
+		m.mu.Unlock()
+		return nil, nil, domaincall.ErrForbidden
+	}
+	if existing := active.peers[key]; existing != nil {
+		m.mu.Unlock()
+		return active, existing, nil
+	}
+	m.mu.Unlock()
+
+	created, err := m.newPeer(active, participantRow)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	active, ok = m.sessions[sessionID]
+	if !ok {
+		_ = created.pc.Close()
+		return nil, nil, domaincall.ErrNotFound
+	}
+	if existing := active.peers[key]; existing != nil {
+		_ = created.pc.Close()
+		return active, existing, nil
+	}
+	active.peers[key] = created
+
+	return active, created, nil
+}
+
+func (m *Manager) newPeer(active *session, participantRow domaincall.RuntimeParticipant) (*peer, error) {
+	configuration := webrtc.Configuration{
+		ICEServers: []webrtc.ICEServer{},
+	}
+	pc, err := m.api.NewPeerConnection(configuration)
+	if err != nil {
+		return nil, fmt.Errorf("new peer connection: %w", err)
+	}
+
+	value := &peer{
+		accountID: participantRow.AccountID,
+		deviceID:  participantRow.DeviceID,
+		withVideo: participantRow.WithVideo,
+		pc:        pc,
+		signals:   make(chan domaincall.RuntimeSignal, 32),
+	}
+
+	pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
+		if candidate == nil {
+			return
+		}
+		json := candidate.ToJSON()
+		signal := domaincall.RuntimeSignal{
+			TargetAccountID: participantRow.AccountID,
+			TargetDeviceID:  participantRow.DeviceID,
+			SessionID:       active.id,
+			IceCandidate: &domaincall.Candidate{
+				Candidate:        json.Candidate,
+				SDPMid:           derefString(json.SDPMid),
+				UsernameFragment: derefString(json.UsernameFragment),
+			},
+		}
+		if json.SDPMLineIndex != nil {
+			signal.IceCandidate.SDPMLineIndex = uint32(*json.SDPMLineIndex)
+		}
+		select {
+		case value.signals <- signal:
+		default:
+		}
+	})
+
+	pc.OnTrack(func(track *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
+		go consumeRemoteTrack(track)
+	})
+
+	return value, nil
+}
+
+func (m *Manager) drainSignals(peerConn *peer) []domaincall.RuntimeSignal {
+	if peerConn == nil {
+		return nil
+	}
+
+	signals := make([]domaincall.RuntimeSignal, 0)
+	for {
+		select {
+		case signal := <-peerConn.signals:
+			signals = append(signals, signal)
+		default:
+			return signals
+		}
+	}
+}
+
+func (m *Manager) newAPI() *webrtc.API {
+	settingEngine := webrtc.SettingEngine{}
+	if err := settingEngine.SetEphemeralUDPPortRange(uint16(m.portMin), uint16(m.portMax)); err != nil {
+		panic(err)
+	}
+	if strings.TrimSpace(m.host) != "" {
+		settingEngine.SetNAT1To1IPs([]string{m.host}, webrtc.ICECandidateTypeHost)
+	}
+
+	mediaEngine := &webrtc.MediaEngine{}
+	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
+		panic(err)
+	}
+	interceptorRegistry := &interceptor.Registry{}
+	if err := webrtc.RegisterDefaultInterceptors(mediaEngine, interceptorRegistry); err != nil {
+		panic(err)
+	}
+
+	return webrtc.NewAPI(
+		webrtc.WithSettingEngine(settingEngine),
+		webrtc.WithMediaEngine(mediaEngine),
+		webrtc.WithInterceptorRegistry(interceptorRegistry),
+	)
 }
 
 func (m *Manager) allocatePortLocked() (int, error) {
@@ -320,6 +591,40 @@ func mustDTLSFingerprint() string {
 		parts = append(parts, encoded[i:i+2])
 	}
 	return "sha-256 " + strings.Join(parts, ":")
+}
+
+func consumeRemoteTrack(track *webrtc.TrackRemote) {
+	if track == nil {
+		return
+	}
+
+	buffer := make([]byte, 1600)
+	for {
+		if _, _, err := track.Read(buffer); err != nil {
+			if err != io.EOF {
+				return
+			}
+			return
+		}
+	}
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func stringPtr(value string) *string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	return &value
+}
+
+func uint16Ptr(value uint16) *uint16 {
+	return &value
 }
 
 var _ domaincall.Runtime = (*Manager)(nil)

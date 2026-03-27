@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 )
 
 const (
 	callMetadataSessionID       = "session_id"
+	callMetadataTargetAccountID = "target_account_id"
+	callMetadataTargetDeviceID  = "target_device_id"
 	callMetadataDescriptionType = "description_type"
 	callMetadataDescriptionSDP  = "description_sdp"
 	callMetadataCandidateValue  = "candidate"
@@ -27,12 +30,11 @@ func (s *Service) PublishDescription(ctx context.Context, params PublishDescript
 	params.AccountID = strings.TrimSpace(params.AccountID)
 	params.DeviceID = strings.TrimSpace(params.DeviceID)
 	params.Description.Type = strings.ToLower(strings.TrimSpace(params.Description.Type))
-	params.Description.SDP = strings.TrimSpace(params.Description.SDP)
 
 	if params.CallID == "" || params.SessionID == "" || params.AccountID == "" || params.DeviceID == "" {
 		return Event{}, ErrInvalidInput
 	}
-	if params.Description.Type == "" || params.Description.SDP == "" {
+	if params.Description.Type == "" || strings.TrimSpace(params.Description.SDP) == "" {
 		return Event{}, ErrInvalidInput
 	}
 	if !validDescriptionType(params.Description.Type) {
@@ -131,11 +133,52 @@ func (s *Service) publishSignalEvent(
 			return ErrForbidden
 		}
 
+		var generated []RuntimeSignal
+		switch eventType {
+		case EventTypeSignalDescription:
+			runtimeSignals, runtimeErr := s.runtime.PublishDescription(ctx, sessionID, RuntimeParticipant{
+				CallID:    callRow.ID,
+				AccountID: accountID,
+				DeviceID:  deviceID,
+				WithVideo: participant.MediaState.CameraEnabled,
+			}, SessionDescription{
+				Type: metadata[callMetadataDescriptionType],
+				SDP:  metadata[callMetadataDescriptionSDP],
+			})
+			if runtimeErr != nil {
+				return fmt.Errorf("publish runtime description %s/%s: %w", callRow.ID, sessionID, runtimeErr)
+			}
+			generated = runtimeSignals
+		case EventTypeSignalCandidate:
+			line := uint32(0)
+			if _, scanErr := fmt.Sscanf(metadata[callMetadataCandidateLine], "%d", &line); scanErr != nil {
+				return ErrInvalidInput
+			}
+			runtimeSignals, runtimeErr := s.runtime.PublishCandidate(ctx, sessionID, RuntimeParticipant{
+				CallID:    callRow.ID,
+				AccountID: accountID,
+				DeviceID:  deviceID,
+				WithVideo: participant.MediaState.CameraEnabled,
+			}, Candidate{
+				Candidate:        metadata[callMetadataCandidateValue],
+				SDPMid:           metadata[callMetadataCandidateSDPMid],
+				SDPMLineIndex:    line,
+				UsernameFragment: metadata[callMetadataCandidateUfrag],
+			})
+			if runtimeErr != nil {
+				return fmt.Errorf("publish runtime candidate %s/%s: %w", callRow.ID, sessionID, runtimeErr)
+			}
+			generated = runtimeSignals
+		}
+
 		metadata = cloneSignalMetadata(metadata)
 		metadata[callMetadataSessionID] = sessionID
 
 		event, appendErr := s.appendEvent(ctx, store, callRow, eventType, accountID, deviceID, metadata, now)
 		if appendErr != nil {
+			return appendErr
+		}
+		if appendErr := s.appendGeneratedSignals(ctx, store, callRow, generated, now); appendErr != nil {
 			return appendErr
 		}
 
@@ -175,4 +218,50 @@ func cloneSignalMetadata(src map[string]string) map[string]string {
 	}
 
 	return dst
+}
+
+func (s *Service) appendGeneratedSignals(
+	ctx context.Context,
+	store Store,
+	callRow Call,
+	signals []RuntimeSignal,
+	createdAt time.Time,
+) error {
+	for _, signal := range signals {
+		metadata := map[string]string{
+			callMetadataSessionID: signal.SessionID,
+		}
+		if signal.TargetAccountID != "" {
+			metadata[callMetadataTargetAccountID] = signal.TargetAccountID
+		}
+		if signal.TargetDeviceID != "" {
+			metadata[callMetadataTargetDeviceID] = signal.TargetDeviceID
+		}
+
+		eventType := EventTypeUnspecified
+		switch {
+		case signal.Description != nil:
+			eventType = EventTypeSignalDescription
+			metadata[callMetadataDescriptionType] = signal.Description.Type
+			metadata[callMetadataDescriptionSDP] = signal.Description.SDP
+		case signal.IceCandidate != nil:
+			eventType = EventTypeSignalCandidate
+			metadata[callMetadataCandidateValue] = signal.IceCandidate.Candidate
+			metadata[callMetadataCandidateLine] = fmt.Sprintf("%d", signal.IceCandidate.SDPMLineIndex)
+			if signal.IceCandidate.SDPMid != "" {
+				metadata[callMetadataCandidateSDPMid] = signal.IceCandidate.SDPMid
+			}
+			if signal.IceCandidate.UsernameFragment != "" {
+				metadata[callMetadataCandidateUfrag] = signal.IceCandidate.UsernameFragment
+			}
+		default:
+			continue
+		}
+
+		if _, err := s.appendEvent(ctx, store, callRow, eventType, "", "", metadata, createdAt); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
