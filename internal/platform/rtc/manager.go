@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/pion/interceptor"
+	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v4"
 
 	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
@@ -64,8 +65,9 @@ type peer struct {
 }
 
 type relayTrack struct {
-	track  *webrtc.TrackLocalStaticRTP
-	sender *webrtc.RTPSender
+	sourceKey string
+	track     *webrtc.TrackLocalStaticRTP
+	sender    *webrtc.RTPSender
 }
 
 // NewManager constructs an in-process RTC session manager.
@@ -595,12 +597,13 @@ func (m *Manager) prepareRelayTargets(
 			continue
 		}
 		target.tracks[trackKey] = &relayTrack{
-			track:  localTrack,
-			sender: sender,
+			sourceKey: sourceKey,
+			track:     localTrack,
+			sender:    sender,
 		}
 		relays = append(relays, localTrack)
 		targets = append(targets, target)
-		go drainSenderRTCP(sender)
+		go m.forwardSenderRTCP(sessionID, target.tracks[trackKey])
 	}
 
 	return targets, relays
@@ -827,17 +830,37 @@ func consumeRemoteTrack(track *webrtc.TrackRemote) {
 	}
 }
 
-func drainSenderRTCP(sender *webrtc.RTPSender) {
-	if sender == nil {
+func (m *Manager) forwardSenderRTCP(sessionID string, relay *relayTrack) {
+	if relay == nil || relay.sender == nil {
 		return
 	}
 
-	buffer := make([]byte, 1500)
 	for {
-		if _, _, err := sender.Read(buffer); err != nil {
+		packets, _, err := relay.sender.ReadRTCP()
+		if err != nil {
 			return
 		}
+		m.writeSourceRTCP(sessionID, relay.sourceKey, packets)
 	}
+}
+
+func (m *Manager) writeSourceRTCP(sessionID string, sourceKey string, packets []rtcp.Packet) {
+	if sessionID == "" || sourceKey == "" || len(packets) == 0 {
+		return
+	}
+
+	m.mu.Lock()
+	active := m.sessions[sessionID]
+	if active == nil {
+		m.mu.Unlock()
+		return
+	}
+	source := active.peers[sourceKey]
+	m.mu.Unlock()
+	if source == nil || source.pc == nil {
+		return
+	}
+	_ = source.pc.WriteRTCP(packets)
 }
 
 func relayTrackKey(sourceKey string, trackID string, streamID string, kind string) string {
