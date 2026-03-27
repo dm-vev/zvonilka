@@ -636,6 +636,18 @@ func TestCallGuardrailsAndInvalidBranches(t *testing.T) {
 		AccountID: "acc-b",
 		DeviceID:  "dev-b",
 		Description: domaincall.SessionDescription{
+			Type: "answer",
+			SDP:  "   ",
+		},
+	})
+	require.ErrorIs(t, err, domaincall.ErrInvalidInput)
+
+	_, err = service.PublishDescription(context.Background(), domaincall.PublishDescriptionParams{
+		CallID:    started.ID,
+		SessionID: join.SessionID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		Description: domaincall.SessionDescription{
 			Type: "bogus",
 			SDP:  "v=0",
 		},
@@ -649,6 +661,17 @@ func TestCallGuardrailsAndInvalidBranches(t *testing.T) {
 		DeviceID:  "dev-b",
 	})
 	require.ErrorIs(t, err, domaincall.ErrInvalidInput)
+
+	_, err = service.PublishIceCandidate(context.Background(), domaincall.PublishCandidateParams{
+		CallID:    started.ID,
+		SessionID: "wrong-session",
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		IceCandidate: domaincall.Candidate{
+			Candidate: "candidate:1 1 udp 2130706431 127.0.0.1 41000 typ host",
+		},
+	})
+	require.ErrorIs(t, err, domaincall.ErrConflict)
 
 	_, _, _, err = service.AcknowledgeCallAdaptation(context.Background(), domaincall.AcknowledgeAdaptationParams{
 		CallID:             joined.ID,
@@ -672,4 +695,65 @@ func TestCallGuardrailsAndInvalidBranches(t *testing.T) {
 		AccountID: "acc-z",
 	})
 	require.ErrorIs(t, err, domaincall.ErrForbidden)
+
+	_, _, err = service.StartCall(context.Background(), domaincall.StartParams{})
+	require.ErrorIs(t, err, domaincall.ErrInvalidInput)
+
+	_, _, _, err = service.JoinCall(context.Background(), domaincall.JoinParams{})
+	require.ErrorIs(t, err, domaincall.ErrInvalidInput)
+
+	_, _, err = service.EndCall(context.Background(), domaincall.EndParams{})
+	require.ErrorIs(t, err, domaincall.ErrInvalidInput)
+}
+
+func TestStartCallRejectsSecondActiveCallAndPublishAfterEnd(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 27, 23, 0, 0, 0, time.UTC)
+	service := newTestService(t, now, newFakeRuntime(now))
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-direct",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+	})
+	require.NoError(t, err)
+
+	_, _, err = service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-direct",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-x",
+	})
+	require.ErrorIs(t, err, domaincall.ErrConflict)
+
+	_, _, err = service.AcceptCall(context.Background(), domaincall.AcceptParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.NoError(t, err)
+	_, join, _, err := service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.NoError(t, err)
+	_, _, err = service.EndCall(context.Background(), domaincall.EndParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+	})
+	require.NoError(t, err)
+
+	_, err = service.PublishDescription(context.Background(), domaincall.PublishDescriptionParams{
+		CallID:    started.ID,
+		SessionID: join.SessionID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		Description: domaincall.SessionDescription{
+			Type: "offer",
+			SDP:  "v=0",
+		},
+	})
+	require.ErrorIs(t, err, domaincall.ErrConflict)
 }

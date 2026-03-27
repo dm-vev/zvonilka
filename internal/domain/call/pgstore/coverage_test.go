@@ -313,3 +313,50 @@ func TestPgstoreValidationAndNotFoundBranches(t *testing.T) {
 	require.True(t, errors.Is(mapConstraintError(&pgconn.PgError{Code: "23514"}), call.ErrInvalidInput))
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestStoreNewAndWithinTxBranches(t *testing.T) {
+	t.Parallel()
+
+	_, err := New(nil, "call")
+	require.ErrorIs(t, err, call.ErrInvalidInput)
+
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	store, err := New(db, "call")
+	require.NoError(t, err)
+
+	require.ErrorIs(t, store.requireContext(nil), call.ErrInvalidInput)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.ErrorIs(t, store.requireContext(ctx), context.Canceled)
+	require.Equal(t, `"call"."tbl"`, store.table("tbl"))
+
+	mock.ExpectBegin()
+	mock.ExpectCommit()
+	err = store.WithinTx(context.Background(), func(call.Store) error { return nil })
+	require.NoError(t, err)
+
+	mock.ExpectBegin()
+	mock.ExpectRollback()
+	errBoom := errors.New("boom")
+	err = store.WithinTx(context.Background(), func(call.Store) error { return errBoom })
+	require.ErrorIs(t, err, errBoom)
+
+	mock.ExpectBegin()
+	mock.ExpectCommit().WillReturnError(&pgconn.PgError{Code: "23514"})
+	err = store.WithinTx(context.Background(), func(call.Store) error { return nil })
+	require.ErrorIs(t, err, call.ErrInvalidInput)
+
+	txStore := &Store{db: db, tx: &sql.Tx{}, schema: "call"}
+	called := false
+	err = txStore.WithinTx(context.Background(), func(call.Store) error {
+		called = true
+		return nil
+	})
+	require.NoError(t, err)
+	require.True(t, called)
+
+	require.NoError(t, mock.ExpectationsWereMet())
+}
