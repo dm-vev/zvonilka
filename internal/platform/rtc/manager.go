@@ -62,6 +62,9 @@ type peer struct {
 	pc        *webrtc.PeerConnection
 	signals   chan domaincall.RuntimeSignal
 	tracks    map[string]*relayTrack
+	mu        sync.Mutex
+	offering  bool
+	queued    bool
 }
 
 type relayTrack struct {
@@ -309,7 +312,14 @@ func (m *Manager) PublishDescription(
 		}); err != nil {
 			return nil, fmt.Errorf("set remote answer: %w", err)
 		}
-		return m.drainSignals(peerConn), nil
+		signals := m.drainSignals(peerConn)
+		if shouldOfferAgain := peerConn.finishOffer(); shouldOfferAgain {
+			if err := m.emitRenegotiationOffer(active.id, peerConn); err != nil {
+				return nil, fmt.Errorf("emit queued renegotiation offer: %w", err)
+			}
+			signals = append(signals, m.drainSignals(peerConn)...)
+		}
+		return signals, nil
 	default:
 		return nil, domaincall.ErrInvalidInput
 	}
@@ -691,7 +701,19 @@ func (m *Manager) renegotiatePeer(sessionID string, target *peer) error {
 	if target == nil || target.pc == nil {
 		return domaincall.ErrInvalidInput
 	}
+	if !target.beginOffer() {
+		return nil
+	}
 
+	if err := m.emitRenegotiationOffer(sessionID, target); err != nil {
+		target.abortOffer()
+		return err
+	}
+
+	return nil
+}
+
+func (m *Manager) emitRenegotiationOffer(sessionID string, target *peer) error {
 	offer, err := target.pc.CreateOffer(nil)
 	if err != nil {
 		return fmt.Errorf("create renegotiation offer: %w", err)
@@ -720,6 +742,42 @@ func (m *Manager) renegotiatePeer(sessionID string, target *peer) error {
 	}
 
 	return nil
+}
+
+func (p *peer) beginOffer() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.offering {
+		p.queued = true
+		return false
+	}
+	p.offering = true
+	p.queued = false
+
+	return true
+}
+
+func (p *peer) finishOffer() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.offering = false
+	queued := p.queued
+	p.queued = false
+	if queued {
+		p.offering = true
+	}
+
+	return queued
+}
+
+func (p *peer) abortOffer() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.offering = false
+	p.queued = false
 }
 
 func (m *Manager) newAPI() *webrtc.API {

@@ -386,6 +386,99 @@ func TestManagerCleanupRelayTrackRemovesOneSourceTrack(t *testing.T) {
 	require.Equal(t, "dev-b", signals[0].TargetDeviceID)
 }
 
+func TestManagerCoalescesRenegotiationUntilAnswer(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager(
+		"webrtc://gateway/calls",
+		15*time.Minute,
+		WithCandidateHost("127.0.0.1"),
+		WithUDPPortRange(41061, 41070),
+	)
+
+	session, err := manager.EnsureSession(context.Background(), domaincall.Call{
+		ID:             "call-coalesce",
+		ConversationID: "conv-coalesce",
+	})
+	require.NoError(t, err)
+
+	_, err = manager.JoinSession(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-coalesce",
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	client := mustNewPeerConnection(t)
+	defer func() {
+		require.NoError(t, client.Close())
+	}()
+	_, err = client.AddTransceiverFromKind(webrtc.RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	offer := mustCreateLocalOffer(t, client)
+	signals, err := manager.PublishDescription(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-coalesce",
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	}, domaincall.SessionDescription{
+		Type: "offer",
+		SDP:  offer,
+	})
+	require.NoError(t, err)
+
+	var answer string
+	for _, signal := range signals {
+		if signal.Description != nil && signal.Description.Type == "answer" {
+			answer = signal.Description.SDP
+			break
+		}
+	}
+	require.NotEmpty(t, answer)
+	require.NoError(t, client.SetRemoteDescription(webrtc.SessionDescription{
+		Type: webrtc.SDPTypeAnswer,
+		SDP:  answer,
+	}))
+
+	_, peerB, err := manager.ensurePeer(session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-coalesce",
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, manager.renegotiatePeer(session.SessionID, peerB))
+	require.NoError(t, manager.renegotiatePeer(session.SessionID, peerB))
+
+	firstSignals := manager.drainSignals(peerB)
+	require.Len(t, firstSignals, 1)
+	require.Equal(t, "offer", firstSignals[0].Description.Type)
+
+	require.NoError(t, client.SetRemoteDescription(webrtc.SessionDescription{
+		Type: webrtc.SDPTypeOffer,
+		SDP:  firstSignals[0].Description.SDP,
+	}))
+	answerTwo, err := client.CreateAnswer(nil)
+	require.NoError(t, err)
+	require.NoError(t, client.SetLocalDescription(answerTwo))
+
+	secondSignals, err := manager.PublishDescription(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-coalesce",
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	}, domaincall.SessionDescription{
+		Type: "answer",
+		SDP:  client.LocalDescription().SDP,
+	})
+	require.NoError(t, err)
+	require.Len(t, secondSignals, 1)
+	require.Equal(t, "offer", secondSignals[0].Description.Type)
+}
+
 func mustNewPeerConnection(t *testing.T) *webrtc.PeerConnection {
 	t.Helper()
 
