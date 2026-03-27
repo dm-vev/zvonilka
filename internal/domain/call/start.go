@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 )
 
-// StartCall creates a new direct ringing call and invite rows for the peer members.
+// StartCall creates a new call for a callable conversation and invite rows for peer members.
 func (s *Service) StartCall(ctx context.Context, params StartParams) (Call, []Event, error) {
 	if err := s.validateContext(ctx, "start call"); err != nil {
 		return Call{}, nil, err
@@ -20,10 +21,11 @@ func (s *Service) StartCall(ctx context.Context, params StartParams) (Call, []Ev
 		return Call{}, nil, ErrInvalidInput
 	}
 
-	conversationRow, members, err := s.ensureDirectConversation(ctx, params.ConversationID, params.AccountID)
+	conversationRow, members, err := s.ensureCallableConversation(ctx, params.ConversationID, params.AccountID)
 	if err != nil {
 		return Call{}, nil, err
 	}
+	groupCall := conversationRow.Kind == conversation.ConversationKindGroup
 
 	now := s.currentTime()
 	var result Call
@@ -51,8 +53,9 @@ func (s *Service) StartCall(ctx context.Context, params StartParams) (Call, []Ev
 			ConversationID:     conversationRow.ID,
 			InitiatorAccountID: params.AccountID,
 			RequestedVideo:     params.WithVideo,
-			State:              StateRinging,
+			State:              stateForConversationKind(conversationRow.Kind),
 			StartedAt:          now,
+			AnsweredAt:         answeredAtForConversationKind(conversationRow.Kind, now),
 			UpdatedAt:          now,
 		})
 		if saveErr != nil {
@@ -66,6 +69,7 @@ func (s *Service) StartCall(ctx context.Context, params StartParams) (Call, []Ev
 
 		startedEvent, appendErr := s.appendEvent(ctx, store, callRow, EventTypeStarted, params.AccountID, params.DeviceID, map[string]string{
 			"with_video": boolString(params.WithVideo),
+			"call_scope": string(conversationRow.Kind),
 		}, now)
 		if appendErr != nil {
 			return appendErr
@@ -85,11 +89,60 @@ func (s *Service) StartCall(ctx context.Context, params StartParams) (Call, []Ev
 			}
 			invitedEvent, appendErr := s.appendEvent(ctx, store, callRow, EventTypeInvited, params.AccountID, params.DeviceID, map[string]string{
 				"target_account_id": target,
+				"call_scope":        string(conversationRow.Kind),
 			}, now)
 			if appendErr != nil {
 				return appendErr
 			}
 			events = append(events, invitedEvent)
+		}
+
+		if groupCall {
+			selfParticipant, saveErr := store.SaveParticipant(ctx, Participant{
+				CallID:    callRow.ID,
+				AccountID: params.AccountID,
+				DeviceID:  params.DeviceID,
+				State:     ParticipantStateJoined,
+				MediaState: MediaState{
+					CameraEnabled: params.WithVideo,
+				},
+				JoinedAt:  now,
+				UpdatedAt: now,
+			})
+			if saveErr != nil {
+				return fmt.Errorf("save group initiator participant %s/%s: %w", callRow.ID, params.DeviceID, saveErr)
+			}
+
+			runtimeSession, runtimeErr := s.runtime.EnsureSession(ctx, callRow)
+			if runtimeErr != nil {
+				return fmt.Errorf("ensure runtime session for group call %s: %w", callRow.ID, runtimeErr)
+			}
+			callRow.ActiveSessionID = runtimeSession.SessionID
+			callRow.UpdatedAt = now
+			savedCall, saveErr := store.SaveCall(ctx, callRow)
+			if saveErr != nil {
+				return fmt.Errorf("save runtime session for group call %s: %w", callRow.ID, saveErr)
+			}
+			callRow = savedCall
+
+			if _, runtimeErr = s.runtime.JoinSession(ctx, callRow.ActiveSessionID, RuntimeParticipant{
+				CallID:    callRow.ID,
+				AccountID: params.AccountID,
+				DeviceID:  params.DeviceID,
+				WithVideo: params.WithVideo,
+				Media:     selfParticipant.MediaState,
+			}); runtimeErr != nil {
+				return fmt.Errorf("join runtime session for group initiator %s/%s: %w", callRow.ID, params.DeviceID, runtimeErr)
+			}
+
+			joinedEvent, appendErr := s.appendEvent(ctx, store, callRow, EventTypeJoined, params.AccountID, params.DeviceID, map[string]string{
+				"with_video": boolString(params.WithVideo),
+				"call_scope": string(conversationRow.Kind),
+			}, now)
+			if appendErr != nil {
+				return appendErr
+			}
+			events = append(events, joinedEvent)
 		}
 
 		result, saveErr = s.hydrateCall(ctx, store, callRow.ID)
@@ -118,6 +171,20 @@ func directTargets(members []conversation.ConversationMember, accountID string) 
 		targets = append(targets, member.AccountID)
 	}
 	return targets
+}
+
+func stateForConversationKind(kind conversation.ConversationKind) State {
+	if kind == conversation.ConversationKindGroup {
+		return StateActive
+	}
+	return StateRinging
+}
+
+func answeredAtForConversationKind(kind conversation.ConversationKind, now time.Time) time.Time {
+	if kind == conversation.ConversationKindGroup {
+		return now
+	}
+	return time.Time{}
 }
 
 func boolString(value bool) string {

@@ -476,7 +476,7 @@ func qualityRankForSummary(value string) int {
 	}
 }
 
-func (s *Service) ensureDirectConversation(
+func (s *Service) ensureCallableConversation(
 	ctx context.Context,
 	conversationID string,
 	accountID string,
@@ -485,7 +485,8 @@ func (s *Service) ensureDirectConversation(
 	if err != nil {
 		return conversation.Conversation{}, nil, err
 	}
-	if conversationRow.Kind != conversation.ConversationKindDirect {
+	if conversationRow.Kind != conversation.ConversationKindDirect &&
+		conversationRow.Kind != conversation.ConversationKindGroup {
 		return conversation.Conversation{}, nil, ErrConflict
 	}
 

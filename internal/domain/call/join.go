@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 )
 
 // AcceptCall accepts one pending incoming invite.
@@ -24,6 +26,10 @@ func (s *Service) AcceptCall(ctx context.Context, params AcceptParams) (Call, []
 	var events []Event
 	err := s.runTx(ctx, func(store Store) error {
 		callRow, loadErr := s.visibleCall(ctx, store, params.CallID, params.AccountID)
+		if loadErr != nil {
+			return loadErr
+		}
+		conversationRow, _, loadErr := s.visibleConversation(ctx, callRow.ConversationID, params.AccountID)
 		if loadErr != nil {
 			return loadErr
 		}
@@ -64,7 +70,9 @@ func (s *Service) AcceptCall(ctx context.Context, params AcceptParams) (Call, []
 			callRow = saved
 		}
 
-		event, appendErr := s.appendEvent(ctx, store, callRow, EventTypeAccepted, params.AccountID, params.DeviceID, nil, now)
+		event, appendErr := s.appendEvent(ctx, store, callRow, EventTypeAccepted, params.AccountID, params.DeviceID, map[string]string{
+			"call_scope": string(conversationRow.Kind),
+		}, now)
 		if appendErr != nil {
 			return appendErr
 		}
@@ -104,6 +112,10 @@ func (s *Service) DeclineCall(ctx context.Context, params DeclineParams) (Call, 
 		if loadErr != nil {
 			return loadErr
 		}
+		conversationRow, _, loadErr := s.visibleConversation(ctx, callRow.ConversationID, params.AccountID)
+		if loadErr != nil {
+			return loadErr
+		}
 		if callRow.State == StateEnded {
 			result = callRow
 			return nil
@@ -136,6 +148,11 @@ func (s *Service) DeclineCall(ctx context.Context, params DeclineParams) (Call, 
 			return appendErr
 		}
 		events = append(events, event)
+
+		if conversationRow.Kind == conversation.ConversationKindGroup {
+			result, loadErr = s.hydrateCall(ctx, store, callRow.ID)
+			return loadErr
+		}
 
 		invites, loadErr := store.InvitesByCall(ctx, callRow.ID)
 		if loadErr != nil {
@@ -351,6 +368,10 @@ func (s *Service) JoinCall(ctx context.Context, params JoinParams) (Call, JoinDe
 		if loadErr != nil {
 			return loadErr
 		}
+		conversationRow, _, loadErr := s.visibleConversation(ctx, callRow.ConversationID, params.AccountID)
+		if loadErr != nil {
+			return loadErr
+		}
 		if callRow.State == StateEnded {
 			return ErrConflict
 		}
@@ -363,8 +384,22 @@ func (s *Service) JoinCall(ctx context.Context, params JoinParams) (Call, JoinDe
 				}
 				return fmt.Errorf("load invite %s/%s: %w", callRow.ID, params.AccountID, loadErr)
 			}
-			if invite.State != InviteStateAccepted {
+			if conversationRow.Kind == conversation.ConversationKindDirect && invite.State != InviteStateAccepted {
 				return ErrConflict
+			}
+			if conversationRow.Kind == conversation.ConversationKindGroup {
+				switch invite.State {
+				case InviteStatePending:
+					invite.State = InviteStateAccepted
+					invite.AnsweredAt = now
+					invite.UpdatedAt = now
+					if _, saveErr := store.SaveInvite(ctx, invite); saveErr != nil {
+						return fmt.Errorf("accept group invite %s/%s: %w", invite.CallID, invite.AccountID, saveErr)
+					}
+				case InviteStateAccepted:
+				default:
+					return ErrConflict
+				}
 			}
 		}
 
@@ -416,6 +451,7 @@ func (s *Service) JoinCall(ctx context.Context, params JoinParams) (Call, JoinDe
 
 		event, appendErr := s.appendEvent(ctx, store, callRow, EventTypeJoined, params.AccountID, params.DeviceID, map[string]string{
 			"with_video": boolString(params.WithVideo),
+			"call_scope": string(conversationRow.Kind),
 		}, now)
 		if appendErr != nil {
 			return appendErr

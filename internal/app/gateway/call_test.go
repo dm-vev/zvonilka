@@ -178,6 +178,63 @@ func TestCallHandoffRPC(t *testing.T) {
 	}
 }
 
+func TestGroupCallScreenShareRPC(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	_, ownerCtx := fixture.mustCreateUserAndLogin(t, "group-call-owner", "group-call-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "group-call-peer", "group-call-peer@example.com")
+	extra, _ := fixture.mustCreateUserAndLogin(t, "group-call-extra", "group-call-extra@example.com")
+
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Group Call",
+		MemberUserIds: []string{peer.ID, extra.ID},
+	})
+	if err != nil {
+		t.Fatalf("create group conversation: %v", err)
+	}
+
+	started, err := fixture.api.StartCall(ownerCtx, &callv1.StartCallRequest{
+		ConversationId: created.Conversation.ConversationId,
+		WithVideo:      true,
+	})
+	if err != nil {
+		t.Fatalf("start group call: %v", err)
+	}
+	if started.Call.State != callv1.CallState_CALL_STATE_ACTIVE {
+		t.Fatalf("expected active group call, got %+v", started.Call)
+	}
+
+	joined, err := fixture.api.JoinCall(peerCtx, &callv1.JoinCallRequest{
+		CallId:    started.Call.CallId,
+		WithVideo: true,
+	})
+	if err != nil {
+		t.Fatalf("join group call: %v", err)
+	}
+	if joined.Transport == nil || joined.Transport.SessionId == "" {
+		t.Fatalf("unexpected join transport: %+v", joined.Transport)
+	}
+
+	updated, err := fixture.api.UpdateCallMediaState(peerCtx, &callv1.UpdateCallMediaStateRequest{
+		CallId: started.Call.CallId,
+		MediaState: &callv1.CallMediaState{
+			AudioMuted:         false,
+			VideoMuted:         false,
+			CameraEnabled:      true,
+			ScreenShareEnabled: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("update group call media state: %v", err)
+	}
+	if updated.Participant == nil || !updated.Participant.MediaState.ScreenShareEnabled {
+		t.Fatalf("unexpected group call participant media state: %+v", updated.Participant)
+	}
+}
+
 func TestGetCallDiagnosticsRPC(t *testing.T) {
 	t.Parallel()
 

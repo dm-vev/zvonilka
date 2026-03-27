@@ -182,15 +182,15 @@ func TestStartCallRejectsNonDirectConversation(t *testing.T) {
 	conversations := conversationtest.NewMemoryStore()
 	ctx := context.Background()
 	_, err := conversations.SaveConversation(ctx, conversation.Conversation{
-		ID:             "conv-group",
-		Kind:           conversation.ConversationKindGroup,
+		ID:             "conv-channel",
+		Kind:           conversation.ConversationKindChannel,
 		OwnerAccountID: "acc-a",
 		CreatedAt:      time.Now().UTC(),
 		UpdatedAt:      time.Now().UTC(),
 	})
 	require.NoError(t, err)
 	_, err = conversations.SaveConversationMember(ctx, conversation.ConversationMember{
-		ConversationID: "conv-group",
+		ConversationID: "conv-channel",
 		AccountID:      "acc-a",
 		Role:           conversation.MemberRoleOwner,
 		JoinedAt:       time.Now().UTC(),
@@ -205,11 +205,85 @@ func TestStartCallRejectsNonDirectConversation(t *testing.T) {
 	require.NoError(t, err)
 
 	_, _, err = service.StartCall(ctx, domaincall.StartParams{
-		ConversationID: "conv-group",
+		ConversationID: "conv-channel",
 		AccountID:      "acc-a",
 		DeviceID:       "dev-a",
 	})
 	require.ErrorIs(t, err, domaincall.ErrConflict)
+}
+
+func TestGroupCallLifecycleWithScreenShare(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 26, 20, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return now }
+
+	conversations := conversationtest.NewMemoryStore()
+	require.NoError(t, seedGroupConversation(conversations))
+
+	service, err := domaincall.NewService(
+		calltest.NewMemoryStore(),
+		conversations,
+		platformrtc.NewManager(
+			"webrtc://test/calls",
+			15*time.Minute,
+			platformrtc.WithCandidateHost("127.0.0.1"),
+			platformrtc.WithUDPPortRange(41040, 41060),
+		),
+		domaincall.WithNow(clock),
+		domaincall.WithSettings(domaincall.Settings{
+			InviteTimeout:  45 * time.Second,
+			RingingTimeout: 45 * time.Second,
+			ReconnectGrace: 5 * time.Second,
+			MaxDuration:    2 * time.Hour,
+		}),
+		domaincall.WithRTC(domaincall.RTCConfig{
+			PublicEndpoint: "webrtc://test/calls",
+			CredentialTTL:  15 * time.Minute,
+			CandidateHost:  "127.0.0.1",
+			UDPPortMin:     41040,
+			UDPPortMax:     41060,
+		}),
+	)
+	require.NoError(t, err)
+
+	started, events, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-group",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, domaincall.StateActive, started.State)
+	require.NotEmpty(t, started.ActiveSessionID)
+	require.Len(t, events, 4)
+
+	joined, transport, events, err := service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, domaincall.StateActive, joined.State)
+	require.NotEmpty(t, transport.SessionID)
+	require.Len(t, events, 1)
+
+	updated, participant, events, err := service.UpdateCallMediaState(context.Background(), domaincall.UpdateParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		Media: domaincall.MediaState{
+			AudioMuted:         false,
+			VideoMuted:         false,
+			CameraEnabled:      true,
+			ScreenShareEnabled: true,
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, domaincall.StateActive, updated.State)
+	require.True(t, participant.MediaState.ScreenShareEnabled)
+	require.Len(t, events, 1)
 }
 
 func TestCallExpiresAfterMaxDuration(t *testing.T) {
@@ -373,6 +447,48 @@ func seedDirectConversation(store conversation.Store) error {
 		JoinedAt:       now,
 	}); err != nil {
 		return err
+	}
+	return nil
+}
+
+func seedGroupConversation(store conversation.Store) error {
+	ctx := context.Background()
+	now := time.Date(2026, time.March, 26, 18, 0, 0, 0, time.UTC)
+
+	if _, err := store.SaveConversation(ctx, conversation.Conversation{
+		ID:             "conv-group",
+		Kind:           conversation.ConversationKindGroup,
+		OwnerAccountID: "acc-a",
+		Title:          "Group",
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}); err != nil {
+		return err
+	}
+	members := []conversation.ConversationMember{
+		{
+			ConversationID: "conv-group",
+			AccountID:      "acc-a",
+			Role:           conversation.MemberRoleOwner,
+			JoinedAt:       now,
+		},
+		{
+			ConversationID: "conv-group",
+			AccountID:      "acc-b",
+			Role:           conversation.MemberRoleMember,
+			JoinedAt:       now,
+		},
+		{
+			ConversationID: "conv-group",
+			AccountID:      "acc-c",
+			Role:           conversation.MemberRoleMember,
+			JoinedAt:       now,
+		},
+	}
+	for _, member := range members {
+		if _, err := store.SaveConversationMember(ctx, member); err != nil {
+			return err
+		}
 	}
 	return nil
 }
