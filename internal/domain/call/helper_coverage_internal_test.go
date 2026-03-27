@@ -2,6 +2,7 @@ package call
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -507,4 +508,195 @@ func TestLoadCallAndVisibleCallValidation(t *testing.T) {
 	callRow, err := service.visibleCall(context.Background(), store, "call-1", "acc-a")
 	require.NoError(t, err)
 	require.Equal(t, "call-1", callRow.ID)
+}
+
+type errorStore struct {
+	*stubStore
+	callsErr        error
+	eventsErr       error
+	invitesErr      error
+	participantsErr error
+}
+
+func (s *errorStore) WithinTx(_ context.Context, fn func(Store) error) error { return fn(s) }
+
+func (s *errorStore) CallsByConversation(ctx context.Context, conversationID string, includeEnded bool) ([]Call, error) {
+	if s.callsErr != nil {
+		return nil, s.callsErr
+	}
+	return s.stubStore.CallsByConversation(ctx, conversationID, includeEnded)
+}
+
+func (s *errorStore) EventsAfterSequence(
+	ctx context.Context,
+	fromSequence uint64,
+	callID string,
+	conversationID string,
+	limit int,
+) ([]Event, error) {
+	if s.eventsErr != nil {
+		return nil, s.eventsErr
+	}
+	return s.stubStore.EventsAfterSequence(ctx, fromSequence, callID, conversationID, limit)
+}
+
+func (s *errorStore) InvitesByCall(ctx context.Context, callID string) ([]Invite, error) {
+	if s.invitesErr != nil {
+		return nil, s.invitesErr
+	}
+	return s.stubStore.InvitesByCall(ctx, callID)
+}
+
+func (s *errorStore) ParticipantsByCall(ctx context.Context, callID string) ([]Participant, error) {
+	if s.participantsErr != nil {
+		return nil, s.participantsErr
+	}
+	return s.stubStore.ParticipantsByCall(ctx, callID)
+}
+
+type errorConversations struct {
+	*stubConversations
+	convErr   error
+	memberErr error
+}
+
+func (s *errorConversations) ConversationByID(ctx context.Context, conversationID string) (conversation.Conversation, error) {
+	if s.convErr != nil {
+		return conversation.Conversation{}, s.convErr
+	}
+	return s.stubConversations.ConversationByID(ctx, conversationID)
+}
+
+func (s *errorConversations) ConversationMemberByConversationAndAccount(
+	ctx context.Context,
+	conversationID string,
+	accountID string,
+) (conversation.ConversationMember, error) {
+	if s.memberErr != nil {
+		return conversation.ConversationMember{}, s.memberErr
+	}
+	return s.stubConversations.ConversationMemberByConversationAndAccount(ctx, conversationID, accountID)
+}
+
+func TestListCallsAndEventsErrorBranches(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 27, 22, 0, 0, 0, time.UTC)
+	baseStore := newStubStore()
+	baseStore.calls["call-1"] = Call{
+		ID:             "call-1",
+		ConversationID: "conv-direct",
+		State:          StateActive,
+		StartedAt:      now,
+		UpdatedAt:      now,
+	}
+	store := &errorStore{stubStore: baseStore}
+	conversations := newStubConversations()
+	service, err := NewService(store, conversations, stubRuntime{}, WithNow(func() time.Time { return now }))
+	require.NoError(t, err)
+
+	_, err = service.ListCalls(context.Background(), ListParams{})
+	require.ErrorIs(t, err, ErrInvalidInput)
+
+	store.callsErr = errors.New("calls failed")
+	_, err = service.ListCalls(context.Background(), ListParams{
+		ConversationID: "conv-direct",
+		AccountID:      "acc-a",
+	})
+	require.ErrorContains(t, err, "calls failed")
+	store.callsErr = nil
+
+	_, err = service.Events(context.Background(), EventParams{AccountID: "acc-a"})
+	require.ErrorIs(t, err, ErrInvalidInput)
+
+	store.eventsErr = errors.New("events failed")
+	_, err = service.Events(context.Background(), EventParams{
+		ConversationID: "conv-direct",
+		AccountID:      "acc-a",
+	})
+	require.ErrorContains(t, err, "events failed")
+}
+
+func TestVisibleConversationErrorMapping(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 27, 22, 30, 0, 0, time.UTC)
+	store := newStubStore()
+	base := newStubConversations()
+	conversations := &errorConversations{stubConversations: base}
+	service, err := NewService(store, conversations, stubRuntime{}, WithNow(func() time.Time { return now }))
+	require.NoError(t, err)
+
+	_, _, err = service.visibleConversation(context.Background(), "", "acc-a")
+	require.ErrorIs(t, err, ErrInvalidInput)
+
+	conversations.convErr = conversation.ErrNotFound
+	_, _, err = service.visibleConversation(context.Background(), "conv-direct", "acc-a")
+	require.ErrorIs(t, err, ErrNotFound)
+	conversations.convErr = errors.New("conv failed")
+	_, _, err = service.visibleConversation(context.Background(), "conv-direct", "acc-a")
+	require.ErrorContains(t, err, "conv failed")
+
+	conversations.convErr = nil
+	conversations.memberErr = conversation.ErrNotFound
+	_, _, err = service.visibleConversation(context.Background(), "conv-direct", "acc-a")
+	require.ErrorIs(t, err, ErrForbidden)
+	conversations.memberErr = errors.New("member failed")
+	_, _, err = service.visibleConversation(context.Background(), "conv-direct", "acc-a")
+	require.ErrorContains(t, err, "member failed")
+}
+
+func TestHydrateCallAndEndedSummaryBranches(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 27, 23, 0, 0, 0, time.UTC)
+	store := &errorStore{stubStore: newStubStore()}
+	store.calls["call-1"] = Call{
+		ID:             "call-1",
+		ConversationID: "conv-direct",
+		State:          StateEnded,
+		StartedAt:      now.Add(-time.Minute),
+		EndedAt:        now,
+		UpdatedAt:      now,
+	}
+	store.events = []Event{
+		{
+			CallID:    "call-1",
+			EventType: EventTypeMediaUpdated,
+			Sequence:  1,
+			Metadata: map[string]string{
+				"transport_quality":          "failed",
+				"video_fallback_recommended": "true",
+				"reconnect_recommended":      "true",
+				"suppress_outgoing_video":    "true",
+				"suppress_incoming_video":    "true",
+				"suppress_outgoing_audio":    "true",
+				"suppress_incoming_audio":    "true",
+				"reconnect_attempt":          "2",
+				callMetadataTargetAccountID:  "acc-a",
+				callMetadataTargetDeviceID:   "dev-a",
+			},
+			CreatedAt: now,
+		},
+	}
+	service, err := NewService(store, newStubConversations(), stubRuntime{}, WithNow(func() time.Time { return now }))
+	require.NoError(t, err)
+
+	callRow, err := service.hydrateCall(context.Background(), store, "call-1")
+	require.NoError(t, err)
+	require.Equal(t, "failed", callRow.QualitySummary.WorstQuality)
+	require.Equal(t, uint32(1), callRow.QualitySummary.VideoFallbackParticipants)
+	require.Equal(t, uint32(1), callRow.QualitySummary.ReconnectParticipants)
+	require.Equal(t, uint32(1), callRow.QualitySummary.OutgoingVideoSuppressed)
+	require.Equal(t, uint32(1), callRow.QualitySummary.IncomingVideoSuppressed)
+	require.Equal(t, uint32(1), callRow.QualitySummary.OutgoingAudioSuppressed)
+	require.Equal(t, uint32(1), callRow.QualitySummary.IncomingAudioSuppressed)
+
+	store.invitesErr = errors.New("invites failed")
+	_, err = service.hydrateCall(context.Background(), store, "call-1")
+	require.ErrorContains(t, err, "invites failed")
+	store.invitesErr = nil
+	store.participantsErr = errors.New("participants failed")
+	_, err = service.hydrateCall(context.Background(), store, "call-1")
+	require.ErrorContains(t, err, "participants failed")
 }

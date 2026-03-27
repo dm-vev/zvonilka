@@ -360,3 +360,18 @@ func TestStoreNewAndWithinTxBranches(t *testing.T) {
 
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestStoreRequireStoreBranches(t *testing.T) {
+	t.Parallel()
+
+	store := &Store{}
+	require.ErrorIs(t, store.requireStore(), call.ErrInvalidInput)
+	_, err := store.SaveCall(context.Background(), call.Call{})
+	require.ErrorIs(t, err, call.ErrInvalidInput)
+	_, err = store.SaveEvent(context.Background(), call.Event{})
+	require.ErrorIs(t, err, call.ErrInvalidInput)
+	_, err = store.SaveInvite(context.Background(), call.Invite{})
+	require.ErrorIs(t, err, call.ErrInvalidInput)
+	_, err = store.SaveParticipant(context.Background(), call.Participant{})
+	require.ErrorIs(t, err, call.ErrInvalidInput)
+}
