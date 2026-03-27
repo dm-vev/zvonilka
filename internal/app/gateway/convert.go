@@ -164,15 +164,19 @@ func callMediaStateProto(state domaincall.MediaState) *callv1.CallMediaState {
 
 func callTransportStatsProto(value domaincall.TransportStats) *callv1.CallTransportStats {
 	return &callv1.CallTransportStats{
-		PeerConnectionState: value.PeerConnectionState,
-		IceConnectionState:  value.IceConnectionState,
-		SignalingState:      value.SignalingState,
-		Quality:             value.Quality,
-		RelayTracks:         value.RelayTracks,
-		RelayPackets:        value.RelayPackets,
-		RelayBytes:          value.RelayBytes,
-		RelayWriteErrors:    value.RelayWriteErrors,
-		LastUpdatedAt:       protoTime(value.LastUpdatedAt),
+		PeerConnectionState:      value.PeerConnectionState,
+		IceConnectionState:       value.IceConnectionState,
+		SignalingState:           value.SignalingState,
+		Quality:                  value.Quality,
+		RecommendedProfile:       value.RecommendedProfile,
+		RecommendationReason:     value.RecommendationReason,
+		VideoFallbackRecommended: value.VideoFallbackRecommended,
+		ReconnectRecommended:     value.ReconnectRecommended,
+		RelayTracks:              value.RelayTracks,
+		RelayPackets:             value.RelayPackets,
+		RelayBytes:               value.RelayBytes,
+		RelayWriteErrors:         value.RelayWriteErrors,
+		LastUpdatedAt:            protoTime(value.LastUpdatedAt),
 	}
 }
 

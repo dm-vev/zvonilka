@@ -101,15 +101,19 @@ type MediaState struct {
 
 // TransportStats describes live transport quality counters for one participant device.
 type TransportStats struct {
-	PeerConnectionState string
-	IceConnectionState  string
-	SignalingState      string
-	Quality             string
-	RelayTracks         uint32
-	RelayPackets        uint64
-	RelayBytes          uint64
-	RelayWriteErrors    uint64
-	LastUpdatedAt       time.Time
+	PeerConnectionState      string
+	IceConnectionState       string
+	SignalingState           string
+	Quality                  string
+	RecommendedProfile       string
+	RecommendationReason     string
+	VideoFallbackRecommended bool
+	ReconnectRecommended     bool
+	RelayTracks              uint32
+	RelayPackets             uint64
+	RelayBytes               uint64
+	RelayWriteErrors         uint64
+	LastUpdatedAt            time.Time
 }
 
 // IceServer describes one STUN or TURN server returned to a client.

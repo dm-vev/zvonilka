@@ -56,19 +56,20 @@ type participant struct {
 }
 
 type peer struct {
-	accountID string
-	deviceID  string
-	withVideo bool
-	pc        *webrtc.PeerConnection
-	signals   chan domaincall.RuntimeSignal
-	tracks    map[string]*relayTrack
-	mu        sync.Mutex
-	offering  bool
-	queued    bool
-	lastPC    string
-	lastICE   string
-	lastSIG   string
-	stats     domaincall.TransportStats
+	accountID              string
+	deviceID               string
+	withVideo              bool
+	pc                     *webrtc.PeerConnection
+	signals                chan domaincall.RuntimeSignal
+	tracks                 map[string]*relayTrack
+	mu                     sync.Mutex
+	offering               bool
+	queued                 bool
+	lastPC                 string
+	lastICE                string
+	lastSIG                string
+	stats                  domaincall.TransportStats
+	consecutiveRelayErrors uint32
 }
 
 type relayTrack struct {
@@ -84,6 +85,10 @@ const (
 	telemetryICEStateKey   = "ice_connection_state"
 	telemetrySignalingKey  = "signaling_state"
 	telemetryQualityKey    = "transport_quality"
+	telemetryProfileKey    = "recommended_profile"
+	telemetryReasonKey     = "recommendation_reason"
+	telemetryVideoKey      = "video_fallback_recommended"
+	telemetryReconnectKey  = "reconnect_recommended"
 )
 
 // NewManager constructs an in-process RTC session manager.
@@ -638,7 +643,17 @@ func (m *Manager) recordRelayWriteSuccess(sessionID string, trackKey string, siz
 	m.mu.Unlock()
 
 	for _, target := range targets {
-		target.recordRelayWrite(uint64(size), false)
+		if metadata := target.recordRelayWrite(uint64(size), false); len(metadata) > 0 {
+			select {
+			case target.signals <- domaincall.RuntimeSignal{
+				TargetAccountID: target.accountID,
+				TargetDeviceID:  target.deviceID,
+				SessionID:       sessionID,
+				Metadata:        metadata,
+			}:
+			default:
+			}
+		}
 	}
 }
 
@@ -663,7 +678,17 @@ func (m *Manager) recordRelayWriteFailure(sessionID string, trackKey string) {
 	m.mu.Unlock()
 
 	for _, target := range targets {
-		target.recordRelayWrite(0, true)
+		if metadata := target.recordRelayWrite(0, true); len(metadata) > 0 {
+			select {
+			case target.signals <- domaincall.RuntimeSignal{
+				TargetAccountID: target.accountID,
+				TargetDeviceID:  target.deviceID,
+				SessionID:       sessionID,
+				Metadata:        metadata,
+			}:
+			default:
+			}
+		}
 	}
 }
 
@@ -946,6 +971,10 @@ func (p *peer) updateTelemetry(key string, value string) map[string]string {
 	defer p.mu.Unlock()
 
 	value = strings.TrimSpace(value)
+	prevProfile := p.stats.RecommendedProfile
+	prevReason := p.stats.RecommendationReason
+	prevVideo := p.stats.VideoFallbackRecommended
+	prevReconnect := p.stats.ReconnectRecommended
 	changed := false
 	switch key {
 	case telemetryPCStateKey:
@@ -984,23 +1013,86 @@ func (p *peer) updateTelemetry(key string, value string) map[string]string {
 	p.stats.IceConnectionState = p.lastICE
 	p.stats.SignalingState = p.lastSIG
 	p.stats.Quality = metadata[telemetryQualityKey]
+	p.applyRecommendationsLocked()
 	p.stats.LastUpdatedAt = time.Now().UTC()
+	metadata[telemetryProfileKey] = p.stats.RecommendedProfile
+	metadata[telemetryReasonKey] = p.stats.RecommendationReason
+	metadata[telemetryVideoKey] = boolString(p.stats.VideoFallbackRecommended)
+	metadata[telemetryReconnectKey] = boolString(p.stats.ReconnectRecommended)
+	if p.stats.RecommendedProfile == prevProfile &&
+		p.stats.RecommendationReason == prevReason &&
+		p.stats.VideoFallbackRecommended == prevVideo &&
+		p.stats.ReconnectRecommended == prevReconnect {
+		return metadata
+	}
 
 	return metadata
 }
 
-func (p *peer) recordRelayWrite(size uint64, failed bool) {
+func (p *peer) recordRelayWrite(size uint64, failed bool) map[string]string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	prevProfile := p.stats.RecommendedProfile
+	prevReason := p.stats.RecommendationReason
+	prevVideo := p.stats.VideoFallbackRecommended
+	prevReconnect := p.stats.ReconnectRecommended
 	if failed {
+		p.consecutiveRelayErrors++
 		p.stats.RelayWriteErrors++
 	} else {
+		p.consecutiveRelayErrors = 0
 		p.stats.RelayPackets++
 		p.stats.RelayBytes += size
 	}
 	p.stats.RelayTracks = uint32(len(p.tracks))
+	p.applyRecommendationsLocked()
 	p.stats.LastUpdatedAt = time.Now().UTC()
+	if p.stats.RecommendedProfile == prevProfile &&
+		p.stats.RecommendationReason == prevReason &&
+		p.stats.VideoFallbackRecommended == prevVideo &&
+		p.stats.ReconnectRecommended == prevReconnect {
+		return nil
+	}
+
+	return map[string]string{
+		telemetryKindKey:      telemetryKindTransport,
+		telemetryQualityKey:   p.stats.Quality,
+		telemetryProfileKey:   p.stats.RecommendedProfile,
+		telemetryReasonKey:    p.stats.RecommendationReason,
+		telemetryVideoKey:     boolString(p.stats.VideoFallbackRecommended),
+		telemetryReconnectKey: boolString(p.stats.ReconnectRecommended),
+	}
+}
+
+func (p *peer) applyRecommendationsLocked() {
+	profile := "full"
+	reason := ""
+	videoFallback := false
+	reconnect := false
+
+	switch p.stats.Quality {
+	case "failed":
+		profile = "reconnect"
+		reason = "transport_failed"
+		reconnect = true
+	case "degraded":
+		if p.withVideo {
+			profile = "audio_only"
+			reason = "transport_degraded"
+			videoFallback = true
+		}
+	}
+	if !reconnect && p.withVideo && p.consecutiveRelayErrors >= 3 {
+		profile = "audio_only"
+		reason = "relay_write_errors"
+		videoFallback = true
+	}
+
+	p.stats.RecommendedProfile = profile
+	p.stats.RecommendationReason = reason
+	p.stats.VideoFallbackRecommended = videoFallback
+	p.stats.ReconnectRecommended = reconnect
 }
 
 func (p *peer) snapshotStats() domaincall.TransportStats {
@@ -1011,6 +1103,14 @@ func (p *peer) snapshotStats() domaincall.TransportStats {
 	stats.RelayTracks = uint32(len(p.tracks))
 
 	return stats
+}
+
+func boolString(value bool) string {
+	if value {
+		return "true"
+	}
+
+	return "false"
 }
 
 func deriveTransportQuality(peerState string, iceState string) string {

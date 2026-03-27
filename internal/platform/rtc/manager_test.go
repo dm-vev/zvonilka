@@ -549,6 +549,7 @@ func TestManagerSessionStatsExposeTransportCounters(t *testing.T) {
 		CallID:    "call-stats",
 		AccountID: "acc-a",
 		DeviceID:  "dev-a",
+		WithVideo: true,
 	})
 	require.NoError(t, err)
 
@@ -556,11 +557,14 @@ func TestManagerSessionStatsExposeTransportCounters(t *testing.T) {
 		CallID:    "call-stats",
 		AccountID: "acc-a",
 		DeviceID:  "dev-a",
+		WithVideo: true,
 	})
 	require.NoError(t, err)
 
 	manager.emitPeerTelemetry(session.SessionID, peerA, telemetryICEStateKey, webrtc.ICEConnectionStateConnected.String())
 	peerA.recordRelayWrite(321, false)
+	peerA.recordRelayWrite(0, true)
+	peerA.recordRelayWrite(0, true)
 	peerA.recordRelayWrite(0, true)
 
 	stats, err := manager.SessionStats(context.Background(), session.SessionID)
@@ -569,10 +573,86 @@ func TestManagerSessionStatsExposeTransportCounters(t *testing.T) {
 	require.Equal(t, "acc-a", stats[0].AccountID)
 	require.Equal(t, "dev-a", stats[0].DeviceID)
 	require.Equal(t, "connected", stats[0].Transport.Quality)
+	require.Equal(t, "audio_only", stats[0].Transport.RecommendedProfile)
+	require.Equal(t, "relay_write_errors", stats[0].Transport.RecommendationReason)
+	require.True(t, stats[0].Transport.VideoFallbackRecommended)
+	require.False(t, stats[0].Transport.ReconnectRecommended)
 	require.EqualValues(t, 1, stats[0].Transport.RelayPackets)
 	require.EqualValues(t, 321, stats[0].Transport.RelayBytes)
-	require.EqualValues(t, 1, stats[0].Transport.RelayWriteErrors)
+	require.EqualValues(t, 3, stats[0].Transport.RelayWriteErrors)
 	require.False(t, stats[0].Transport.LastUpdatedAt.IsZero())
+}
+
+func TestManagerAdaptiveRecommendationRecoversAfterHealthyRelayWrite(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager("webrtc://gateway/calls", 15*time.Minute)
+	session, err := manager.EnsureSession(context.Background(), domaincall.Call{
+		ID:             "call-recovery",
+		ConversationID: "conv-recovery",
+	})
+	require.NoError(t, err)
+
+	_, err = manager.JoinSession(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-recovery",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	_, peerA, err := manager.ensurePeer(session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-recovery",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	manager.emitPeerTelemetry(session.SessionID, peerA, telemetryICEStateKey, webrtc.ICEConnectionStateConnected.String())
+	peerA.recordRelayWrite(0, true)
+	peerA.recordRelayWrite(0, true)
+	metadata := peerA.recordRelayWrite(0, true)
+	require.Equal(t, "audio_only", metadata[telemetryProfileKey])
+
+	metadata = peerA.recordRelayWrite(512, false)
+	require.Equal(t, "full", metadata[telemetryProfileKey])
+	require.Equal(t, "", metadata[telemetryReasonKey])
+	require.Equal(t, "false", metadata[telemetryVideoKey])
+	require.Equal(t, "false", metadata[telemetryReconnectKey])
+}
+
+func TestManagerFailedTransportRecommendsReconnect(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager("webrtc://gateway/calls", 15*time.Minute)
+	session, err := manager.EnsureSession(context.Background(), domaincall.Call{
+		ID:             "call-failed",
+		ConversationID: "conv-failed",
+	})
+	require.NoError(t, err)
+
+	_, err = manager.JoinSession(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-failed",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	_, peerA, err := manager.ensurePeer(session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-failed",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	metadata := peerA.updateTelemetry(telemetryPCStateKey, webrtc.PeerConnectionStateFailed.String())
+	require.Equal(t, "reconnect", metadata[telemetryProfileKey])
+	require.Equal(t, "transport_failed", metadata[telemetryReasonKey])
+	require.Equal(t, "true", metadata[telemetryReconnectKey])
+	require.Equal(t, "false", metadata[telemetryVideoKey])
 }
 
 func mustNewPeerConnection(t *testing.T) *webrtc.PeerConnection {
