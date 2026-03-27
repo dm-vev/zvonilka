@@ -294,6 +294,98 @@ func TestManagerLeaveSessionRemovesSourceRelayTracks(t *testing.T) {
 	require.Equal(t, "dev-b", signals[0].TargetDeviceID)
 }
 
+func TestManagerCleanupRelayTrackRemovesOneSourceTrack(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager(
+		"webrtc://gateway/calls",
+		15*time.Minute,
+		WithCandidateHost("127.0.0.1"),
+		WithUDPPortRange(41051, 41060),
+	)
+
+	session, err := manager.EnsureSession(context.Background(), domaincall.Call{
+		ID:             "call-track-cleanup",
+		ConversationID: "conv-track-cleanup",
+	})
+	require.NoError(t, err)
+
+	_, err = manager.JoinSession(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-track-cleanup",
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	client := mustNewPeerConnection(t)
+	defer func() {
+		require.NoError(t, client.Close())
+	}()
+	_, err = client.AddTransceiverFromKind(webrtc.RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	offer := mustCreateLocalOffer(t, client)
+	_, err = manager.PublishDescription(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-track-cleanup",
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	}, domaincall.SessionDescription{
+		Type: "offer",
+		SDP:  offer,
+	})
+	require.NoError(t, err)
+
+	_, peerB, err := manager.ensurePeer(session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-track-cleanup",
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	firstTrack, err := webrtc.NewTrackLocalStaticRTP(
+		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000, Channels: 2},
+		"audio-1",
+		"relay-1",
+	)
+	require.NoError(t, err)
+	firstSender, err := peerB.pc.AddTrack(firstTrack)
+	require.NoError(t, err)
+
+	secondTrack, err := webrtc.NewTrackLocalStaticRTP(
+		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000, Channels: 2},
+		"audio-2",
+		"relay-2",
+	)
+	require.NoError(t, err)
+	secondSender, err := peerB.pc.AddTrack(secondTrack)
+	require.NoError(t, err)
+
+	firstKey := relayTrackKey(participantKey("acc-a", "dev-a"), "audio-1", "relay-1", "audio")
+	secondKey := relayTrackKey(participantKey("acc-c", "dev-c"), "audio-2", "relay-2", "audio")
+	peerB.tracks[firstKey] = &relayTrack{
+		track:  firstTrack,
+		sender: firstSender,
+	}
+	peerB.tracks[secondKey] = &relayTrack{
+		track:  secondTrack,
+		sender: secondSender,
+	}
+
+	manager.cleanupRelayTrack(session.SessionID, firstKey)
+
+	require.NotContains(t, peerB.tracks, firstKey)
+	require.Contains(t, peerB.tracks, secondKey)
+
+	signals := manager.drainSignals(peerB)
+	require.NotEmpty(t, signals)
+	require.Equal(t, "offer", signals[0].Description.Type)
+	require.Equal(t, "acc-b", signals[0].TargetAccountID)
+	require.Equal(t, "dev-b", signals[0].TargetDeviceID)
+}
+
 func mustNewPeerConnection(t *testing.T) *webrtc.PeerConnection {
 	t.Helper()
 

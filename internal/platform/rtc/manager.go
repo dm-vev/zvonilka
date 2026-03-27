@@ -533,6 +533,9 @@ func (m *Manager) handleRemoteTrack(sessionID string, sourceKey string, track *w
 		return
 	}
 
+	trackKey := relayTrackKey(sourceKey, track.ID(), track.StreamID(), track.Kind().String())
+	defer m.cleanupRelayTrack(sessionID, trackKey)
+
 	targets, relays := m.prepareRelayTargets(sessionID, sourceKey, track)
 	for _, target := range targets {
 		if err := m.renegotiatePeer(sessionID, target); err != nil {
@@ -603,6 +606,29 @@ func (m *Manager) prepareRelayTargets(
 	return targets, relays
 }
 
+func (m *Manager) cleanupRelayTrack(sessionID string, trackKey string) {
+	sessionID = strings.TrimSpace(sessionID)
+	trackKey = strings.TrimSpace(trackKey)
+	if sessionID == "" || trackKey == "" {
+		return
+	}
+
+	m.mu.Lock()
+	active, ok := m.sessions[sessionID]
+	if !ok {
+		m.mu.Unlock()
+		return
+	}
+	affected := m.removeRelayTrackLocked(active, trackKey)
+	m.mu.Unlock()
+
+	for _, target := range affected {
+		if err := m.renegotiatePeer(sessionID, target); err != nil {
+			continue
+		}
+	}
+}
+
 func (m *Manager) removeSourceRelayTracksLocked(active *session, sourceKey string) []*peer {
 	if active == nil || sourceKey == "" {
 		return nil
@@ -629,6 +655,30 @@ func (m *Manager) removeSourceRelayTracksLocked(active *session, sourceKey strin
 		if removed {
 			affected = append(affected, target)
 		}
+	}
+
+	return affected
+}
+
+func (m *Manager) removeRelayTrackLocked(active *session, trackKey string) []*peer {
+	if active == nil || trackKey == "" {
+		return nil
+	}
+
+	affected := make([]*peer, 0)
+	for _, target := range active.peers {
+		if target == nil {
+			continue
+		}
+		relay := target.tracks[trackKey]
+		if relay == nil {
+			continue
+		}
+		if relay.sender != nil {
+			_ = target.pc.RemoveTrack(relay.sender)
+		}
+		delete(target.tracks, trackKey)
+		affected = append(affected, target)
 	}
 
 	return affected
