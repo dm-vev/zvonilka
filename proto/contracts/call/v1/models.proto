@@ -67,6 +67,7 @@ message CallMediaState {
   bool audio_muted = 1;
   bool video_muted = 2;
   bool camera_enabled = 3;
+  bool screen_share_enabled = 4;
 }
 
 message CallTransportStats {

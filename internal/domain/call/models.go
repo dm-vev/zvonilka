@@ -94,9 +94,10 @@ const (
 
 // MediaState describes the participant media toggles visible to other clients.
 type MediaState struct {
-	AudioMuted    bool
-	VideoMuted    bool
-	CameraEnabled bool
+	AudioMuted         bool
+	VideoMuted         bool
+	CameraEnabled      bool
+	ScreenShareEnabled bool
 }
 
 // TransportStats describes live transport quality counters for one participant device.

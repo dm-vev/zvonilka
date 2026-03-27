@@ -148,17 +148,19 @@ func callMediaStateFromProto(state *callv1.CallMediaState) domaincall.MediaState
 	}
 
 	return domaincall.MediaState{
-		AudioMuted:    state.GetAudioMuted(),
-		VideoMuted:    state.GetVideoMuted(),
-		CameraEnabled: state.GetCameraEnabled(),
+		AudioMuted:         state.GetAudioMuted(),
+		VideoMuted:         state.GetVideoMuted(),
+		CameraEnabled:      state.GetCameraEnabled(),
+		ScreenShareEnabled: state.GetScreenShareEnabled(),
 	}
 }
 
 func callMediaStateProto(state domaincall.MediaState) *callv1.CallMediaState {
 	return &callv1.CallMediaState{
-		AudioMuted:    state.AudioMuted,
-		VideoMuted:    state.VideoMuted,
-		CameraEnabled: state.CameraEnabled,
+		AudioMuted:         state.AudioMuted,
+		VideoMuted:         state.VideoMuted,
+		CameraEnabled:      state.CameraEnabled,
+		ScreenShareEnabled: state.ScreenShareEnabled,
 	}
 }
 

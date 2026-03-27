@@ -90,14 +90,16 @@ func TestCallLifecycle(t *testing.T) {
 		AccountID: "acc-b",
 		DeviceID:  "dev-b",
 		Media: domaincall.MediaState{
-			AudioMuted:    true,
-			VideoMuted:    false,
-			CameraEnabled: true,
+			AudioMuted:         true,
+			VideoMuted:         false,
+			CameraEnabled:      true,
+			ScreenShareEnabled: true,
 		},
 	})
 	require.NoError(t, err)
 	require.Equal(t, started.ID, updated.ID)
 	require.True(t, participant.MediaState.AudioMuted)
+	require.True(t, participant.MediaState.ScreenShareEnabled)
 	require.Len(t, events, 1)
 
 	offer := mustCreateCallOffer(t)

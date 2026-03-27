@@ -109,6 +109,7 @@ func scanParticipant(row rowScanner) (call.Participant, error) {
 		&value.MediaState.AudioMuted,
 		&value.MediaState.VideoMuted,
 		&value.MediaState.CameraEnabled,
+		&value.MediaState.ScreenShareEnabled,
 		&value.JoinedAt,
 		&leftAt,
 		&value.UpdatedAt,

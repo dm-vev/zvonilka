@@ -62,15 +62,16 @@ func TestCallLifecycleRPC(t *testing.T) {
 	updated, err := fixture.api.UpdateCallMediaState(peerCtx, &callv1.UpdateCallMediaStateRequest{
 		CallId: started.Call.CallId,
 		MediaState: &callv1.CallMediaState{
-			AudioMuted:    true,
-			VideoMuted:    false,
-			CameraEnabled: true,
+			AudioMuted:         true,
+			VideoMuted:         false,
+			CameraEnabled:      true,
+			ScreenShareEnabled: true,
 		},
 	})
 	if err != nil {
 		t.Fatalf("update media state: %v", err)
 	}
-	if updated.Participant == nil || !updated.Participant.MediaState.AudioMuted {
+	if updated.Participant == nil || !updated.Participant.MediaState.AudioMuted || !updated.Participant.MediaState.ScreenShareEnabled {
 		t.Fatalf("unexpected participant media state: %+v", updated.Participant)
 	}
 

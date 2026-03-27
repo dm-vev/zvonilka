@@ -590,9 +590,10 @@ func (s *Service) UpdateCallMediaState(
 		saved = savedParticipant
 
 		event, appendErr := s.appendEvent(ctx, store, callRow, EventTypeMediaUpdated, params.AccountID, params.DeviceID, map[string]string{
-			"audio_muted":    boolString(params.Media.AudioMuted),
-			"video_muted":    boolString(params.Media.VideoMuted),
-			"camera_enabled": boolString(params.Media.CameraEnabled),
+			"audio_muted":          boolString(params.Media.AudioMuted),
+			"video_muted":          boolString(params.Media.VideoMuted),
+			"camera_enabled":       boolString(params.Media.CameraEnabled),
+			"screen_share_enabled": boolString(params.Media.ScreenShareEnabled),
 		}, now)
 		if appendErr != nil {
 			return appendErr
@@ -724,9 +725,10 @@ func joinedParticipants(participants []Participant) int {
 
 func defaultJoinMediaState(withVideo bool) MediaState {
 	return MediaState{
-		AudioMuted:    false,
-		VideoMuted:    !withVideo,
-		CameraEnabled: withVideo,
+		AudioMuted:         false,
+		VideoMuted:         !withVideo,
+		CameraEnabled:      withVideo,
+		ScreenShareEnabled: false,
 	}
 }
 
