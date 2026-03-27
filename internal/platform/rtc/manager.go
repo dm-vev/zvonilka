@@ -60,7 +60,12 @@ type peer struct {
 	withVideo bool
 	pc        *webrtc.PeerConnection
 	signals   chan domaincall.RuntimeSignal
-	tracks    map[string]*webrtc.TrackLocalStaticRTP
+	tracks    map[string]*relayTrack
+}
+
+type relayTrack struct {
+	track  *webrtc.TrackLocalStaticRTP
+	sender *webrtc.RTPSender
 }
 
 // NewManager constructs an in-process RTC session manager.
@@ -356,6 +361,7 @@ func (m *Manager) LeaveSession(_ context.Context, sessionID string, accountID st
 	}
 
 	var peerConn *peer
+	var affected []*peer
 
 	m.mu.Lock()
 	active, ok := m.sessions[sessionID]
@@ -366,11 +372,17 @@ func (m *Manager) LeaveSession(_ context.Context, sessionID string, accountID st
 	delete(active.participants, participantKey(accountID, deviceID))
 	peerConn = active.peers[participantKey(accountID, deviceID)]
 	delete(active.peers, participantKey(accountID, deviceID))
+	affected = m.removeSourceRelayTracksLocked(active, participantKey(accountID, deviceID))
 	m.mu.Unlock()
 
 	if peerConn != nil && peerConn.pc != nil {
 		if err := peerConn.pc.Close(); err != nil {
 			return fmt.Errorf("close participant peer: %w", err)
+		}
+	}
+	for _, target := range affected {
+		if err := m.renegotiatePeer(sessionID, target); err != nil {
+			return fmt.Errorf("renegotiate relay cleanup: %w", err)
 		}
 	}
 
@@ -466,7 +478,7 @@ func (m *Manager) newPeer(active *session, participantRow domaincall.RuntimePart
 		withVideo: participantRow.WithVideo,
 		pc:        pc,
 		signals:   make(chan domaincall.RuntimeSignal, 32),
-		tracks:    make(map[string]*webrtc.TrackLocalStaticRTP),
+		tracks:    make(map[string]*relayTrack),
 	}
 
 	pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
@@ -567,7 +579,7 @@ func (m *Manager) prepareRelayTargets(
 			continue
 		}
 		if existing := target.tracks[trackKey]; existing != nil {
-			relays = append(relays, existing)
+			relays = append(relays, existing.track)
 			continue
 		}
 
@@ -575,15 +587,51 @@ func (m *Manager) prepareRelayTargets(
 		if err != nil {
 			continue
 		}
-		if _, err := target.pc.AddTrack(localTrack); err != nil {
+		sender, err := target.pc.AddTrack(localTrack)
+		if err != nil {
 			continue
 		}
-		target.tracks[trackKey] = localTrack
+		target.tracks[trackKey] = &relayTrack{
+			track:  localTrack,
+			sender: sender,
+		}
 		relays = append(relays, localTrack)
 		targets = append(targets, target)
+		go drainSenderRTCP(sender)
 	}
 
 	return targets, relays
+}
+
+func (m *Manager) removeSourceRelayTracksLocked(active *session, sourceKey string) []*peer {
+	if active == nil || sourceKey == "" {
+		return nil
+	}
+
+	prefix := sourceKey + "|"
+	affected := make([]*peer, 0)
+	for _, target := range active.peers {
+		if target == nil || len(target.tracks) == 0 {
+			continue
+		}
+
+		removed := false
+		for trackKey, relay := range target.tracks {
+			if !strings.HasPrefix(trackKey, prefix) {
+				continue
+			}
+			if relay != nil && relay.sender != nil {
+				_ = target.pc.RemoveTrack(relay.sender)
+			}
+			delete(target.tracks, trackKey)
+			removed = true
+		}
+		if removed {
+			affected = append(affected, target)
+		}
+	}
+
+	return affected
 }
 
 func (m *Manager) renegotiatePeer(sessionID string, target *peer) error {
@@ -724,6 +772,19 @@ func consumeRemoteTrack(track *webrtc.TrackRemote) {
 			if err != io.EOF {
 				return
 			}
+			return
+		}
+	}
+}
+
+func drainSenderRTCP(sender *webrtc.RTPSender) {
+	if sender == nil {
+		return
+	}
+
+	buffer := make([]byte, 1500)
+	for {
+		if _, _, err := sender.Read(buffer); err != nil {
 			return
 		}
 	}
