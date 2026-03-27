@@ -259,6 +259,13 @@ func callDiagnosticsProto(value domaincall.Diagnostics) *callv1.CallDiagnostics 
 	}
 }
 
+func callStatsSnapshotProto(value domaincall.Call, observedAt time.Time) *callv1.CallStatsSnapshot {
+	return &callv1.CallStatsSnapshot{
+		Call:       callProto(value),
+		ObservedAt: protoTime(observedAt),
+	}
+}
+
 func iceServerProto(server domaincall.IceServer) *callv1.IceServer {
 	return &callv1.IceServer{
 		Urls:       append([]string(nil), server.URLs...),

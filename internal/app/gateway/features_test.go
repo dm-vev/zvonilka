@@ -884,6 +884,32 @@ func (*testSubscribeCallEventsStream) SetTrailer(metadata.MD)       {}
 func (*testSubscribeCallEventsStream) SendMsg(any) error            { return nil }
 func (*testSubscribeCallEventsStream) RecvMsg(any) error            { return nil }
 
+type testSubscribeCallStatsStream struct {
+	ctx       context.Context
+	cancel    context.CancelFunc
+	responses chan *callv1.SubscribeCallStatsResponse
+}
+
+func newTestSubscribeCallStatsStream(ctx context.Context) *testSubscribeCallStatsStream {
+	streamCtx, cancel := context.WithCancel(ctx)
+	return &testSubscribeCallStatsStream{
+		ctx:       streamCtx,
+		cancel:    cancel,
+		responses: make(chan *callv1.SubscribeCallStatsResponse, 64),
+	}
+}
+
+func (s *testSubscribeCallStatsStream) Context() context.Context { return s.ctx }
+func (s *testSubscribeCallStatsStream) Send(resp *callv1.SubscribeCallStatsResponse) error {
+	s.responses <- resp
+	return nil
+}
+func (*testSubscribeCallStatsStream) SetHeader(metadata.MD) error  { return nil }
+func (*testSubscribeCallStatsStream) SendHeader(metadata.MD) error { return nil }
+func (*testSubscribeCallStatsStream) SetTrailer(metadata.MD)       {}
+func (*testSubscribeCallStatsStream) SendMsg(any) error            { return nil }
+func (*testSubscribeCallStatsStream) RecvMsg(any) error            { return nil }
+
 type gatewayMediaStore struct {
 	mu     sync.Mutex
 	assets map[string]media.MediaAsset

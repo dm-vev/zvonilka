@@ -24,4 +24,5 @@ service CallService {
   rpc AcknowledgeCallAdaptation(AcknowledgeCallAdaptationRequest) returns (AcknowledgeCallAdaptationResponse);
   rpc GetIceConfig(GetIceConfigRequest) returns (GetIceConfigResponse);
   rpc SubscribeCallEvents(SubscribeCallEventsRequest) returns (stream SubscribeCallEventsResponse);
+  rpc SubscribeCallStats(SubscribeCallStatsRequest) returns (stream SubscribeCallStatsResponse);
 }

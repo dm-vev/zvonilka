@@ -167,3 +167,12 @@ message SubscribeCallEventsRequest {
 message SubscribeCallEventsResponse {
   CallEvent event = 1;
 }
+
+message SubscribeCallStatsRequest {
+  string call_id = 1;
+  uint32 interval_ms = 2;
+}
+
+message SubscribeCallStatsResponse {
+  CallStatsSnapshot snapshot = 1;
+}

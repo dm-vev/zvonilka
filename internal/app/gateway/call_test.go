@@ -478,6 +478,105 @@ func TestSubscribeCallEventsFiltersTargetedSignals(t *testing.T) {
 	}
 }
 
+func TestSubscribeCallStatsStreamsDedicatedSnapshots(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	_, ownerCtx := fixture.mustCreateUserAndLogin(t, "call-stats-owner", "call-stats-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "call-stats-peer", "call-stats-peer@example.com")
+
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	started, err := fixture.api.StartCall(ownerCtx, &callv1.StartCallRequest{
+		ConversationId: created.Conversation.ConversationId,
+		WithVideo:      true,
+	})
+	if err != nil {
+		t.Fatalf("start call: %v", err)
+	}
+	if _, err := fixture.api.AcceptCall(peerCtx, &callv1.AcceptCallRequest{CallId: started.Call.CallId}); err != nil {
+		t.Fatalf("accept call: %v", err)
+	}
+	if _, err := fixture.api.JoinCall(peerCtx, &callv1.JoinCallRequest{
+		CallId:    started.Call.CallId,
+		WithVideo: true,
+	}); err != nil {
+		t.Fatalf("join call: %v", err)
+	}
+
+	stream := newTestSubscribeCallStatsStream(ownerCtx)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- fixture.api.SubscribeCallStats(&callv1.SubscribeCallStatsRequest{
+			CallId:     started.Call.CallId,
+			IntervalMs: 100,
+		}, stream)
+	}()
+
+	select {
+	case response := <-stream.responses:
+		snapshot := response.GetSnapshot()
+		if snapshot == nil || snapshot.GetCall() == nil {
+			t.Fatalf("expected initial stats snapshot, got %+v", response)
+		}
+		if snapshot.GetCall().GetCallId() != started.Call.CallId {
+			t.Fatalf("unexpected initial snapshot: %+v", snapshot)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for initial stats snapshot")
+	}
+
+	if _, err := fixture.api.UpdateCallMediaState(peerCtx, &callv1.UpdateCallMediaStateRequest{
+		CallId: started.Call.CallId,
+		MediaState: &callv1.CallMediaState{
+			AudioMuted:         true,
+			VideoMuted:         false,
+			CameraEnabled:      true,
+			ScreenShareEnabled: true,
+		},
+	}); err != nil {
+		t.Fatalf("update media state: %v", err)
+	}
+
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case response := <-stream.responses:
+			snapshot := response.GetSnapshot()
+			if snapshot == nil || snapshot.GetCall() == nil {
+				continue
+			}
+			for _, participant := range snapshot.GetCall().GetParticipants() {
+				if participant.GetUserId() != peer.ID {
+					continue
+				}
+				if !participant.GetMediaState().GetScreenShareEnabled() || !participant.GetMediaState().GetAudioMuted() {
+					continue
+				}
+				stream.cancel()
+				select {
+				case err := <-errCh:
+					if err != nil {
+						t.Fatalf("subscribe call stats returned error: %v", err)
+					}
+				case <-time.After(time.Second):
+					t.Fatal("timed out waiting for subscribe call stats loop to stop")
+				}
+				return
+			}
+		case <-timeout:
+			t.Fatal("timed out waiting for updated call stats snapshot")
+		}
+	}
+}
+
 func TestCallEventProtoCarriesScreenShareAdaptationMetadata(t *testing.T) {
 	t.Parallel()
 

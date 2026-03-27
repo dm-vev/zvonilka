@@ -36,6 +36,7 @@ const (
 	CallService_AcknowledgeCallAdaptation_FullMethodName = "/zvonilka.call.v1.CallService/AcknowledgeCallAdaptation"
 	CallService_GetIceConfig_FullMethodName              = "/zvonilka.call.v1.CallService/GetIceConfig"
 	CallService_SubscribeCallEvents_FullMethodName       = "/zvonilka.call.v1.CallService/SubscribeCallEvents"
+	CallService_SubscribeCallStats_FullMethodName        = "/zvonilka.call.v1.CallService/SubscribeCallStats"
 )
 
 // CallServiceClient is the client API for CallService service.
@@ -59,6 +60,7 @@ type CallServiceClient interface {
 	AcknowledgeCallAdaptation(ctx context.Context, in *AcknowledgeCallAdaptationRequest, opts ...grpc.CallOption) (*AcknowledgeCallAdaptationResponse, error)
 	GetIceConfig(ctx context.Context, in *GetIceConfigRequest, opts ...grpc.CallOption) (*GetIceConfigResponse, error)
 	SubscribeCallEvents(ctx context.Context, in *SubscribeCallEventsRequest, opts ...grpc.CallOption) (CallService_SubscribeCallEventsClient, error)
+	SubscribeCallStats(ctx context.Context, in *SubscribeCallStatsRequest, opts ...grpc.CallOption) (CallService_SubscribeCallStatsClient, error)
 }
 
 type callServiceClient struct {
@@ -245,6 +247,38 @@ func (x *callServiceSubscribeCallEventsClient) Recv() (*SubscribeCallEventsRespo
 	return m, nil
 }
 
+func (c *callServiceClient) SubscribeCallStats(ctx context.Context, in *SubscribeCallStatsRequest, opts ...grpc.CallOption) (CallService_SubscribeCallStatsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &CallService_ServiceDesc.Streams[1], CallService_SubscribeCallStats_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &callServiceSubscribeCallStatsClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type CallService_SubscribeCallStatsClient interface {
+	Recv() (*SubscribeCallStatsResponse, error)
+	grpc.ClientStream
+}
+
+type callServiceSubscribeCallStatsClient struct {
+	grpc.ClientStream
+}
+
+func (x *callServiceSubscribeCallStatsClient) Recv() (*SubscribeCallStatsResponse, error) {
+	m := new(SubscribeCallStatsResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // CallServiceServer is the server API for CallService service.
 // All implementations must embed UnimplementedCallServiceServer
 // for forward compatibility
@@ -266,6 +300,7 @@ type CallServiceServer interface {
 	AcknowledgeCallAdaptation(context.Context, *AcknowledgeCallAdaptationRequest) (*AcknowledgeCallAdaptationResponse, error)
 	GetIceConfig(context.Context, *GetIceConfigRequest) (*GetIceConfigResponse, error)
 	SubscribeCallEvents(*SubscribeCallEventsRequest, CallService_SubscribeCallEventsServer) error
+	SubscribeCallStats(*SubscribeCallStatsRequest, CallService_SubscribeCallStatsServer) error
 	mustEmbedUnimplementedCallServiceServer()
 }
 
@@ -323,6 +358,9 @@ func (UnimplementedCallServiceServer) GetIceConfig(context.Context, *GetIceConfi
 }
 func (UnimplementedCallServiceServer) SubscribeCallEvents(*SubscribeCallEventsRequest, CallService_SubscribeCallEventsServer) error {
 	return status.Errorf(codes.Unimplemented, "method SubscribeCallEvents not implemented")
+}
+func (UnimplementedCallServiceServer) SubscribeCallStats(*SubscribeCallStatsRequest, CallService_SubscribeCallStatsServer) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeCallStats not implemented")
 }
 func (UnimplementedCallServiceServer) mustEmbedUnimplementedCallServiceServer() {}
 
@@ -646,6 +684,27 @@ func (x *callServiceSubscribeCallEventsServer) Send(m *SubscribeCallEventsRespon
 	return x.ServerStream.SendMsg(m)
 }
 
+func _CallService_SubscribeCallStats_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(SubscribeCallStatsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(CallServiceServer).SubscribeCallStats(m, &callServiceSubscribeCallStatsServer{stream})
+}
+
+type CallService_SubscribeCallStatsServer interface {
+	Send(*SubscribeCallStatsResponse) error
+	grpc.ServerStream
+}
+
+type callServiceSubscribeCallStatsServer struct {
+	grpc.ServerStream
+}
+
+func (x *callServiceSubscribeCallStatsServer) Send(m *SubscribeCallStatsResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // CallService_ServiceDesc is the grpc.ServiceDesc for CallService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -722,6 +781,11 @@ var CallService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "SubscribeCallEvents",
 			Handler:       _CallService_SubscribeCallEvents_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "SubscribeCallStats",
+			Handler:       _CallService_SubscribeCallStats_Handler,
 			ServerStreams: true,
 		},
 	},

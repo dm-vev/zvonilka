@@ -1812,6 +1812,108 @@ func (x *SubscribeCallEventsResponse) GetEvent() *CallEvent {
 	return nil
 }
 
+type SubscribeCallStatsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	CallId     string `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
+	IntervalMs uint32 `protobuf:"varint,2,opt,name=interval_ms,json=intervalMs,proto3" json:"interval_ms,omitempty"`
+}
+
+func (x *SubscribeCallStatsRequest) Reset() {
+	*x = SubscribeCallStatsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_call_v1_requests_proto_msgTypes[34]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *SubscribeCallStatsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubscribeCallStatsRequest) ProtoMessage() {}
+
+func (x *SubscribeCallStatsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_call_v1_requests_proto_msgTypes[34]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubscribeCallStatsRequest.ProtoReflect.Descriptor instead.
+func (*SubscribeCallStatsRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *SubscribeCallStatsRequest) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
+}
+
+func (x *SubscribeCallStatsRequest) GetIntervalMs() uint32 {
+	if x != nil {
+		return x.IntervalMs
+	}
+	return 0
+}
+
+type SubscribeCallStatsResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Snapshot *CallStatsSnapshot `protobuf:"bytes,1,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
+}
+
+func (x *SubscribeCallStatsResponse) Reset() {
+	*x = SubscribeCallStatsResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_call_v1_requests_proto_msgTypes[35]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *SubscribeCallStatsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubscribeCallStatsResponse) ProtoMessage() {}
+
+func (x *SubscribeCallStatsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_call_v1_requests_proto_msgTypes[35]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubscribeCallStatsResponse.ProtoReflect.Descriptor instead.
+func (*SubscribeCallStatsResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *SubscribeCallStatsResponse) GetSnapshot() *CallStatsSnapshot {
+	if x != nil {
+		return x.Snapshot
+	}
+	return nil
+}
+
 var File_contracts_call_v1_requests_proto protoreflect.FileDescriptor
 
 var file_contracts_call_v1_requests_proto_rawDesc = []byte{
@@ -2033,11 +2135,22 @@ var file_contracts_call_v1_requests_proto_rawDesc = []byte{
 	0x0a, 0x05, 0x65, 0x76, 0x65, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1b, 0x2e,
 	0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31,
 	0x2e, 0x43, 0x61, 0x6c, 0x6c, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x52, 0x05, 0x65, 0x76, 0x65, 0x6e,
-	0x74, 0x42, 0x3f, 0x5a, 0x3d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f,
-	0x64, 0x6d, 0x2d, 0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2f,
-	0x67, 0x65, 0x6e, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61,
-	0x63, 0x74, 0x73, 0x2f, 0x63, 0x61, 0x6c, 0x6c, 0x2f, 0x76, 0x31, 0x3b, 0x63, 0x61, 0x6c, 0x6c,
-	0x76, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x74, 0x22, 0x55, 0x0a, 0x19, 0x53, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x43, 0x61,
+	0x6c, 0x6c, 0x53, 0x74, 0x61, 0x74, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x17,
+	0x0a, 0x07, 0x63, 0x61, 0x6c, 0x6c, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x06, 0x63, 0x61, 0x6c, 0x6c, 0x49, 0x64, 0x12, 0x1f, 0x0a, 0x0b, 0x69, 0x6e, 0x74, 0x65, 0x72,
+	0x76, 0x61, 0x6c, 0x5f, 0x6d, 0x73, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x0a, 0x69, 0x6e,
+	0x74, 0x65, 0x72, 0x76, 0x61, 0x6c, 0x4d, 0x73, 0x22, 0x5d, 0x0a, 0x1a, 0x53, 0x75, 0x62, 0x73,
+	0x63, 0x72, 0x69, 0x62, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x53, 0x74, 0x61, 0x74, 0x73, 0x52, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x3f, 0x0a, 0x08, 0x73, 0x6e, 0x61, 0x70, 0x73, 0x68,
+	0x6f, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x23, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69,
+	0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x61, 0x6c, 0x6c,
+	0x53, 0x74, 0x61, 0x74, 0x73, 0x53, 0x6e, 0x61, 0x70, 0x73, 0x68, 0x6f, 0x74, 0x52, 0x08, 0x73,
+	0x6e, 0x61, 0x70, 0x73, 0x68, 0x6f, 0x74, 0x42, 0x3f, 0x5a, 0x3d, 0x67, 0x69, 0x74, 0x68, 0x75,
+	0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6d, 0x2d, 0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f,
+	0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2f, 0x67, 0x65, 0x6e, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f,
+	0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74, 0x73, 0x2f, 0x63, 0x61, 0x6c, 0x6c, 0x2f, 0x76,
+	0x31, 0x3b, 0x63, 0x61, 0x6c, 0x6c, 0x76, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -2052,7 +2165,7 @@ func file_contracts_call_v1_requests_proto_rawDescGZIP() []byte {
 	return file_contracts_call_v1_requests_proto_rawDescData
 }
 
-var file_contracts_call_v1_requests_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_contracts_call_v1_requests_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_contracts_call_v1_requests_proto_goTypes = []interface{}{
 	(*StartCallRequest)(nil),                  // 0: zvonilka.call.v1.StartCallRequest
 	(*StartCallResponse)(nil),                 // 1: zvonilka.call.v1.StartCallResponse
@@ -2088,55 +2201,59 @@ var file_contracts_call_v1_requests_proto_goTypes = []interface{}{
 	(*GetIceConfigResponse)(nil),              // 31: zvonilka.call.v1.GetIceConfigResponse
 	(*SubscribeCallEventsRequest)(nil),        // 32: zvonilka.call.v1.SubscribeCallEventsRequest
 	(*SubscribeCallEventsResponse)(nil),       // 33: zvonilka.call.v1.SubscribeCallEventsResponse
-	(*Call)(nil),                              // 34: zvonilka.call.v1.Call
-	(*CallDiagnostics)(nil),                   // 35: zvonilka.call.v1.CallDiagnostics
-	(*v1.PageRequest)(nil),                    // 36: zvonilka.common.v1.PageRequest
-	(*v1.PageResponse)(nil),                   // 37: zvonilka.common.v1.PageResponse
-	(CallEndReason)(0),                        // 38: zvonilka.call.v1.CallEndReason
-	(*JoinTransport)(nil),                     // 39: zvonilka.call.v1.JoinTransport
-	(*CallParticipant)(nil),                   // 40: zvonilka.call.v1.CallParticipant
-	(*SessionDescription)(nil),                // 41: zvonilka.call.v1.SessionDescription
-	(*CallEvent)(nil),                         // 42: zvonilka.call.v1.CallEvent
-	(*IceCandidate)(nil),                      // 43: zvonilka.call.v1.IceCandidate
-	(*CallMediaState)(nil),                    // 44: zvonilka.call.v1.CallMediaState
-	(*IceServer)(nil),                         // 45: zvonilka.call.v1.IceServer
-	(*timestamppb.Timestamp)(nil),             // 46: google.protobuf.Timestamp
+	(*SubscribeCallStatsRequest)(nil),         // 34: zvonilka.call.v1.SubscribeCallStatsRequest
+	(*SubscribeCallStatsResponse)(nil),        // 35: zvonilka.call.v1.SubscribeCallStatsResponse
+	(*Call)(nil),                              // 36: zvonilka.call.v1.Call
+	(*CallDiagnostics)(nil),                   // 37: zvonilka.call.v1.CallDiagnostics
+	(*v1.PageRequest)(nil),                    // 38: zvonilka.common.v1.PageRequest
+	(*v1.PageResponse)(nil),                   // 39: zvonilka.common.v1.PageResponse
+	(CallEndReason)(0),                        // 40: zvonilka.call.v1.CallEndReason
+	(*JoinTransport)(nil),                     // 41: zvonilka.call.v1.JoinTransport
+	(*CallParticipant)(nil),                   // 42: zvonilka.call.v1.CallParticipant
+	(*SessionDescription)(nil),                // 43: zvonilka.call.v1.SessionDescription
+	(*CallEvent)(nil),                         // 44: zvonilka.call.v1.CallEvent
+	(*IceCandidate)(nil),                      // 45: zvonilka.call.v1.IceCandidate
+	(*CallMediaState)(nil),                    // 46: zvonilka.call.v1.CallMediaState
+	(*IceServer)(nil),                         // 47: zvonilka.call.v1.IceServer
+	(*timestamppb.Timestamp)(nil),             // 48: google.protobuf.Timestamp
+	(*CallStatsSnapshot)(nil),                 // 49: zvonilka.call.v1.CallStatsSnapshot
 }
 var file_contracts_call_v1_requests_proto_depIdxs = []int32{
-	34, // 0: zvonilka.call.v1.StartCallResponse.call:type_name -> zvonilka.call.v1.Call
-	34, // 1: zvonilka.call.v1.GetCallResponse.call:type_name -> zvonilka.call.v1.Call
-	35, // 2: zvonilka.call.v1.GetCallDiagnosticsResponse.diagnostics:type_name -> zvonilka.call.v1.CallDiagnostics
-	36, // 3: zvonilka.call.v1.ListCallsRequest.page:type_name -> zvonilka.common.v1.PageRequest
-	34, // 4: zvonilka.call.v1.ListCallsResponse.calls:type_name -> zvonilka.call.v1.Call
-	37, // 5: zvonilka.call.v1.ListCallsResponse.page:type_name -> zvonilka.common.v1.PageResponse
-	34, // 6: zvonilka.call.v1.AcceptCallResponse.call:type_name -> zvonilka.call.v1.Call
-	34, // 7: zvonilka.call.v1.DeclineCallResponse.call:type_name -> zvonilka.call.v1.Call
-	34, // 8: zvonilka.call.v1.CancelCallResponse.call:type_name -> zvonilka.call.v1.Call
-	38, // 9: zvonilka.call.v1.EndCallRequest.reason:type_name -> zvonilka.call.v1.CallEndReason
-	34, // 10: zvonilka.call.v1.EndCallResponse.call:type_name -> zvonilka.call.v1.Call
-	34, // 11: zvonilka.call.v1.JoinCallResponse.call:type_name -> zvonilka.call.v1.Call
-	39, // 12: zvonilka.call.v1.JoinCallResponse.transport:type_name -> zvonilka.call.v1.JoinTransport
-	34, // 13: zvonilka.call.v1.HandoffCallResponse.call:type_name -> zvonilka.call.v1.Call
-	40, // 14: zvonilka.call.v1.HandoffCallResponse.participant:type_name -> zvonilka.call.v1.CallParticipant
-	39, // 15: zvonilka.call.v1.HandoffCallResponse.transport:type_name -> zvonilka.call.v1.JoinTransport
-	41, // 16: zvonilka.call.v1.PublishCallDescriptionRequest.description:type_name -> zvonilka.call.v1.SessionDescription
-	42, // 17: zvonilka.call.v1.PublishCallDescriptionResponse.event:type_name -> zvonilka.call.v1.CallEvent
-	43, // 18: zvonilka.call.v1.PublishCallIceCandidateRequest.ice_candidate:type_name -> zvonilka.call.v1.IceCandidate
-	42, // 19: zvonilka.call.v1.PublishCallIceCandidateResponse.event:type_name -> zvonilka.call.v1.CallEvent
-	34, // 20: zvonilka.call.v1.LeaveCallResponse.call:type_name -> zvonilka.call.v1.Call
-	44, // 21: zvonilka.call.v1.UpdateCallMediaStateRequest.media_state:type_name -> zvonilka.call.v1.CallMediaState
-	34, // 22: zvonilka.call.v1.UpdateCallMediaStateResponse.call:type_name -> zvonilka.call.v1.Call
-	40, // 23: zvonilka.call.v1.UpdateCallMediaStateResponse.participant:type_name -> zvonilka.call.v1.CallParticipant
-	34, // 24: zvonilka.call.v1.AcknowledgeCallAdaptationResponse.call:type_name -> zvonilka.call.v1.Call
-	40, // 25: zvonilka.call.v1.AcknowledgeCallAdaptationResponse.participant:type_name -> zvonilka.call.v1.CallParticipant
-	45, // 26: zvonilka.call.v1.GetIceConfigResponse.ice_servers:type_name -> zvonilka.call.v1.IceServer
-	46, // 27: zvonilka.call.v1.GetIceConfigResponse.expires_at:type_name -> google.protobuf.Timestamp
-	42, // 28: zvonilka.call.v1.SubscribeCallEventsResponse.event:type_name -> zvonilka.call.v1.CallEvent
-	29, // [29:29] is the sub-list for method output_type
-	29, // [29:29] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	36, // 0: zvonilka.call.v1.StartCallResponse.call:type_name -> zvonilka.call.v1.Call
+	36, // 1: zvonilka.call.v1.GetCallResponse.call:type_name -> zvonilka.call.v1.Call
+	37, // 2: zvonilka.call.v1.GetCallDiagnosticsResponse.diagnostics:type_name -> zvonilka.call.v1.CallDiagnostics
+	38, // 3: zvonilka.call.v1.ListCallsRequest.page:type_name -> zvonilka.common.v1.PageRequest
+	36, // 4: zvonilka.call.v1.ListCallsResponse.calls:type_name -> zvonilka.call.v1.Call
+	39, // 5: zvonilka.call.v1.ListCallsResponse.page:type_name -> zvonilka.common.v1.PageResponse
+	36, // 6: zvonilka.call.v1.AcceptCallResponse.call:type_name -> zvonilka.call.v1.Call
+	36, // 7: zvonilka.call.v1.DeclineCallResponse.call:type_name -> zvonilka.call.v1.Call
+	36, // 8: zvonilka.call.v1.CancelCallResponse.call:type_name -> zvonilka.call.v1.Call
+	40, // 9: zvonilka.call.v1.EndCallRequest.reason:type_name -> zvonilka.call.v1.CallEndReason
+	36, // 10: zvonilka.call.v1.EndCallResponse.call:type_name -> zvonilka.call.v1.Call
+	36, // 11: zvonilka.call.v1.JoinCallResponse.call:type_name -> zvonilka.call.v1.Call
+	41, // 12: zvonilka.call.v1.JoinCallResponse.transport:type_name -> zvonilka.call.v1.JoinTransport
+	36, // 13: zvonilka.call.v1.HandoffCallResponse.call:type_name -> zvonilka.call.v1.Call
+	42, // 14: zvonilka.call.v1.HandoffCallResponse.participant:type_name -> zvonilka.call.v1.CallParticipant
+	41, // 15: zvonilka.call.v1.HandoffCallResponse.transport:type_name -> zvonilka.call.v1.JoinTransport
+	43, // 16: zvonilka.call.v1.PublishCallDescriptionRequest.description:type_name -> zvonilka.call.v1.SessionDescription
+	44, // 17: zvonilka.call.v1.PublishCallDescriptionResponse.event:type_name -> zvonilka.call.v1.CallEvent
+	45, // 18: zvonilka.call.v1.PublishCallIceCandidateRequest.ice_candidate:type_name -> zvonilka.call.v1.IceCandidate
+	44, // 19: zvonilka.call.v1.PublishCallIceCandidateResponse.event:type_name -> zvonilka.call.v1.CallEvent
+	36, // 20: zvonilka.call.v1.LeaveCallResponse.call:type_name -> zvonilka.call.v1.Call
+	46, // 21: zvonilka.call.v1.UpdateCallMediaStateRequest.media_state:type_name -> zvonilka.call.v1.CallMediaState
+	36, // 22: zvonilka.call.v1.UpdateCallMediaStateResponse.call:type_name -> zvonilka.call.v1.Call
+	42, // 23: zvonilka.call.v1.UpdateCallMediaStateResponse.participant:type_name -> zvonilka.call.v1.CallParticipant
+	36, // 24: zvonilka.call.v1.AcknowledgeCallAdaptationResponse.call:type_name -> zvonilka.call.v1.Call
+	42, // 25: zvonilka.call.v1.AcknowledgeCallAdaptationResponse.participant:type_name -> zvonilka.call.v1.CallParticipant
+	47, // 26: zvonilka.call.v1.GetIceConfigResponse.ice_servers:type_name -> zvonilka.call.v1.IceServer
+	48, // 27: zvonilka.call.v1.GetIceConfigResponse.expires_at:type_name -> google.protobuf.Timestamp
+	44, // 28: zvonilka.call.v1.SubscribeCallEventsResponse.event:type_name -> zvonilka.call.v1.CallEvent
+	49, // 29: zvonilka.call.v1.SubscribeCallStatsResponse.snapshot:type_name -> zvonilka.call.v1.CallStatsSnapshot
+	30, // [30:30] is the sub-list for method output_type
+	30, // [30:30] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_contracts_call_v1_requests_proto_init() }
@@ -2554,6 +2671,30 @@ func file_contracts_call_v1_requests_proto_init() {
 				return nil
 			}
 		}
+		file_contracts_call_v1_requests_proto_msgTypes[34].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*SubscribeCallStatsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_call_v1_requests_proto_msgTypes[35].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*SubscribeCallStatsResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -2561,7 +2702,7 @@ func file_contracts_call_v1_requests_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_contracts_call_v1_requests_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   34,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

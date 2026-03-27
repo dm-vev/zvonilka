@@ -179,6 +179,11 @@ message CallDiagnostics {
   google.protobuf.Timestamp last_applied_at = 9;
 }
 
+message CallStatsSnapshot {
+  Call call = 1;
+  google.protobuf.Timestamp observed_at = 2;
+}
+
 message Call {
   string call_id = 1;
   string conversation_id = 2;

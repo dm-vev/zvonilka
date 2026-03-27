@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	callv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1"
@@ -477,4 +478,77 @@ func (a *api) SubscribeCallEvents(
 		case <-reconcileTicker.C:
 		}
 	}
+}
+
+// SubscribeCallStats streams dedicated live call stats snapshots for one visible call.
+func (a *api) SubscribeCallStats(
+	req *callv1.SubscribeCallStatsRequest,
+	stream callv1.CallService_SubscribeCallStatsServer,
+) error {
+	authContext, err := a.requireAuth(stream.Context())
+	if err != nil {
+		return err
+	}
+
+	interval := subscribeCallStatsInterval(req.GetIntervalMs())
+	sendSnapshot := func() error {
+		callRow, loadErr := a.call.GetCall(stream.Context(), domaincall.GetParams{
+			CallID:    req.GetCallId(),
+			AccountID: authContext.Account.ID,
+		})
+		if loadErr != nil {
+			if stream.Context().Err() != nil {
+				return nil
+			}
+			return grpcError(loadErr)
+		}
+		if sendErr := stream.Send(&callv1.SubscribeCallStatsResponse{
+			Snapshot: callStatsSnapshotProto(callRow, time.Now().UTC()),
+		}); sendErr != nil {
+			return sendErr
+		}
+		if callRow.State == domaincall.StateEnded {
+			return nil
+		}
+		return errCallStatsContinue
+	}
+
+	if err := sendSnapshot(); err != errCallStatsContinue {
+		return err
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-stream.Context().Done():
+			return nil
+		case <-ticker.C:
+			if err := sendSnapshot(); err != errCallStatsContinue {
+				return err
+			}
+		}
+	}
+}
+
+var errCallStatsContinue = errors.New("continue call stats stream")
+
+func subscribeCallStatsInterval(intervalMs uint32) time.Duration {
+	const (
+		defaultInterval = time.Second
+		minInterval     = 100 * time.Millisecond
+		maxInterval     = 5 * time.Second
+	)
+	if intervalMs == 0 {
+		return defaultInterval
+	}
+	interval := time.Duration(intervalMs) * time.Millisecond
+	if interval < minInterval {
+		return minInterval
+	}
+	if interval > maxInterval {
+		return maxInterval
+	}
+	return interval
 }

@@ -27,7 +27,7 @@ var file_contracts_call_v1_call_proto_rawDesc = []byte{
 	0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31,
 	0x1a, 0x20, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74, 0x73, 0x2f, 0x63, 0x61, 0x6c, 0x6c,
 	0x2f, 0x76, 0x31, 0x2f, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x73, 0x2e, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x32, 0xad, 0x0d, 0x0a, 0x0b, 0x43, 0x61, 0x6c, 0x6c, 0x53, 0x65, 0x72, 0x76, 0x69,
+	0x74, 0x6f, 0x32, 0xa0, 0x0e, 0x0a, 0x0b, 0x43, 0x61, 0x6c, 0x6c, 0x53, 0x65, 0x72, 0x76, 0x69,
 	0x63, 0x65, 0x12, 0x54, 0x0a, 0x09, 0x53, 0x74, 0x61, 0x72, 0x74, 0x43, 0x61, 0x6c, 0x6c, 0x12,
 	0x22, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e,
 	0x76, 0x31, 0x2e, 0x53, 0x74, 0x61, 0x72, 0x74, 0x43, 0x61, 0x6c, 0x6c, 0x52, 0x65, 0x71, 0x75,
@@ -134,11 +134,18 @@ var file_contracts_call_v1_call_proto_rawDesc = []byte{
 	0x74, 0x1a, 0x2d, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c,
 	0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x53, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x43, 0x61,
 	0x6c, 0x6c, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
-	0x30, 0x01, 0x42, 0x3f, 0x5a, 0x3d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d,
-	0x2f, 0x64, 0x6d, 0x2d, 0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61,
-	0x2f, 0x67, 0x65, 0x6e, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x72,
-	0x61, 0x63, 0x74, 0x73, 0x2f, 0x63, 0x61, 0x6c, 0x6c, 0x2f, 0x76, 0x31, 0x3b, 0x63, 0x61, 0x6c,
-	0x6c, 0x76, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x30, 0x01, 0x12, 0x71, 0x0a, 0x12, 0x53, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x43,
+	0x61, 0x6c, 0x6c, 0x53, 0x74, 0x61, 0x74, 0x73, 0x12, 0x2b, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69,
+	0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x53, 0x75, 0x62, 0x73,
+	0x63, 0x72, 0x69, 0x62, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x53, 0x74, 0x61, 0x74, 0x73, 0x52, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x2c, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61,
+	0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x53, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69,
+	0x62, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x53, 0x74, 0x61, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f,
+	0x6e, 0x73, 0x65, 0x30, 0x01, 0x42, 0x3f, 0x5a, 0x3d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e,
+	0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6d, 0x2d, 0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e, 0x69,
+	0x6c, 0x6b, 0x61, 0x2f, 0x67, 0x65, 0x6e, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f,
+	0x6e, 0x74, 0x72, 0x61, 0x63, 0x74, 0x73, 0x2f, 0x63, 0x61, 0x6c, 0x6c, 0x2f, 0x76, 0x31, 0x3b,
+	0x63, 0x61, 0x6c, 0x6c, 0x76, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var file_contracts_call_v1_call_proto_goTypes = []interface{}{
@@ -159,23 +166,25 @@ var file_contracts_call_v1_call_proto_goTypes = []interface{}{
 	(*AcknowledgeCallAdaptationRequest)(nil),  // 14: zvonilka.call.v1.AcknowledgeCallAdaptationRequest
 	(*GetIceConfigRequest)(nil),               // 15: zvonilka.call.v1.GetIceConfigRequest
 	(*SubscribeCallEventsRequest)(nil),        // 16: zvonilka.call.v1.SubscribeCallEventsRequest
-	(*StartCallResponse)(nil),                 // 17: zvonilka.call.v1.StartCallResponse
-	(*GetCallResponse)(nil),                   // 18: zvonilka.call.v1.GetCallResponse
-	(*GetCallDiagnosticsResponse)(nil),        // 19: zvonilka.call.v1.GetCallDiagnosticsResponse
-	(*ListCallsResponse)(nil),                 // 20: zvonilka.call.v1.ListCallsResponse
-	(*AcceptCallResponse)(nil),                // 21: zvonilka.call.v1.AcceptCallResponse
-	(*DeclineCallResponse)(nil),               // 22: zvonilka.call.v1.DeclineCallResponse
-	(*CancelCallResponse)(nil),                // 23: zvonilka.call.v1.CancelCallResponse
-	(*EndCallResponse)(nil),                   // 24: zvonilka.call.v1.EndCallResponse
-	(*JoinCallResponse)(nil),                  // 25: zvonilka.call.v1.JoinCallResponse
-	(*HandoffCallResponse)(nil),               // 26: zvonilka.call.v1.HandoffCallResponse
-	(*PublishCallDescriptionResponse)(nil),    // 27: zvonilka.call.v1.PublishCallDescriptionResponse
-	(*PublishCallIceCandidateResponse)(nil),   // 28: zvonilka.call.v1.PublishCallIceCandidateResponse
-	(*LeaveCallResponse)(nil),                 // 29: zvonilka.call.v1.LeaveCallResponse
-	(*UpdateCallMediaStateResponse)(nil),      // 30: zvonilka.call.v1.UpdateCallMediaStateResponse
-	(*AcknowledgeCallAdaptationResponse)(nil), // 31: zvonilka.call.v1.AcknowledgeCallAdaptationResponse
-	(*GetIceConfigResponse)(nil),              // 32: zvonilka.call.v1.GetIceConfigResponse
-	(*SubscribeCallEventsResponse)(nil),       // 33: zvonilka.call.v1.SubscribeCallEventsResponse
+	(*SubscribeCallStatsRequest)(nil),         // 17: zvonilka.call.v1.SubscribeCallStatsRequest
+	(*StartCallResponse)(nil),                 // 18: zvonilka.call.v1.StartCallResponse
+	(*GetCallResponse)(nil),                   // 19: zvonilka.call.v1.GetCallResponse
+	(*GetCallDiagnosticsResponse)(nil),        // 20: zvonilka.call.v1.GetCallDiagnosticsResponse
+	(*ListCallsResponse)(nil),                 // 21: zvonilka.call.v1.ListCallsResponse
+	(*AcceptCallResponse)(nil),                // 22: zvonilka.call.v1.AcceptCallResponse
+	(*DeclineCallResponse)(nil),               // 23: zvonilka.call.v1.DeclineCallResponse
+	(*CancelCallResponse)(nil),                // 24: zvonilka.call.v1.CancelCallResponse
+	(*EndCallResponse)(nil),                   // 25: zvonilka.call.v1.EndCallResponse
+	(*JoinCallResponse)(nil),                  // 26: zvonilka.call.v1.JoinCallResponse
+	(*HandoffCallResponse)(nil),               // 27: zvonilka.call.v1.HandoffCallResponse
+	(*PublishCallDescriptionResponse)(nil),    // 28: zvonilka.call.v1.PublishCallDescriptionResponse
+	(*PublishCallIceCandidateResponse)(nil),   // 29: zvonilka.call.v1.PublishCallIceCandidateResponse
+	(*LeaveCallResponse)(nil),                 // 30: zvonilka.call.v1.LeaveCallResponse
+	(*UpdateCallMediaStateResponse)(nil),      // 31: zvonilka.call.v1.UpdateCallMediaStateResponse
+	(*AcknowledgeCallAdaptationResponse)(nil), // 32: zvonilka.call.v1.AcknowledgeCallAdaptationResponse
+	(*GetIceConfigResponse)(nil),              // 33: zvonilka.call.v1.GetIceConfigResponse
+	(*SubscribeCallEventsResponse)(nil),       // 34: zvonilka.call.v1.SubscribeCallEventsResponse
+	(*SubscribeCallStatsResponse)(nil),        // 35: zvonilka.call.v1.SubscribeCallStatsResponse
 }
 var file_contracts_call_v1_call_proto_depIdxs = []int32{
 	0,  // 0: zvonilka.call.v1.CallService.StartCall:input_type -> zvonilka.call.v1.StartCallRequest
@@ -195,25 +204,27 @@ var file_contracts_call_v1_call_proto_depIdxs = []int32{
 	14, // 14: zvonilka.call.v1.CallService.AcknowledgeCallAdaptation:input_type -> zvonilka.call.v1.AcknowledgeCallAdaptationRequest
 	15, // 15: zvonilka.call.v1.CallService.GetIceConfig:input_type -> zvonilka.call.v1.GetIceConfigRequest
 	16, // 16: zvonilka.call.v1.CallService.SubscribeCallEvents:input_type -> zvonilka.call.v1.SubscribeCallEventsRequest
-	17, // 17: zvonilka.call.v1.CallService.StartCall:output_type -> zvonilka.call.v1.StartCallResponse
-	18, // 18: zvonilka.call.v1.CallService.GetCall:output_type -> zvonilka.call.v1.GetCallResponse
-	19, // 19: zvonilka.call.v1.CallService.GetCallDiagnostics:output_type -> zvonilka.call.v1.GetCallDiagnosticsResponse
-	20, // 20: zvonilka.call.v1.CallService.ListCalls:output_type -> zvonilka.call.v1.ListCallsResponse
-	21, // 21: zvonilka.call.v1.CallService.AcceptCall:output_type -> zvonilka.call.v1.AcceptCallResponse
-	22, // 22: zvonilka.call.v1.CallService.DeclineCall:output_type -> zvonilka.call.v1.DeclineCallResponse
-	23, // 23: zvonilka.call.v1.CallService.CancelCall:output_type -> zvonilka.call.v1.CancelCallResponse
-	24, // 24: zvonilka.call.v1.CallService.EndCall:output_type -> zvonilka.call.v1.EndCallResponse
-	25, // 25: zvonilka.call.v1.CallService.JoinCall:output_type -> zvonilka.call.v1.JoinCallResponse
-	26, // 26: zvonilka.call.v1.CallService.HandoffCall:output_type -> zvonilka.call.v1.HandoffCallResponse
-	27, // 27: zvonilka.call.v1.CallService.PublishCallDescription:output_type -> zvonilka.call.v1.PublishCallDescriptionResponse
-	28, // 28: zvonilka.call.v1.CallService.PublishCallIceCandidate:output_type -> zvonilka.call.v1.PublishCallIceCandidateResponse
-	29, // 29: zvonilka.call.v1.CallService.LeaveCall:output_type -> zvonilka.call.v1.LeaveCallResponse
-	30, // 30: zvonilka.call.v1.CallService.UpdateCallMediaState:output_type -> zvonilka.call.v1.UpdateCallMediaStateResponse
-	31, // 31: zvonilka.call.v1.CallService.AcknowledgeCallAdaptation:output_type -> zvonilka.call.v1.AcknowledgeCallAdaptationResponse
-	32, // 32: zvonilka.call.v1.CallService.GetIceConfig:output_type -> zvonilka.call.v1.GetIceConfigResponse
-	33, // 33: zvonilka.call.v1.CallService.SubscribeCallEvents:output_type -> zvonilka.call.v1.SubscribeCallEventsResponse
-	17, // [17:34] is the sub-list for method output_type
-	0,  // [0:17] is the sub-list for method input_type
+	17, // 17: zvonilka.call.v1.CallService.SubscribeCallStats:input_type -> zvonilka.call.v1.SubscribeCallStatsRequest
+	18, // 18: zvonilka.call.v1.CallService.StartCall:output_type -> zvonilka.call.v1.StartCallResponse
+	19, // 19: zvonilka.call.v1.CallService.GetCall:output_type -> zvonilka.call.v1.GetCallResponse
+	20, // 20: zvonilka.call.v1.CallService.GetCallDiagnostics:output_type -> zvonilka.call.v1.GetCallDiagnosticsResponse
+	21, // 21: zvonilka.call.v1.CallService.ListCalls:output_type -> zvonilka.call.v1.ListCallsResponse
+	22, // 22: zvonilka.call.v1.CallService.AcceptCall:output_type -> zvonilka.call.v1.AcceptCallResponse
+	23, // 23: zvonilka.call.v1.CallService.DeclineCall:output_type -> zvonilka.call.v1.DeclineCallResponse
+	24, // 24: zvonilka.call.v1.CallService.CancelCall:output_type -> zvonilka.call.v1.CancelCallResponse
+	25, // 25: zvonilka.call.v1.CallService.EndCall:output_type -> zvonilka.call.v1.EndCallResponse
+	26, // 26: zvonilka.call.v1.CallService.JoinCall:output_type -> zvonilka.call.v1.JoinCallResponse
+	27, // 27: zvonilka.call.v1.CallService.HandoffCall:output_type -> zvonilka.call.v1.HandoffCallResponse
+	28, // 28: zvonilka.call.v1.CallService.PublishCallDescription:output_type -> zvonilka.call.v1.PublishCallDescriptionResponse
+	29, // 29: zvonilka.call.v1.CallService.PublishCallIceCandidate:output_type -> zvonilka.call.v1.PublishCallIceCandidateResponse
+	30, // 30: zvonilka.call.v1.CallService.LeaveCall:output_type -> zvonilka.call.v1.LeaveCallResponse
+	31, // 31: zvonilka.call.v1.CallService.UpdateCallMediaState:output_type -> zvonilka.call.v1.UpdateCallMediaStateResponse
+	32, // 32: zvonilka.call.v1.CallService.AcknowledgeCallAdaptation:output_type -> zvonilka.call.v1.AcknowledgeCallAdaptationResponse
+	33, // 33: zvonilka.call.v1.CallService.GetIceConfig:output_type -> zvonilka.call.v1.GetIceConfigResponse
+	34, // 34: zvonilka.call.v1.CallService.SubscribeCallEvents:output_type -> zvonilka.call.v1.SubscribeCallEventsResponse
+	35, // 35: zvonilka.call.v1.CallService.SubscribeCallStats:output_type -> zvonilka.call.v1.SubscribeCallStatsResponse
+	18, // [18:36] is the sub-list for method output_type
+	0,  // [0:18] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name
