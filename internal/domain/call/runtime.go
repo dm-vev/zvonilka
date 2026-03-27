@@ -49,6 +49,7 @@ type RuntimeSignal struct {
 	SessionID       string
 	Description     *SessionDescription
 	IceCandidate    *Candidate
+	Metadata        map[string]string
 }
 
 // RuntimeParticipant describes one participant join request for the media plane.

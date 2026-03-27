@@ -254,6 +254,11 @@ func (s *Service) appendGeneratedSignals(
 			if signal.IceCandidate.UsernameFragment != "" {
 				metadata[callMetadataCandidateUfrag] = signal.IceCandidate.UsernameFragment
 			}
+		case len(signal.Metadata) > 0:
+			eventType = EventTypeMediaUpdated
+			for key, value := range signal.Metadata {
+				metadata[key] = value
+			}
 		default:
 			continue
 		}

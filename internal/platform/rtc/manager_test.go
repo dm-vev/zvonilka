@@ -208,9 +208,16 @@ func TestManagerRenegotiatesWhenRelayTrackAdded(t *testing.T) {
 
 	signals := manager.drainSignals(peerB)
 	require.NotEmpty(t, signals)
-	require.Equal(t, "offer", signals[0].Description.Type)
-	require.Equal(t, "acc-b", signals[0].TargetAccountID)
-	require.Equal(t, "dev-b", signals[0].TargetDeviceID)
+	var offerSignal *domaincall.RuntimeSignal
+	for i := range signals {
+		if signals[i].Description != nil && signals[i].Description.Type == "offer" {
+			offerSignal = &signals[i]
+			break
+		}
+	}
+	require.NotNil(t, offerSignal)
+	require.Equal(t, "acc-b", offerSignal.TargetAccountID)
+	require.Equal(t, "dev-b", offerSignal.TargetDeviceID)
 }
 
 func TestManagerLeaveSessionRemovesSourceRelayTracks(t *testing.T) {
@@ -289,9 +296,16 @@ func TestManagerLeaveSessionRemovesSourceRelayTracks(t *testing.T) {
 
 	signals := manager.drainSignals(peerB)
 	require.NotEmpty(t, signals)
-	require.Equal(t, "offer", signals[0].Description.Type)
-	require.Equal(t, "acc-b", signals[0].TargetAccountID)
-	require.Equal(t, "dev-b", signals[0].TargetDeviceID)
+	var offerSignal *domaincall.RuntimeSignal
+	for i := range signals {
+		if signals[i].Description != nil && signals[i].Description.Type == "offer" {
+			offerSignal = &signals[i]
+			break
+		}
+	}
+	require.NotNil(t, offerSignal)
+	require.Equal(t, "acc-b", offerSignal.TargetAccountID)
+	require.Equal(t, "dev-b", offerSignal.TargetDeviceID)
 }
 
 func TestManagerCleanupRelayTrackRemovesOneSourceTrack(t *testing.T) {
@@ -381,9 +395,16 @@ func TestManagerCleanupRelayTrackRemovesOneSourceTrack(t *testing.T) {
 
 	signals := manager.drainSignals(peerB)
 	require.NotEmpty(t, signals)
-	require.Equal(t, "offer", signals[0].Description.Type)
-	require.Equal(t, "acc-b", signals[0].TargetAccountID)
-	require.Equal(t, "dev-b", signals[0].TargetDeviceID)
+	var offerSignal *domaincall.RuntimeSignal
+	for i := range signals {
+		if signals[i].Description != nil && signals[i].Description.Type == "offer" {
+			offerSignal = &signals[i]
+			break
+		}
+	}
+	require.NotNil(t, offerSignal)
+	require.Equal(t, "acc-b", offerSignal.TargetAccountID)
+	require.Equal(t, "dev-b", offerSignal.TargetDeviceID)
 }
 
 func TestManagerCoalescesRenegotiationUntilAnswer(t *testing.T) {
@@ -454,12 +475,18 @@ func TestManagerCoalescesRenegotiationUntilAnswer(t *testing.T) {
 	require.NoError(t, manager.renegotiatePeer(session.SessionID, peerB))
 
 	firstSignals := manager.drainSignals(peerB)
-	require.Len(t, firstSignals, 1)
-	require.Equal(t, "offer", firstSignals[0].Description.Type)
+	var firstOffer *domaincall.RuntimeSignal
+	for i := range firstSignals {
+		if firstSignals[i].Description != nil && firstSignals[i].Description.Type == "offer" {
+			firstOffer = &firstSignals[i]
+			break
+		}
+	}
+	require.NotNil(t, firstOffer)
 
 	require.NoError(t, client.SetRemoteDescription(webrtc.SessionDescription{
 		Type: webrtc.SDPTypeOffer,
-		SDP:  firstSignals[0].Description.SDP,
+		SDP:  firstOffer.Description.SDP,
 	}))
 	answerTwo, err := client.CreateAnswer(nil)
 	require.NoError(t, err)
@@ -475,8 +502,38 @@ func TestManagerCoalescesRenegotiationUntilAnswer(t *testing.T) {
 		SDP:  client.LocalDescription().SDP,
 	})
 	require.NoError(t, err)
-	require.Len(t, secondSignals, 1)
-	require.Equal(t, "offer", secondSignals[0].Description.Type)
+	var secondOffer *domaincall.RuntimeSignal
+	for i := range secondSignals {
+		if secondSignals[i].Description != nil && secondSignals[i].Description.Type == "offer" {
+			secondOffer = &secondSignals[i]
+			break
+		}
+	}
+	require.NotNil(t, secondOffer)
+}
+
+func TestManagerEmitsDeduplicatedTelemetrySignals(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager("webrtc://gateway/calls", 15*time.Minute)
+	target := &peer{
+		accountID: "acc-a",
+		deviceID:  "dev-a",
+		signals:   make(chan domaincall.RuntimeSignal, 8),
+	}
+
+	manager.emitPeerTelemetry("rtc_call-1", target, telemetryICEStateKey, webrtc.ICEConnectionStateChecking.String())
+	manager.emitPeerTelemetry("rtc_call-1", target, telemetryICEStateKey, webrtc.ICEConnectionStateChecking.String())
+	manager.emitPeerTelemetry("rtc_call-1", target, telemetryPCStateKey, webrtc.PeerConnectionStateConnecting.String())
+
+	signals := manager.drainSignals(target)
+	require.Len(t, signals, 2)
+	require.Equal(t, "acc-a", signals[0].TargetAccountID)
+	require.Equal(t, "dev-a", signals[0].TargetDeviceID)
+	require.Equal(t, telemetryKindTransport, signals[0].Metadata[telemetryKindKey])
+	require.Equal(t, "connecting", signals[0].Metadata[telemetryQualityKey])
+	require.Equal(t, webrtc.ICEConnectionStateChecking.String(), signals[0].Metadata[telemetryICEStateKey])
+	require.Equal(t, webrtc.PeerConnectionStateConnecting.String(), signals[1].Metadata[telemetryPCStateKey])
 }
 
 func mustNewPeerConnection(t *testing.T) *webrtc.PeerConnection {

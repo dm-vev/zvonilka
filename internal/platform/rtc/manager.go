@@ -65,6 +65,9 @@ type peer struct {
 	mu        sync.Mutex
 	offering  bool
 	queued    bool
+	lastPC    string
+	lastICE   string
+	lastSIG   string
 }
 
 type relayTrack struct {
@@ -72,6 +75,15 @@ type relayTrack struct {
 	track     *webrtc.TrackLocalStaticRTP
 	sender    *webrtc.RTPSender
 }
+
+const (
+	telemetryKindKey       = "telemetry_kind"
+	telemetryKindTransport = "transport_state"
+	telemetryPCStateKey    = "peer_connection_state"
+	telemetryICEStateKey   = "ice_connection_state"
+	telemetrySignalingKey  = "signaling_state"
+	telemetryQualityKey    = "transport_quality"
+)
 
 // NewManager constructs an in-process RTC session manager.
 func NewManager(endpoint string, tokenTTL time.Duration, opts ...Option) *Manager {
@@ -517,6 +529,16 @@ func (m *Manager) newPeer(active *session, participantRow domaincall.RuntimePart
 		}
 	})
 
+	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		m.emitPeerTelemetry(active.id, value, telemetryPCStateKey, state.String())
+	})
+	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
+		m.emitPeerTelemetry(active.id, value, telemetryICEStateKey, state.String())
+	})
+	pc.OnSignalingStateChange(func(state webrtc.SignalingState) {
+		m.emitPeerTelemetry(active.id, value, telemetrySignalingKey, state.String())
+	})
+
 	pc.OnTrack(func(track *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
 		go m.handleRemoteTrack(active.id, participantKey(participantRow.AccountID, participantRow.DeviceID), track)
 	})
@@ -537,6 +559,27 @@ func (m *Manager) drainSignals(peerConn *peer) []domaincall.RuntimeSignal {
 		default:
 			return signals
 		}
+	}
+}
+
+func (m *Manager) emitPeerTelemetry(sessionID string, target *peer, key string, value string) {
+	if target == nil || strings.TrimSpace(sessionID) == "" || strings.TrimSpace(key) == "" {
+		return
+	}
+
+	metadata := target.updateTelemetry(key, value)
+	if len(metadata) == 0 {
+		return
+	}
+
+	select {
+	case target.signals <- domaincall.RuntimeSignal{
+		TargetAccountID: target.accountID,
+		TargetDeviceID:  target.deviceID,
+		SessionID:       sessionID,
+		Metadata:        metadata,
+	}:
+	default:
 	}
 }
 
@@ -778,6 +821,64 @@ func (p *peer) abortOffer() {
 
 	p.offering = false
 	p.queued = false
+}
+
+func (p *peer) updateTelemetry(key string, value string) map[string]string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	value = strings.TrimSpace(value)
+	changed := false
+	switch key {
+	case telemetryPCStateKey:
+		if p.lastPC == value {
+			return nil
+		}
+		p.lastPC = value
+		changed = true
+	case telemetryICEStateKey:
+		if p.lastICE == value {
+			return nil
+		}
+		p.lastICE = value
+		changed = true
+	case telemetrySignalingKey:
+		if p.lastSIG == value {
+			return nil
+		}
+		p.lastSIG = value
+		changed = true
+	default:
+		return nil
+	}
+	if !changed {
+		return nil
+	}
+
+	metadata := map[string]string{
+		telemetryKindKey:      telemetryKindTransport,
+		telemetryPCStateKey:   p.lastPC,
+		telemetryICEStateKey:  p.lastICE,
+		telemetrySignalingKey: p.lastSIG,
+		telemetryQualityKey:   deriveTransportQuality(p.lastPC, p.lastICE),
+	}
+
+	return metadata
+}
+
+func deriveTransportQuality(peerState string, iceState string) string {
+	switch {
+	case peerState == webrtc.PeerConnectionStateFailed.String() || iceState == webrtc.ICEConnectionStateFailed.String():
+		return "failed"
+	case peerState == webrtc.PeerConnectionStateDisconnected.String() || iceState == webrtc.ICEConnectionStateDisconnected.String():
+		return "degraded"
+	case peerState == webrtc.PeerConnectionStateConnected.String() || iceState == webrtc.ICEConnectionStateConnected.String():
+		return "connected"
+	case peerState == webrtc.PeerConnectionStateConnecting.String() || iceState == webrtc.ICEConnectionStateChecking.String():
+		return "connecting"
+	default:
+		return "unknown"
+	}
 }
 
 func (m *Manager) newAPI() *webrtc.API {
