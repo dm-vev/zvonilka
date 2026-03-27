@@ -25,6 +25,7 @@ services:
       - --use-auth-secret
       - --static-auth-secret=zvonilka-turn-secret
       - --listening-port=3478
+      - --relay-ip=127.0.0.1
       - --min-port=49160
       - --max-port=49200
       - --external-ip=127.0.0.1

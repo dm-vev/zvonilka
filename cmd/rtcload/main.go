@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -33,6 +37,8 @@ type result struct {
 	GoMaxProcs         int           `json:"gomaxprocs"`
 	GoRoutines         int           `json:"goroutines"`
 	EstimatedPeakPeers int           `json:"estimated_peak_peers"`
+	RelayOnly          bool          `json:"relay_only"`
+	TURNURL            string        `json:"turn_url,omitempty"`
 }
 
 type timings struct {
@@ -49,6 +55,9 @@ func main() {
 		sessions    = flag.Int("sessions", 100, "number of sessions to execute")
 		concurrency = flag.Int("concurrency", 8, "number of concurrent workers")
 		withVideo   = flag.Bool("with-video", true, "whether participants join with video")
+		relayOnly   = flag.Bool("relay-only", false, "force client negotiation through TURN relay")
+		turnURL     = flag.String("turn-url", "", "TURN URL used when relay-only is enabled")
+		turnSecret  = flag.String("turn-secret", "", "TURN REST auth secret used when relay-only is enabled")
 	)
 	flag.Parse()
 
@@ -60,6 +69,9 @@ func main() {
 	}
 	if *mode != "lifecycle" && *mode != "negotiate" {
 		fatalf("unsupported mode %q", *mode)
+	}
+	if *relayOnly && (trim(*turnURL) == "" || trim(*turnSecret) == "") {
+		fatalf("relay-only mode requires -turn-url and -turn-secret")
 	}
 
 	manager := rtc.NewManager(
@@ -81,7 +93,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			for index := range jobs {
-				if err := runScenario(ctx, manager, *mode, *withVideo, index, &samples); err != nil {
+				if err := runScenario(ctx, manager, *mode, *withVideo, index, *relayOnly, *turnURL, *turnSecret, &samples); err != nil {
 					failures.Add(1)
 				}
 			}
@@ -111,6 +123,8 @@ func main() {
 		GoMaxProcs:         runtime.GOMAXPROCS(0),
 		GoRoutines:         runtime.NumGoroutine(),
 		EstimatedPeakPeers: *concurrency * 2,
+		RelayOnly:          *relayOnly,
+		TURNURL:            trim(*turnURL),
 	}
 
 	encoder := json.NewEncoder(os.Stdout)
@@ -129,6 +143,9 @@ func runScenario(
 	mode string,
 	withVideo bool,
 	index int,
+	relayOnly bool,
+	turnURL string,
+	turnSecret string,
 	samples *timings,
 ) error {
 	callID := fmt.Sprintf("load-call-%d", index)
@@ -164,7 +181,7 @@ func runScenario(
 
 	if mode == "negotiate" {
 		negotiateStart := time.Now()
-		if err := negotiateOnce(ctx, manager, session.SessionID, callID, withVideo); err != nil {
+		if err := negotiateOnce(ctx, manager, session.SessionID, callID, withVideo, relayOnly, turnURL, turnSecret); err != nil {
 			return err
 		}
 		samples.negotiateNanos.Add(time.Since(negotiateStart).Nanoseconds())
@@ -191,8 +208,22 @@ func negotiateOnce(
 	sessionID string,
 	callID string,
 	withVideo bool,
+	relayOnly bool,
+	turnURL string,
+	turnSecret string,
 ) error {
-	client, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	config := webrtc.Configuration{}
+	if relayOnly {
+		username, credential := turnCredential(turnSecret, "load-"+callID, time.Now().UTC().Add(15*time.Minute))
+		config.ICETransportPolicy = webrtc.ICETransportPolicyRelay
+		config.ICEServers = []webrtc.ICEServer{{
+			URLs:       []string{trim(turnURL)},
+			Username:   username,
+			Credential: credential,
+		}}
+	}
+
+	client, err := webrtc.NewPeerConnection(config)
 	if err != nil {
 		return err
 	}
@@ -211,8 +242,19 @@ func negotiateOnce(
 	if err != nil {
 		return err
 	}
+	gatherComplete := webrtc.GatheringCompletePromise(client)
 	if err := client.SetLocalDescription(offer); err != nil {
 		return err
+	}
+	if relayOnly {
+		select {
+		case <-gatherComplete:
+		case <-time.After(10 * time.Second):
+			return fmt.Errorf("timed out waiting for relay-only ICE gathering for %s", callID)
+		}
+		if !strings.Contains(client.LocalDescription().SDP, " typ relay ") {
+			return fmt.Errorf("missing relay candidate for %s", callID)
+		}
 	}
 	signals, err := manager.PublishDescription(ctx, sessionID, domaincall.RuntimeParticipant{
 		CallID:    callID,
@@ -244,6 +286,17 @@ func averageDuration(totalNanos int64, count int) time.Duration {
 		return 0
 	}
 	return time.Duration(totalNanos / int64(count))
+}
+
+func turnCredential(secret string, accountID string, expiresAt time.Time) (string, string) {
+	username := fmt.Sprintf("%d:%s", expiresAt.UTC().Unix(), trim(accountID))
+	mac := hmac.New(sha1.New, []byte(trim(secret)))
+	_, _ = mac.Write([]byte(username))
+	return username, base64.StdEncoding.EncodeToString(mac.Sum(nil))
+}
+
+func trim(value string) string {
+	return strings.TrimSpace(value)
 }
 
 func fatalf(format string, args ...any) {
