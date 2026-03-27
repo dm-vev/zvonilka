@@ -592,6 +592,9 @@ func (m *Manager) handleRemoteTrack(sessionID string, sourceKey string, track *w
 	defer m.cleanupRelayTrack(sessionID, trackKey)
 
 	targets, relays := m.prepareRelayTargets(sessionID, sourceKey, track)
+	if len(targets) > 0 && track.Kind() == webrtc.RTPCodecTypeVideo {
+		m.requestRelayKeyframe(sessionID, sourceKey, track)
+	}
 	for _, target := range targets {
 		if err := m.renegotiatePeer(sessionID, target); err != nil {
 			continue
@@ -607,11 +610,15 @@ func (m *Manager) handleRemoteTrack(sessionID string, sourceKey string, track *w
 		if err != nil {
 			return
 		}
+		rawPacket, err := packet.Marshal()
+		if err != nil {
+			continue
+		}
 		for _, relay := range relays {
 			if relay == nil {
 				continue
 			}
-			_ = relay.WriteRTP(packet.Clone())
+			_, _ = relay.Write(rawPacket)
 		}
 	}
 }
@@ -683,6 +690,29 @@ func (m *Manager) cleanupRelayTrack(sessionID string, trackKey string) {
 			continue
 		}
 	}
+}
+
+func (m *Manager) requestRelayKeyframe(sessionID string, sourceKey string, track *webrtc.TrackRemote) {
+	if strings.TrimSpace(sessionID) == "" || strings.TrimSpace(sourceKey) == "" || track == nil {
+		return
+	}
+
+	m.mu.Lock()
+	active := m.sessions[sessionID]
+	if active == nil {
+		m.mu.Unlock()
+		return
+	}
+	source := active.peers[sourceKey]
+	m.mu.Unlock()
+	if source == nil || source.pc == nil {
+		return
+	}
+
+	_ = source.pc.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{
+		SenderSSRC: 0,
+		MediaSSRC:  uint32(track.SSRC()),
+	}})
 }
 
 func (m *Manager) removeSourceRelayTracksLocked(active *session, sourceKey string) []*peer {
