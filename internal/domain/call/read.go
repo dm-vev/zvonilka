@@ -262,6 +262,14 @@ func (s *Service) hydrateCall(ctx context.Context, store Store, callID string) (
 		}
 		applyRuntimeStats(callRow.Participants, stats)
 	}
+	callRow.QualitySummary = summarizeCallQuality(callRow.Participants)
+	if callRow.State == StateEnded {
+		events, eventsErr := store.EventsAfterSequence(ctx, 0, callID, "", 1000)
+		if eventsErr != nil {
+			return Call{}, fmt.Errorf("load call quality history for %s: %w", callID, eventsErr)
+		}
+		applyEndedCallQualitySummary(&callRow, events)
+	}
 	return cloneCall(callRow), nil
 }
 
@@ -283,6 +291,129 @@ func applyRuntimeStats(participants []Participant, stats []RuntimeStats) {
 
 func callParticipantKey(accountID string, deviceID string) string {
 	return strings.TrimSpace(accountID) + "|" + strings.TrimSpace(deviceID)
+}
+
+func summarizeCallQuality(participants []Participant) QualitySummary {
+	summary := QualitySummary{
+		WorstQuality:    "unknown",
+		DominantProfile: "full",
+	}
+	if len(participants) == 0 {
+		return summary
+	}
+
+	profileCounts := make(map[string]uint32, 4)
+	worstRank := int(^uint(0) >> 1)
+	for _, participant := range participants {
+		if participant.State != ParticipantStateJoined && participant.State != ParticipantStateLeft {
+			continue
+		}
+		summary.ParticipantCount++
+		stats := participant.Transport
+		if stats.VideoFallbackRecommended {
+			summary.VideoFallbackParticipants++
+		}
+		if stats.ReconnectRecommended {
+			summary.ReconnectParticipants++
+		}
+		summary.DegradedTransitions += stats.DegradedTransitions
+		summary.RecoveredTransitions += stats.RecoveredTransitions
+		if stats.LastQualityChangeAt.After(summary.LastChangedAt) {
+			summary.LastChangedAt = stats.LastQualityChangeAt
+		}
+		profile := strings.TrimSpace(stats.RecommendedProfile)
+		if profile == "" {
+			profile = "full"
+		}
+		profileCounts[profile]++
+		rank := qualityRankForSummary(stats.Quality)
+		if rank < worstRank {
+			worstRank = rank
+			summary.WorstQuality = normalizeQualityForSummary(stats.Quality)
+		}
+	}
+
+	var dominantCount uint32
+	for profile, count := range profileCounts {
+		if count > dominantCount {
+			dominantCount = count
+			summary.DominantProfile = profile
+		}
+	}
+
+	return summary
+}
+
+func applyEndedCallQualitySummary(callRow *Call, events []Event) {
+	if callRow == nil || len(events) == 0 {
+		return
+	}
+
+	summary := callRow.QualitySummary
+	videoFallbackParticipants := make(map[string]struct{})
+	reconnectParticipants := make(map[string]struct{})
+	for _, event := range events {
+		if event.EventType != EventTypeMediaUpdated {
+			continue
+		}
+		quality := normalizeQualityForSummary(event.Metadata["transport_quality"])
+		if qualityRankForSummary(quality) < qualityRankForSummary(summary.WorstQuality) {
+			summary.WorstQuality = quality
+		}
+		participantKey := strings.TrimSpace(event.Metadata[callMetadataTargetAccountID]) + "|" +
+			strings.TrimSpace(event.Metadata[callMetadataTargetDeviceID])
+		if event.Metadata["video_fallback_recommended"] == "true" && participantKey != "|" {
+			videoFallbackParticipants[participantKey] = struct{}{}
+		}
+		if event.Metadata["reconnect_recommended"] == "true" && participantKey != "|" {
+			reconnectParticipants[participantKey] = struct{}{}
+		}
+		if value := parseUint32Metadata(event.Metadata["reconnect_attempt"]); value > 0 && event.CreatedAt.After(summary.LastChangedAt) {
+			summary.LastChangedAt = event.CreatedAt
+		}
+	}
+	if uint32(len(videoFallbackParticipants)) > summary.VideoFallbackParticipants {
+		summary.VideoFallbackParticipants = uint32(len(videoFallbackParticipants))
+	}
+	if uint32(len(reconnectParticipants)) > summary.ReconnectParticipants {
+		summary.ReconnectParticipants = uint32(len(reconnectParticipants))
+	}
+	callRow.QualitySummary = summary
+}
+
+func parseUint32Metadata(value string) uint32 {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+
+	var parsed uint32
+	_, _ = fmt.Sscanf(value, "%d", &parsed)
+	return parsed
+}
+
+func normalizeQualityForSummary(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "unknown"
+	}
+
+	return value
+}
+
+func qualityRankForSummary(value string) int {
+	switch normalizeQualityForSummary(value) {
+	case "failed":
+		return 0
+	case "degraded":
+		return 1
+	case "connecting":
+		return 2
+	case "connected":
+		return 3
+	default:
+		return 4
+	}
 }
 
 func (s *Service) ensureDirectConversation(

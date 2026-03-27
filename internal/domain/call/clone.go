@@ -9,6 +9,10 @@ func cloneTransportStats(stats TransportStats) TransportStats {
 	return stats
 }
 
+func cloneQualitySummary(summary QualitySummary) QualitySummary {
+	return summary
+}
+
 func cloneTransportQualitySample(sample TransportQualitySample) TransportQualitySample {
 	return sample
 }
@@ -65,6 +69,7 @@ func cloneParticipants(participants []Participant) []Participant {
 func cloneCall(value Call) Call {
 	value.Invites = cloneInvites(value.Invites)
 	value.Participants = cloneParticipants(value.Participants)
+	value.QualitySummary = cloneQualitySummary(value.QualitySummary)
 	return value
 }
 

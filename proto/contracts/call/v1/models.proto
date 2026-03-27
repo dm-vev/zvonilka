@@ -78,16 +78,18 @@ message CallTransportStats {
   string recommendation_reason = 6;
   bool video_fallback_recommended = 7;
   bool reconnect_recommended = 8;
-  string quality_trend = 9;
-  uint32 degraded_transitions = 10;
-  uint32 recovered_transitions = 11;
-  google.protobuf.Timestamp last_quality_change_at = 12;
-  repeated CallTransportQualitySample recent_samples = 13;
-  uint32 relay_tracks = 14;
-  uint64 relay_packets = 15;
-  uint64 relay_bytes = 16;
-  uint64 relay_write_errors = 17;
-  google.protobuf.Timestamp last_updated_at = 18;
+  uint32 reconnect_attempt = 9;
+  google.protobuf.Timestamp reconnect_backoff_until = 10;
+  string quality_trend = 11;
+  uint32 degraded_transitions = 12;
+  uint32 recovered_transitions = 13;
+  google.protobuf.Timestamp last_quality_change_at = 14;
+  repeated CallTransportQualitySample recent_samples = 15;
+  uint32 relay_tracks = 16;
+  uint64 relay_packets = 17;
+  uint64 relay_bytes = 18;
+  uint64 relay_write_errors = 19;
+  google.protobuf.Timestamp last_updated_at = 20;
 }
 
 message CallTransportQualitySample {
@@ -121,6 +123,17 @@ message CallParticipant {
   CallTransportStats transport_stats = 8;
 }
 
+message CallQualitySummary {
+  string worst_quality = 1;
+  string dominant_profile = 2;
+  uint32 participant_count = 3;
+  uint32 video_fallback_participants = 4;
+  uint32 reconnect_participants = 5;
+  uint32 degraded_transitions = 6;
+  uint32 recovered_transitions = 7;
+  google.protobuf.Timestamp last_changed_at = 8;
+}
+
 message Call {
   string call_id = 1;
   string conversation_id = 2;
@@ -135,6 +148,7 @@ message Call {
   google.protobuf.Timestamp updated_at = 11;
   repeated CallInvite invites = 12;
   repeated CallParticipant participants = 13;
+  CallQualitySummary quality_summary = 14;
 }
 
 message CallEvent {

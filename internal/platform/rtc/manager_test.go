@@ -668,6 +668,8 @@ func TestManagerFailedTransportRecommendsReconnect(t *testing.T) {
 	require.Equal(t, "transport_failed", metadata[telemetryReasonKey])
 	require.Equal(t, "true", metadata[telemetryReconnectKey])
 	require.Equal(t, "false", metadata[telemetryVideoKey])
+	require.Equal(t, "1", metadata[telemetryReconnectAttemptKey])
+	require.NotEmpty(t, metadata[telemetryReconnectBackoffKey])
 
 	stats, err := manager.SessionStats(context.Background(), session.SessionID)
 	require.NoError(t, err)
@@ -675,6 +677,8 @@ func TestManagerFailedTransportRecommendsReconnect(t *testing.T) {
 	require.Equal(t, "degrading", stats[0].Transport.QualityTrend)
 	require.EqualValues(t, 1, stats[0].Transport.DegradedTransitions)
 	require.EqualValues(t, 0, stats[0].Transport.RecoveredTransitions)
+	require.EqualValues(t, 1, stats[0].Transport.ReconnectAttempt)
+	require.False(t, stats[0].Transport.ReconnectBackoffUntil.IsZero())
 	require.False(t, stats[0].Transport.LastQualityChangeAt.IsZero())
 	require.Len(t, stats[0].Transport.RecentSamples, 2)
 	require.Equal(t, "connected", stats[0].Transport.RecentSamples[0].Quality)

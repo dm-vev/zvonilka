@@ -181,6 +181,8 @@ func callTransportStatsProto(value domaincall.TransportStats) *callv1.CallTransp
 		RecommendationReason:     value.RecommendationReason,
 		VideoFallbackRecommended: value.VideoFallbackRecommended,
 		ReconnectRecommended:     value.ReconnectRecommended,
+		ReconnectAttempt:         value.ReconnectAttempt,
+		ReconnectBackoffUntil:    protoTime(value.ReconnectBackoffUntil),
 		QualityTrend:             value.QualityTrend,
 		DegradedTransitions:      value.DegradedTransitions,
 		RecoveredTransitions:     value.RecoveredTransitions,
@@ -191,6 +193,19 @@ func callTransportStatsProto(value domaincall.TransportStats) *callv1.CallTransp
 		RelayBytes:               value.RelayBytes,
 		RelayWriteErrors:         value.RelayWriteErrors,
 		LastUpdatedAt:            protoTime(value.LastUpdatedAt),
+	}
+}
+
+func callQualitySummaryProto(value domaincall.QualitySummary) *callv1.CallQualitySummary {
+	return &callv1.CallQualitySummary{
+		WorstQuality:              value.WorstQuality,
+		DominantProfile:           value.DominantProfile,
+		ParticipantCount:          value.ParticipantCount,
+		VideoFallbackParticipants: value.VideoFallbackParticipants,
+		ReconnectParticipants:     value.ReconnectParticipants,
+		DegradedTransitions:       value.DegradedTransitions,
+		RecoveredTransitions:      value.RecoveredTransitions,
+		LastChangedAt:             protoTime(value.LastChangedAt),
 	}
 }
 
@@ -269,6 +284,7 @@ func callProto(value domaincall.Call) *callv1.Call {
 		UpdatedAt:       protoTime(value.UpdatedAt),
 		Invites:         invites,
 		Participants:    participants,
+		QualitySummary:  callQualitySummaryProto(value.QualitySummary),
 	}
 }
 

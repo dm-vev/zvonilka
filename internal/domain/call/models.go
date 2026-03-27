@@ -116,6 +116,8 @@ type TransportStats struct {
 	RecommendationReason     string
 	VideoFallbackRecommended bool
 	ReconnectRecommended     bool
+	ReconnectAttempt         uint32
+	ReconnectBackoffUntil    time.Time
 	QualityTrend             string
 	DegradedTransitions      uint32
 	RecoveredTransitions     uint32
@@ -126,6 +128,18 @@ type TransportStats struct {
 	RelayBytes               uint64
 	RelayWriteErrors         uint64
 	LastUpdatedAt            time.Time
+}
+
+// QualitySummary describes aggregated quality state for one call.
+type QualitySummary struct {
+	WorstQuality              string
+	DominantProfile           string
+	ParticipantCount          uint32
+	VideoFallbackParticipants uint32
+	ReconnectParticipants     uint32
+	DegradedTransitions       uint32
+	RecoveredTransitions      uint32
+	LastChangedAt             time.Time
 }
 
 // IceServer describes one STUN or TURN server returned to a client.
@@ -174,6 +188,7 @@ type Call struct {
 	UpdatedAt          time.Time
 	Invites            []Invite
 	Participants       []Participant
+	QualitySummary     QualitySummary
 }
 
 // Event describes one persisted call event.

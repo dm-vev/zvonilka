@@ -70,6 +70,7 @@ type peer struct {
 	lastSIG                string
 	stats                  domaincall.TransportStats
 	consecutiveRelayErrors uint32
+	reconnectAttempts      uint32
 }
 
 type relayTrack struct {
@@ -79,17 +80,19 @@ type relayTrack struct {
 }
 
 const (
-	telemetryKindKey       = "telemetry_kind"
-	telemetryKindTransport = "transport_state"
-	telemetryPCStateKey    = "peer_connection_state"
-	telemetryICEStateKey   = "ice_connection_state"
-	telemetrySignalingKey  = "signaling_state"
-	telemetryQualityKey    = "transport_quality"
-	telemetryProfileKey    = "recommended_profile"
-	telemetryReasonKey     = "recommendation_reason"
-	telemetryVideoKey      = "video_fallback_recommended"
-	telemetryReconnectKey  = "reconnect_recommended"
-	maxQualitySamples      = 8
+	telemetryKindKey             = "telemetry_kind"
+	telemetryKindTransport       = "transport_state"
+	telemetryPCStateKey          = "peer_connection_state"
+	telemetryICEStateKey         = "ice_connection_state"
+	telemetrySignalingKey        = "signaling_state"
+	telemetryQualityKey          = "transport_quality"
+	telemetryProfileKey          = "recommended_profile"
+	telemetryReasonKey           = "recommendation_reason"
+	telemetryVideoKey            = "video_fallback_recommended"
+	telemetryReconnectKey        = "reconnect_recommended"
+	telemetryReconnectAttemptKey = "reconnect_attempt"
+	telemetryReconnectBackoffKey = "reconnect_backoff_until"
+	maxQualitySamples            = 8
 )
 
 // NewManager constructs an in-process RTC session manager.
@@ -1022,6 +1025,10 @@ func (p *peer) updateTelemetry(key string, value string) map[string]string {
 	metadata[telemetryReasonKey] = p.stats.RecommendationReason
 	metadata[telemetryVideoKey] = boolString(p.stats.VideoFallbackRecommended)
 	metadata[telemetryReconnectKey] = boolString(p.stats.ReconnectRecommended)
+	metadata[telemetryReconnectAttemptKey] = fmt.Sprintf("%d", p.stats.ReconnectAttempt)
+	if !p.stats.ReconnectBackoffUntil.IsZero() {
+		metadata[telemetryReconnectBackoffKey] = p.stats.ReconnectBackoffUntil.Format(time.RFC3339Nano)
+	}
 	if p.stats.RecommendedProfile == prevProfile &&
 		p.stats.RecommendationReason == prevReason &&
 		p.stats.VideoFallbackRecommended == prevVideo &&
@@ -1062,12 +1069,14 @@ func (p *peer) recordRelayWrite(size uint64, failed bool) map[string]string {
 	}
 
 	return map[string]string{
-		telemetryKindKey:      telemetryKindTransport,
-		telemetryQualityKey:   p.stats.Quality,
-		telemetryProfileKey:   p.stats.RecommendedProfile,
-		telemetryReasonKey:    p.stats.RecommendationReason,
-		telemetryVideoKey:     boolString(p.stats.VideoFallbackRecommended),
-		telemetryReconnectKey: boolString(p.stats.ReconnectRecommended),
+		telemetryKindKey:             telemetryKindTransport,
+		telemetryQualityKey:          p.stats.Quality,
+		telemetryProfileKey:          p.stats.RecommendedProfile,
+		telemetryReasonKey:           p.stats.RecommendationReason,
+		telemetryVideoKey:            boolString(p.stats.VideoFallbackRecommended),
+		telemetryReconnectKey:        boolString(p.stats.ReconnectRecommended),
+		telemetryReconnectAttemptKey: fmt.Sprintf("%d", p.stats.ReconnectAttempt),
+		telemetryReconnectBackoffKey: p.stats.ReconnectBackoffUntil.Format(time.RFC3339Nano),
 	}
 }
 
@@ -1099,6 +1108,11 @@ func (p *peer) applyRecommendationsLocked() {
 	p.stats.RecommendationReason = reason
 	p.stats.VideoFallbackRecommended = videoFallback
 	p.stats.ReconnectRecommended = reconnect
+	if !reconnect {
+		p.reconnectAttempts = 0
+		p.stats.ReconnectAttempt = 0
+		p.stats.ReconnectBackoffUntil = time.Time{}
+	}
 }
 
 func (p *peer) recordQualityTransitionLocked(prevQuality string) {
@@ -1107,6 +1121,7 @@ func (p *peer) recordQualityTransitionLocked(prevQuality string) {
 		return
 	}
 	if prevQuality != "" && prevQuality != currentQuality {
+		now := time.Now().UTC()
 		if qualityRank(currentQuality) > qualityRank(prevQuality) {
 			p.stats.QualityTrend = "improving"
 			p.stats.RecoveredTransitions++
@@ -1114,7 +1129,12 @@ func (p *peer) recordQualityTransitionLocked(prevQuality string) {
 			p.stats.QualityTrend = "degrading"
 			p.stats.DegradedTransitions++
 		}
-		p.stats.LastQualityChangeAt = time.Now().UTC()
+		p.stats.LastQualityChangeAt = now
+		if currentQuality == "failed" {
+			p.reconnectAttempts++
+			p.stats.ReconnectAttempt = p.reconnectAttempts
+			p.stats.ReconnectBackoffUntil = now.Add(reconnectBackoffDuration(p.reconnectAttempts))
+		}
 	} else if p.stats.QualityTrend == "" {
 		p.stats.QualityTrend = "stable"
 	}
@@ -1180,6 +1200,25 @@ func qualityRank(value string) int {
 	default:
 		return -1
 	}
+}
+
+func reconnectBackoffDuration(attempt uint32) time.Duration {
+	if attempt == 0 {
+		return 0
+	}
+
+	backoff := 5 * time.Second
+	for i := uint32(1); i < attempt; i++ {
+		backoff *= 2
+		if backoff >= 30*time.Second {
+			return 30 * time.Second
+		}
+	}
+	if backoff > 30*time.Second {
+		return 30 * time.Second
+	}
+
+	return backoff
 }
 
 func deriveTransportQuality(peerState string, iceState string) string {
