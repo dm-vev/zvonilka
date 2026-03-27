@@ -740,6 +740,60 @@ func TestManagerQualityTrendTracksRecovery(t *testing.T) {
 	require.Equal(t, "connected", stats[0].Transport.RecentSamples[2].Quality)
 }
 
+func TestManagerAcknowledgeAdaptationClearsPendingState(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager("webrtc://gateway/calls", 15*time.Minute)
+	session, err := manager.EnsureSession(context.Background(), domaincall.Call{
+		ID:             "call-ack",
+		ConversationID: "conv-ack",
+	})
+	require.NoError(t, err)
+
+	_, err = manager.JoinSession(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-ack",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	_, peerA, err := manager.ensurePeer(session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-ack",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	peerA.updateTelemetry(telemetryICEStateKey, webrtc.ICEConnectionStateConnected.String())
+	peerA.recordRelayWrite(0, true)
+	peerA.recordRelayWrite(0, true)
+	peerA.recordRelayWrite(0, true)
+
+	stats, err := manager.SessionStats(context.Background(), session.SessionID)
+	require.NoError(t, err)
+	require.Len(t, stats, 1)
+	require.True(t, stats[0].Transport.PendingAdaptation)
+	require.NotZero(t, stats[0].Transport.AdaptationRevision)
+
+	err = manager.AcknowledgeAdaptation(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-ack",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		WithVideo: true,
+	}, stats[0].Transport.AdaptationRevision, "audio_only")
+	require.NoError(t, err)
+
+	stats, err = manager.SessionStats(context.Background(), session.SessionID)
+	require.NoError(t, err)
+	require.Len(t, stats, 1)
+	require.False(t, stats[0].Transport.PendingAdaptation)
+	require.Equal(t, stats[0].Transport.AdaptationRevision, stats[0].Transport.AckedAdaptationRevision)
+	require.Equal(t, "audio_only", stats[0].Transport.AppliedProfile)
+	require.False(t, stats[0].Transport.AppliedAt.IsZero())
+}
+
 func mustNewPeerConnection(t *testing.T) *webrtc.PeerConnection {
 	t.Helper()
 

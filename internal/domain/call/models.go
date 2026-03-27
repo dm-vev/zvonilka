@@ -112,6 +112,11 @@ type TransportStats struct {
 	IceConnectionState       string
 	SignalingState           string
 	Quality                  string
+	AdaptationRevision       uint64
+	PendingAdaptation        bool
+	AckedAdaptationRevision  uint64
+	AppliedProfile           string
+	AppliedAt                time.Time
 	RecommendedProfile       string
 	RecommendationReason     string
 	VideoFallbackRecommended bool

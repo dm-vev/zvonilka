@@ -19,6 +19,7 @@ service CallService {
   rpc PublishCallIceCandidate(PublishCallIceCandidateRequest) returns (PublishCallIceCandidateResponse);
   rpc LeaveCall(LeaveCallRequest) returns (LeaveCallResponse);
   rpc UpdateCallMediaState(UpdateCallMediaStateRequest) returns (UpdateCallMediaStateResponse);
+  rpc AcknowledgeCallAdaptation(AcknowledgeCallAdaptationRequest) returns (AcknowledgeCallAdaptationResponse);
   rpc GetIceConfig(GetIceConfigRequest) returns (GetIceConfigResponse);
   rpc SubscribeCallEvents(SubscribeCallEventsRequest) returns (stream SubscribeCallEventsResponse);
 }

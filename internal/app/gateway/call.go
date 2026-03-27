@@ -309,6 +309,35 @@ func (a *api) UpdateCallMediaState(
 	}, nil
 }
 
+// AcknowledgeCallAdaptation confirms application of a server-issued adaptation revision.
+func (a *api) AcknowledgeCallAdaptation(
+	ctx context.Context,
+	req *callv1.AcknowledgeCallAdaptationRequest,
+) (*callv1.AcknowledgeCallAdaptationResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	callRow, participant, events, err := a.call.AcknowledgeCallAdaptation(ctx, domaincall.AcknowledgeAdaptationParams{
+		CallID:             req.GetCallId(),
+		SessionID:          req.GetSessionId(),
+		AccountID:          authContext.Account.ID,
+		DeviceID:           authContext.Device.ID,
+		AdaptationRevision: req.GetAdaptationRevision(),
+		AppliedProfile:     req.GetAppliedProfile(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(events...)
+
+	return &callv1.AcknowledgeCallAdaptationResponse{
+		Call:        callProto(callRow),
+		Participant: callParticipantProto(participant),
+	}, nil
+}
+
 // GetIceConfig returns ICE/TURN settings for the current call.
 func (a *api) GetIceConfig(ctx context.Context, req *callv1.GetIceConfigRequest) (*callv1.GetIceConfigResponse, error) {
 	authContext, err := a.requireAuth(ctx)

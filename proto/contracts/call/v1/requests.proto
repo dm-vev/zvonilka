@@ -117,6 +117,18 @@ message UpdateCallMediaStateResponse {
   CallParticipant participant = 2;
 }
 
+message AcknowledgeCallAdaptationRequest {
+  string call_id = 1;
+  string session_id = 2;
+  uint64 adaptation_revision = 3;
+  string applied_profile = 4;
+}
+
+message AcknowledgeCallAdaptationResponse {
+  Call call = 1;
+  CallParticipant participant = 2;
+}
+
 message GetIceConfigRequest {
   string call_id = 1;
 }

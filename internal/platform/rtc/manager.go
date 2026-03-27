@@ -96,6 +96,10 @@ const (
 	telemetrySuppressIncomingAudioKey = "suppress_incoming_audio"
 	telemetryReconnectAttemptKey      = "reconnect_attempt"
 	telemetryReconnectBackoffKey      = "reconnect_backoff_until"
+	telemetryAdaptationRevisionKey    = "adaptation_revision"
+	telemetryPendingAdaptationKey     = "pending_adaptation"
+	telemetryAckedRevisionKey         = "acked_adaptation_revision"
+	telemetryAppliedProfileKey        = "applied_profile"
 	maxQualitySamples                 = 8
 )
 
@@ -420,6 +424,46 @@ func (m *Manager) SessionStats(_ context.Context, sessionID string) ([]domaincal
 	}
 
 	return stats, nil
+}
+
+// AcknowledgeAdaptation records that one participant device applied the current server-issued adaptation.
+func (m *Manager) AcknowledgeAdaptation(
+	_ context.Context,
+	sessionID string,
+	participantRow domaincall.RuntimeParticipant,
+	adaptationRevision uint64,
+	appliedProfile string,
+) error {
+	sessionID = strings.TrimSpace(sessionID)
+	participantRow.AccountID = strings.TrimSpace(participantRow.AccountID)
+	participantRow.DeviceID = strings.TrimSpace(participantRow.DeviceID)
+	appliedProfile = strings.TrimSpace(appliedProfile)
+	if sessionID == "" || participantRow.AccountID == "" || participantRow.DeviceID == "" {
+		return domaincall.ErrInvalidInput
+	}
+	if adaptationRevision == 0 || appliedProfile == "" {
+		return domaincall.ErrInvalidInput
+	}
+
+	_, peerConn, err := m.ensurePeer(sessionID, participantRow)
+	if err != nil {
+		return err
+	}
+
+	peerConn.mu.Lock()
+	defer peerConn.mu.Unlock()
+
+	if adaptationRevision != peerConn.stats.AdaptationRevision {
+		return domaincall.ErrConflict
+	}
+
+	peerConn.stats.AckedAdaptationRevision = adaptationRevision
+	peerConn.stats.AppliedProfile = appliedProfile
+	peerConn.stats.AppliedAt = time.Now().UTC()
+	peerConn.stats.PendingAdaptation = false
+	peerConn.stats.LastUpdatedAt = peerConn.stats.AppliedAt
+
+	return nil
 }
 
 // LeaveSession removes one device from a running session.
@@ -1034,6 +1078,10 @@ func (p *peer) updateTelemetry(key string, value string) map[string]string {
 	metadata[telemetrySuppressOutgoingAudioKey] = boolString(p.stats.SuppressOutgoingAudio)
 	metadata[telemetrySuppressIncomingAudioKey] = boolString(p.stats.SuppressIncomingAudio)
 	metadata[telemetryReconnectAttemptKey] = fmt.Sprintf("%d", p.stats.ReconnectAttempt)
+	metadata[telemetryAdaptationRevisionKey] = fmt.Sprintf("%d", p.stats.AdaptationRevision)
+	metadata[telemetryPendingAdaptationKey] = boolString(p.stats.PendingAdaptation)
+	metadata[telemetryAckedRevisionKey] = fmt.Sprintf("%d", p.stats.AckedAdaptationRevision)
+	metadata[telemetryAppliedProfileKey] = p.stats.AppliedProfile
 	if !p.stats.ReconnectBackoffUntil.IsZero() {
 		metadata[telemetryReconnectBackoffKey] = p.stats.ReconnectBackoffUntil.Format(time.RFC3339Nano)
 	}
@@ -1088,11 +1136,24 @@ func (p *peer) recordRelayWrite(size uint64, failed bool) map[string]string {
 		telemetrySuppressOutgoingAudioKey: boolString(p.stats.SuppressOutgoingAudio),
 		telemetrySuppressIncomingAudioKey: boolString(p.stats.SuppressIncomingAudio),
 		telemetryReconnectAttemptKey:      fmt.Sprintf("%d", p.stats.ReconnectAttempt),
+		telemetryAdaptationRevisionKey:    fmt.Sprintf("%d", p.stats.AdaptationRevision),
+		telemetryPendingAdaptationKey:     boolString(p.stats.PendingAdaptation),
+		telemetryAckedRevisionKey:         fmt.Sprintf("%d", p.stats.AckedAdaptationRevision),
+		telemetryAppliedProfileKey:        p.stats.AppliedProfile,
 		telemetryReconnectBackoffKey:      p.stats.ReconnectBackoffUntil.Format(time.RFC3339Nano),
 	}
 }
 
 func (p *peer) applyRecommendationsLocked() {
+	prevProfile := p.stats.RecommendedProfile
+	prevReason := p.stats.RecommendationReason
+	prevVideo := p.stats.VideoFallbackRecommended
+	prevReconnect := p.stats.ReconnectRecommended
+	prevSuppressOutgoingVideo := p.stats.SuppressOutgoingVideo
+	prevSuppressIncomingVideo := p.stats.SuppressIncomingVideo
+	prevSuppressOutgoingAudio := p.stats.SuppressOutgoingAudio
+	prevSuppressIncomingAudio := p.stats.SuppressIncomingAudio
+
 	profile := "full"
 	reason := ""
 	videoFallback := false
@@ -1124,6 +1185,17 @@ func (p *peer) applyRecommendationsLocked() {
 	p.stats.SuppressIncomingVideo = videoFallback
 	p.stats.SuppressOutgoingAudio = reconnect
 	p.stats.SuppressIncomingAudio = reconnect
+	if p.stats.RecommendedProfile != prevProfile ||
+		p.stats.RecommendationReason != prevReason ||
+		p.stats.VideoFallbackRecommended != prevVideo ||
+		p.stats.ReconnectRecommended != prevReconnect ||
+		p.stats.SuppressOutgoingVideo != prevSuppressOutgoingVideo ||
+		p.stats.SuppressIncomingVideo != prevSuppressIncomingVideo ||
+		p.stats.SuppressOutgoingAudio != prevSuppressOutgoingAudio ||
+		p.stats.SuppressIncomingAudio != prevSuppressIncomingAudio {
+		p.stats.AdaptationRevision++
+		p.stats.PendingAdaptation = true
+	}
 	if !reconnect {
 		p.reconnectAttempts = 0
 		p.stats.ReconnectAttempt = 0

@@ -78,6 +78,16 @@ type UpdateParams struct {
 	Media     MediaState
 }
 
+// AcknowledgeAdaptationParams describes one acknowledged server-issued adaptation revision.
+type AcknowledgeAdaptationParams struct {
+	CallID             string
+	SessionID          string
+	AccountID          string
+	DeviceID           string
+	AdaptationRevision uint64
+	AppliedProfile     string
+}
+
 // GetParams identifies one visible call.
 type GetParams struct {
 	CallID    string

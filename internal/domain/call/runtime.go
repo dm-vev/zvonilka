@@ -83,6 +83,13 @@ type Runtime interface {
 		participant RuntimeParticipant,
 		candidate Candidate,
 	) ([]RuntimeSignal, error)
+	AcknowledgeAdaptation(
+		ctx context.Context,
+		sessionID string,
+		participant RuntimeParticipant,
+		adaptationRevision uint64,
+		appliedProfile string,
+	) error
 	SessionStats(ctx context.Context, sessionID string) ([]RuntimeStats, error)
 	LeaveSession(ctx context.Context, sessionID string, accountID string, deviceID string) error
 	CloseSession(ctx context.Context, sessionID string) error

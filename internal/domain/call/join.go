@@ -613,6 +613,94 @@ func (s *Service) UpdateCallMediaState(
 	return result, cloneParticipant(saved), cloneEvents(events), nil
 }
 
+// AcknowledgeCallAdaptation confirms that one joined participant applied the current adaptation revision.
+func (s *Service) AcknowledgeCallAdaptation(
+	ctx context.Context,
+	params AcknowledgeAdaptationParams,
+) (Call, Participant, []Event, error) {
+	if err := s.validateContext(ctx, "acknowledge call adaptation"); err != nil {
+		return Call{}, Participant{}, nil, err
+	}
+	params.CallID = strings.TrimSpace(params.CallID)
+	params.SessionID = strings.TrimSpace(params.SessionID)
+	params.AccountID = strings.TrimSpace(params.AccountID)
+	params.DeviceID = strings.TrimSpace(params.DeviceID)
+	params.AppliedProfile = strings.TrimSpace(params.AppliedProfile)
+	if params.CallID == "" || params.SessionID == "" || params.AccountID == "" || params.DeviceID == "" {
+		return Call{}, Participant{}, nil, ErrInvalidInput
+	}
+	if params.AdaptationRevision == 0 || params.AppliedProfile == "" {
+		return Call{}, Participant{}, nil, ErrInvalidInput
+	}
+
+	now := s.currentTime()
+	var result Call
+	var acknowledged Participant
+	var events []Event
+	err := s.runTx(ctx, func(store Store) error {
+		callRow, loadErr := s.visibleCall(ctx, store, params.CallID, params.AccountID)
+		if loadErr != nil {
+			return loadErr
+		}
+		if callRow.State != StateActive || strings.TrimSpace(callRow.ActiveSessionID) != params.SessionID {
+			return ErrConflict
+		}
+
+		participant, loadErr := store.ParticipantByCallAndDevice(ctx, callRow.ID, params.DeviceID)
+		if loadErr != nil {
+			if loadErr == ErrNotFound {
+				return ErrForbidden
+			}
+			return fmt.Errorf("load participant %s/%s: %w", callRow.ID, params.DeviceID, loadErr)
+		}
+		if participant.AccountID != params.AccountID || participant.State != ParticipantStateJoined {
+			return ErrForbidden
+		}
+
+		if runtimeErr := s.runtime.AcknowledgeAdaptation(ctx, params.SessionID, RuntimeParticipant{
+			CallID:    callRow.ID,
+			AccountID: params.AccountID,
+			DeviceID:  params.DeviceID,
+			WithVideo: participant.MediaState.CameraEnabled,
+		}, params.AdaptationRevision, params.AppliedProfile); runtimeErr != nil {
+			return fmt.Errorf("acknowledge runtime adaptation %s/%s: %w", callRow.ID, params.DeviceID, runtimeErr)
+		}
+
+		event, appendErr := s.appendEvent(ctx, store, callRow, EventTypeMediaUpdated, params.AccountID, params.DeviceID, map[string]string{
+			"adaptation_revision":       fmt.Sprintf("%d", params.AdaptationRevision),
+			"pending_adaptation":        "false",
+			"acked_adaptation_revision": fmt.Sprintf("%d", params.AdaptationRevision),
+			"applied_profile":           params.AppliedProfile,
+		}, now)
+		if appendErr != nil {
+			return appendErr
+		}
+		events = append(events, event)
+
+		result, loadErr = s.hydrateCall(ctx, store, callRow.ID)
+		if loadErr != nil {
+			return loadErr
+		}
+		for _, item := range result.Participants {
+			if item.AccountID == params.AccountID && item.DeviceID == params.DeviceID {
+				acknowledged = cloneParticipant(item)
+				break
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return Call{}, Participant{}, nil, err
+	}
+
+	for i := range events {
+		events[i].Call = cloneCall(result)
+	}
+
+	return result, acknowledged, cloneEvents(events), nil
+}
+
 func liveInvite(invites []Invite) bool {
 	for _, invite := range invites {
 		if invite.State == InviteStatePending || invite.State == InviteStateAccepted {
