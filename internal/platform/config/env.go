@@ -134,6 +134,21 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.RTC.CredentialTTL = value
 	}
+	if value, ok, err := stringValueWithPresence(serviceName, "RTC_CANDIDATE_HOST", cfg.RTC.CandidateHost); err != nil {
+		return err
+	} else if ok {
+		cfg.RTC.CandidateHost = value
+	}
+	if value, ok, err := intValue(serviceName, "RTC_UDP_PORT_MIN", cfg.RTC.UDPPortMin); err != nil {
+		return err
+	} else if ok {
+		cfg.RTC.UDPPortMin = value
+	}
+	if value, ok, err := intValue(serviceName, "RTC_UDP_PORT_MAX", cfg.RTC.UDPPortMax); err != nil {
+		return err
+	} else if ok {
+		cfg.RTC.UDPPortMax = value
+	}
 	if value, ok, err := stringSliceValue(serviceName, "RTC_STUN_URLS", cfg.RTC.STUNURLs); err != nil {
 		return err
 	} else if ok {

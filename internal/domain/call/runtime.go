@@ -10,6 +10,9 @@ import (
 type RTCConfig struct {
 	PublicEndpoint string
 	CredentialTTL  time.Duration
+	CandidateHost  string
+	UDPPortMin     int
+	UDPPortMax     int
 	STUNURLs       []string
 	TURNURLs       []string
 	TURNSecret     string
@@ -19,6 +22,11 @@ type RTCConfig struct {
 type RuntimeSession struct {
 	SessionID       string
 	RuntimeEndpoint string
+	IceUfrag        string
+	IcePwd          string
+	DTLSFingerprint string
+	CandidateHost   string
+	CandidatePort   int
 }
 
 // RuntimeJoin describes one participant admission to the media room.
@@ -27,6 +35,11 @@ type RuntimeJoin struct {
 	SessionToken    string
 	RuntimeEndpoint string
 	ExpiresAt       time.Time
+	IceUfrag        string
+	IcePwd          string
+	DTLSFingerprint string
+	CandidateHost   string
+	CandidatePort   int
 }
 
 // RuntimeParticipant describes one participant join request for the media plane.
@@ -49,7 +62,17 @@ func (c RTCConfig) normalize() RTCConfig {
 	if c.CredentialTTL <= 0 {
 		c.CredentialTTL = 15 * time.Minute
 	}
+	if c.UDPPortMin <= 0 {
+		c.UDPPortMin = 40000
+	}
+	if c.UDPPortMax <= 0 {
+		c.UDPPortMax = 40100
+	}
+	if c.UDPPortMax < c.UDPPortMin {
+		c.UDPPortMax = c.UDPPortMin
+	}
 	c.PublicEndpoint = strings.TrimSpace(c.PublicEndpoint)
+	c.CandidateHost = strings.TrimSpace(c.CandidateHost)
 	c.TURNSecret = strings.TrimSpace(c.TURNSecret)
 	c.STUNURLs = trimList(c.STUNURLs)
 	c.TURNURLs = trimList(c.TURNURLs)

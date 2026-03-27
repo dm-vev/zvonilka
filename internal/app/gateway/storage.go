@@ -224,7 +224,12 @@ func buildAppStorage(
 			closeStorageCatalog(ctx, catalog),
 		)
 	}
-	callRuntime := platformrtc.NewManager(cfg.RTC.PublicEndpoint, cfg.RTC.CredentialTTL)
+	callRuntime := platformrtc.NewManager(
+		cfg.RTC.PublicEndpoint,
+		cfg.RTC.CredentialTTL,
+		platformrtc.WithCandidateHost(cfg.RTC.CandidateHost),
+		platformrtc.WithUDPPortRange(cfg.RTC.UDPPortMin, cfg.RTC.UDPPortMax),
+	)
 	callService, err := domaincall.NewService(
 		callStore,
 		conversationStore,

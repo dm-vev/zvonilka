@@ -2,8 +2,13 @@ package rtc
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"sync"
@@ -17,6 +22,11 @@ type Manager struct {
 	mu       sync.Mutex
 	endpoint string
 	tokenTTL time.Duration
+	host     string
+	portMin  int
+	portMax  int
+	nextPort int
+	dtlsFP   string
 	now      func() time.Time
 	sessions map[string]*session
 }
@@ -25,6 +35,10 @@ type session struct {
 	id           string
 	callID       string
 	conversation string
+	iceUfrag     string
+	icePwd       string
+	host         string
+	port         int
 	participants map[string]participant
 }
 
@@ -35,7 +49,7 @@ type participant struct {
 }
 
 // NewManager constructs an in-process RTC session manager.
-func NewManager(endpoint string, tokenTTL time.Duration) *Manager {
+func NewManager(endpoint string, tokenTTL time.Duration, opts ...Option) *Manager {
 	endpoint = strings.TrimSpace(endpoint)
 	if endpoint == "" {
 		endpoint = "webrtc://gateway/calls"
@@ -44,11 +58,59 @@ func NewManager(endpoint string, tokenTTL time.Duration) *Manager {
 		tokenTTL = 15 * time.Minute
 	}
 
-	return &Manager{
+	manager := &Manager{
 		endpoint: endpoint,
 		tokenTTL: tokenTTL,
+		host:     "127.0.0.1",
+		portMin:  40000,
+		portMax:  40100,
+		nextPort: 40000,
+		dtlsFP:   mustDTLSFingerprint(),
 		now:      func() time.Time { return time.Now().UTC() },
 		sessions: make(map[string]*session),
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(manager)
+		}
+	}
+	if manager.portMin <= 0 {
+		manager.portMin = 40000
+	}
+	if manager.portMax < manager.portMin {
+		manager.portMax = manager.portMin
+	}
+	if manager.nextPort < manager.portMin || manager.nextPort > manager.portMax {
+		manager.nextPort = manager.portMin
+	}
+
+	return manager
+}
+
+// Option configures the in-server RTC manager.
+type Option func(*Manager)
+
+// WithCandidateHost overrides the candidate host returned to clients.
+func WithCandidateHost(host string) Option {
+	return func(manager *Manager) {
+		if manager != nil && strings.TrimSpace(host) != "" {
+			manager.host = strings.TrimSpace(host)
+		}
+	}
+}
+
+// WithUDPPortRange overrides the UDP media-plane port range.
+func WithUDPPortRange(min int, max int) Option {
+	return func(manager *Manager) {
+		if manager == nil {
+			return
+		}
+		if min > 0 {
+			manager.portMin = min
+		}
+		if max > 0 {
+			manager.portMax = max
+		}
 	}
 }
 
@@ -69,19 +131,46 @@ func (m *Manager) EnsureSession(_ context.Context, callRow domaincall.Call) (dom
 		return domaincall.RuntimeSession{
 			SessionID:       active.id,
 			RuntimeEndpoint: m.endpoint,
+			IceUfrag:        active.iceUfrag,
+			IcePwd:          active.icePwd,
+			DTLSFingerprint: m.dtlsFP,
+			CandidateHost:   active.host,
+			CandidatePort:   active.port,
 		}, nil
+	}
+
+	iceUfrag, err := randomToken(8)
+	if err != nil {
+		return domaincall.RuntimeSession{}, fmt.Errorf("generate ice ufrag: %w", err)
+	}
+	icePwd, err := randomToken(24)
+	if err != nil {
+		return domaincall.RuntimeSession{}, fmt.Errorf("generate ice pwd: %w", err)
+	}
+	port, err := m.allocatePortLocked()
+	if err != nil {
+		return domaincall.RuntimeSession{}, err
 	}
 
 	m.sessions[sessionID] = &session{
 		id:           sessionID,
 		callID:       callRow.ID,
 		conversation: callRow.ConversationID,
+		iceUfrag:     iceUfrag,
+		icePwd:       icePwd,
+		host:         m.host,
+		port:         port,
 		participants: make(map[string]participant),
 	}
 
 	return domaincall.RuntimeSession{
 		SessionID:       sessionID,
 		RuntimeEndpoint: m.endpoint,
+		IceUfrag:        iceUfrag,
+		IcePwd:          icePwd,
+		DTLSFingerprint: m.dtlsFP,
+		CandidateHost:   m.host,
+		CandidatePort:   port,
 	}, nil
 }
 
@@ -121,6 +210,11 @@ func (m *Manager) JoinSession(
 		SessionToken:    token,
 		RuntimeEndpoint: m.endpoint,
 		ExpiresAt:       m.now().Add(m.tokenTTL),
+		IceUfrag:        active.iceUfrag,
+		IcePwd:          active.icePwd,
+		DTLSFingerprint: m.dtlsFP,
+		CandidateHost:   active.host,
+		CandidatePort:   active.port,
 	}, nil
 }
 
@@ -161,6 +255,38 @@ func (m *Manager) CloseSession(_ context.Context, sessionID string) error {
 	return nil
 }
 
+func (m *Manager) allocatePortLocked() (int, error) {
+	size := m.portMax - m.portMin + 1
+	if size <= 0 {
+		return 0, domaincall.ErrInvalidInput
+	}
+
+	for i := 0; i < size; i++ {
+		port := m.nextPort
+		if port < m.portMin || port > m.portMax {
+			port = m.portMin
+		}
+		m.nextPort = port + 1
+		if m.nextPort > m.portMax {
+			m.nextPort = m.portMin
+		}
+		if !m.portInUseLocked(port) {
+			return port, nil
+		}
+	}
+
+	return 0, fmt.Errorf("allocate media port: %w", domaincall.ErrConflict)
+}
+
+func (m *Manager) portInUseLocked(port int) bool {
+	for _, active := range m.sessions {
+		if active.port == port {
+			return true
+		}
+	}
+	return false
+}
+
 func participantKey(accountID string, deviceID string) string {
 	return accountID + "|" + deviceID
 }
@@ -176,6 +302,24 @@ func randomToken(size int) (string, error) {
 	}
 
 	return base64.RawURLEncoding.EncodeToString(data), nil
+}
+
+func mustDTLSFingerprint() string {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	publicKey, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+	if err != nil {
+		panic(err)
+	}
+	sum := sha256.Sum256(publicKey)
+	encoded := strings.ToUpper(hex.EncodeToString(sum[:]))
+	parts := make([]string, 0, len(encoded)/2)
+	for i := 0; i < len(encoded); i += 2 {
+		parts = append(parts, encoded[i:i+2])
+	}
+	return "sha-256 " + strings.Join(parts, ":")
 }
 
 var _ domaincall.Runtime = (*Manager)(nil)

@@ -177,6 +177,11 @@ func joinDetailsProto(details domaincall.JoinDetails) *callv1.JoinTransport {
 		SessionToken:    details.SessionToken,
 		RuntimeEndpoint: details.RuntimeEndpoint,
 		ExpiresAt:       protoTime(details.ExpiresAt),
+		IceUfrag:        details.IceUfrag,
+		IcePwd:          details.IcePwd,
+		DtlsFingerprint: details.DTLSFingerprint,
+		CandidateHost:   details.CandidateHost,
+		CandidatePort:   uint32(details.CandidatePort),
 		IceServers:      servers,
 	}
 }

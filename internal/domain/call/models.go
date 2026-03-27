@@ -162,5 +162,10 @@ type JoinDetails struct {
 	SessionToken    string
 	RuntimeEndpoint string
 	ExpiresAt       time.Time
+	IceUfrag        string
+	IcePwd          string
+	DTLSFingerprint string
+	CandidateHost   string
+	CandidatePort   int
 	IceServers      []IceServer
 }

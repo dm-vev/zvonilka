@@ -94,6 +94,9 @@ func defaultConfiguration(serviceName string) Configuration {
 		RTC: RTCConfig{
 			PublicEndpoint: "webrtc://gateway/calls",
 			CredentialTTL:  15 * time.Minute,
+			CandidateHost:  "127.0.0.1",
+			UDPPortMin:     40000,
+			UDPPortMax:     40100,
 		},
 		Bot: BotConfig{
 			FanoutPollInterval:  botDefaults.FanoutPollInterval,

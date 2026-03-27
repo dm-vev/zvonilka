@@ -26,8 +26,20 @@ func TestCallLifecycle(t *testing.T) {
 	service, err := domaincall.NewService(
 		calltest.NewMemoryStore(),
 		conversations,
-		platformrtc.NewManager("webrtc://test/calls", 15*time.Minute),
+		platformrtc.NewManager(
+			"webrtc://test/calls",
+			15*time.Minute,
+			platformrtc.WithCandidateHost("127.0.0.1"),
+			platformrtc.WithUDPPortRange(41000, 41010),
+		),
 		domaincall.WithNow(clock),
+		domaincall.WithRTC(domaincall.RTCConfig{
+			PublicEndpoint: "webrtc://test/calls",
+			CredentialTTL:  15 * time.Minute,
+			CandidateHost:  "127.0.0.1",
+			UDPPortMin:     41000,
+			UDPPortMax:     41010,
+		}),
 	)
 	require.NoError(t, err)
 
@@ -59,6 +71,11 @@ func TestCallLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, started.ID, joined.ID)
 	require.NotEmpty(t, transport.SessionID)
+	require.NotEmpty(t, transport.IceUfrag)
+	require.NotEmpty(t, transport.IcePwd)
+	require.NotEmpty(t, transport.DTLSFingerprint)
+	require.Equal(t, "127.0.0.1", transport.CandidateHost)
+	require.NotZero(t, transport.CandidatePort)
 	require.Len(t, events, 1)
 
 	updated, participant, events, err := service.UpdateCallMediaState(context.Background(), domaincall.UpdateParams{

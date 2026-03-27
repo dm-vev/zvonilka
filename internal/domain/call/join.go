@@ -435,6 +435,11 @@ func (s *Service) JoinCall(ctx context.Context, params JoinParams) (Call, JoinDe
 			SessionToken:    runtimeJoin.SessionToken,
 			RuntimeEndpoint: s.resolveRuntimeEndpoint(runtimeJoin.RuntimeEndpoint),
 			ExpiresAt:       expiresAt,
+			IceUfrag:        runtimeJoin.IceUfrag,
+			IcePwd:          runtimeJoin.IcePwd,
+			DTLSFingerprint: runtimeJoin.DTLSFingerprint,
+			CandidateHost:   runtimeJoin.CandidateHost,
+			CandidatePort:   runtimeJoin.CandidatePort,
 			IceServers:      iceServers,
 		}
 		_ = savedParticipant

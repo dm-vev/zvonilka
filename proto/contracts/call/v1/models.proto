@@ -114,4 +114,9 @@ message JoinTransport {
   string runtime_endpoint = 3;
   google.protobuf.Timestamp expires_at = 4;
   repeated IceServer ice_servers = 5;
+  string ice_ufrag = 6;
+  string ice_pwd = 7;
+  string dtls_fingerprint = 8;
+  string candidate_host = 9;
+  uint32 candidate_port = 10;
 }

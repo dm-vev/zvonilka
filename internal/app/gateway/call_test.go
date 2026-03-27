@@ -54,6 +54,9 @@ func TestCallLifecycleRPC(t *testing.T) {
 	if joined.Transport == nil || joined.Transport.SessionId == "" || joined.Transport.RuntimeEndpoint == "" {
 		t.Fatalf("unexpected join transport: %+v", joined.Transport)
 	}
+	if joined.Transport.CandidateHost == "" || joined.Transport.CandidatePort == 0 || joined.Transport.IceUfrag == "" || joined.Transport.IcePwd == "" || joined.Transport.DtlsFingerprint == "" {
+		t.Fatalf("unexpected media-plane transport details: %+v", joined.Transport)
+	}
 
 	updated, err := fixture.api.UpdateCallMediaState(peerCtx, &callv1.UpdateCallMediaStateRequest{
 		CallId: started.Call.CallId,

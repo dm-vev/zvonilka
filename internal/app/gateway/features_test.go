@@ -675,11 +675,19 @@ func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
 	callService, err := domaincall.NewService(
 		calltest.NewMemoryStore(),
 		conversationStore,
-		platformrtc.NewManager("webrtc://test/calls", 15*time.Minute),
+		platformrtc.NewManager(
+			"webrtc://test/calls",
+			15*time.Minute,
+			platformrtc.WithCandidateHost("127.0.0.1"),
+			platformrtc.WithUDPPortRange(41000, 41010),
+		),
 		domaincall.WithNow(nowFunc),
 		domaincall.WithRTC(domaincall.RTCConfig{
 			PublicEndpoint: "webrtc://test/calls",
 			CredentialTTL:  15 * time.Minute,
+			CandidateHost:  "127.0.0.1",
+			UDPPortMin:     41000,
+			UDPPortMax:     41010,
 		}),
 	)
 	if err != nil {

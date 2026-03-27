@@ -21,6 +21,7 @@ func (c *Configuration) normalize() {
 	c.Runtime.HTTP.Address = strings.TrimSpace(c.Runtime.HTTP.Address)
 	c.Runtime.GRPC.Address = strings.TrimSpace(c.Runtime.GRPC.Address)
 	c.RTC.PublicEndpoint = strings.TrimSpace(c.RTC.PublicEndpoint)
+	c.RTC.CandidateHost = strings.TrimSpace(c.RTC.CandidateHost)
 	c.RTC.TURNSecret = strings.TrimSpace(c.RTC.TURNSecret)
 	c.RTC.STUNURLs = normalizeList(c.RTC.STUNURLs)
 	c.RTC.TURNURLs = normalizeList(c.RTC.TURNURLs)
