@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
 	domainnotification "github.com/dm-vev/zvonilka/internal/domain/notification"
 	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
@@ -207,6 +208,33 @@ func TestLoadIdentityDefaultsMatchDomainSettings(t *testing.T) {
 
 	if got, want := cfg.Identity.ToSettings(), domainidentity.DefaultSettings(); got != want {
 		t.Fatalf("identity settings mismatch: got %+v, want %+v", got, want)
+	}
+}
+
+func TestLoadCallDefaultsMatchDomainSettings(t *testing.T) {
+	resetConfigEnv(t)
+
+	cfg, err := Load("gateway")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if got, want := cfg.Call.ToSettings(), domaincall.DefaultSettings(); got != want {
+		t.Fatalf("call settings mismatch: got %+v, want %+v", got, want)
+	}
+}
+
+func TestLoadAppliesCallReconnectGraceOverride(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_CALL_RECONNECT_GRACE", "12s")
+
+	cfg, err := Load("gateway")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.Call.ReconnectGrace != 12*time.Second {
+		t.Fatalf("call reconnect grace: got %s, want 12s", cfg.Call.ReconnectGrace)
 	}
 }
 

@@ -51,6 +51,9 @@ func (c Configuration) Validate() error {
 	if c.Call.RingingTimeout <= 0 {
 		errs = append(errs, errors.New("call ringing timeout must be positive"))
 	}
+	if c.Call.ReconnectGrace <= 0 {
+		errs = append(errs, errors.New("call reconnect grace must be positive"))
+	}
 	if c.Call.MaxDuration <= 0 {
 		errs = append(errs, errors.New("call max duration must be positive"))
 	}

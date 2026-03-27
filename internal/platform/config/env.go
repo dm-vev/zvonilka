@@ -119,6 +119,11 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Call.RingingTimeout = value
 	}
+	if value, ok, err := durationValue(serviceName, "CALL_RECONNECT_GRACE", cfg.Call.ReconnectGrace); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.ReconnectGrace = value
+	}
 	if value, ok, err := durationValue(serviceName, "CALL_MAX_DURATION", cfg.Call.MaxDuration); err != nil {
 		return err
 	} else if ok {

@@ -10,6 +10,7 @@ import (
 type CallConfig struct {
 	InviteTimeout  time.Duration
 	RingingTimeout time.Duration
+	ReconnectGrace time.Duration
 	MaxDuration    time.Duration
 }
 
@@ -18,6 +19,7 @@ func (c CallConfig) ToSettings() domaincall.Settings {
 	return domaincall.Settings{
 		InviteTimeout:  c.InviteTimeout,
 		RingingTimeout: c.RingingTimeout,
+		ReconnectGrace: c.ReconnectGrace,
 		MaxDuration:    c.MaxDuration,
 	}
 }

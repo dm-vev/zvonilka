@@ -89,6 +89,7 @@ func defaultConfiguration(serviceName string) Configuration {
 		Call: CallConfig{
 			InviteTimeout:  callDefaults.InviteTimeout,
 			RingingTimeout: callDefaults.RingingTimeout,
+			ReconnectGrace: callDefaults.ReconnectGrace,
 			MaxDuration:    callDefaults.MaxDuration,
 		},
 		RTC: RTCConfig{

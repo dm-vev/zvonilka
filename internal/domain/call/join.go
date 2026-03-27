@@ -513,25 +513,8 @@ func (s *Service) LeaveCall(ctx context.Context, params LeaveParams) (Call, []Ev
 			return fmt.Errorf("load participants for call %s: %w", callRow.ID, loadErr)
 		}
 		if joinedParticipants(participants) == 0 {
-			callRow.State = StateEnded
-			callRow.EndReason = EndReasonEnded
-			callRow.EndedAt = now
-			callRow.UpdatedAt = now
-			saved, saveErr := store.SaveCall(ctx, callRow)
-			if saveErr != nil {
-				return fmt.Errorf("end empty call %s: %w", callRow.ID, saveErr)
-			}
-			callRow = saved
 			sessionID = callRow.ActiveSessionID
-			closeRuntime = sessionID != ""
-
-			event, appendErr := s.appendEvent(ctx, store, callRow, EventTypeEnded, params.AccountID, params.DeviceID, map[string]string{
-				"reason": string(EndReasonEnded),
-			}, now)
-			if appendErr != nil {
-				return appendErr
-			}
-			events = append(events, event)
+			closeRuntime = false
 		}
 
 		result, loadErr = s.hydrateCall(ctx, store, callRow.ID)

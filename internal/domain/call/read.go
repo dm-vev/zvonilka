@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 )
@@ -289,47 +290,111 @@ func (s *Service) ensureDirectConversation(
 }
 
 func (s *Service) expireCallIfNeeded(ctx context.Context, store Store, callRow Call) (Call, error) {
-	if callRow.State != StateRinging || callRow.EndedAt.IsZero() == false {
+	if !callRow.EndedAt.IsZero() {
 		return callRow, nil
 	}
 
 	now := s.currentTime()
-	if now.Before(callRow.StartedAt.Add(s.settings.RingingTimeout)) {
+	switch callRow.State {
+	case StateRinging:
+		if now.Before(callRow.StartedAt.Add(s.settings.RingingTimeout)) {
+			return callRow, nil
+		}
+
+		callRow.State = StateEnded
+		callRow.EndReason = EndReasonMissed
+		callRow.EndedAt = now
+		callRow.UpdatedAt = now
+
+		saved, err := store.SaveCall(ctx, callRow)
+		if err != nil {
+			return Call{}, fmt.Errorf("expire call %s: %w", callRow.ID, err)
+		}
+
+		invites, err := store.InvitesByCall(ctx, callRow.ID)
+		if err != nil {
+			return Call{}, fmt.Errorf("load invites for expiring call %s: %w", callRow.ID, err)
+		}
+		for _, invite := range invites {
+			if invite.State != InviteStatePending {
+				continue
+			}
+			invite.State = InviteStateExpired
+			invite.UpdatedAt = now
+			if invite.AnsweredAt.IsZero() {
+				invite.AnsweredAt = now
+			}
+			if _, saveErr := store.SaveInvite(ctx, invite); saveErr != nil {
+				return Call{}, fmt.Errorf("expire invite %s/%s: %w", invite.CallID, invite.AccountID, saveErr)
+			}
+		}
+		if _, err := s.appendEvent(ctx, store, saved, EventTypeEnded, "", "", map[string]string{
+			"reason": string(EndReasonMissed),
+		}, now); err != nil {
+			return Call{}, err
+		}
+
+		return saved, nil
+	case StateActive:
+		if now.After(callRow.StartedAt.Add(s.settings.MaxDuration)) {
+			return s.endExpiredActiveCall(ctx, store, callRow, now, "max_duration")
+		}
+
+		participants, err := store.ParticipantsByCall(ctx, callRow.ID)
+		if err != nil {
+			return Call{}, fmt.Errorf("load participants for expiring call %s: %w", callRow.ID, err)
+		}
+		if joinedParticipants(participants) > 0 {
+			return callRow, nil
+		}
+
+		lastLeftAt := latestParticipantLeftAt(participants)
+		if lastLeftAt.IsZero() || now.Before(lastLeftAt.Add(s.settings.ReconnectGrace)) {
+			return callRow, nil
+		}
+
+		return s.endExpiredActiveCall(ctx, store, callRow, now, "reconnect_grace")
+	default:
 		return callRow, nil
 	}
+}
 
+func (s *Service) endExpiredActiveCall(
+	ctx context.Context,
+	store Store,
+	callRow Call,
+	now time.Time,
+	policy string,
+) (Call, error) {
 	callRow.State = StateEnded
-	callRow.EndReason = EndReasonMissed
+	callRow.EndReason = EndReasonEnded
 	callRow.EndedAt = now
 	callRow.UpdatedAt = now
 
 	saved, err := store.SaveCall(ctx, callRow)
 	if err != nil {
-		return Call{}, fmt.Errorf("expire call %s: %w", callRow.ID, err)
-	}
-
-	invites, err := store.InvitesByCall(ctx, callRow.ID)
-	if err != nil {
-		return Call{}, fmt.Errorf("load invites for expiring call %s: %w", callRow.ID, err)
-	}
-	for _, invite := range invites {
-		if invite.State != InviteStatePending {
-			continue
-		}
-		invite.State = InviteStateExpired
-		invite.UpdatedAt = now
-		if invite.AnsweredAt.IsZero() {
-			invite.AnsweredAt = now
-		}
-		if _, saveErr := store.SaveInvite(ctx, invite); saveErr != nil {
-			return Call{}, fmt.Errorf("expire invite %s/%s: %w", invite.CallID, invite.AccountID, saveErr)
-		}
+		return Call{}, fmt.Errorf("end expired active call %s: %w", callRow.ID, err)
 	}
 	if _, err := s.appendEvent(ctx, store, saved, EventTypeEnded, "", "", map[string]string{
-		"reason": string(EndReasonMissed),
+		"reason": string(EndReasonEnded),
+		"policy": policy,
 	}, now); err != nil {
 		return Call{}, err
 	}
 
 	return saved, nil
+}
+
+func latestParticipantLeftAt(participants []Participant) time.Time {
+	var latest time.Time
+	for _, participant := range participants {
+		if participant.LeftAt.IsZero() {
+			continue
+		}
+		if latest.IsZero() || participant.LeftAt.After(latest) {
+			latest = participant.LeftAt
+		}
+	}
+
+	return latest
 }

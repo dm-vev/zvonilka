@@ -34,6 +34,12 @@ func TestCallLifecycle(t *testing.T) {
 			platformrtc.WithUDPPortRange(41000, 41010),
 		),
 		domaincall.WithNow(clock),
+		domaincall.WithSettings(domaincall.Settings{
+			InviteTimeout:  45 * time.Second,
+			RingingTimeout: 45 * time.Second,
+			ReconnectGrace: 5 * time.Second,
+			MaxDuration:    2 * time.Hour,
+		}),
 		domaincall.WithRTC(domaincall.RTCConfig{
 			PublicEndpoint: "webrtc://test/calls",
 			CredentialTTL:  15 * time.Minute,
@@ -134,8 +140,17 @@ func TestCallLifecycle(t *testing.T) {
 		DeviceID:  "dev-b",
 	})
 	require.NoError(t, err)
-	require.Equal(t, domaincall.StateEnded, left.State)
-	require.Len(t, events, 2)
+	require.Equal(t, domaincall.StateActive, left.State)
+	require.Len(t, events, 1)
+
+	now = now.Add(6 * time.Second)
+	expired, err := service.GetCall(context.Background(), domaincall.GetParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+	})
+	require.NoError(t, err)
+	require.Equal(t, domaincall.StateEnded, expired.State)
+	require.Equal(t, domaincall.EndReasonEnded, expired.EndReason)
 }
 
 func mustCreateCallOffer(t *testing.T) string {
@@ -193,6 +208,53 @@ func TestStartCallRejectsNonDirectConversation(t *testing.T) {
 		DeviceID:       "dev-a",
 	})
 	require.ErrorIs(t, err, domaincall.ErrConflict)
+}
+
+func TestCallExpiresAfterMaxDuration(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 26, 21, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return now }
+
+	conversations := conversationtest.NewMemoryStore()
+	require.NoError(t, seedDirectConversation(conversations))
+
+	service, err := domaincall.NewService(
+		calltest.NewMemoryStore(),
+		conversations,
+		platformrtc.NewManager("webrtc://test/calls", 15*time.Minute),
+		domaincall.WithNow(clock),
+		domaincall.WithSettings(domaincall.Settings{
+			InviteTimeout:  45 * time.Second,
+			RingingTimeout: 45 * time.Second,
+			ReconnectGrace: 20 * time.Second,
+			MaxDuration:    30 * time.Second,
+		}),
+	)
+	require.NoError(t, err)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-direct",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+	})
+	require.NoError(t, err)
+	accepted, _, err := service.AcceptCall(context.Background(), domaincall.AcceptParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.NoError(t, err)
+	require.Equal(t, domaincall.StateActive, accepted.State)
+
+	now = now.Add(31 * time.Second)
+	expired, err := service.GetCall(context.Background(), domaincall.GetParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+	})
+	require.NoError(t, err)
+	require.Equal(t, domaincall.StateEnded, expired.State)
+	require.Equal(t, domaincall.EndReasonEnded, expired.EndReason)
 }
 
 func seedDirectConversation(store conversation.Store) error {

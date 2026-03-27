@@ -6,6 +6,7 @@ import "time"
 type Settings struct {
 	InviteTimeout  time.Duration
 	RingingTimeout time.Duration
+	ReconnectGrace time.Duration
 	MaxDuration    time.Duration
 }
 
@@ -14,6 +15,7 @@ func DefaultSettings() Settings {
 	return Settings{
 		InviteTimeout:  45 * time.Second,
 		RingingTimeout: 45 * time.Second,
+		ReconnectGrace: 20 * time.Second,
 		MaxDuration:    2 * time.Hour,
 	}
 }
@@ -25,6 +27,9 @@ func (s Settings) normalize() Settings {
 	}
 	if s.RingingTimeout <= 0 {
 		s.RingingTimeout = defaults.RingingTimeout
+	}
+	if s.ReconnectGrace <= 0 {
+		s.ReconnectGrace = defaults.ReconnectGrace
 	}
 	if s.MaxDuration <= 0 {
 		s.MaxDuration = defaults.MaxDuration
