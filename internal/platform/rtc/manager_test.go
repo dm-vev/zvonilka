@@ -814,6 +814,42 @@ func TestManagerPrioritizesScreenShareBeforeFullVideoFallback(t *testing.T) {
 	require.False(t, stats[0].Transport.SuppressIncomingVideo)
 }
 
+func TestBuildKeyframeRecoveryPacketsPrioritizesScreenShare(t *testing.T) {
+	t.Parallel()
+
+	cameraPackets := buildKeyframeRecoveryPackets(42, false)
+	require.Len(t, cameraPackets, 1)
+	_, ok := cameraPackets[0].(*rtcp.PictureLossIndication)
+	require.True(t, ok)
+
+	screenPackets := buildKeyframeRecoveryPackets(42, true)
+	require.Len(t, screenPackets, 2)
+	_, ok = screenPackets[0].(*rtcp.PictureLossIndication)
+	require.True(t, ok)
+	_, ok = screenPackets[1].(*rtcp.FullIntraRequest)
+	require.True(t, ok)
+}
+
+func TestMediaSSRCFromFeedbackReadsKeyframePackets(t *testing.T) {
+	t.Parallel()
+
+	ssrc, ok := mediaSSRCFromFeedback([]rtcp.Packet{
+		&rtcp.PictureLossIndication{MediaSSRC: 77},
+	})
+	require.True(t, ok)
+	require.EqualValues(t, 77, ssrc)
+
+	ssrc, ok = mediaSSRCFromFeedback([]rtcp.Packet{
+		&rtcp.FullIntraRequest{MediaSSRC: 88},
+	})
+	require.True(t, ok)
+	require.EqualValues(t, 88, ssrc)
+
+	ssrc, ok = mediaSSRCFromFeedback(nil)
+	require.False(t, ok)
+	require.Zero(t, ssrc)
+}
+
 func TestManagerFailedTransportRecommendsReconnect(t *testing.T) {
 	t.Parallel()
 

@@ -880,10 +880,10 @@ func (m *Manager) requestRelayKeyframe(sessionID string, sourceKey string, track
 		return
 	}
 
-	_ = source.pc.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{
-		SenderSSRC: 0,
-		MediaSSRC:  uint32(track.SSRC()),
-	}})
+	_ = source.pc.WriteRTCP(buildKeyframeRecoveryPackets(
+		uint32(track.SSRC()),
+		isScreenShareTrack(track.ID(), track.StreamID()),
+	))
 }
 
 func (m *Manager) removeSourceRelayTracksLocked(active *session, sourceKey string) []*peer {
@@ -1641,6 +1641,44 @@ func countScreenShareRelayTracks(tracks map[string]*relayTrack) int {
 	return count
 }
 
+func buildKeyframeRecoveryPackets(mediaSSRC uint32, prioritizeScreenShare bool) []rtcp.Packet {
+	if mediaSSRC == 0 {
+		return nil
+	}
+
+	packets := []rtcp.Packet{
+		&rtcp.PictureLossIndication{
+			SenderSSRC: 0,
+			MediaSSRC:  mediaSSRC,
+		},
+	}
+	if prioritizeScreenShare {
+		packets = append(packets, &rtcp.FullIntraRequest{
+			SenderSSRC: 0,
+			MediaSSRC:  mediaSSRC,
+		})
+	}
+
+	return packets
+}
+
+func mediaSSRCFromFeedback(packets []rtcp.Packet) (uint32, bool) {
+	for _, packet := range packets {
+		switch value := packet.(type) {
+		case *rtcp.PictureLossIndication:
+			if value.MediaSSRC != 0 {
+				return value.MediaSSRC, true
+			}
+		case *rtcp.FullIntraRequest:
+			if value.MediaSSRC != 0 {
+				return value.MediaSSRC, true
+			}
+		}
+	}
+
+	return 0, false
+}
+
 func isScreenShareTrack(trackID string, streamID string) bool {
 	value := strings.ToLower(strings.TrimSpace(trackID + " " + streamID))
 	return strings.Contains(value, "screen") ||
@@ -1705,12 +1743,12 @@ func (m *Manager) forwardSenderRTCP(sessionID string, relay *relayTrack) {
 		if err != nil {
 			return
 		}
-		m.writeSourceRTCP(sessionID, relay.sourceKey, packets)
+		m.writeSourceRTCP(sessionID, relay, packets)
 	}
 }
 
-func (m *Manager) writeSourceRTCP(sessionID string, sourceKey string, packets []rtcp.Packet) {
-	if sessionID == "" || sourceKey == "" || len(packets) == 0 {
+func (m *Manager) writeSourceRTCP(sessionID string, relay *relayTrack, packets []rtcp.Packet) {
+	if sessionID == "" || relay == nil || relay.sourceKey == "" || len(packets) == 0 {
 		return
 	}
 
@@ -1720,7 +1758,7 @@ func (m *Manager) writeSourceRTCP(sessionID string, sourceKey string, packets []
 		m.mu.Unlock()
 		return
 	}
-	source := active.peers[sourceKey]
+	source := active.peers[relay.sourceKey]
 	m.mu.Unlock()
 	if source == nil || source.pc == nil {
 		return
@@ -1732,6 +1770,11 @@ func (m *Manager) writeSourceRTCP(sessionID string, sourceKey string, packets []
 			SessionID:       sessionID,
 			Metadata:        metadata,
 		})
+	}
+	if relay.screenShare {
+		if mediaSSRC, ok := mediaSSRCFromFeedback(packets); ok {
+			packets = append(packets, buildKeyframeRecoveryPackets(mediaSSRC, true)...)
+		}
 	}
 	_ = source.pc.WriteRTCP(packets)
 }
