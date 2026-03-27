@@ -60,7 +60,8 @@ type peer struct {
 	deviceID               string
 	withVideo              bool
 	pc                     *webrtc.PeerConnection
-	signals                chan domaincall.RuntimeSignal
+	signalMu               sync.Mutex
+	signals                []domaincall.RuntimeSignal
 	tracks                 map[string]*relayTrack
 	mu                     sync.Mutex
 	offering               bool
@@ -77,6 +78,11 @@ type relayTrack struct {
 	sourceKey string
 	track     *webrtc.TrackLocalStaticRTP
 	sender    *webrtc.RTPSender
+}
+
+type relayTarget struct {
+	peer  *peer
+	track *webrtc.TrackLocalStaticRTP
 }
 
 const (
@@ -101,6 +107,7 @@ const (
 	telemetryAckedRevisionKey         = "acked_adaptation_revision"
 	telemetryAppliedProfileKey        = "applied_profile"
 	maxQualitySamples                 = 8
+	maxPendingSignals                 = 256
 )
 
 // NewManager constructs an in-process RTC session manager.
@@ -592,7 +599,6 @@ func (m *Manager) newPeer(active *session, participantRow domaincall.RuntimePart
 		deviceID:  participantRow.DeviceID,
 		withVideo: participantRow.WithVideo,
 		pc:        pc,
-		signals:   make(chan domaincall.RuntimeSignal, 32),
 		tracks:    make(map[string]*relayTrack),
 	}
 
@@ -614,10 +620,7 @@ func (m *Manager) newPeer(active *session, participantRow domaincall.RuntimePart
 		if json.SDPMLineIndex != nil {
 			signal.IceCandidate.SDPMLineIndex = uint32(*json.SDPMLineIndex)
 		}
-		select {
-		case value.signals <- signal:
-		default:
-		}
+		value.enqueueSignal(signal)
 	})
 
 	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
@@ -643,14 +646,11 @@ func (m *Manager) drainSignals(peerConn *peer) []domaincall.RuntimeSignal {
 	}
 
 	signals := make([]domaincall.RuntimeSignal, 0)
-	for {
-		select {
-		case signal := <-peerConn.signals:
-			signals = append(signals, signal)
-		default:
-			return signals
-		}
-	}
+	peerConn.signalMu.Lock()
+	signals = append(signals, peerConn.signals...)
+	peerConn.signals = nil
+	peerConn.signalMu.Unlock()
+	return signals
 }
 
 func (m *Manager) emitPeerTelemetry(sessionID string, target *peer, key string, value string) {
@@ -663,85 +663,12 @@ func (m *Manager) emitPeerTelemetry(sessionID string, target *peer, key string, 
 		return
 	}
 
-	select {
-	case target.signals <- domaincall.RuntimeSignal{
+	target.enqueueSignal(domaincall.RuntimeSignal{
 		TargetAccountID: target.accountID,
 		TargetDeviceID:  target.deviceID,
 		SessionID:       sessionID,
 		Metadata:        metadata,
-	}:
-	default:
-	}
-}
-
-func (m *Manager) recordRelayWriteSuccess(sessionID string, trackKey string, size int) {
-	if strings.TrimSpace(sessionID) == "" || strings.TrimSpace(trackKey) == "" || size <= 0 {
-		return
-	}
-
-	m.mu.Lock()
-	active := m.sessions[sessionID]
-	if active == nil {
-		m.mu.Unlock()
-		return
-	}
-	targets := make([]*peer, 0, len(active.peers))
-	for _, target := range active.peers {
-		if target == nil || target.tracks[trackKey] == nil {
-			continue
-		}
-		targets = append(targets, target)
-	}
-	m.mu.Unlock()
-
-	for _, target := range targets {
-		if metadata := target.recordRelayWrite(uint64(size), false); len(metadata) > 0 {
-			select {
-			case target.signals <- domaincall.RuntimeSignal{
-				TargetAccountID: target.accountID,
-				TargetDeviceID:  target.deviceID,
-				SessionID:       sessionID,
-				Metadata:        metadata,
-			}:
-			default:
-			}
-		}
-	}
-}
-
-func (m *Manager) recordRelayWriteFailure(sessionID string, trackKey string) {
-	if strings.TrimSpace(sessionID) == "" || strings.TrimSpace(trackKey) == "" {
-		return
-	}
-
-	m.mu.Lock()
-	active := m.sessions[sessionID]
-	if active == nil {
-		m.mu.Unlock()
-		return
-	}
-	targets := make([]*peer, 0, len(active.peers))
-	for _, target := range active.peers {
-		if target == nil || target.tracks[trackKey] == nil {
-			continue
-		}
-		targets = append(targets, target)
-	}
-	m.mu.Unlock()
-
-	for _, target := range targets {
-		if metadata := target.recordRelayWrite(0, true); len(metadata) > 0 {
-			select {
-			case target.signals <- domaincall.RuntimeSignal{
-				TargetAccountID: target.accountID,
-				TargetDeviceID:  target.deviceID,
-				SessionID:       sessionID,
-				Metadata:        metadata,
-			}:
-			default:
-			}
-		}
-	}
+	})
 }
 
 func (m *Manager) handleRemoteTrack(sessionID string, sourceKey string, track *webrtc.TrackRemote) {
@@ -776,14 +703,28 @@ func (m *Manager) handleRemoteTrack(sessionID string, sourceKey string, track *w
 			continue
 		}
 		for _, relay := range relays {
-			if relay == nil {
+			if relay.peer == nil || relay.track == nil {
 				continue
 			}
-			if _, err := relay.Write(rawPacket); err != nil {
-				m.recordRelayWriteFailure(sessionID, trackKey)
+			if _, err := relay.track.Write(rawPacket); err != nil {
+				if metadata := relay.peer.recordRelayWrite(0, true); len(metadata) > 0 {
+					relay.peer.enqueueSignal(domaincall.RuntimeSignal{
+						TargetAccountID: relay.peer.accountID,
+						TargetDeviceID:  relay.peer.deviceID,
+						SessionID:       sessionID,
+						Metadata:        metadata,
+					})
+				}
 				continue
 			}
-			m.recordRelayWriteSuccess(sessionID, trackKey, len(rawPacket))
+			if metadata := relay.peer.recordRelayWrite(uint64(len(rawPacket)), false); len(metadata) > 0 {
+				relay.peer.enqueueSignal(domaincall.RuntimeSignal{
+					TargetAccountID: relay.peer.accountID,
+					TargetDeviceID:  relay.peer.deviceID,
+					SessionID:       sessionID,
+					Metadata:        metadata,
+				})
+			}
 		}
 	}
 }
@@ -792,7 +733,7 @@ func (m *Manager) prepareRelayTargets(
 	sessionID string,
 	sourceKey string,
 	track *webrtc.TrackRemote,
-) ([]*peer, []*webrtc.TrackLocalStaticRTP) {
+) ([]*peer, []relayTarget) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -802,14 +743,14 @@ func (m *Manager) prepareRelayTargets(
 	}
 
 	targets := make([]*peer, 0)
-	relays := make([]*webrtc.TrackLocalStaticRTP, 0)
+	relays := make([]relayTarget, 0)
 	trackKey := relayTrackKey(sourceKey, track.ID(), track.StreamID(), track.Kind().String())
 	for key, target := range active.peers {
 		if key == sourceKey || target == nil {
 			continue
 		}
 		if existing := target.tracks[trackKey]; existing != nil {
-			relays = append(relays, existing.track)
+			relays = append(relays, relayTarget{peer: target, track: existing.track})
 			continue
 		}
 
@@ -826,7 +767,7 @@ func (m *Manager) prepareRelayTargets(
 			track:     localTrack,
 			sender:    sender,
 		}
-		relays = append(relays, localTrack)
+		relays = append(relays, relayTarget{peer: target, track: localTrack})
 		targets = append(targets, target)
 		go m.forwardSenderRTCP(sessionID, target.tracks[trackKey])
 	}
@@ -966,8 +907,7 @@ func (m *Manager) emitRenegotiationOffer(sessionID string, target *peer) error {
 	if local == nil {
 		return nil
 	}
-	select {
-	case target.signals <- domaincall.RuntimeSignal{
+	target.enqueueSignal(domaincall.RuntimeSignal{
 		TargetAccountID: target.accountID,
 		TargetDeviceID:  target.deviceID,
 		SessionID:       sessionID,
@@ -975,9 +915,7 @@ func (m *Manager) emitRenegotiationOffer(sessionID string, target *peer) error {
 			Type: "offer",
 			SDP:  local.SDP,
 		},
-	}:
-	default:
-	}
+	})
 
 	return nil
 }
@@ -1093,6 +1031,52 @@ func (p *peer) updateTelemetry(key string, value string) map[string]string {
 	}
 
 	return metadata
+}
+
+func (p *peer) enqueueSignal(signal domaincall.RuntimeSignal) {
+	if p == nil {
+		return
+	}
+
+	p.signalMu.Lock()
+	defer p.signalMu.Unlock()
+
+	isTransportMetadata := signal.Description == nil &&
+		signal.IceCandidate == nil &&
+		len(signal.Metadata) > 0 &&
+		signal.Metadata[telemetryKindKey] == telemetryKindTransport
+
+	if isTransportMetadata {
+		for i := len(p.signals) - 1; i >= 0; i-- {
+			item := p.signals[i]
+			if item.Description == nil &&
+				item.IceCandidate == nil &&
+				len(item.Metadata) > 0 &&
+				item.Metadata[telemetryKindKey] == telemetryKindTransport {
+				p.signals[i] = signal
+				return
+			}
+		}
+	}
+
+	if len(p.signals) >= maxPendingSignals {
+		for i := 0; i < len(p.signals); i++ {
+			item := p.signals[i]
+			if item.Description == nil &&
+				item.IceCandidate == nil &&
+				len(item.Metadata) > 0 &&
+				item.Metadata[telemetryKindKey] == telemetryKindTransport {
+				p.signals = append(p.signals[:i], p.signals[i+1:]...)
+				break
+			}
+		}
+		if len(p.signals) >= maxPendingSignals {
+			p.signals = append(p.signals[1:], signal)
+			return
+		}
+	}
+
+	p.signals = append(p.signals, signal)
 }
 
 func (p *peer) recordRelayWrite(size uint64, failed bool) map[string]string {
@@ -1616,15 +1600,12 @@ func (m *Manager) writeSourceRTCP(sessionID string, sourceKey string, packets []
 		return
 	}
 	if metadata := source.recordQoSFeedback(packets); len(metadata) > 0 {
-		select {
-		case source.signals <- domaincall.RuntimeSignal{
+		source.enqueueSignal(domaincall.RuntimeSignal{
 			TargetAccountID: source.accountID,
 			TargetDeviceID:  source.deviceID,
 			SessionID:       sessionID,
 			Metadata:        metadata,
-		}:
-		default:
-		}
+		})
 	}
 	_ = source.pc.WriteRTCP(packets)
 }

@@ -520,7 +520,6 @@ func TestManagerEmitsDeduplicatedTelemetrySignals(t *testing.T) {
 	target := &peer{
 		accountID: "acc-a",
 		deviceID:  "dev-a",
-		signals:   make(chan domaincall.RuntimeSignal, 8),
 	}
 
 	manager.emitPeerTelemetry("rtc_call-1", target, telemetryICEStateKey, webrtc.ICEConnectionStateChecking.String())
@@ -528,13 +527,49 @@ func TestManagerEmitsDeduplicatedTelemetrySignals(t *testing.T) {
 	manager.emitPeerTelemetry("rtc_call-1", target, telemetryPCStateKey, webrtc.PeerConnectionStateConnecting.String())
 
 	signals := manager.drainSignals(target)
-	require.Len(t, signals, 2)
+	require.Len(t, signals, 1)
 	require.Equal(t, "acc-a", signals[0].TargetAccountID)
 	require.Equal(t, "dev-a", signals[0].TargetDeviceID)
 	require.Equal(t, telemetryKindTransport, signals[0].Metadata[telemetryKindKey])
 	require.Equal(t, "connecting", signals[0].Metadata[telemetryQualityKey])
 	require.Equal(t, webrtc.ICEConnectionStateChecking.String(), signals[0].Metadata[telemetryICEStateKey])
-	require.Equal(t, webrtc.PeerConnectionStateConnecting.String(), signals[1].Metadata[telemetryPCStateKey])
+	require.Equal(t, webrtc.PeerConnectionStateConnecting.String(), signals[0].Metadata[telemetryPCStateKey])
+}
+
+func TestPeerSignalQueueCoalescesTelemetryAndKeepsCriticalSignals(t *testing.T) {
+	t.Parallel()
+
+	target := &peer{
+		accountID: "acc-a",
+		deviceID:  "dev-a",
+	}
+
+	for i := 0; i < maxPendingSignals+10; i++ {
+		target.enqueueSignal(domaincall.RuntimeSignal{
+			TargetAccountID: "acc-a",
+			TargetDeviceID:  "dev-a",
+			SessionID:       "rtc-1",
+			Metadata: map[string]string{
+				telemetryKindKey:     telemetryKindTransport,
+				telemetryICEStateKey: webrtc.ICEConnectionStateChecking.String(),
+			},
+		})
+	}
+	target.enqueueSignal(domaincall.RuntimeSignal{
+		TargetAccountID: "acc-a",
+		TargetDeviceID:  "dev-a",
+		SessionID:       "rtc-1",
+		Description: &domaincall.SessionDescription{
+			Type: "offer",
+			SDP:  "v=0",
+		},
+	})
+
+	manager := &Manager{}
+	signals := manager.drainSignals(target)
+	require.Len(t, signals, 2)
+	require.NotNil(t, signals[1].Description)
+	require.Equal(t, "offer", signals[1].Description.Type)
 }
 
 func TestManagerSessionStatsExposeTransportCounters(t *testing.T) {
