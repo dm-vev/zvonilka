@@ -577,6 +577,14 @@ func TestManagerSessionStatsExposeTransportCounters(t *testing.T) {
 	require.Equal(t, "relay_write_errors", stats[0].Transport.RecommendationReason)
 	require.True(t, stats[0].Transport.VideoFallbackRecommended)
 	require.False(t, stats[0].Transport.ReconnectRecommended)
+	require.Equal(t, "stable", stats[0].Transport.QualityTrend)
+	require.EqualValues(t, 0, stats[0].Transport.DegradedTransitions)
+	require.EqualValues(t, 0, stats[0].Transport.RecoveredTransitions)
+	require.Len(t, stats[0].Transport.RecentSamples, 2)
+	require.Equal(t, "connected", stats[0].Transport.RecentSamples[0].Quality)
+	require.Equal(t, "full", stats[0].Transport.RecentSamples[0].RecommendedProfile)
+	require.Equal(t, "connected", stats[0].Transport.RecentSamples[1].Quality)
+	require.Equal(t, "audio_only", stats[0].Transport.RecentSamples[1].RecommendedProfile)
 	require.EqualValues(t, 1, stats[0].Transport.RelayPackets)
 	require.EqualValues(t, 321, stats[0].Transport.RelayBytes)
 	require.EqualValues(t, 3, stats[0].Transport.RelayWriteErrors)
@@ -620,6 +628,12 @@ func TestManagerAdaptiveRecommendationRecoversAfterHealthyRelayWrite(t *testing.
 	require.Equal(t, "", metadata[telemetryReasonKey])
 	require.Equal(t, "false", metadata[telemetryVideoKey])
 	require.Equal(t, "false", metadata[telemetryReconnectKey])
+
+	stats, err := manager.SessionStats(context.Background(), session.SessionID)
+	require.NoError(t, err)
+	require.Len(t, stats, 1)
+	require.Equal(t, "stable", stats[0].Transport.QualityTrend)
+	require.Len(t, stats[0].Transport.RecentSamples, 3)
 }
 
 func TestManagerFailedTransportRecommendsReconnect(t *testing.T) {
@@ -648,11 +662,66 @@ func TestManagerFailedTransportRecommendsReconnect(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	peerA.updateTelemetry(telemetryICEStateKey, webrtc.ICEConnectionStateConnected.String())
 	metadata := peerA.updateTelemetry(telemetryPCStateKey, webrtc.PeerConnectionStateFailed.String())
 	require.Equal(t, "reconnect", metadata[telemetryProfileKey])
 	require.Equal(t, "transport_failed", metadata[telemetryReasonKey])
 	require.Equal(t, "true", metadata[telemetryReconnectKey])
 	require.Equal(t, "false", metadata[telemetryVideoKey])
+
+	stats, err := manager.SessionStats(context.Background(), session.SessionID)
+	require.NoError(t, err)
+	require.Len(t, stats, 1)
+	require.Equal(t, "degrading", stats[0].Transport.QualityTrend)
+	require.EqualValues(t, 1, stats[0].Transport.DegradedTransitions)
+	require.EqualValues(t, 0, stats[0].Transport.RecoveredTransitions)
+	require.False(t, stats[0].Transport.LastQualityChangeAt.IsZero())
+	require.Len(t, stats[0].Transport.RecentSamples, 2)
+	require.Equal(t, "connected", stats[0].Transport.RecentSamples[0].Quality)
+	require.Equal(t, "failed", stats[0].Transport.RecentSamples[1].Quality)
+	require.Equal(t, "reconnect", stats[0].Transport.RecentSamples[1].RecommendedProfile)
+}
+
+func TestManagerQualityTrendTracksRecovery(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager("webrtc://gateway/calls", 15*time.Minute)
+	session, err := manager.EnsureSession(context.Background(), domaincall.Call{
+		ID:             "call-trend",
+		ConversationID: "conv-trend",
+	})
+	require.NoError(t, err)
+
+	_, err = manager.JoinSession(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-trend",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	_, peerA, err := manager.ensurePeer(session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-trend",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	peerA.updateTelemetry(telemetryICEStateKey, webrtc.ICEConnectionStateConnected.String())
+	peerA.updateTelemetry(telemetryICEStateKey, webrtc.ICEConnectionStateDisconnected.String())
+	peerA.updateTelemetry(telemetryICEStateKey, webrtc.ICEConnectionStateConnected.String())
+
+	stats, err := manager.SessionStats(context.Background(), session.SessionID)
+	require.NoError(t, err)
+	require.Len(t, stats, 1)
+	require.Equal(t, "improving", stats[0].Transport.QualityTrend)
+	require.EqualValues(t, 1, stats[0].Transport.DegradedTransitions)
+	require.EqualValues(t, 1, stats[0].Transport.RecoveredTransitions)
+	require.Len(t, stats[0].Transport.RecentSamples, 3)
+	require.Equal(t, "connected", stats[0].Transport.RecentSamples[0].Quality)
+	require.Equal(t, "degraded", stats[0].Transport.RecentSamples[1].Quality)
+	require.Equal(t, "connected", stats[0].Transport.RecentSamples[2].Quality)
 }
 
 func mustNewPeerConnection(t *testing.T) *webrtc.PeerConnection {

@@ -163,6 +163,15 @@ func callMediaStateProto(state domaincall.MediaState) *callv1.CallMediaState {
 }
 
 func callTransportStatsProto(value domaincall.TransportStats) *callv1.CallTransportStats {
+	samples := make([]*callv1.CallTransportQualitySample, 0, len(value.RecentSamples))
+	for _, sample := range value.RecentSamples {
+		samples = append(samples, &callv1.CallTransportQualitySample{
+			Quality:            sample.Quality,
+			RecommendedProfile: sample.RecommendedProfile,
+			RecordedAt:         protoTime(sample.RecordedAt),
+		})
+	}
+
 	return &callv1.CallTransportStats{
 		PeerConnectionState:      value.PeerConnectionState,
 		IceConnectionState:       value.IceConnectionState,
@@ -172,6 +181,11 @@ func callTransportStatsProto(value domaincall.TransportStats) *callv1.CallTransp
 		RecommendationReason:     value.RecommendationReason,
 		VideoFallbackRecommended: value.VideoFallbackRecommended,
 		ReconnectRecommended:     value.ReconnectRecommended,
+		QualityTrend:             value.QualityTrend,
+		DegradedTransitions:      value.DegradedTransitions,
+		RecoveredTransitions:     value.RecoveredTransitions,
+		LastQualityChangeAt:      protoTime(value.LastQualityChangeAt),
+		RecentSamples:            samples,
 		RelayTracks:              value.RelayTracks,
 		RelayPackets:             value.RelayPackets,
 		RelayBytes:               value.RelayBytes,

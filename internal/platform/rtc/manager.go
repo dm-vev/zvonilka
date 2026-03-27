@@ -89,6 +89,7 @@ const (
 	telemetryReasonKey     = "recommendation_reason"
 	telemetryVideoKey      = "video_fallback_recommended"
 	telemetryReconnectKey  = "reconnect_recommended"
+	maxQualitySamples      = 8
 )
 
 // NewManager constructs an in-process RTC session manager.
@@ -971,6 +972,7 @@ func (p *peer) updateTelemetry(key string, value string) map[string]string {
 	defer p.mu.Unlock()
 
 	value = strings.TrimSpace(value)
+	prevQuality := p.stats.Quality
 	prevProfile := p.stats.RecommendedProfile
 	prevReason := p.stats.RecommendationReason
 	prevVideo := p.stats.VideoFallbackRecommended
@@ -1014,6 +1016,7 @@ func (p *peer) updateTelemetry(key string, value string) map[string]string {
 	p.stats.SignalingState = p.lastSIG
 	p.stats.Quality = metadata[telemetryQualityKey]
 	p.applyRecommendationsLocked()
+	p.recordQualityTransitionLocked(prevQuality)
 	p.stats.LastUpdatedAt = time.Now().UTC()
 	metadata[telemetryProfileKey] = p.stats.RecommendedProfile
 	metadata[telemetryReasonKey] = p.stats.RecommendationReason
@@ -1033,6 +1036,7 @@ func (p *peer) recordRelayWrite(size uint64, failed bool) map[string]string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	prevQuality := p.stats.Quality
 	prevProfile := p.stats.RecommendedProfile
 	prevReason := p.stats.RecommendationReason
 	prevVideo := p.stats.VideoFallbackRecommended
@@ -1047,11 +1051,13 @@ func (p *peer) recordRelayWrite(size uint64, failed bool) map[string]string {
 	}
 	p.stats.RelayTracks = uint32(len(p.tracks))
 	p.applyRecommendationsLocked()
+	p.recordQualityTransitionLocked(prevQuality)
 	p.stats.LastUpdatedAt = time.Now().UTC()
 	if p.stats.RecommendedProfile == prevProfile &&
 		p.stats.RecommendationReason == prevReason &&
 		p.stats.VideoFallbackRecommended == prevVideo &&
-		p.stats.ReconnectRecommended == prevReconnect {
+		p.stats.ReconnectRecommended == prevReconnect &&
+		p.stats.Quality == prevQuality {
 		return nil
 	}
 
@@ -1095,6 +1101,54 @@ func (p *peer) applyRecommendationsLocked() {
 	p.stats.ReconnectRecommended = reconnect
 }
 
+func (p *peer) recordQualityTransitionLocked(prevQuality string) {
+	currentQuality := strings.TrimSpace(p.stats.Quality)
+	if currentQuality == "" {
+		return
+	}
+	if prevQuality != "" && prevQuality != currentQuality {
+		if qualityRank(currentQuality) > qualityRank(prevQuality) {
+			p.stats.QualityTrend = "improving"
+			p.stats.RecoveredTransitions++
+		} else if qualityRank(currentQuality) < qualityRank(prevQuality) {
+			p.stats.QualityTrend = "degrading"
+			p.stats.DegradedTransitions++
+		}
+		p.stats.LastQualityChangeAt = time.Now().UTC()
+	} else if p.stats.QualityTrend == "" {
+		p.stats.QualityTrend = "stable"
+	}
+
+	if prevQuality == currentQuality && p.stats.RecommendedProfile == "full" {
+		p.stats.QualityTrend = "stable"
+	}
+	p.appendQualitySampleLocked(currentQuality)
+}
+
+func (p *peer) appendQualitySampleLocked(quality string) {
+	if quality == "" {
+		return
+	}
+
+	sample := domaincall.TransportQualitySample{
+		Quality:            quality,
+		RecommendedProfile: p.stats.RecommendedProfile,
+		RecordedAt:         time.Now().UTC(),
+	}
+	if len(p.stats.RecentSamples) > 0 {
+		last := p.stats.RecentSamples[len(p.stats.RecentSamples)-1]
+		if last.Quality == sample.Quality && last.RecommendedProfile == sample.RecommendedProfile {
+			p.stats.RecentSamples[len(p.stats.RecentSamples)-1] = sample
+			return
+		}
+	}
+
+	p.stats.RecentSamples = append(p.stats.RecentSamples, sample)
+	if len(p.stats.RecentSamples) > maxQualitySamples {
+		p.stats.RecentSamples = append([]domaincall.TransportQualitySample(nil), p.stats.RecentSamples[len(p.stats.RecentSamples)-maxQualitySamples:]...)
+	}
+}
+
 func (p *peer) snapshotStats() domaincall.TransportStats {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -1111,6 +1165,21 @@ func boolString(value bool) string {
 	}
 
 	return "false"
+}
+
+func qualityRank(value string) int {
+	switch strings.TrimSpace(value) {
+	case "failed":
+		return 0
+	case "degraded":
+		return 1
+	case "connecting":
+		return 2
+	case "connected":
+		return 3
+	default:
+		return -1
+	}
 }
 
 func deriveTransportQuality(peerState string, iceState string) string {

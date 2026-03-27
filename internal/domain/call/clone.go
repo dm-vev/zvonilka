@@ -5,7 +5,25 @@ func cloneMediaState(state MediaState) MediaState {
 }
 
 func cloneTransportStats(stats TransportStats) TransportStats {
+	stats.RecentSamples = cloneTransportQualitySamples(stats.RecentSamples)
 	return stats
+}
+
+func cloneTransportQualitySample(sample TransportQualitySample) TransportQualitySample {
+	return sample
+}
+
+func cloneTransportQualitySamples(samples []TransportQualitySample) []TransportQualitySample {
+	if len(samples) == 0 {
+		return nil
+	}
+
+	cloned := make([]TransportQualitySample, len(samples))
+	for i := range samples {
+		cloned[i] = cloneTransportQualitySample(samples[i])
+	}
+
+	return cloned
 }
 
 func cloneInvite(invite Invite) Invite {

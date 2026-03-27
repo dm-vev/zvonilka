@@ -100,6 +100,13 @@ type MediaState struct {
 }
 
 // TransportStats describes live transport quality counters for one participant device.
+type TransportQualitySample struct {
+	Quality            string
+	RecommendedProfile string
+	RecordedAt         time.Time
+}
+
+// TransportStats describes live transport quality counters for one participant device.
 type TransportStats struct {
 	PeerConnectionState      string
 	IceConnectionState       string
@@ -109,6 +116,11 @@ type TransportStats struct {
 	RecommendationReason     string
 	VideoFallbackRecommended bool
 	ReconnectRecommended     bool
+	QualityTrend             string
+	DegradedTransitions      uint32
+	RecoveredTransitions     uint32
+	LastQualityChangeAt      time.Time
+	RecentSamples            []TransportQualitySample
 	RelayTracks              uint32
 	RelayPackets             uint64
 	RelayBytes               uint64
