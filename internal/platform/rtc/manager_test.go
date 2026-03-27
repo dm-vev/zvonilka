@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v4"
 	"github.com/stretchr/testify/require"
 
@@ -792,6 +793,66 @@ func TestManagerAcknowledgeAdaptationClearsPendingState(t *testing.T) {
 	require.Equal(t, stats[0].Transport.AdaptationRevision, stats[0].Transport.AckedAdaptationRevision)
 	require.Equal(t, "audio_only", stats[0].Transport.AppliedProfile)
 	require.False(t, stats[0].Transport.AppliedAt.IsZero())
+}
+
+func TestManagerQoSFeedbackEscalatesToCritical(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager("webrtc://gateway/calls", 15*time.Minute)
+	session, err := manager.EnsureSession(context.Background(), domaincall.Call{
+		ID:             "call-qos",
+		ConversationID: "conv-qos",
+	})
+	require.NoError(t, err)
+
+	_, err = manager.JoinSession(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-qos",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	_, peerA, err := manager.ensurePeer(session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-qos",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	metadata := peerA.recordQoSFeedback([]rtcp.Packet{
+		&rtcp.ReceiverReport{
+			Reports: []rtcp.ReceptionReport{{
+				FractionLost: 20,
+				Jitter:       800,
+			}},
+		},
+	})
+	require.Equal(t, "elevated", metadata["qos_escalation"])
+
+	metadata = peerA.recordQoSFeedback([]rtcp.Packet{
+		&rtcp.ReceiverReport{
+			Reports: []rtcp.ReceptionReport{{
+				FractionLost: 128,
+				Jitter:       4000,
+			}},
+		},
+		&rtcp.TransportLayerNack{},
+		&rtcp.TransportLayerNack{},
+		&rtcp.TransportLayerNack{},
+	})
+	require.Equal(t, "critical", metadata["qos_escalation"])
+
+	stats, err := manager.SessionStats(context.Background(), session.SessionID)
+	require.NoError(t, err)
+	require.Len(t, stats, 1)
+	require.InDelta(t, 50.0, stats[0].Transport.PacketLossPct, 0.1)
+	require.EqualValues(t, 4000, stats[0].Transport.JitterScore)
+	require.Equal(t, "critical", stats[0].Transport.QoSEscalation)
+	require.Equal(t, "worsening", stats[0].Transport.QoSTrend)
+	require.True(t, stats[0].Transport.ReconnectRecommended)
+	require.Len(t, stats[0].Transport.RecentQoSSamples, 2)
 }
 
 func mustNewPeerConnection(t *testing.T) *webrtc.PeerConnection {

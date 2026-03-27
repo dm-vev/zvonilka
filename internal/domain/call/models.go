@@ -106,6 +106,14 @@ type TransportQualitySample struct {
 	RecordedAt         time.Time
 }
 
+// TransportQoSSample describes one derived QoS snapshot from RTCP feedback.
+type TransportQoSSample struct {
+	PacketLossPct float64
+	JitterScore   uint32
+	Escalation    string
+	RecordedAt    time.Time
+}
+
 // TransportStats describes live transport quality counters for one participant device.
 type TransportStats struct {
 	PeerConnectionState      string
@@ -132,6 +140,13 @@ type TransportStats struct {
 	RecoveredTransitions     uint32
 	LastQualityChangeAt      time.Time
 	RecentSamples            []TransportQualitySample
+	PacketLossPct            float64
+	JitterScore              uint32
+	QoSEscalation            string
+	QoSTrend                 string
+	QoSBadStreak             uint32
+	LastQoSUpdatedAt         time.Time
+	RecentQoSSamples         []TransportQoSSample
 	RelayTracks              uint32
 	RelayPackets             uint64
 	RelayBytes               uint64

@@ -94,17 +94,31 @@ message CallTransportStats {
   uint32 recovered_transitions = 22;
   google.protobuf.Timestamp last_quality_change_at = 23;
   repeated CallTransportQualitySample recent_samples = 24;
-  uint32 relay_tracks = 25;
-  uint64 relay_packets = 26;
-  uint64 relay_bytes = 27;
-  uint64 relay_write_errors = 28;
-  google.protobuf.Timestamp last_updated_at = 29;
+  double packet_loss_pct = 25;
+  uint32 jitter_score = 26;
+  string qos_escalation = 27;
+  string qos_trend = 28;
+  uint32 qos_bad_streak = 29;
+  google.protobuf.Timestamp last_qos_updated_at = 30;
+  repeated CallTransportQoSSample recent_qos_samples = 31;
+  uint32 relay_tracks = 32;
+  uint64 relay_packets = 33;
+  uint64 relay_bytes = 34;
+  uint64 relay_write_errors = 35;
+  google.protobuf.Timestamp last_updated_at = 36;
 }
 
 message CallTransportQualitySample {
   string quality = 1;
   string recommended_profile = 2;
   google.protobuf.Timestamp recorded_at = 3;
+}
+
+message CallTransportQoSSample {
+  double packet_loss_pct = 1;
+  uint32 jitter_score = 2;
+  string escalation = 3;
+  google.protobuf.Timestamp recorded_at = 4;
 }
 
 message IceServer {

@@ -171,6 +171,15 @@ func callTransportStatsProto(value domaincall.TransportStats) *callv1.CallTransp
 			RecordedAt:         protoTime(sample.RecordedAt),
 		})
 	}
+	qosSamples := make([]*callv1.CallTransportQoSSample, 0, len(value.RecentQoSSamples))
+	for _, sample := range value.RecentQoSSamples {
+		qosSamples = append(qosSamples, &callv1.CallTransportQoSSample{
+			PacketLossPct: sample.PacketLossPct,
+			JitterScore:   sample.JitterScore,
+			Escalation:    sample.Escalation,
+			RecordedAt:    protoTime(sample.RecordedAt),
+		})
+	}
 
 	return &callv1.CallTransportStats{
 		PeerConnectionState:      value.PeerConnectionState,
@@ -197,6 +206,13 @@ func callTransportStatsProto(value domaincall.TransportStats) *callv1.CallTransp
 		RecoveredTransitions:     value.RecoveredTransitions,
 		LastQualityChangeAt:      protoTime(value.LastQualityChangeAt),
 		RecentSamples:            samples,
+		PacketLossPct:            value.PacketLossPct,
+		JitterScore:              value.JitterScore,
+		QosEscalation:            value.QoSEscalation,
+		QosTrend:                 value.QoSTrend,
+		QosBadStreak:             value.QoSBadStreak,
+		LastQosUpdatedAt:         protoTime(value.LastQoSUpdatedAt),
+		RecentQosSamples:         qosSamples,
 		RelayTracks:              value.RelayTracks,
 		RelayPackets:             value.RelayPackets,
 		RelayBytes:               value.RelayBytes,

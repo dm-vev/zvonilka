@@ -6,6 +6,7 @@ func cloneMediaState(state MediaState) MediaState {
 
 func cloneTransportStats(stats TransportStats) TransportStats {
 	stats.RecentSamples = cloneTransportQualitySamples(stats.RecentSamples)
+	stats.RecentQoSSamples = cloneTransportQoSSamples(stats.RecentQoSSamples)
 	return stats
 }
 
@@ -25,6 +26,23 @@ func cloneTransportQualitySamples(samples []TransportQualitySample) []TransportQ
 	cloned := make([]TransportQualitySample, len(samples))
 	for i := range samples {
 		cloned[i] = cloneTransportQualitySample(samples[i])
+	}
+
+	return cloned
+}
+
+func cloneTransportQoSSample(sample TransportQoSSample) TransportQoSSample {
+	return sample
+}
+
+func cloneTransportQoSSamples(samples []TransportQoSSample) []TransportQoSSample {
+	if len(samples) == 0 {
+		return nil
+	}
+
+	cloned := make([]TransportQoSSample, len(samples))
+	for i := range samples {
+		cloned[i] = cloneTransportQoSSample(samples[i])
 	}
 
 	return cloned

@@ -1144,6 +1144,73 @@ func (p *peer) recordRelayWrite(size uint64, failed bool) map[string]string {
 	}
 }
 
+func (p *peer) recordQoSFeedback(packets []rtcp.Packet) map[string]string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if len(packets) == 0 {
+		return nil
+	}
+
+	prevEscalation := p.stats.QoSEscalation
+	prevTrend := p.stats.QoSTrend
+	prevLoss := p.stats.PacketLossPct
+	prevJitter := p.stats.JitterScore
+
+	lossPct := p.stats.PacketLossPct
+	jitterScore := p.stats.JitterScore
+	updated := false
+	for _, packet := range packets {
+		switch value := packet.(type) {
+		case *rtcp.ReceiverReport:
+			for _, report := range value.Reports {
+				reportLoss := float64(report.FractionLost) * 100 / 256
+				if reportLoss > lossPct {
+					lossPct = reportLoss
+				}
+				if report.Jitter > jitterScore {
+					jitterScore = report.Jitter
+				}
+				updated = true
+			}
+		case *rtcp.TransportLayerNack:
+			p.stats.QoSBadStreak++
+			updated = true
+		case *rtcp.PictureLossIndication, *rtcp.FullIntraRequest:
+			if p.stats.QoSBadStreak < 1 {
+				p.stats.QoSBadStreak = 1
+			}
+			updated = true
+		}
+	}
+	if !updated {
+		return nil
+	}
+
+	p.stats.PacketLossPct = lossPct
+	p.stats.JitterScore = jitterScore
+	p.applyQoSEscalationLocked()
+	p.applyRecommendationsLocked()
+	p.appendQoSSampleLocked()
+	p.stats.LastQoSUpdatedAt = time.Now().UTC()
+
+	if p.stats.QoSEscalation == prevEscalation &&
+		p.stats.QoSTrend == prevTrend &&
+		p.stats.PacketLossPct == prevLoss &&
+		p.stats.JitterScore == prevJitter {
+		return nil
+	}
+
+	return map[string]string{
+		telemetryKindKey:  telemetryKindTransport,
+		"packet_loss_pct": fmt.Sprintf("%.2f", p.stats.PacketLossPct),
+		"jitter_score":    fmt.Sprintf("%d", p.stats.JitterScore),
+		"qos_escalation":  p.stats.QoSEscalation,
+		"qos_trend":       p.stats.QoSTrend,
+		"qos_bad_streak":  fmt.Sprintf("%d", p.stats.QoSBadStreak),
+	}
+}
+
 func (p *peer) applyRecommendationsLocked() {
 	prevProfile := p.stats.RecommendedProfile
 	prevReason := p.stats.RecommendationReason
@@ -1176,6 +1243,19 @@ func (p *peer) applyRecommendationsLocked() {
 		reason = "relay_write_errors"
 		videoFallback = true
 	}
+	switch p.stats.QoSEscalation {
+	case "elevated":
+		if profile == "full" && p.withVideo {
+			profile = "audio_only"
+			reason = "qos_elevated"
+			videoFallback = true
+		}
+	case "critical":
+		profile = "reconnect"
+		reason = "qos_critical"
+		videoFallback = false
+		reconnect = true
+	}
 
 	p.stats.RecommendedProfile = profile
 	p.stats.RecommendationReason = reason
@@ -1200,6 +1280,66 @@ func (p *peer) applyRecommendationsLocked() {
 		p.reconnectAttempts = 0
 		p.stats.ReconnectAttempt = 0
 		p.stats.ReconnectBackoffUntil = time.Time{}
+	}
+}
+
+func (p *peer) applyQoSEscalationLocked() {
+	prevEscalation := p.stats.QoSEscalation
+	prevLoss := p.stats.PacketLossPct
+	prevJitter := p.stats.JitterScore
+
+	switch {
+	case p.stats.PacketLossPct >= 15 || p.stats.JitterScore >= 3000 || p.stats.QoSBadStreak >= 3:
+		p.stats.QoSEscalation = "critical"
+	case p.stats.PacketLossPct >= 5 || p.stats.JitterScore >= 1000 || p.stats.QoSBadStreak >= 1:
+		p.stats.QoSEscalation = "elevated"
+	default:
+		p.stats.QoSEscalation = "normal"
+		p.stats.QoSBadStreak = 0
+	}
+
+	switch {
+	case p.stats.QoSEscalation == prevEscalation:
+		if p.stats.QoSTrend == "" {
+			p.stats.QoSTrend = "stable"
+		}
+	case qosEscalationRank(p.stats.QoSEscalation) > qosEscalationRank(prevEscalation):
+		p.stats.QoSTrend = "worsening"
+	case qosEscalationRank(p.stats.QoSEscalation) < qosEscalationRank(prevEscalation):
+		p.stats.QoSTrend = "recovering"
+	default:
+		if p.stats.PacketLossPct > prevLoss || p.stats.JitterScore > prevJitter {
+			p.stats.QoSTrend = "worsening"
+		} else if p.stats.PacketLossPct < prevLoss || p.stats.JitterScore < prevJitter {
+			p.stats.QoSTrend = "recovering"
+		} else if p.stats.QoSTrend == "" {
+			p.stats.QoSTrend = "stable"
+		}
+	}
+}
+
+func (p *peer) appendQoSSampleLocked() {
+	sample := domaincall.TransportQoSSample{
+		PacketLossPct: p.stats.PacketLossPct,
+		JitterScore:   p.stats.JitterScore,
+		Escalation:    p.stats.QoSEscalation,
+		RecordedAt:    time.Now().UTC(),
+	}
+	if len(p.stats.RecentQoSSamples) > 0 {
+		last := p.stats.RecentQoSSamples[len(p.stats.RecentQoSSamples)-1]
+		if last.PacketLossPct == sample.PacketLossPct &&
+			last.JitterScore == sample.JitterScore &&
+			last.Escalation == sample.Escalation {
+			p.stats.RecentQoSSamples[len(p.stats.RecentQoSSamples)-1] = sample
+			return
+		}
+	}
+	p.stats.RecentQoSSamples = append(p.stats.RecentQoSSamples, sample)
+	if len(p.stats.RecentQoSSamples) > maxQualitySamples {
+		p.stats.RecentQoSSamples = append(
+			[]domaincall.TransportQoSSample(nil),
+			p.stats.RecentQoSSamples[len(p.stats.RecentQoSSamples)-maxQualitySamples:]...,
+		)
 	}
 }
 
@@ -1285,6 +1425,19 @@ func qualityRank(value string) int {
 		return 2
 	case "connected":
 		return 3
+	default:
+		return -1
+	}
+}
+
+func qosEscalationRank(value string) int {
+	switch strings.TrimSpace(value) {
+	case "critical":
+		return 2
+	case "elevated":
+		return 1
+	case "normal":
+		return 0
 	default:
 		return -1
 	}
@@ -1461,6 +1614,17 @@ func (m *Manager) writeSourceRTCP(sessionID string, sourceKey string, packets []
 	m.mu.Unlock()
 	if source == nil || source.pc == nil {
 		return
+	}
+	if metadata := source.recordQoSFeedback(packets); len(metadata) > 0 {
+		select {
+		case source.signals <- domaincall.RuntimeSignal{
+			TargetAccountID: source.accountID,
+			TargetDeviceID:  source.deviceID,
+			SessionID:       sessionID,
+			Metadata:        metadata,
+		}:
+		default:
+		}
 	}
 	_ = source.pc.WriteRTCP(packets)
 }
