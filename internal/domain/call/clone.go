@@ -14,6 +14,11 @@ func cloneQualitySummary(summary QualitySummary) QualitySummary {
 	return summary
 }
 
+func cloneDiagnostics(value Diagnostics) Diagnostics {
+	value.Call = cloneCall(value.Call)
+	return value
+}
+
 func cloneTransportQualitySample(sample TransportQualitySample) TransportQualitySample {
 	return sample
 }

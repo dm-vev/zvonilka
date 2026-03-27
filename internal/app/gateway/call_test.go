@@ -94,6 +94,47 @@ func TestCallLifecycleRPC(t *testing.T) {
 	}
 }
 
+func TestGetCallDiagnosticsRPC(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	owner, ownerCtx := fixture.mustCreateUserAndLogin(t, "call-diagnostics-owner", "call-diagnostics-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "call-diagnostics-peer", "call-diagnostics-peer@example.com")
+
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	started, err := fixture.api.StartCall(ownerCtx, &callv1.StartCallRequest{
+		ConversationId: created.Conversation.ConversationId,
+		WithVideo:      true,
+	})
+	if err != nil {
+		t.Fatalf("start call: %v", err)
+	}
+	if _, err := fixture.api.AcceptCall(peerCtx, &callv1.AcceptCallRequest{CallId: started.Call.CallId}); err != nil {
+		t.Fatalf("accept call: %v", err)
+	}
+
+	report, err := fixture.api.GetCallDiagnostics(ownerCtx, &callv1.GetCallDiagnosticsRequest{
+		CallId: started.Call.CallId,
+	})
+	if err != nil {
+		t.Fatalf("get call diagnostics: %v", err)
+	}
+	if report.Diagnostics == nil || report.Diagnostics.Call == nil {
+		t.Fatalf("expected diagnostics report")
+	}
+	if report.Diagnostics.Call.CallId != started.Call.CallId || report.Diagnostics.Call.InitiatorUserId != owner.ID {
+		t.Fatalf("unexpected diagnostics payload: %+v", report.Diagnostics)
+	}
+}
+
 func TestSubscribeCallEventsStreamsNewEvents(t *testing.T) {
 	t.Parallel()
 

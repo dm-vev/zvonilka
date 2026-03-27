@@ -257,6 +257,92 @@ func TestCallExpiresAfterMaxDuration(t *testing.T) {
 	require.Equal(t, domaincall.EndReasonEnded, expired.EndReason)
 }
 
+func TestGetDiagnosticsAggregatesEndedCallReport(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 26, 23, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return now }
+
+	conversations := conversationtest.NewMemoryStore()
+	require.NoError(t, seedDirectConversation(conversations))
+
+	service, err := domaincall.NewService(
+		calltest.NewMemoryStore(),
+		conversations,
+		platformrtc.NewManager(
+			"webrtc://test/calls",
+			15*time.Minute,
+			platformrtc.WithCandidateHost("127.0.0.1"),
+			platformrtc.WithUDPPortRange(41020, 41030),
+		),
+		domaincall.WithNow(clock),
+		domaincall.WithRTC(domaincall.RTCConfig{
+			PublicEndpoint: "webrtc://test/calls",
+			CredentialTTL:  15 * time.Minute,
+			CandidateHost:  "127.0.0.1",
+			UDPPortMin:     41020,
+			UDPPortMax:     41030,
+		}),
+	)
+	require.NoError(t, err)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-direct",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+
+	_, _, err = service.AcceptCall(context.Background(), domaincall.AcceptParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.NoError(t, err)
+
+	joined, transport, _, err := service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, transport.SessionID)
+
+	offer := mustCreateCallOffer(t)
+	_, err = service.PublishDescription(context.Background(), domaincall.PublishDescriptionParams{
+		CallID:    started.ID,
+		SessionID: transport.SessionID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		Description: domaincall.SessionDescription{
+			Type: "offer",
+			SDP:  offer,
+		},
+	})
+	require.NoError(t, err)
+
+	now = now.Add(10 * time.Second)
+	ended, _, err := service.EndCall(context.Background(), domaincall.EndParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		Reason:    domaincall.EndReasonEnded,
+	})
+	require.NoError(t, err)
+	require.Equal(t, domaincall.StateEnded, ended.State)
+
+	report, err := service.GetDiagnostics(context.Background(), domaincall.GetParams{
+		CallID:    joined.ID,
+		AccountID: "acc-a",
+	})
+	require.NoError(t, err)
+	require.Equal(t, joined.ID, report.Call.ID)
+	require.GreaterOrEqual(t, report.DurationSeconds, uint32(10))
+	require.NotEmpty(t, report.PeakQoSEscalation)
+}
+
 func seedDirectConversation(store conversation.Store) error {
 	ctx := context.Background()
 	now := time.Date(2026, time.March, 26, 18, 0, 0, 0, time.UTC)

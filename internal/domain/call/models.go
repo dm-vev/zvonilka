@@ -170,6 +170,19 @@ type QualitySummary struct {
 	LastChangedAt             time.Time
 }
 
+// Diagnostics describes one client-facing call diagnostics report.
+type Diagnostics struct {
+	Call                     Call
+	DurationSeconds          uint32
+	ActiveDurationSeconds    uint32
+	PeakQoSEscalation        string
+	MaxReconnectAttempt      uint32
+	TotalAdaptationRevisions uint32
+	TotalAdaptationAcks      uint32
+	LastAppliedProfile       string
+	LastAppliedAt            time.Time
+}
+
 // IceServer describes one STUN or TURN server returned to a client.
 type IceServer struct {
 	URLs       []string

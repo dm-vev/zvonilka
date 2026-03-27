@@ -25,6 +25,14 @@ message GetCallResponse {
   Call call = 1;
 }
 
+message GetCallDiagnosticsRequest {
+  string call_id = 1;
+}
+
+message GetCallDiagnosticsResponse {
+  CallDiagnostics diagnostics = 1;
+}
+
 message ListCallsRequest {
   string conversation_id = 1;
   bool include_ended = 2;

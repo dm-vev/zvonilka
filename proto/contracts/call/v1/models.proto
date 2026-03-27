@@ -161,6 +161,18 @@ message CallQualitySummary {
   google.protobuf.Timestamp last_changed_at = 12;
 }
 
+message CallDiagnostics {
+  Call call = 1;
+  uint32 duration_seconds = 2;
+  uint32 active_duration_seconds = 3;
+  string peak_qos_escalation = 4;
+  uint32 max_reconnect_attempt = 5;
+  uint32 total_adaptation_revisions = 6;
+  uint32 total_adaptation_acks = 7;
+  string last_applied_profile = 8;
+  google.protobuf.Timestamp last_applied_at = 9;
+}
+
 message Call {
   string call_id = 1;
   string conversation_id = 2;

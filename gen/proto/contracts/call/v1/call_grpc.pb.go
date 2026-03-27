@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion7
 const (
 	CallService_StartCall_FullMethodName                 = "/zvonilka.call.v1.CallService/StartCall"
 	CallService_GetCall_FullMethodName                   = "/zvonilka.call.v1.CallService/GetCall"
+	CallService_GetCallDiagnostics_FullMethodName        = "/zvonilka.call.v1.CallService/GetCallDiagnostics"
 	CallService_ListCalls_FullMethodName                 = "/zvonilka.call.v1.CallService/ListCalls"
 	CallService_AcceptCall_FullMethodName                = "/zvonilka.call.v1.CallService/AcceptCall"
 	CallService_DeclineCall_FullMethodName               = "/zvonilka.call.v1.CallService/DeclineCall"
@@ -42,6 +43,7 @@ const (
 type CallServiceClient interface {
 	StartCall(ctx context.Context, in *StartCallRequest, opts ...grpc.CallOption) (*StartCallResponse, error)
 	GetCall(ctx context.Context, in *GetCallRequest, opts ...grpc.CallOption) (*GetCallResponse, error)
+	GetCallDiagnostics(ctx context.Context, in *GetCallDiagnosticsRequest, opts ...grpc.CallOption) (*GetCallDiagnosticsResponse, error)
 	ListCalls(ctx context.Context, in *ListCallsRequest, opts ...grpc.CallOption) (*ListCallsResponse, error)
 	AcceptCall(ctx context.Context, in *AcceptCallRequest, opts ...grpc.CallOption) (*AcceptCallResponse, error)
 	DeclineCall(ctx context.Context, in *DeclineCallRequest, opts ...grpc.CallOption) (*DeclineCallResponse, error)
@@ -77,6 +79,15 @@ func (c *callServiceClient) StartCall(ctx context.Context, in *StartCallRequest,
 func (c *callServiceClient) GetCall(ctx context.Context, in *GetCallRequest, opts ...grpc.CallOption) (*GetCallResponse, error) {
 	out := new(GetCallResponse)
 	err := c.cc.Invoke(ctx, CallService_GetCall_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *callServiceClient) GetCallDiagnostics(ctx context.Context, in *GetCallDiagnosticsRequest, opts ...grpc.CallOption) (*GetCallDiagnosticsResponse, error) {
+	out := new(GetCallDiagnosticsResponse)
+	err := c.cc.Invoke(ctx, CallService_GetCallDiagnostics_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -229,6 +240,7 @@ func (x *callServiceSubscribeCallEventsClient) Recv() (*SubscribeCallEventsRespo
 type CallServiceServer interface {
 	StartCall(context.Context, *StartCallRequest) (*StartCallResponse, error)
 	GetCall(context.Context, *GetCallRequest) (*GetCallResponse, error)
+	GetCallDiagnostics(context.Context, *GetCallDiagnosticsRequest) (*GetCallDiagnosticsResponse, error)
 	ListCalls(context.Context, *ListCallsRequest) (*ListCallsResponse, error)
 	AcceptCall(context.Context, *AcceptCallRequest) (*AcceptCallResponse, error)
 	DeclineCall(context.Context, *DeclineCallRequest) (*DeclineCallResponse, error)
@@ -254,6 +266,9 @@ func (UnimplementedCallServiceServer) StartCall(context.Context, *StartCallReque
 }
 func (UnimplementedCallServiceServer) GetCall(context.Context, *GetCallRequest) (*GetCallResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetCall not implemented")
+}
+func (UnimplementedCallServiceServer) GetCallDiagnostics(context.Context, *GetCallDiagnosticsRequest) (*GetCallDiagnosticsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCallDiagnostics not implemented")
 }
 func (UnimplementedCallServiceServer) ListCalls(context.Context, *ListCallsRequest) (*ListCallsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListCalls not implemented")
@@ -339,6 +354,24 @@ func _CallService_GetCall_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CallServiceServer).GetCall(ctx, req.(*GetCallRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CallService_GetCallDiagnostics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCallDiagnosticsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).GetCallDiagnostics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_GetCallDiagnostics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).GetCallDiagnostics(ctx, req.(*GetCallDiagnosticsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -594,6 +627,10 @@ var CallService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetCall",
 			Handler:    _CallService_GetCall_Handler,
+		},
+		{
+			MethodName: "GetCallDiagnostics",
+			Handler:    _CallService_GetCallDiagnostics_Handler,
 		},
 		{
 			MethodName: "ListCalls",

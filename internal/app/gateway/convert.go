@@ -238,6 +238,20 @@ func callQualitySummaryProto(value domaincall.QualitySummary) *callv1.CallQualit
 	}
 }
 
+func callDiagnosticsProto(value domaincall.Diagnostics) *callv1.CallDiagnostics {
+	return &callv1.CallDiagnostics{
+		Call:                     callProto(value.Call),
+		DurationSeconds:          value.DurationSeconds,
+		ActiveDurationSeconds:    value.ActiveDurationSeconds,
+		PeakQosEscalation:        value.PeakQoSEscalation,
+		MaxReconnectAttempt:      value.MaxReconnectAttempt,
+		TotalAdaptationRevisions: value.TotalAdaptationRevisions,
+		TotalAdaptationAcks:      value.TotalAdaptationAcks,
+		LastAppliedProfile:       value.LastAppliedProfile,
+		LastAppliedAt:            protoTime(value.LastAppliedAt),
+	}
+}
+
 func iceServerProto(server domaincall.IceServer) *callv1.IceServer {
 	return &callv1.IceServer{
 		Urls:       append([]string(nil), server.URLs...),

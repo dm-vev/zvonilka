@@ -9,6 +9,7 @@ option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1;call
 service CallService {
   rpc StartCall(StartCallRequest) returns (StartCallResponse);
   rpc GetCall(GetCallRequest) returns (GetCallResponse);
+  rpc GetCallDiagnostics(GetCallDiagnosticsRequest) returns (GetCallDiagnosticsResponse);
   rpc ListCalls(ListCallsRequest) returns (ListCallsResponse);
   rpc AcceptCall(AcceptCallRequest) returns (AcceptCallResponse);
   rpc DeclineCall(DeclineCallRequest) returns (DeclineCallResponse);

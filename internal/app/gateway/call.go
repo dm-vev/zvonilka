@@ -47,6 +47,27 @@ func (a *api) GetCall(ctx context.Context, req *callv1.GetCallRequest) (*callv1.
 	return &callv1.GetCallResponse{Call: callProto(callRow)}, nil
 }
 
+// GetCallDiagnostics returns one aggregated diagnostics report for a visible call.
+func (a *api) GetCallDiagnostics(
+	ctx context.Context,
+	req *callv1.GetCallDiagnosticsRequest,
+) (*callv1.GetCallDiagnosticsResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	report, err := a.call.GetDiagnostics(ctx, domaincall.GetParams{
+		CallID:    req.GetCallId(),
+		AccountID: authContext.Account.ID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &callv1.GetCallDiagnosticsResponse{Diagnostics: callDiagnosticsProto(report)}, nil
+}
+
 // ListCalls returns calls for one conversation visible to the caller.
 func (a *api) ListCalls(ctx context.Context, req *callv1.ListCallsRequest) (*callv1.ListCallsResponse, error) {
 	authContext, err := a.requireAuth(ctx)
