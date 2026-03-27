@@ -86,6 +86,7 @@ func (s *Service) Events(ctx context.Context, params EventParams) ([]Event, erro
 	params.CallID = strings.TrimSpace(params.CallID)
 	params.ConversationID = strings.TrimSpace(params.ConversationID)
 	params.AccountID = strings.TrimSpace(params.AccountID)
+	params.DeviceID = strings.TrimSpace(params.DeviceID)
 	if params.AccountID == "" {
 		return nil, ErrInvalidInput
 	}
@@ -121,9 +122,14 @@ func (s *Service) Events(ctx context.Context, params EventParams) ([]Event, erro
 	}
 
 	hydrated := make(map[string]Call)
+	filtered := make([]Event, 0, len(events))
 	for i := range events {
+		if !visibleSignalEvent(events[i], params.AccountID, params.DeviceID) {
+			continue
+		}
 		callID := events[i].CallID
 		if callID == "" {
+			filtered = append(filtered, cloneEvent(events[i]))
 			continue
 		}
 		callRow, ok := hydrated[callID]
@@ -136,9 +142,26 @@ func (s *Service) Events(ctx context.Context, params EventParams) ([]Event, erro
 			hydrated[callID] = loaded
 		}
 		events[i].Call = cloneCall(callRow)
+		filtered = append(filtered, events[i])
 	}
 
-	return cloneEvents(events), nil
+	return cloneEvents(filtered), nil
+}
+
+func visibleSignalEvent(event Event, accountID string, deviceID string) bool {
+	targetAccountID := strings.TrimSpace(event.Metadata[callMetadataTargetAccountID])
+	targetDeviceID := strings.TrimSpace(event.Metadata[callMetadataTargetDeviceID])
+	if targetAccountID == "" && targetDeviceID == "" {
+		return true
+	}
+	if targetAccountID != "" && targetAccountID != accountID {
+		return false
+	}
+	if targetDeviceID != "" && targetDeviceID != deviceID {
+		return false
+	}
+
+	return true
 }
 
 func (s *Service) visibleConversation(

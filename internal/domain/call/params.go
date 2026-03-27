@@ -104,4 +104,5 @@ type EventParams struct {
 	ConversationID string
 	Limit          int
 	AccountID      string
+	DeviceID       string
 }

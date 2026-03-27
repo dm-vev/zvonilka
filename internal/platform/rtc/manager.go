@@ -60,6 +60,7 @@ type peer struct {
 	withVideo bool
 	pc        *webrtc.PeerConnection
 	signals   chan domaincall.RuntimeSignal
+	tracks    map[string]*webrtc.TrackLocalStaticRTP
 }
 
 // NewManager constructs an in-process RTC session manager.
@@ -249,7 +250,7 @@ func (m *Manager) PublishDescription(
 	if sessionID == "" || participantRow.AccountID == "" || participantRow.DeviceID == "" {
 		return nil, domaincall.ErrInvalidInput
 	}
-	if description.Type != "offer" || strings.TrimSpace(description.SDP) == "" {
+	if strings.TrimSpace(description.SDP) == "" {
 		return nil, domaincall.ErrInvalidInput
 	}
 
@@ -258,40 +259,53 @@ func (m *Manager) PublishDescription(
 		return nil, err
 	}
 
-	if err := peerConn.pc.SetRemoteDescription(webrtc.SessionDescription{
-		Type: webrtc.SDPTypeOffer,
-		SDP:  description.SDP,
-	}); err != nil {
-		return nil, fmt.Errorf("set remote description: %w", err)
-	}
+	switch description.Type {
+	case "offer":
+		if err := peerConn.pc.SetRemoteDescription(webrtc.SessionDescription{
+			Type: webrtc.SDPTypeOffer,
+			SDP:  description.SDP,
+		}); err != nil {
+			return nil, fmt.Errorf("set remote description: %w", err)
+		}
 
-	answer, err := peerConn.pc.CreateAnswer(nil)
-	if err != nil {
-		return nil, fmt.Errorf("create answer: %w", err)
-	}
-	gatherComplete := webrtc.GatheringCompletePromise(peerConn.pc)
-	if err := peerConn.pc.SetLocalDescription(answer); err != nil {
-		return nil, fmt.Errorf("set local description: %w", err)
-	}
-	<-gatherComplete
+		answer, err := peerConn.pc.CreateAnswer(nil)
+		if err != nil {
+			return nil, fmt.Errorf("create answer: %w", err)
+		}
+		gatherComplete := webrtc.GatheringCompletePromise(peerConn.pc)
+		if err := peerConn.pc.SetLocalDescription(answer); err != nil {
+			return nil, fmt.Errorf("set local description: %w", err)
+		}
+		<-gatherComplete
 
-	signals := m.drainSignals(peerConn)
-	local := peerConn.pc.LocalDescription()
-	if local == nil {
+		signals := m.drainSignals(peerConn)
+		local := peerConn.pc.LocalDescription()
+		if local == nil {
+			return signals, nil
+		}
+
+		signals = append([]domaincall.RuntimeSignal{{
+			TargetAccountID: participantRow.AccountID,
+			TargetDeviceID:  participantRow.DeviceID,
+			SessionID:       active.id,
+			Description: &domaincall.SessionDescription{
+				Type: "answer",
+				SDP:  local.SDP,
+			},
+		}}, signals...)
+
 		return signals, nil
+	case "answer":
+		if err := peerConn.pc.SetRemoteDescription(webrtc.SessionDescription{
+			Type: webrtc.SDPTypeAnswer,
+			SDP:  description.SDP,
+		}); err != nil {
+			return nil, fmt.Errorf("set remote answer: %w", err)
+		}
+		return m.drainSignals(peerConn), nil
+	default:
+		return nil, domaincall.ErrInvalidInput
 	}
-
-	signals = append([]domaincall.RuntimeSignal{{
-		TargetAccountID: participantRow.AccountID,
-		TargetDeviceID:  participantRow.DeviceID,
-		SessionID:       active.id,
-		Description: &domaincall.SessionDescription{
-			Type: "answer",
-			SDP:  local.SDP,
-		},
-	}}, signals...)
-
-	return signals, nil
 }
 
 // PublishCandidate applies one remote ICE candidate.
@@ -452,6 +466,7 @@ func (m *Manager) newPeer(active *session, participantRow domaincall.RuntimePart
 		withVideo: participantRow.WithVideo,
 		pc:        pc,
 		signals:   make(chan domaincall.RuntimeSignal, 32),
+		tracks:    make(map[string]*webrtc.TrackLocalStaticRTP),
 	}
 
 	pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
@@ -479,7 +494,7 @@ func (m *Manager) newPeer(active *session, participantRow domaincall.RuntimePart
 	})
 
 	pc.OnTrack(func(track *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
-		go consumeRemoteTrack(track)
+		go m.handleRemoteTrack(active.id, participantKey(participantRow.AccountID, participantRow.DeviceID), track)
 	})
 
 	return value, nil
@@ -499,6 +514,111 @@ func (m *Manager) drainSignals(peerConn *peer) []domaincall.RuntimeSignal {
 			return signals
 		}
 	}
+}
+
+func (m *Manager) handleRemoteTrack(sessionID string, sourceKey string, track *webrtc.TrackRemote) {
+	if track == nil {
+		return
+	}
+
+	targets, relays := m.prepareRelayTargets(sessionID, sourceKey, track)
+	for _, target := range targets {
+		if err := m.renegotiatePeer(sessionID, target); err != nil {
+			continue
+		}
+	}
+	if len(relays) == 0 {
+		consumeRemoteTrack(track)
+		return
+	}
+
+	for {
+		packet, _, err := track.ReadRTP()
+		if err != nil {
+			return
+		}
+		for _, relay := range relays {
+			if relay == nil {
+				continue
+			}
+			_ = relay.WriteRTP(packet.Clone())
+		}
+	}
+}
+
+func (m *Manager) prepareRelayTargets(
+	sessionID string,
+	sourceKey string,
+	track *webrtc.TrackRemote,
+) ([]*peer, []*webrtc.TrackLocalStaticRTP) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	active, ok := m.sessions[sessionID]
+	if !ok {
+		return nil, nil
+	}
+
+	targets := make([]*peer, 0)
+	relays := make([]*webrtc.TrackLocalStaticRTP, 0)
+	trackKey := relayTrackKey(sourceKey, track.ID(), track.StreamID(), track.Kind().String())
+	for key, target := range active.peers {
+		if key == sourceKey || target == nil {
+			continue
+		}
+		if existing := target.tracks[trackKey]; existing != nil {
+			relays = append(relays, existing)
+			continue
+		}
+
+		localTrack, err := webrtc.NewTrackLocalStaticRTP(track.Codec().RTPCodecCapability, track.ID(), track.StreamID())
+		if err != nil {
+			continue
+		}
+		if _, err := target.pc.AddTrack(localTrack); err != nil {
+			continue
+		}
+		target.tracks[trackKey] = localTrack
+		relays = append(relays, localTrack)
+		targets = append(targets, target)
+	}
+
+	return targets, relays
+}
+
+func (m *Manager) renegotiatePeer(sessionID string, target *peer) error {
+	if target == nil || target.pc == nil {
+		return domaincall.ErrInvalidInput
+	}
+
+	offer, err := target.pc.CreateOffer(nil)
+	if err != nil {
+		return fmt.Errorf("create renegotiation offer: %w", err)
+	}
+	gatherComplete := webrtc.GatheringCompletePromise(target.pc)
+	if err := target.pc.SetLocalDescription(offer); err != nil {
+		return fmt.Errorf("set renegotiation local description: %w", err)
+	}
+	<-gatherComplete
+
+	local := target.pc.LocalDescription()
+	if local == nil {
+		return nil
+	}
+	select {
+	case target.signals <- domaincall.RuntimeSignal{
+		TargetAccountID: target.accountID,
+		TargetDeviceID:  target.deviceID,
+		SessionID:       sessionID,
+		Description: &domaincall.SessionDescription{
+			Type: "offer",
+			SDP:  local.SDP,
+		},
+	}:
+	default:
+	}
+
+	return nil
 }
 
 func (m *Manager) newAPI() *webrtc.API {
@@ -607,6 +727,10 @@ func consumeRemoteTrack(track *webrtc.TrackRemote) {
 			return
 		}
 	}
+}
+
+func relayTrackKey(sourceKey string, trackID string, streamID string, kind string) string {
+	return sourceKey + "|" + trackID + "|" + streamID + "|" + kind
 }
 
 func derefString(value *string) string {

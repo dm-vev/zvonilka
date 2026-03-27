@@ -359,6 +359,7 @@ func (a *api) SubscribeCallEvents(
 			CallID:         req.GetCallId(),
 			ConversationID: req.GetConversationId(),
 			AccountID:      authContext.Account.ID,
+			DeviceID:       authContext.Device.ID,
 			Limit:          defaultPageSize,
 		})
 		if loadErr != nil {

@@ -271,6 +271,88 @@ func TestCallSignalingRPC(t *testing.T) {
 	}
 }
 
+func TestSubscribeCallEventsFiltersTargetedSignals(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	_, ownerCtx := fixture.mustCreateUserAndLogin(t, "call-target-owner", "call-target-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "call-target-peer", "call-target-peer@example.com")
+
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	started, err := fixture.api.StartCall(ownerCtx, &callv1.StartCallRequest{
+		ConversationId: created.Conversation.ConversationId,
+		WithVideo:      true,
+	})
+	if err != nil {
+		t.Fatalf("start call: %v", err)
+	}
+	if _, err := fixture.api.AcceptCall(peerCtx, &callv1.AcceptCallRequest{CallId: started.Call.CallId}); err != nil {
+		t.Fatalf("accept call: %v", err)
+	}
+	joined, err := fixture.api.JoinCall(peerCtx, &callv1.JoinCallRequest{
+		CallId:    started.Call.CallId,
+		WithVideo: true,
+	})
+	if err != nil {
+		t.Fatalf("join call: %v", err)
+	}
+
+	stream := newTestSubscribeCallEventsStream(ownerCtx)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- fixture.api.SubscribeCallEvents(&callv1.SubscribeCallEventsRequest{
+			CallId: started.Call.CallId,
+		}, stream)
+	}()
+	time.Sleep(20 * time.Millisecond)
+
+	offer := mustCreateGatewayCallOffer(t)
+	if _, err := fixture.api.PublishCallDescription(peerCtx, &callv1.PublishCallDescriptionRequest{
+		CallId:    started.Call.CallId,
+		SessionId: joined.Transport.SessionId,
+		Description: &callv1.SessionDescription{
+			Type: "offer",
+			Sdp:  offer,
+		},
+	}); err != nil {
+		t.Fatalf("publish description: %v", err)
+	}
+
+	timeout := time.After(300 * time.Millisecond)
+	for {
+		select {
+		case response := <-stream.responses:
+			event := response.GetEvent()
+			if event == nil {
+				continue
+			}
+			if event.GetEventType() == callv1.CallEventType_CALL_EVENT_TYPE_SIGNAL_DESCRIPTION &&
+				event.GetDescription().GetType() == "answer" {
+				t.Fatalf("owner stream must not receive peer-targeted answer: %+v", event)
+			}
+		case <-timeout:
+			stream.cancel()
+			select {
+			case err := <-errCh:
+				if err != nil {
+					t.Fatalf("subscribe call events returned error: %v", err)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("timed out waiting for subscribe call loop to stop")
+			}
+			return
+		}
+	}
+}
+
 func mustCreateGatewayCallOffer(t *testing.T) string {
 	t.Helper()
 

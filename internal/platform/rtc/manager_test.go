@@ -143,3 +143,93 @@ func TestManagerNegotiatesOfferWithPionClient(t *testing.T) {
 
 	require.Equal(t, joined.SessionID, session.SessionID)
 }
+
+func TestManagerRenegotiatesWhenRelayTrackAdded(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager(
+		"webrtc://gateway/calls",
+		15*time.Minute,
+		WithCandidateHost("127.0.0.1"),
+		WithUDPPortRange(41030, 41040),
+	)
+
+	session, err := manager.EnsureSession(context.Background(), domaincall.Call{
+		ID:             "call-relay",
+		ConversationID: "conv-relay",
+	})
+	require.NoError(t, err)
+
+	_, err = manager.JoinSession(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-relay",
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	client := mustNewPeerConnection(t)
+	defer func() {
+		require.NoError(t, client.Close())
+	}()
+	_, err = client.AddTransceiverFromKind(webrtc.RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	offer := mustCreateLocalOffer(t, client)
+	_, err = manager.PublishDescription(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-relay",
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	}, domaincall.SessionDescription{
+		Type: "offer",
+		SDP:  offer,
+	})
+	require.NoError(t, err)
+
+	_, peerB, err := manager.ensurePeer(session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-relay",
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	localTrack, err := webrtc.NewTrackLocalStaticRTP(
+		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000, Channels: 2},
+		"audio",
+		"relay",
+	)
+	require.NoError(t, err)
+	_, err = peerB.pc.AddTrack(localTrack)
+	require.NoError(t, err)
+
+	require.NoError(t, manager.renegotiatePeer(session.SessionID, peerB))
+
+	signals := manager.drainSignals(peerB)
+	require.NotEmpty(t, signals)
+	require.Equal(t, "offer", signals[0].Description.Type)
+	require.Equal(t, "acc-b", signals[0].TargetAccountID)
+	require.Equal(t, "dev-b", signals[0].TargetDeviceID)
+}
+
+func mustNewPeerConnection(t *testing.T) *webrtc.PeerConnection {
+	t.Helper()
+
+	pc, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	require.NoError(t, err)
+
+	return pc
+}
+
+func mustCreateLocalOffer(t *testing.T, client *webrtc.PeerConnection) string {
+	t.Helper()
+
+	offer, err := client.CreateOffer(nil)
+	require.NoError(t, err)
+	require.NoError(t, client.SetLocalDescription(offer))
+	require.NotNil(t, client.LocalDescription())
+	require.NotEmpty(t, client.LocalDescription().SDP)
+
+	return client.LocalDescription().SDP
+}
