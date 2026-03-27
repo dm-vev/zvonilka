@@ -7,6 +7,7 @@ import (
 	callv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1"
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
 	conversationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1"
+	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -392,6 +393,34 @@ func TestSubscribeCallEventsFiltersTargetedSignals(t *testing.T) {
 			}
 			return
 		}
+	}
+}
+
+func TestCallEventProtoCarriesScreenShareAdaptationMetadata(t *testing.T) {
+	t.Parallel()
+
+	event := callEventProto(domaincall.Event{
+		EventID:        "evt-1",
+		CallID:         "call-1",
+		ConversationID: "conv-1",
+		EventType:      domaincall.EventTypeMediaUpdated,
+		Sequence:       7,
+		Metadata: map[string]string{
+			"recommended_profile":   "screen_share_only",
+			"screen_share_priority": "true",
+			"suppress_camera_video": "true",
+		},
+		CreatedAt: time.Date(2026, time.March, 27, 18, 0, 0, 0, time.UTC),
+	})
+
+	if event.GetMetadata()["recommended_profile"] != "screen_share_only" {
+		t.Fatalf("expected recommended_profile to survive conversion, got %+v", event.GetMetadata())
+	}
+	if event.GetMetadata()["screen_share_priority"] != "true" {
+		t.Fatalf("expected screen_share_priority to survive conversion, got %+v", event.GetMetadata())
+	}
+	if event.GetMetadata()["suppress_camera_video"] != "true" {
+		t.Fatalf("expected suppress_camera_video to survive conversion, got %+v", event.GetMetadata())
 	}
 }
 

@@ -369,7 +369,9 @@ func applyEndedCallQualitySummary(callRow *Call, events []Event) {
 
 	summary := callRow.QualitySummary
 	videoFallbackParticipants := make(map[string]struct{})
+	screenSharePriorityParticipants := make(map[string]struct{})
 	reconnectParticipants := make(map[string]struct{})
+	cameraVideoParticipants := make(map[string]struct{})
 	outgoingVideoParticipants := make(map[string]struct{})
 	incomingVideoParticipants := make(map[string]struct{})
 	outgoingAudioParticipants := make(map[string]struct{})
@@ -387,8 +389,14 @@ func applyEndedCallQualitySummary(callRow *Call, events []Event) {
 		if event.Metadata["video_fallback_recommended"] == "true" && participantKey != "|" {
 			videoFallbackParticipants[participantKey] = struct{}{}
 		}
+		if event.Metadata["screen_share_priority"] == "true" && participantKey != "|" {
+			screenSharePriorityParticipants[participantKey] = struct{}{}
+		}
 		if event.Metadata["reconnect_recommended"] == "true" && participantKey != "|" {
 			reconnectParticipants[participantKey] = struct{}{}
+		}
+		if event.Metadata["suppress_camera_video"] == "true" && participantKey != "|" {
+			cameraVideoParticipants[participantKey] = struct{}{}
 		}
 		if event.Metadata["suppress_outgoing_video"] == "true" && participantKey != "|" {
 			outgoingVideoParticipants[participantKey] = struct{}{}
@@ -409,8 +417,14 @@ func applyEndedCallQualitySummary(callRow *Call, events []Event) {
 	if uint32(len(videoFallbackParticipants)) > summary.VideoFallbackParticipants {
 		summary.VideoFallbackParticipants = uint32(len(videoFallbackParticipants))
 	}
+	if uint32(len(screenSharePriorityParticipants)) > summary.ScreenSharePriorityParticipants {
+		summary.ScreenSharePriorityParticipants = uint32(len(screenSharePriorityParticipants))
+	}
 	if uint32(len(reconnectParticipants)) > summary.ReconnectParticipants {
 		summary.ReconnectParticipants = uint32(len(reconnectParticipants))
+	}
+	if uint32(len(cameraVideoParticipants)) > summary.CameraVideoSuppressed {
+		summary.CameraVideoSuppressed = uint32(len(cameraVideoParticipants))
 	}
 	if uint32(len(outgoingVideoParticipants)) > summary.OutgoingVideoSuppressed {
 		summary.OutgoingVideoSuppressed = uint32(len(outgoingVideoParticipants))

@@ -668,7 +668,9 @@ func TestHydrateCallAndEndedSummaryBranches(t *testing.T) {
 			Metadata: map[string]string{
 				"transport_quality":          "failed",
 				"video_fallback_recommended": "true",
+				"screen_share_priority":      "true",
 				"reconnect_recommended":      "true",
+				"suppress_camera_video":      "true",
 				"suppress_outgoing_video":    "true",
 				"suppress_incoming_video":    "true",
 				"suppress_outgoing_audio":    "true",
@@ -687,7 +689,9 @@ func TestHydrateCallAndEndedSummaryBranches(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "failed", callRow.QualitySummary.WorstQuality)
 	require.Equal(t, uint32(1), callRow.QualitySummary.VideoFallbackParticipants)
+	require.Equal(t, uint32(1), callRow.QualitySummary.ScreenSharePriorityParticipants)
 	require.Equal(t, uint32(1), callRow.QualitySummary.ReconnectParticipants)
+	require.Equal(t, uint32(1), callRow.QualitySummary.CameraVideoSuppressed)
 	require.Equal(t, uint32(1), callRow.QualitySummary.OutgoingVideoSuppressed)
 	require.Equal(t, uint32(1), callRow.QualitySummary.IncomingVideoSuppressed)
 	require.Equal(t, uint32(1), callRow.QualitySummary.OutgoingAudioSuppressed)
