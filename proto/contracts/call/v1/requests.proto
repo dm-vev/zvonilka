@@ -79,6 +79,26 @@ message JoinCallResponse {
   JoinTransport transport = 2;
 }
 
+message PublishCallDescriptionRequest {
+  string call_id = 1;
+  string session_id = 2;
+  SessionDescription description = 3;
+}
+
+message PublishCallDescriptionResponse {
+  CallEvent event = 1;
+}
+
+message PublishCallIceCandidateRequest {
+  string call_id = 1;
+  string session_id = 2;
+  IceCandidate ice_candidate = 3;
+}
+
+message PublishCallIceCandidateResponse {
+  CallEvent event = 1;
+}
+
 message LeaveCallRequest {
   string call_id = 1;
 }

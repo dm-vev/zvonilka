@@ -19,18 +19,20 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	CallService_StartCall_FullMethodName            = "/zvonilka.call.v1.CallService/StartCall"
-	CallService_GetCall_FullMethodName              = "/zvonilka.call.v1.CallService/GetCall"
-	CallService_ListCalls_FullMethodName            = "/zvonilka.call.v1.CallService/ListCalls"
-	CallService_AcceptCall_FullMethodName           = "/zvonilka.call.v1.CallService/AcceptCall"
-	CallService_DeclineCall_FullMethodName          = "/zvonilka.call.v1.CallService/DeclineCall"
-	CallService_CancelCall_FullMethodName           = "/zvonilka.call.v1.CallService/CancelCall"
-	CallService_EndCall_FullMethodName              = "/zvonilka.call.v1.CallService/EndCall"
-	CallService_JoinCall_FullMethodName             = "/zvonilka.call.v1.CallService/JoinCall"
-	CallService_LeaveCall_FullMethodName            = "/zvonilka.call.v1.CallService/LeaveCall"
-	CallService_UpdateCallMediaState_FullMethodName = "/zvonilka.call.v1.CallService/UpdateCallMediaState"
-	CallService_GetIceConfig_FullMethodName         = "/zvonilka.call.v1.CallService/GetIceConfig"
-	CallService_SubscribeCallEvents_FullMethodName  = "/zvonilka.call.v1.CallService/SubscribeCallEvents"
+	CallService_StartCall_FullMethodName               = "/zvonilka.call.v1.CallService/StartCall"
+	CallService_GetCall_FullMethodName                 = "/zvonilka.call.v1.CallService/GetCall"
+	CallService_ListCalls_FullMethodName               = "/zvonilka.call.v1.CallService/ListCalls"
+	CallService_AcceptCall_FullMethodName              = "/zvonilka.call.v1.CallService/AcceptCall"
+	CallService_DeclineCall_FullMethodName             = "/zvonilka.call.v1.CallService/DeclineCall"
+	CallService_CancelCall_FullMethodName              = "/zvonilka.call.v1.CallService/CancelCall"
+	CallService_EndCall_FullMethodName                 = "/zvonilka.call.v1.CallService/EndCall"
+	CallService_JoinCall_FullMethodName                = "/zvonilka.call.v1.CallService/JoinCall"
+	CallService_PublishCallDescription_FullMethodName  = "/zvonilka.call.v1.CallService/PublishCallDescription"
+	CallService_PublishCallIceCandidate_FullMethodName = "/zvonilka.call.v1.CallService/PublishCallIceCandidate"
+	CallService_LeaveCall_FullMethodName               = "/zvonilka.call.v1.CallService/LeaveCall"
+	CallService_UpdateCallMediaState_FullMethodName    = "/zvonilka.call.v1.CallService/UpdateCallMediaState"
+	CallService_GetIceConfig_FullMethodName            = "/zvonilka.call.v1.CallService/GetIceConfig"
+	CallService_SubscribeCallEvents_FullMethodName     = "/zvonilka.call.v1.CallService/SubscribeCallEvents"
 )
 
 // CallServiceClient is the client API for CallService service.
@@ -45,6 +47,8 @@ type CallServiceClient interface {
 	CancelCall(ctx context.Context, in *CancelCallRequest, opts ...grpc.CallOption) (*CancelCallResponse, error)
 	EndCall(ctx context.Context, in *EndCallRequest, opts ...grpc.CallOption) (*EndCallResponse, error)
 	JoinCall(ctx context.Context, in *JoinCallRequest, opts ...grpc.CallOption) (*JoinCallResponse, error)
+	PublishCallDescription(ctx context.Context, in *PublishCallDescriptionRequest, opts ...grpc.CallOption) (*PublishCallDescriptionResponse, error)
+	PublishCallIceCandidate(ctx context.Context, in *PublishCallIceCandidateRequest, opts ...grpc.CallOption) (*PublishCallIceCandidateResponse, error)
 	LeaveCall(ctx context.Context, in *LeaveCallRequest, opts ...grpc.CallOption) (*LeaveCallResponse, error)
 	UpdateCallMediaState(ctx context.Context, in *UpdateCallMediaStateRequest, opts ...grpc.CallOption) (*UpdateCallMediaStateResponse, error)
 	GetIceConfig(ctx context.Context, in *GetIceConfigRequest, opts ...grpc.CallOption) (*GetIceConfigResponse, error)
@@ -131,6 +135,24 @@ func (c *callServiceClient) JoinCall(ctx context.Context, in *JoinCallRequest, o
 	return out, nil
 }
 
+func (c *callServiceClient) PublishCallDescription(ctx context.Context, in *PublishCallDescriptionRequest, opts ...grpc.CallOption) (*PublishCallDescriptionResponse, error) {
+	out := new(PublishCallDescriptionResponse)
+	err := c.cc.Invoke(ctx, CallService_PublishCallDescription_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *callServiceClient) PublishCallIceCandidate(ctx context.Context, in *PublishCallIceCandidateRequest, opts ...grpc.CallOption) (*PublishCallIceCandidateResponse, error) {
+	out := new(PublishCallIceCandidateResponse)
+	err := c.cc.Invoke(ctx, CallService_PublishCallIceCandidate_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *callServiceClient) LeaveCall(ctx context.Context, in *LeaveCallRequest, opts ...grpc.CallOption) (*LeaveCallResponse, error) {
 	out := new(LeaveCallResponse)
 	err := c.cc.Invoke(ctx, CallService_LeaveCall_FullMethodName, in, out, opts...)
@@ -202,6 +224,8 @@ type CallServiceServer interface {
 	CancelCall(context.Context, *CancelCallRequest) (*CancelCallResponse, error)
 	EndCall(context.Context, *EndCallRequest) (*EndCallResponse, error)
 	JoinCall(context.Context, *JoinCallRequest) (*JoinCallResponse, error)
+	PublishCallDescription(context.Context, *PublishCallDescriptionRequest) (*PublishCallDescriptionResponse, error)
+	PublishCallIceCandidate(context.Context, *PublishCallIceCandidateRequest) (*PublishCallIceCandidateResponse, error)
 	LeaveCall(context.Context, *LeaveCallRequest) (*LeaveCallResponse, error)
 	UpdateCallMediaState(context.Context, *UpdateCallMediaStateRequest) (*UpdateCallMediaStateResponse, error)
 	GetIceConfig(context.Context, *GetIceConfigRequest) (*GetIceConfigResponse, error)
@@ -236,6 +260,12 @@ func (UnimplementedCallServiceServer) EndCall(context.Context, *EndCallRequest) 
 }
 func (UnimplementedCallServiceServer) JoinCall(context.Context, *JoinCallRequest) (*JoinCallResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method JoinCall not implemented")
+}
+func (UnimplementedCallServiceServer) PublishCallDescription(context.Context, *PublishCallDescriptionRequest) (*PublishCallDescriptionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PublishCallDescription not implemented")
+}
+func (UnimplementedCallServiceServer) PublishCallIceCandidate(context.Context, *PublishCallIceCandidateRequest) (*PublishCallIceCandidateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PublishCallIceCandidate not implemented")
 }
 func (UnimplementedCallServiceServer) LeaveCall(context.Context, *LeaveCallRequest) (*LeaveCallResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LeaveCall not implemented")
@@ -406,6 +436,42 @@ func _CallService_JoinCall_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CallService_PublishCallDescription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublishCallDescriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).PublishCallDescription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_PublishCallDescription_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).PublishCallDescription(ctx, req.(*PublishCallDescriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CallService_PublishCallIceCandidate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublishCallIceCandidateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).PublishCallIceCandidate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_PublishCallIceCandidate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).PublishCallIceCandidate(ctx, req.(*PublishCallIceCandidateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CallService_LeaveCall_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(LeaveCallRequest)
 	if err := dec(in); err != nil {
@@ -519,6 +585,14 @@ var CallService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "JoinCall",
 			Handler:    _CallService_JoinCall_Handler,
+		},
+		{
+			MethodName: "PublishCallDescription",
+			Handler:    _CallService_PublishCallDescription_Handler,
+		},
+		{
+			MethodName: "PublishCallIceCandidate",
+			Handler:    _CallService_PublishCallIceCandidate_Handler,
 		},
 		{
 			MethodName: "LeaveCall",

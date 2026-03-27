@@ -45,6 +45,24 @@ type JoinParams struct {
 	WithVideo bool
 }
 
+// PublishDescriptionParams describes one SDP publication for a joined participant.
+type PublishDescriptionParams struct {
+	CallID      string
+	SessionID   string
+	AccountID   string
+	DeviceID    string
+	Description SessionDescription
+}
+
+// PublishCandidateParams describes one ICE-candidate publication for a joined participant.
+type PublishCandidateParams struct {
+	CallID       string
+	SessionID    string
+	AccountID    string
+	DeviceID     string
+	IceCandidate Candidate
+}
+
 // LeaveParams describes one participant leave.
 type LeaveParams struct {
 	CallID    string

@@ -204,6 +204,64 @@ func (a *api) JoinCall(ctx context.Context, req *callv1.JoinCallRequest) (*callv
 	}, nil
 }
 
+// PublishCallDescription publishes one SDP description for the joined device.
+func (a *api) PublishCallDescription(
+	ctx context.Context,
+	req *callv1.PublishCallDescriptionRequest,
+) (*callv1.PublishCallDescriptionResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	event, err := a.call.PublishDescription(ctx, domaincall.PublishDescriptionParams{
+		CallID:    req.GetCallId(),
+		SessionID: req.GetSessionId(),
+		AccountID: authContext.Account.ID,
+		DeviceID:  authContext.Device.ID,
+		Description: domaincall.SessionDescription{
+			Type: req.GetDescription().GetType(),
+			SDP:  req.GetDescription().GetSdp(),
+		},
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(event)
+
+	return &callv1.PublishCallDescriptionResponse{Event: callEventProto(event)}, nil
+}
+
+// PublishCallIceCandidate publishes one ICE candidate for the joined device.
+func (a *api) PublishCallIceCandidate(
+	ctx context.Context,
+	req *callv1.PublishCallIceCandidateRequest,
+) (*callv1.PublishCallIceCandidateResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	event, err := a.call.PublishIceCandidate(ctx, domaincall.PublishCandidateParams{
+		CallID:    req.GetCallId(),
+		SessionID: req.GetSessionId(),
+		AccountID: authContext.Account.ID,
+		DeviceID:  authContext.Device.ID,
+		IceCandidate: domaincall.Candidate{
+			Candidate:        req.GetIceCandidate().GetCandidate(),
+			SDPMid:           req.GetIceCandidate().GetSdpMid(),
+			SDPMLineIndex:    req.GetIceCandidate().GetSdpMlineIndex(),
+			UsernameFragment: req.GetIceCandidate().GetUsernameFragment(),
+		},
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(event)
+
+	return &callv1.PublishCallIceCandidateResponse{Event: callEventProto(event)}, nil
+}
+
 // LeaveCall leaves one call for the authenticated device.
 func (a *api) LeaveCall(ctx context.Context, req *callv1.LeaveCallRequest) (*callv1.LeaveCallResponse, error) {
 	authContext, err := a.requireAuth(ctx)

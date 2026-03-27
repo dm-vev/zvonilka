@@ -93,6 +93,38 @@ func TestCallLifecycle(t *testing.T) {
 	require.True(t, participant.MediaState.AudioMuted)
 	require.Len(t, events, 1)
 
+	descriptionEvent, err := service.PublishDescription(context.Background(), domaincall.PublishDescriptionParams{
+		CallID:    started.ID,
+		SessionID: transport.SessionID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		Description: domaincall.SessionDescription{
+			Type: "offer",
+			SDP:  "v=0\r\ns=test\r\n",
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, domaincall.EventTypeSignalDescription, descriptionEvent.EventType)
+	require.Equal(t, transport.SessionID, descriptionEvent.Metadata["session_id"])
+	require.Equal(t, "offer", descriptionEvent.Metadata["description_type"])
+
+	candidateEvent, err := service.PublishIceCandidate(context.Background(), domaincall.PublishCandidateParams{
+		CallID:    started.ID,
+		SessionID: transport.SessionID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		IceCandidate: domaincall.Candidate{
+			Candidate:        "candidate:1 1 udp 2130706431 127.0.0.1 41000 typ host",
+			SDPMid:           "0",
+			SDPMLineIndex:    0,
+			UsernameFragment: transport.IceUfrag,
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, domaincall.EventTypeSignalCandidate, candidateEvent.EventType)
+	require.Equal(t, transport.SessionID, candidateEvent.Metadata["session_id"])
+	require.Equal(t, "candidate:1 1 udp 2130706431 127.0.0.1 41000 typ host", candidateEvent.Metadata["candidate"])
+
 	left, events, err := service.LeaveCall(context.Background(), domaincall.LeaveParams{
 		CallID:    started.ID,
 		AccountID: "acc-b",

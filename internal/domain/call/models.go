@@ -86,6 +86,10 @@ const (
 	EventTypeMediaUpdated EventType = "call.media_updated"
 	// EventTypeEnded indicates a finished call.
 	EventTypeEnded EventType = "call.ended"
+	// EventTypeSignalDescription indicates a published SDP description.
+	EventTypeSignalDescription EventType = "call.signal_description"
+	// EventTypeSignalCandidate indicates a published ICE candidate.
+	EventTypeSignalCandidate EventType = "call.signal_candidate"
 )
 
 // MediaState describes the participant media toggles visible to other clients.
@@ -168,4 +172,18 @@ type JoinDetails struct {
 	CandidateHost   string
 	CandidatePort   int
 	IceServers      []IceServer
+}
+
+// SessionDescription describes one SDP payload exchanged through call signaling.
+type SessionDescription struct {
+	Type string
+	SDP  string
+}
+
+// Candidate describes one ICE candidate payload exchanged through call signaling.
+type Candidate struct {
+	Candidate        string
+	SDPMid           string
+	SDPMLineIndex    uint32
+	UsernameFragment string
 }

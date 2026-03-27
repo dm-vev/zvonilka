@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/base64"
+	"strconv"
 	"strings"
 	"time"
 
@@ -132,6 +133,10 @@ func callEventTypeToProto(eventType domaincall.EventType) callv1.CallEventType {
 		return callv1.CallEventType_CALL_EVENT_TYPE_MEDIA_UPDATED
 	case domaincall.EventTypeEnded:
 		return callv1.CallEventType_CALL_EVENT_TYPE_ENDED
+	case domaincall.EventTypeSignalDescription:
+		return callv1.CallEventType_CALL_EVENT_TYPE_SIGNAL_DESCRIPTION
+	case domaincall.EventTypeSignalCandidate:
+		return callv1.CallEventType_CALL_EVENT_TYPE_SIGNAL_CANDIDATE
 	default:
 		return callv1.CallEventType_CALL_EVENT_TYPE_UNSPECIFIED
 	}
@@ -251,6 +256,44 @@ func callEventProto(value domaincall.Event) *callv1.CallEvent {
 		Metadata:       metadata,
 		CreatedAt:      protoTime(value.CreatedAt),
 		Call:           callProto(value.Call),
+		SessionId:      value.Metadata["session_id"],
+		Description:    callDescriptionProto(value),
+		IceCandidate:   callCandidateProto(value),
+	}
+}
+
+func callDescriptionProto(value domaincall.Event) *callv1.SessionDescription {
+	if value.EventType != domaincall.EventTypeSignalDescription {
+		return nil
+	}
+	descriptionType := strings.TrimSpace(value.Metadata["description_type"])
+	sdp := value.Metadata["description_sdp"]
+	if descriptionType == "" || sdp == "" {
+		return nil
+	}
+
+	return &callv1.SessionDescription{
+		Type: descriptionType,
+		Sdp:  sdp,
+	}
+}
+
+func callCandidateProto(value domaincall.Event) *callv1.IceCandidate {
+	if value.EventType != domaincall.EventTypeSignalCandidate {
+		return nil
+	}
+
+	candidate := strings.TrimSpace(value.Metadata["candidate"])
+	if candidate == "" {
+		return nil
+	}
+	line, _ := strconv.ParseUint(strings.TrimSpace(value.Metadata["candidate_sdp_mline_index"]), 10, 32)
+
+	return &callv1.IceCandidate{
+		Candidate:        candidate,
+		SdpMid:           strings.TrimSpace(value.Metadata["candidate_sdp_mid"]),
+		SdpMlineIndex:    uint32(line),
+		UsernameFragment: strings.TrimSpace(value.Metadata["candidate_username_fragment"]),
 	}
 }
 

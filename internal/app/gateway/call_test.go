@@ -145,3 +145,122 @@ func TestSubscribeCallEventsStreamsNewEvents(t *testing.T) {
 		t.Fatal("timed out waiting for subscribe call loop to stop")
 	}
 }
+
+func TestCallSignalingRPC(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	owner, ownerCtx := fixture.mustCreateUserAndLogin(t, "call-signal-owner", "call-signal-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "call-signal-peer", "call-signal-peer@example.com")
+
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	started, err := fixture.api.StartCall(ownerCtx, &callv1.StartCallRequest{
+		ConversationId: created.Conversation.ConversationId,
+		WithVideo:      true,
+	})
+	if err != nil {
+		t.Fatalf("start call: %v", err)
+	}
+	if _, err := fixture.api.AcceptCall(peerCtx, &callv1.AcceptCallRequest{CallId: started.Call.CallId}); err != nil {
+		t.Fatalf("accept call: %v", err)
+	}
+
+	joined, err := fixture.api.JoinCall(peerCtx, &callv1.JoinCallRequest{
+		CallId:    started.Call.CallId,
+		WithVideo: true,
+	})
+	if err != nil {
+		t.Fatalf("join call: %v", err)
+	}
+
+	stream := newTestSubscribeCallEventsStream(ownerCtx)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- fixture.api.SubscribeCallEvents(&callv1.SubscribeCallEventsRequest{
+			CallId: started.Call.CallId,
+		}, stream)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+
+	description, err := fixture.api.PublishCallDescription(peerCtx, &callv1.PublishCallDescriptionRequest{
+		CallId:    started.Call.CallId,
+		SessionId: joined.Transport.SessionId,
+		Description: &callv1.SessionDescription{
+			Type: "offer",
+			Sdp:  "v=0\r\ns=test\r\n",
+		},
+	})
+	if err != nil {
+		t.Fatalf("publish description: %v", err)
+	}
+	if description.Event == nil || description.Event.EventType != callv1.CallEventType_CALL_EVENT_TYPE_SIGNAL_DESCRIPTION {
+		t.Fatalf("unexpected description event: %+v", description.Event)
+	}
+
+	candidate, err := fixture.api.PublishCallIceCandidate(peerCtx, &callv1.PublishCallIceCandidateRequest{
+		CallId:    started.Call.CallId,
+		SessionId: joined.Transport.SessionId,
+		IceCandidate: &callv1.IceCandidate{
+			Candidate:        "candidate:1 1 udp 2130706431 127.0.0.1 41000 typ host",
+			SdpMid:           "0",
+			SdpMlineIndex:    0,
+			UsernameFragment: joined.Transport.IceUfrag,
+		},
+	})
+	if err != nil {
+		t.Fatalf("publish candidate: %v", err)
+	}
+	if candidate.Event == nil || candidate.Event.EventType != callv1.CallEventType_CALL_EVENT_TYPE_SIGNAL_CANDIDATE {
+		t.Fatalf("unexpected candidate event: %+v", candidate.Event)
+	}
+
+	var sawDescription bool
+	var sawCandidate bool
+	timeout := time.After(time.Second)
+	for !(sawDescription && sawCandidate) {
+		select {
+		case response := <-stream.responses:
+			event := response.GetEvent()
+			if event == nil {
+				t.Fatal("expected streamed call event")
+			}
+			switch event.GetEventType() {
+			case callv1.CallEventType_CALL_EVENT_TYPE_SIGNAL_DESCRIPTION:
+				sawDescription = true
+				if event.GetSessionId() != joined.Transport.SessionId || event.GetDescription().GetType() != "offer" {
+					t.Fatalf("unexpected streamed description event: %+v", event)
+				}
+			case callv1.CallEventType_CALL_EVENT_TYPE_SIGNAL_CANDIDATE:
+				sawCandidate = true
+				if event.GetIceCandidate().GetCandidate() == "" {
+					t.Fatalf("unexpected streamed candidate event: %+v", event)
+				}
+			}
+		case <-timeout:
+			t.Fatal("timed out waiting for streamed signaling events")
+		}
+	}
+
+	stream.cancel()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("subscribe call events returned error: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for subscribe call loop to stop")
+	}
+
+	if owner.ID == "" {
+		t.Fatal("expected owner account")
+	}
+}

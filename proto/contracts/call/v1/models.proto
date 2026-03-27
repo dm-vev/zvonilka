@@ -47,6 +47,20 @@ enum CallEventType {
   CALL_EVENT_TYPE_LEFT = 6;
   CALL_EVENT_TYPE_MEDIA_UPDATED = 7;
   CALL_EVENT_TYPE_ENDED = 8;
+  CALL_EVENT_TYPE_SIGNAL_DESCRIPTION = 9;
+  CALL_EVENT_TYPE_SIGNAL_CANDIDATE = 10;
+}
+
+message SessionDescription {
+  string type = 1;
+  string sdp = 2;
+}
+
+message IceCandidate {
+  string candidate = 1;
+  string sdp_mid = 2;
+  uint32 sdp_mline_index = 3;
+  string username_fragment = 4;
 }
 
 message CallMediaState {
@@ -106,6 +120,9 @@ message CallEvent {
   map<string, string> metadata = 8;
   google.protobuf.Timestamp created_at = 9;
   Call call = 10;
+  string session_id = 11;
+  SessionDescription description = 12;
+  IceCandidate ice_candidate = 13;
 }
 
 message JoinTransport {

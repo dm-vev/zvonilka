@@ -830,6 +830,226 @@ func (x *JoinCallResponse) GetTransport() *JoinTransport {
 	return nil
 }
 
+type PublishCallDescriptionRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	CallId      string              `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
+	SessionId   string              `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Description *SessionDescription `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+}
+
+func (x *PublishCallDescriptionRequest) Reset() {
+	*x = PublishCallDescriptionRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_call_v1_requests_proto_msgTypes[16]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PublishCallDescriptionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishCallDescriptionRequest) ProtoMessage() {}
+
+func (x *PublishCallDescriptionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_call_v1_requests_proto_msgTypes[16]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishCallDescriptionRequest.ProtoReflect.Descriptor instead.
+func (*PublishCallDescriptionRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *PublishCallDescriptionRequest) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
+}
+
+func (x *PublishCallDescriptionRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *PublishCallDescriptionRequest) GetDescription() *SessionDescription {
+	if x != nil {
+		return x.Description
+	}
+	return nil
+}
+
+type PublishCallDescriptionResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Event *CallEvent `protobuf:"bytes,1,opt,name=event,proto3" json:"event,omitempty"`
+}
+
+func (x *PublishCallDescriptionResponse) Reset() {
+	*x = PublishCallDescriptionResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_call_v1_requests_proto_msgTypes[17]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PublishCallDescriptionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishCallDescriptionResponse) ProtoMessage() {}
+
+func (x *PublishCallDescriptionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_call_v1_requests_proto_msgTypes[17]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishCallDescriptionResponse.ProtoReflect.Descriptor instead.
+func (*PublishCallDescriptionResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *PublishCallDescriptionResponse) GetEvent() *CallEvent {
+	if x != nil {
+		return x.Event
+	}
+	return nil
+}
+
+type PublishCallIceCandidateRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	CallId       string        `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
+	SessionId    string        `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	IceCandidate *IceCandidate `protobuf:"bytes,3,opt,name=ice_candidate,json=iceCandidate,proto3" json:"ice_candidate,omitempty"`
+}
+
+func (x *PublishCallIceCandidateRequest) Reset() {
+	*x = PublishCallIceCandidateRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_call_v1_requests_proto_msgTypes[18]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PublishCallIceCandidateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishCallIceCandidateRequest) ProtoMessage() {}
+
+func (x *PublishCallIceCandidateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_call_v1_requests_proto_msgTypes[18]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishCallIceCandidateRequest.ProtoReflect.Descriptor instead.
+func (*PublishCallIceCandidateRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *PublishCallIceCandidateRequest) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
+}
+
+func (x *PublishCallIceCandidateRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *PublishCallIceCandidateRequest) GetIceCandidate() *IceCandidate {
+	if x != nil {
+		return x.IceCandidate
+	}
+	return nil
+}
+
+type PublishCallIceCandidateResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Event *CallEvent `protobuf:"bytes,1,opt,name=event,proto3" json:"event,omitempty"`
+}
+
+func (x *PublishCallIceCandidateResponse) Reset() {
+	*x = PublishCallIceCandidateResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_call_v1_requests_proto_msgTypes[19]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PublishCallIceCandidateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishCallIceCandidateResponse) ProtoMessage() {}
+
+func (x *PublishCallIceCandidateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_call_v1_requests_proto_msgTypes[19]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishCallIceCandidateResponse.ProtoReflect.Descriptor instead.
+func (*PublishCallIceCandidateResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *PublishCallIceCandidateResponse) GetEvent() *CallEvent {
+	if x != nil {
+		return x.Event
+	}
+	return nil
+}
+
 type LeaveCallRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -841,7 +1061,7 @@ type LeaveCallRequest struct {
 func (x *LeaveCallRequest) Reset() {
 	*x = LeaveCallRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_call_v1_requests_proto_msgTypes[16]
+		mi := &file_contracts_call_v1_requests_proto_msgTypes[20]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -854,7 +1074,7 @@ func (x *LeaveCallRequest) String() string {
 func (*LeaveCallRequest) ProtoMessage() {}
 
 func (x *LeaveCallRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_call_v1_requests_proto_msgTypes[16]
+	mi := &file_contracts_call_v1_requests_proto_msgTypes[20]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -867,7 +1087,7 @@ func (x *LeaveCallRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaveCallRequest.ProtoReflect.Descriptor instead.
 func (*LeaveCallRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{16}
+	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *LeaveCallRequest) GetCallId() string {
@@ -888,7 +1108,7 @@ type LeaveCallResponse struct {
 func (x *LeaveCallResponse) Reset() {
 	*x = LeaveCallResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_call_v1_requests_proto_msgTypes[17]
+		mi := &file_contracts_call_v1_requests_proto_msgTypes[21]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -901,7 +1121,7 @@ func (x *LeaveCallResponse) String() string {
 func (*LeaveCallResponse) ProtoMessage() {}
 
 func (x *LeaveCallResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_call_v1_requests_proto_msgTypes[17]
+	mi := &file_contracts_call_v1_requests_proto_msgTypes[21]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -914,7 +1134,7 @@ func (x *LeaveCallResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaveCallResponse.ProtoReflect.Descriptor instead.
 func (*LeaveCallResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{17}
+	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *LeaveCallResponse) GetCall() *Call {
@@ -936,7 +1156,7 @@ type UpdateCallMediaStateRequest struct {
 func (x *UpdateCallMediaStateRequest) Reset() {
 	*x = UpdateCallMediaStateRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_call_v1_requests_proto_msgTypes[18]
+		mi := &file_contracts_call_v1_requests_proto_msgTypes[22]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -949,7 +1169,7 @@ func (x *UpdateCallMediaStateRequest) String() string {
 func (*UpdateCallMediaStateRequest) ProtoMessage() {}
 
 func (x *UpdateCallMediaStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_call_v1_requests_proto_msgTypes[18]
+	mi := &file_contracts_call_v1_requests_proto_msgTypes[22]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -962,7 +1182,7 @@ func (x *UpdateCallMediaStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateCallMediaStateRequest.ProtoReflect.Descriptor instead.
 func (*UpdateCallMediaStateRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{18}
+	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *UpdateCallMediaStateRequest) GetCallId() string {
@@ -991,7 +1211,7 @@ type UpdateCallMediaStateResponse struct {
 func (x *UpdateCallMediaStateResponse) Reset() {
 	*x = UpdateCallMediaStateResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_call_v1_requests_proto_msgTypes[19]
+		mi := &file_contracts_call_v1_requests_proto_msgTypes[23]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1004,7 +1224,7 @@ func (x *UpdateCallMediaStateResponse) String() string {
 func (*UpdateCallMediaStateResponse) ProtoMessage() {}
 
 func (x *UpdateCallMediaStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_call_v1_requests_proto_msgTypes[19]
+	mi := &file_contracts_call_v1_requests_proto_msgTypes[23]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1017,7 +1237,7 @@ func (x *UpdateCallMediaStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateCallMediaStateResponse.ProtoReflect.Descriptor instead.
 func (*UpdateCallMediaStateResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{19}
+	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *UpdateCallMediaStateResponse) GetCall() *Call {
@@ -1045,7 +1265,7 @@ type GetIceConfigRequest struct {
 func (x *GetIceConfigRequest) Reset() {
 	*x = GetIceConfigRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_call_v1_requests_proto_msgTypes[20]
+		mi := &file_contracts_call_v1_requests_proto_msgTypes[24]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1058,7 +1278,7 @@ func (x *GetIceConfigRequest) String() string {
 func (*GetIceConfigRequest) ProtoMessage() {}
 
 func (x *GetIceConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_call_v1_requests_proto_msgTypes[20]
+	mi := &file_contracts_call_v1_requests_proto_msgTypes[24]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1071,7 +1291,7 @@ func (x *GetIceConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIceConfigRequest.ProtoReflect.Descriptor instead.
 func (*GetIceConfigRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{20}
+	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetIceConfigRequest) GetCallId() string {
@@ -1094,7 +1314,7 @@ type GetIceConfigResponse struct {
 func (x *GetIceConfigResponse) Reset() {
 	*x = GetIceConfigResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_call_v1_requests_proto_msgTypes[21]
+		mi := &file_contracts_call_v1_requests_proto_msgTypes[25]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1107,7 +1327,7 @@ func (x *GetIceConfigResponse) String() string {
 func (*GetIceConfigResponse) ProtoMessage() {}
 
 func (x *GetIceConfigResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_call_v1_requests_proto_msgTypes[21]
+	mi := &file_contracts_call_v1_requests_proto_msgTypes[25]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1120,7 +1340,7 @@ func (x *GetIceConfigResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIceConfigResponse.ProtoReflect.Descriptor instead.
 func (*GetIceConfigResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{21}
+	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *GetIceConfigResponse) GetIceServers() []*IceServer {
@@ -1157,7 +1377,7 @@ type SubscribeCallEventsRequest struct {
 func (x *SubscribeCallEventsRequest) Reset() {
 	*x = SubscribeCallEventsRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_call_v1_requests_proto_msgTypes[22]
+		mi := &file_contracts_call_v1_requests_proto_msgTypes[26]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1170,7 +1390,7 @@ func (x *SubscribeCallEventsRequest) String() string {
 func (*SubscribeCallEventsRequest) ProtoMessage() {}
 
 func (x *SubscribeCallEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_call_v1_requests_proto_msgTypes[22]
+	mi := &file_contracts_call_v1_requests_proto_msgTypes[26]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1183,7 +1403,7 @@ func (x *SubscribeCallEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeCallEventsRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeCallEventsRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{22}
+	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *SubscribeCallEventsRequest) GetCallId() string {
@@ -1218,7 +1438,7 @@ type SubscribeCallEventsResponse struct {
 func (x *SubscribeCallEventsResponse) Reset() {
 	*x = SubscribeCallEventsResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_call_v1_requests_proto_msgTypes[23]
+		mi := &file_contracts_call_v1_requests_proto_msgTypes[27]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1231,7 +1451,7 @@ func (x *SubscribeCallEventsResponse) String() string {
 func (*SubscribeCallEventsResponse) ProtoMessage() {}
 
 func (x *SubscribeCallEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_call_v1_requests_proto_msgTypes[23]
+	mi := &file_contracts_call_v1_requests_proto_msgTypes[27]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1244,7 +1464,7 @@ func (x *SubscribeCallEventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeCallEventsResponse.ProtoReflect.Descriptor instead.
 func (*SubscribeCallEventsResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{23}
+	return file_contracts_call_v1_requests_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *SubscribeCallEventsResponse) GetEvent() *CallEvent {
@@ -1344,63 +1564,94 @@ var file_contracts_call_v1_requests_proto_rawDesc = []byte{
 	0x20, 0x01, 0x28, 0x0b, 0x32, 0x1f, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e,
 	0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x4a, 0x6f, 0x69, 0x6e, 0x54, 0x72, 0x61, 0x6e,
 	0x73, 0x70, 0x6f, 0x72, 0x74, 0x52, 0x09, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x70, 0x6f, 0x72, 0x74,
-	0x22, 0x2b, 0x0a, 0x10, 0x4c, 0x65, 0x61, 0x76, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x52, 0x65, 0x71,
-	0x75, 0x65, 0x73, 0x74, 0x12, 0x17, 0x0a, 0x07, 0x63, 0x61, 0x6c, 0x6c, 0x5f, 0x69, 0x64, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x63, 0x61, 0x6c, 0x6c, 0x49, 0x64, 0x22, 0x3f, 0x0a,
-	0x11, 0x4c, 0x65, 0x61, 0x76, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
-	0x73, 0x65, 0x12, 0x2a, 0x0a, 0x04, 0x63, 0x61, 0x6c, 0x6c, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b,
-	0x32, 0x16, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c,
-	0x2e, 0x76, 0x31, 0x2e, 0x43, 0x61, 0x6c, 0x6c, 0x52, 0x04, 0x63, 0x61, 0x6c, 0x6c, 0x22, 0x79,
-	0x0a, 0x1b, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x4d, 0x65, 0x64, 0x69,
-	0x61, 0x53, 0x74, 0x61, 0x74, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x17, 0x0a,
-	0x07, 0x63, 0x61, 0x6c, 0x6c, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06,
-	0x63, 0x61, 0x6c, 0x6c, 0x49, 0x64, 0x12, 0x41, 0x0a, 0x0b, 0x6d, 0x65, 0x64, 0x69, 0x61, 0x5f,
-	0x73, 0x74, 0x61, 0x74, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x20, 0x2e, 0x7a, 0x76,
-	0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x43,
-	0x61, 0x6c, 0x6c, 0x4d, 0x65, 0x64, 0x69, 0x61, 0x53, 0x74, 0x61, 0x74, 0x65, 0x52, 0x0a, 0x6d,
-	0x65, 0x64, 0x69, 0x61, 0x53, 0x74, 0x61, 0x74, 0x65, 0x22, 0x8f, 0x01, 0x0a, 0x1c, 0x55, 0x70,
-	0x64, 0x61, 0x74, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x4d, 0x65, 0x64, 0x69, 0x61, 0x53, 0x74, 0x61,
-	0x74, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2a, 0x0a, 0x04, 0x63, 0x61,
-	0x6c, 0x6c, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x16, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69,
-	0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x61, 0x6c, 0x6c,
-	0x52, 0x04, 0x63, 0x61, 0x6c, 0x6c, 0x12, 0x43, 0x0a, 0x0b, 0x70, 0x61, 0x72, 0x74, 0x69, 0x63,
-	0x69, 0x70, 0x61, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x21, 0x2e, 0x7a, 0x76,
-	0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x43,
-	0x61, 0x6c, 0x6c, 0x50, 0x61, 0x72, 0x74, 0x69, 0x63, 0x69, 0x70, 0x61, 0x6e, 0x74, 0x52, 0x0b,
-	0x70, 0x61, 0x72, 0x74, 0x69, 0x63, 0x69, 0x70, 0x61, 0x6e, 0x74, 0x22, 0x2e, 0x0a, 0x13, 0x47,
-	0x65, 0x74, 0x49, 0x63, 0x65, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x22, 0x9f, 0x01, 0x0a, 0x1d, 0x50, 0x75, 0x62, 0x6c, 0x69, 0x73, 0x68, 0x43, 0x61, 0x6c, 0x6c,
+	0x44, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x71, 0x75, 0x65,
 	0x73, 0x74, 0x12, 0x17, 0x0a, 0x07, 0x63, 0x61, 0x6c, 0x6c, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x06, 0x63, 0x61, 0x6c, 0x6c, 0x49, 0x64, 0x22, 0xba, 0x01, 0x0a, 0x14,
-	0x47, 0x65, 0x74, 0x49, 0x63, 0x65, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x52, 0x65, 0x73, 0x70,
-	0x6f, 0x6e, 0x73, 0x65, 0x12, 0x3c, 0x0a, 0x0b, 0x69, 0x63, 0x65, 0x5f, 0x73, 0x65, 0x72, 0x76,
-	0x65, 0x72, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x1b, 0x2e, 0x7a, 0x76, 0x6f, 0x6e,
+	0x01, 0x28, 0x09, 0x52, 0x06, 0x63, 0x61, 0x6c, 0x6c, 0x49, 0x64, 0x12, 0x1d, 0x0a, 0x0a, 0x73,
+	0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x09, 0x73, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x49, 0x64, 0x12, 0x46, 0x0a, 0x0b, 0x64, 0x65,
+	0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32,
+	0x24, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e,
+	0x76, 0x31, 0x2e, 0x53, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x44, 0x65, 0x73, 0x63, 0x72, 0x69,
+	0x70, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x0b, 0x64, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69,
+	0x6f, 0x6e, 0x22, 0x53, 0x0a, 0x1e, 0x50, 0x75, 0x62, 0x6c, 0x69, 0x73, 0x68, 0x43, 0x61, 0x6c,
+	0x6c, 0x44, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x12, 0x31, 0x0a, 0x05, 0x65, 0x76, 0x65, 0x6e, 0x74, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x0b, 0x32, 0x1b, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63,
+	0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x61, 0x6c, 0x6c, 0x45, 0x76, 0x65, 0x6e, 0x74,
+	0x52, 0x05, 0x65, 0x76, 0x65, 0x6e, 0x74, 0x22, 0x9d, 0x01, 0x0a, 0x1e, 0x50, 0x75, 0x62, 0x6c,
+	0x69, 0x73, 0x68, 0x43, 0x61, 0x6c, 0x6c, 0x49, 0x63, 0x65, 0x43, 0x61, 0x6e, 0x64, 0x69, 0x64,
+	0x61, 0x74, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x17, 0x0a, 0x07, 0x63, 0x61,
+	0x6c, 0x6c, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x63, 0x61, 0x6c,
+	0x6c, 0x49, 0x64, 0x12, 0x1d, 0x0a, 0x0a, 0x73, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x5f, 0x69,
+	0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x73, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e,
+	0x49, 0x64, 0x12, 0x43, 0x0a, 0x0d, 0x69, 0x63, 0x65, 0x5f, 0x63, 0x61, 0x6e, 0x64, 0x69, 0x64,
+	0x61, 0x74, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1e, 0x2e, 0x7a, 0x76, 0x6f, 0x6e,
 	0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x49, 0x63, 0x65,
-	0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x52, 0x0a, 0x69, 0x63, 0x65, 0x53, 0x65, 0x72, 0x76, 0x65,
-	0x72, 0x73, 0x12, 0x39, 0x0a, 0x0a, 0x65, 0x78, 0x70, 0x69, 0x72, 0x65, 0x73, 0x5f, 0x61, 0x74,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61,
-	0x6d, 0x70, 0x52, 0x09, 0x65, 0x78, 0x70, 0x69, 0x72, 0x65, 0x73, 0x41, 0x74, 0x12, 0x29, 0x0a,
-	0x10, 0x72, 0x75, 0x6e, 0x74, 0x69, 0x6d, 0x65, 0x5f, 0x65, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e,
-	0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0f, 0x72, 0x75, 0x6e, 0x74, 0x69, 0x6d, 0x65,
-	0x45, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x22, 0x83, 0x01, 0x0a, 0x1a, 0x53, 0x75, 0x62,
-	0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x73,
-	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x17, 0x0a, 0x07, 0x63, 0x61, 0x6c, 0x6c, 0x5f,
-	0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x63, 0x61, 0x6c, 0x6c, 0x49, 0x64,
-	0x12, 0x27, 0x0a, 0x0f, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e,
-	0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x63, 0x6f, 0x6e, 0x76, 0x65,
-	0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x49, 0x64, 0x12, 0x23, 0x0a, 0x0d, 0x66, 0x72, 0x6f,
-	0x6d, 0x5f, 0x73, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04,
-	0x52, 0x0c, 0x66, 0x72, 0x6f, 0x6d, 0x53, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x22, 0x50,
-	0x0a, 0x1b, 0x53, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x45,
-	0x76, 0x65, 0x6e, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x31, 0x0a,
-	0x05, 0x65, 0x76, 0x65, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1b, 0x2e, 0x7a,
-	0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e,
-	0x43, 0x61, 0x6c, 0x6c, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x52, 0x05, 0x65, 0x76, 0x65, 0x6e, 0x74,
-	0x42, 0x3f, 0x5a, 0x3d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64,
-	0x6d, 0x2d, 0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2f, 0x67,
-	0x65, 0x6e, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63,
-	0x74, 0x73, 0x2f, 0x63, 0x61, 0x6c, 0x6c, 0x2f, 0x76, 0x31, 0x3b, 0x63, 0x61, 0x6c, 0x6c, 0x76,
-	0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x43, 0x61, 0x6e, 0x64, 0x69, 0x64, 0x61, 0x74, 0x65, 0x52, 0x0c, 0x69, 0x63, 0x65, 0x43, 0x61,
+	0x6e, 0x64, 0x69, 0x64, 0x61, 0x74, 0x65, 0x22, 0x54, 0x0a, 0x1f, 0x50, 0x75, 0x62, 0x6c, 0x69,
+	0x73, 0x68, 0x43, 0x61, 0x6c, 0x6c, 0x49, 0x63, 0x65, 0x43, 0x61, 0x6e, 0x64, 0x69, 0x64, 0x61,
+	0x74, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x31, 0x0a, 0x05, 0x65, 0x76,
+	0x65, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1b, 0x2e, 0x7a, 0x76, 0x6f, 0x6e,
+	0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x61, 0x6c,
+	0x6c, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x52, 0x05, 0x65, 0x76, 0x65, 0x6e, 0x74, 0x22, 0x2b, 0x0a,
+	0x10, 0x4c, 0x65, 0x61, 0x76, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x74, 0x12, 0x17, 0x0a, 0x07, 0x63, 0x61, 0x6c, 0x6c, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x06, 0x63, 0x61, 0x6c, 0x6c, 0x49, 0x64, 0x22, 0x3f, 0x0a, 0x11, 0x4c, 0x65,
+	0x61, 0x76, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12,
+	0x2a, 0x0a, 0x04, 0x63, 0x61, 0x6c, 0x6c, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x16, 0x2e,
+	0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31,
+	0x2e, 0x43, 0x61, 0x6c, 0x6c, 0x52, 0x04, 0x63, 0x61, 0x6c, 0x6c, 0x22, 0x79, 0x0a, 0x1b, 0x55,
+	0x70, 0x64, 0x61, 0x74, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x4d, 0x65, 0x64, 0x69, 0x61, 0x53, 0x74,
+	0x61, 0x74, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x17, 0x0a, 0x07, 0x63, 0x61,
+	0x6c, 0x6c, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x63, 0x61, 0x6c,
+	0x6c, 0x49, 0x64, 0x12, 0x41, 0x0a, 0x0b, 0x6d, 0x65, 0x64, 0x69, 0x61, 0x5f, 0x73, 0x74, 0x61,
+	0x74, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x20, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69,
+	0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x61, 0x6c, 0x6c,
+	0x4d, 0x65, 0x64, 0x69, 0x61, 0x53, 0x74, 0x61, 0x74, 0x65, 0x52, 0x0a, 0x6d, 0x65, 0x64, 0x69,
+	0x61, 0x53, 0x74, 0x61, 0x74, 0x65, 0x22, 0x8f, 0x01, 0x0a, 0x1c, 0x55, 0x70, 0x64, 0x61, 0x74,
+	0x65, 0x43, 0x61, 0x6c, 0x6c, 0x4d, 0x65, 0x64, 0x69, 0x61, 0x53, 0x74, 0x61, 0x74, 0x65, 0x52,
+	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2a, 0x0a, 0x04, 0x63, 0x61, 0x6c, 0x6c, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x16, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61,
+	0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x61, 0x6c, 0x6c, 0x52, 0x04, 0x63,
+	0x61, 0x6c, 0x6c, 0x12, 0x43, 0x0a, 0x0b, 0x70, 0x61, 0x72, 0x74, 0x69, 0x63, 0x69, 0x70, 0x61,
+	0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x21, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69,
+	0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x61, 0x6c, 0x6c,
+	0x50, 0x61, 0x72, 0x74, 0x69, 0x63, 0x69, 0x70, 0x61, 0x6e, 0x74, 0x52, 0x0b, 0x70, 0x61, 0x72,
+	0x74, 0x69, 0x63, 0x69, 0x70, 0x61, 0x6e, 0x74, 0x22, 0x2e, 0x0a, 0x13, 0x47, 0x65, 0x74, 0x49,
+	0x63, 0x65, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12,
+	0x17, 0x0a, 0x07, 0x63, 0x61, 0x6c, 0x6c, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x06, 0x63, 0x61, 0x6c, 0x6c, 0x49, 0x64, 0x22, 0xba, 0x01, 0x0a, 0x14, 0x47, 0x65, 0x74,
+	0x49, 0x63, 0x65, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
+	0x65, 0x12, 0x3c, 0x0a, 0x0b, 0x69, 0x63, 0x65, 0x5f, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x73,
+	0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x1b, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b,
+	0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x49, 0x63, 0x65, 0x53, 0x65, 0x72,
+	0x76, 0x65, 0x72, 0x52, 0x0a, 0x69, 0x63, 0x65, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x73, 0x12,
+	0x39, 0x0a, 0x0a, 0x65, 0x78, 0x70, 0x69, 0x72, 0x65, 0x73, 0x5f, 0x61, 0x74, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52,
+	0x09, 0x65, 0x78, 0x70, 0x69, 0x72, 0x65, 0x73, 0x41, 0x74, 0x12, 0x29, 0x0a, 0x10, 0x72, 0x75,
+	0x6e, 0x74, 0x69, 0x6d, 0x65, 0x5f, 0x65, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x18, 0x03,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x0f, 0x72, 0x75, 0x6e, 0x74, 0x69, 0x6d, 0x65, 0x45, 0x6e, 0x64,
+	0x70, 0x6f, 0x69, 0x6e, 0x74, 0x22, 0x83, 0x01, 0x0a, 0x1a, 0x53, 0x75, 0x62, 0x73, 0x63, 0x72,
+	0x69, 0x62, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x73, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x12, 0x17, 0x0a, 0x07, 0x63, 0x61, 0x6c, 0x6c, 0x5f, 0x69, 0x64, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x63, 0x61, 0x6c, 0x6c, 0x49, 0x64, 0x12, 0x27, 0x0a,
+	0x0f, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x69, 0x64,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61,
+	0x74, 0x69, 0x6f, 0x6e, 0x49, 0x64, 0x12, 0x23, 0x0a, 0x0d, 0x66, 0x72, 0x6f, 0x6d, 0x5f, 0x73,
+	0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0c, 0x66,
+	0x72, 0x6f, 0x6d, 0x53, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x22, 0x50, 0x0a, 0x1b, 0x53,
+	0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x45, 0x76, 0x65, 0x6e,
+	0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x31, 0x0a, 0x05, 0x65, 0x76,
+	0x65, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1b, 0x2e, 0x7a, 0x76, 0x6f, 0x6e,
+	0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x61, 0x6c, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x61, 0x6c,
+	0x6c, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x52, 0x05, 0x65, 0x76, 0x65, 0x6e, 0x74, 0x42, 0x3f, 0x5a,
+	0x3d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6d, 0x2d, 0x76,
+	0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2f, 0x67, 0x65, 0x6e, 0x2f,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74, 0x73, 0x2f,
+	0x63, 0x61, 0x6c, 0x6c, 0x2f, 0x76, 0x31, 0x3b, 0x63, 0x61, 0x6c, 0x6c, 0x76, 0x31, 0x62, 0x06,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1415,68 +1666,78 @@ func file_contracts_call_v1_requests_proto_rawDescGZIP() []byte {
 	return file_contracts_call_v1_requests_proto_rawDescData
 }
 
-var file_contracts_call_v1_requests_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_contracts_call_v1_requests_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_contracts_call_v1_requests_proto_goTypes = []interface{}{
-	(*StartCallRequest)(nil),             // 0: zvonilka.call.v1.StartCallRequest
-	(*StartCallResponse)(nil),            // 1: zvonilka.call.v1.StartCallResponse
-	(*GetCallRequest)(nil),               // 2: zvonilka.call.v1.GetCallRequest
-	(*GetCallResponse)(nil),              // 3: zvonilka.call.v1.GetCallResponse
-	(*ListCallsRequest)(nil),             // 4: zvonilka.call.v1.ListCallsRequest
-	(*ListCallsResponse)(nil),            // 5: zvonilka.call.v1.ListCallsResponse
-	(*AcceptCallRequest)(nil),            // 6: zvonilka.call.v1.AcceptCallRequest
-	(*AcceptCallResponse)(nil),           // 7: zvonilka.call.v1.AcceptCallResponse
-	(*DeclineCallRequest)(nil),           // 8: zvonilka.call.v1.DeclineCallRequest
-	(*DeclineCallResponse)(nil),          // 9: zvonilka.call.v1.DeclineCallResponse
-	(*CancelCallRequest)(nil),            // 10: zvonilka.call.v1.CancelCallRequest
-	(*CancelCallResponse)(nil),           // 11: zvonilka.call.v1.CancelCallResponse
-	(*EndCallRequest)(nil),               // 12: zvonilka.call.v1.EndCallRequest
-	(*EndCallResponse)(nil),              // 13: zvonilka.call.v1.EndCallResponse
-	(*JoinCallRequest)(nil),              // 14: zvonilka.call.v1.JoinCallRequest
-	(*JoinCallResponse)(nil),             // 15: zvonilka.call.v1.JoinCallResponse
-	(*LeaveCallRequest)(nil),             // 16: zvonilka.call.v1.LeaveCallRequest
-	(*LeaveCallResponse)(nil),            // 17: zvonilka.call.v1.LeaveCallResponse
-	(*UpdateCallMediaStateRequest)(nil),  // 18: zvonilka.call.v1.UpdateCallMediaStateRequest
-	(*UpdateCallMediaStateResponse)(nil), // 19: zvonilka.call.v1.UpdateCallMediaStateResponse
-	(*GetIceConfigRequest)(nil),          // 20: zvonilka.call.v1.GetIceConfigRequest
-	(*GetIceConfigResponse)(nil),         // 21: zvonilka.call.v1.GetIceConfigResponse
-	(*SubscribeCallEventsRequest)(nil),   // 22: zvonilka.call.v1.SubscribeCallEventsRequest
-	(*SubscribeCallEventsResponse)(nil),  // 23: zvonilka.call.v1.SubscribeCallEventsResponse
-	(*Call)(nil),                         // 24: zvonilka.call.v1.Call
-	(*v1.PageRequest)(nil),               // 25: zvonilka.common.v1.PageRequest
-	(*v1.PageResponse)(nil),              // 26: zvonilka.common.v1.PageResponse
-	(CallEndReason)(0),                   // 27: zvonilka.call.v1.CallEndReason
-	(*JoinTransport)(nil),                // 28: zvonilka.call.v1.JoinTransport
-	(*CallMediaState)(nil),               // 29: zvonilka.call.v1.CallMediaState
-	(*CallParticipant)(nil),              // 30: zvonilka.call.v1.CallParticipant
-	(*IceServer)(nil),                    // 31: zvonilka.call.v1.IceServer
-	(*timestamppb.Timestamp)(nil),        // 32: google.protobuf.Timestamp
-	(*CallEvent)(nil),                    // 33: zvonilka.call.v1.CallEvent
+	(*StartCallRequest)(nil),                // 0: zvonilka.call.v1.StartCallRequest
+	(*StartCallResponse)(nil),               // 1: zvonilka.call.v1.StartCallResponse
+	(*GetCallRequest)(nil),                  // 2: zvonilka.call.v1.GetCallRequest
+	(*GetCallResponse)(nil),                 // 3: zvonilka.call.v1.GetCallResponse
+	(*ListCallsRequest)(nil),                // 4: zvonilka.call.v1.ListCallsRequest
+	(*ListCallsResponse)(nil),               // 5: zvonilka.call.v1.ListCallsResponse
+	(*AcceptCallRequest)(nil),               // 6: zvonilka.call.v1.AcceptCallRequest
+	(*AcceptCallResponse)(nil),              // 7: zvonilka.call.v1.AcceptCallResponse
+	(*DeclineCallRequest)(nil),              // 8: zvonilka.call.v1.DeclineCallRequest
+	(*DeclineCallResponse)(nil),             // 9: zvonilka.call.v1.DeclineCallResponse
+	(*CancelCallRequest)(nil),               // 10: zvonilka.call.v1.CancelCallRequest
+	(*CancelCallResponse)(nil),              // 11: zvonilka.call.v1.CancelCallResponse
+	(*EndCallRequest)(nil),                  // 12: zvonilka.call.v1.EndCallRequest
+	(*EndCallResponse)(nil),                 // 13: zvonilka.call.v1.EndCallResponse
+	(*JoinCallRequest)(nil),                 // 14: zvonilka.call.v1.JoinCallRequest
+	(*JoinCallResponse)(nil),                // 15: zvonilka.call.v1.JoinCallResponse
+	(*PublishCallDescriptionRequest)(nil),   // 16: zvonilka.call.v1.PublishCallDescriptionRequest
+	(*PublishCallDescriptionResponse)(nil),  // 17: zvonilka.call.v1.PublishCallDescriptionResponse
+	(*PublishCallIceCandidateRequest)(nil),  // 18: zvonilka.call.v1.PublishCallIceCandidateRequest
+	(*PublishCallIceCandidateResponse)(nil), // 19: zvonilka.call.v1.PublishCallIceCandidateResponse
+	(*LeaveCallRequest)(nil),                // 20: zvonilka.call.v1.LeaveCallRequest
+	(*LeaveCallResponse)(nil),               // 21: zvonilka.call.v1.LeaveCallResponse
+	(*UpdateCallMediaStateRequest)(nil),     // 22: zvonilka.call.v1.UpdateCallMediaStateRequest
+	(*UpdateCallMediaStateResponse)(nil),    // 23: zvonilka.call.v1.UpdateCallMediaStateResponse
+	(*GetIceConfigRequest)(nil),             // 24: zvonilka.call.v1.GetIceConfigRequest
+	(*GetIceConfigResponse)(nil),            // 25: zvonilka.call.v1.GetIceConfigResponse
+	(*SubscribeCallEventsRequest)(nil),      // 26: zvonilka.call.v1.SubscribeCallEventsRequest
+	(*SubscribeCallEventsResponse)(nil),     // 27: zvonilka.call.v1.SubscribeCallEventsResponse
+	(*Call)(nil),                            // 28: zvonilka.call.v1.Call
+	(*v1.PageRequest)(nil),                  // 29: zvonilka.common.v1.PageRequest
+	(*v1.PageResponse)(nil),                 // 30: zvonilka.common.v1.PageResponse
+	(CallEndReason)(0),                      // 31: zvonilka.call.v1.CallEndReason
+	(*JoinTransport)(nil),                   // 32: zvonilka.call.v1.JoinTransport
+	(*SessionDescription)(nil),              // 33: zvonilka.call.v1.SessionDescription
+	(*CallEvent)(nil),                       // 34: zvonilka.call.v1.CallEvent
+	(*IceCandidate)(nil),                    // 35: zvonilka.call.v1.IceCandidate
+	(*CallMediaState)(nil),                  // 36: zvonilka.call.v1.CallMediaState
+	(*CallParticipant)(nil),                 // 37: zvonilka.call.v1.CallParticipant
+	(*IceServer)(nil),                       // 38: zvonilka.call.v1.IceServer
+	(*timestamppb.Timestamp)(nil),           // 39: google.protobuf.Timestamp
 }
 var file_contracts_call_v1_requests_proto_depIdxs = []int32{
-	24, // 0: zvonilka.call.v1.StartCallResponse.call:type_name -> zvonilka.call.v1.Call
-	24, // 1: zvonilka.call.v1.GetCallResponse.call:type_name -> zvonilka.call.v1.Call
-	25, // 2: zvonilka.call.v1.ListCallsRequest.page:type_name -> zvonilka.common.v1.PageRequest
-	24, // 3: zvonilka.call.v1.ListCallsResponse.calls:type_name -> zvonilka.call.v1.Call
-	26, // 4: zvonilka.call.v1.ListCallsResponse.page:type_name -> zvonilka.common.v1.PageResponse
-	24, // 5: zvonilka.call.v1.AcceptCallResponse.call:type_name -> zvonilka.call.v1.Call
-	24, // 6: zvonilka.call.v1.DeclineCallResponse.call:type_name -> zvonilka.call.v1.Call
-	24, // 7: zvonilka.call.v1.CancelCallResponse.call:type_name -> zvonilka.call.v1.Call
-	27, // 8: zvonilka.call.v1.EndCallRequest.reason:type_name -> zvonilka.call.v1.CallEndReason
-	24, // 9: zvonilka.call.v1.EndCallResponse.call:type_name -> zvonilka.call.v1.Call
-	24, // 10: zvonilka.call.v1.JoinCallResponse.call:type_name -> zvonilka.call.v1.Call
-	28, // 11: zvonilka.call.v1.JoinCallResponse.transport:type_name -> zvonilka.call.v1.JoinTransport
-	24, // 12: zvonilka.call.v1.LeaveCallResponse.call:type_name -> zvonilka.call.v1.Call
-	29, // 13: zvonilka.call.v1.UpdateCallMediaStateRequest.media_state:type_name -> zvonilka.call.v1.CallMediaState
-	24, // 14: zvonilka.call.v1.UpdateCallMediaStateResponse.call:type_name -> zvonilka.call.v1.Call
-	30, // 15: zvonilka.call.v1.UpdateCallMediaStateResponse.participant:type_name -> zvonilka.call.v1.CallParticipant
-	31, // 16: zvonilka.call.v1.GetIceConfigResponse.ice_servers:type_name -> zvonilka.call.v1.IceServer
-	32, // 17: zvonilka.call.v1.GetIceConfigResponse.expires_at:type_name -> google.protobuf.Timestamp
-	33, // 18: zvonilka.call.v1.SubscribeCallEventsResponse.event:type_name -> zvonilka.call.v1.CallEvent
-	19, // [19:19] is the sub-list for method output_type
-	19, // [19:19] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	28, // 0: zvonilka.call.v1.StartCallResponse.call:type_name -> zvonilka.call.v1.Call
+	28, // 1: zvonilka.call.v1.GetCallResponse.call:type_name -> zvonilka.call.v1.Call
+	29, // 2: zvonilka.call.v1.ListCallsRequest.page:type_name -> zvonilka.common.v1.PageRequest
+	28, // 3: zvonilka.call.v1.ListCallsResponse.calls:type_name -> zvonilka.call.v1.Call
+	30, // 4: zvonilka.call.v1.ListCallsResponse.page:type_name -> zvonilka.common.v1.PageResponse
+	28, // 5: zvonilka.call.v1.AcceptCallResponse.call:type_name -> zvonilka.call.v1.Call
+	28, // 6: zvonilka.call.v1.DeclineCallResponse.call:type_name -> zvonilka.call.v1.Call
+	28, // 7: zvonilka.call.v1.CancelCallResponse.call:type_name -> zvonilka.call.v1.Call
+	31, // 8: zvonilka.call.v1.EndCallRequest.reason:type_name -> zvonilka.call.v1.CallEndReason
+	28, // 9: zvonilka.call.v1.EndCallResponse.call:type_name -> zvonilka.call.v1.Call
+	28, // 10: zvonilka.call.v1.JoinCallResponse.call:type_name -> zvonilka.call.v1.Call
+	32, // 11: zvonilka.call.v1.JoinCallResponse.transport:type_name -> zvonilka.call.v1.JoinTransport
+	33, // 12: zvonilka.call.v1.PublishCallDescriptionRequest.description:type_name -> zvonilka.call.v1.SessionDescription
+	34, // 13: zvonilka.call.v1.PublishCallDescriptionResponse.event:type_name -> zvonilka.call.v1.CallEvent
+	35, // 14: zvonilka.call.v1.PublishCallIceCandidateRequest.ice_candidate:type_name -> zvonilka.call.v1.IceCandidate
+	34, // 15: zvonilka.call.v1.PublishCallIceCandidateResponse.event:type_name -> zvonilka.call.v1.CallEvent
+	28, // 16: zvonilka.call.v1.LeaveCallResponse.call:type_name -> zvonilka.call.v1.Call
+	36, // 17: zvonilka.call.v1.UpdateCallMediaStateRequest.media_state:type_name -> zvonilka.call.v1.CallMediaState
+	28, // 18: zvonilka.call.v1.UpdateCallMediaStateResponse.call:type_name -> zvonilka.call.v1.Call
+	37, // 19: zvonilka.call.v1.UpdateCallMediaStateResponse.participant:type_name -> zvonilka.call.v1.CallParticipant
+	38, // 20: zvonilka.call.v1.GetIceConfigResponse.ice_servers:type_name -> zvonilka.call.v1.IceServer
+	39, // 21: zvonilka.call.v1.GetIceConfigResponse.expires_at:type_name -> google.protobuf.Timestamp
+	34, // 22: zvonilka.call.v1.SubscribeCallEventsResponse.event:type_name -> zvonilka.call.v1.CallEvent
+	23, // [23:23] is the sub-list for method output_type
+	23, // [23:23] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_contracts_call_v1_requests_proto_init() }
@@ -1679,7 +1940,7 @@ func file_contracts_call_v1_requests_proto_init() {
 			}
 		}
 		file_contracts_call_v1_requests_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*LeaveCallRequest); i {
+			switch v := v.(*PublishCallDescriptionRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1691,7 +1952,7 @@ func file_contracts_call_v1_requests_proto_init() {
 			}
 		}
 		file_contracts_call_v1_requests_proto_msgTypes[17].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*LeaveCallResponse); i {
+			switch v := v.(*PublishCallDescriptionResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1703,7 +1964,7 @@ func file_contracts_call_v1_requests_proto_init() {
 			}
 		}
 		file_contracts_call_v1_requests_proto_msgTypes[18].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*UpdateCallMediaStateRequest); i {
+			switch v := v.(*PublishCallIceCandidateRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1715,7 +1976,7 @@ func file_contracts_call_v1_requests_proto_init() {
 			}
 		}
 		file_contracts_call_v1_requests_proto_msgTypes[19].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*UpdateCallMediaStateResponse); i {
+			switch v := v.(*PublishCallIceCandidateResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1727,7 +1988,7 @@ func file_contracts_call_v1_requests_proto_init() {
 			}
 		}
 		file_contracts_call_v1_requests_proto_msgTypes[20].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetIceConfigRequest); i {
+			switch v := v.(*LeaveCallRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1739,7 +2000,7 @@ func file_contracts_call_v1_requests_proto_init() {
 			}
 		}
 		file_contracts_call_v1_requests_proto_msgTypes[21].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetIceConfigResponse); i {
+			switch v := v.(*LeaveCallResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1751,7 +2012,7 @@ func file_contracts_call_v1_requests_proto_init() {
 			}
 		}
 		file_contracts_call_v1_requests_proto_msgTypes[22].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SubscribeCallEventsRequest); i {
+			switch v := v.(*UpdateCallMediaStateRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1763,6 +2024,54 @@ func file_contracts_call_v1_requests_proto_init() {
 			}
 		}
 		file_contracts_call_v1_requests_proto_msgTypes[23].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*UpdateCallMediaStateResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_call_v1_requests_proto_msgTypes[24].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetIceConfigRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_call_v1_requests_proto_msgTypes[25].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetIceConfigResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_call_v1_requests_proto_msgTypes[26].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*SubscribeCallEventsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_call_v1_requests_proto_msgTypes[27].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*SubscribeCallEventsResponse); i {
 			case 0:
 				return &v.state
@@ -1781,7 +2090,7 @@ func file_contracts_call_v1_requests_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_contracts_call_v1_requests_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   24,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

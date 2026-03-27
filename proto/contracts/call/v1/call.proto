@@ -15,6 +15,8 @@ service CallService {
   rpc CancelCall(CancelCallRequest) returns (CancelCallResponse);
   rpc EndCall(EndCallRequest) returns (EndCallResponse);
   rpc JoinCall(JoinCallRequest) returns (JoinCallResponse);
+  rpc PublishCallDescription(PublishCallDescriptionRequest) returns (PublishCallDescriptionResponse);
+  rpc PublishCallIceCandidate(PublishCallIceCandidateRequest) returns (PublishCallIceCandidateResponse);
   rpc LeaveCall(LeaveCallRequest) returns (LeaveCallResponse);
   rpc UpdateCallMediaState(UpdateCallMediaStateRequest) returns (UpdateCallMediaStateResponse);
   rpc GetIceConfig(GetIceConfigRequest) returns (GetIceConfigResponse);
