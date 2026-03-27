@@ -53,12 +53,14 @@ type participant struct {
 	accountID string
 	deviceID  string
 	withVideo bool
+	media     domaincall.MediaState
 }
 
 type peer struct {
 	accountID              string
 	deviceID               string
 	withVideo              bool
+	media                  domaincall.MediaState
 	pc                     *webrtc.PeerConnection
 	signalMu               sync.Mutex
 	signals                []domaincall.RuntimeSignal
@@ -77,9 +79,10 @@ type peer struct {
 }
 
 type relayTrack struct {
-	sourceKey string
-	track     *webrtc.TrackLocalStaticRTP
-	sender    *webrtc.RTPSender
+	sourceKey   string
+	track       *webrtc.TrackLocalStaticRTP
+	sender      *webrtc.RTPSender
+	screenShare bool
 }
 
 type relayTarget struct {
@@ -97,7 +100,9 @@ const (
 	telemetryProfileKey               = "recommended_profile"
 	telemetryReasonKey                = "recommendation_reason"
 	telemetryVideoKey                 = "video_fallback_recommended"
+	telemetryScreenSharePriorityKey   = "screen_share_priority"
 	telemetryReconnectKey             = "reconnect_recommended"
+	telemetrySuppressCameraVideoKey   = "suppress_camera_video"
 	telemetrySuppressOutgoingVideoKey = "suppress_outgoing_video"
 	telemetrySuppressIncomingVideoKey = "suppress_incoming_video"
 	telemetrySuppressOutgoingAudioKey = "suppress_outgoing_audio"
@@ -269,6 +274,7 @@ func (m *Manager) JoinSession(
 		accountID: participantRow.AccountID,
 		deviceID:  participantRow.DeviceID,
 		withVideo: participantRow.WithVideo,
+		media:     participantRow.Media,
 	}
 
 	return domaincall.RuntimeJoin{
@@ -282,6 +288,51 @@ func (m *Manager) JoinSession(
 		CandidateHost:   active.host,
 		CandidatePort:   active.port,
 	}, nil
+}
+
+// UpdateParticipant updates one joined participant media preferences inside the RTC runtime.
+func (m *Manager) UpdateParticipant(
+	_ context.Context,
+	sessionID string,
+	participantRow domaincall.RuntimeParticipant,
+) error {
+	sessionID = strings.TrimSpace(sessionID)
+	participantRow.AccountID = strings.TrimSpace(participantRow.AccountID)
+	participantRow.DeviceID = strings.TrimSpace(participantRow.DeviceID)
+	if sessionID == "" || participantRow.AccountID == "" || participantRow.DeviceID == "" {
+		return domaincall.ErrInvalidInput
+	}
+
+	key := participantKey(participantRow.AccountID, participantRow.DeviceID)
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	active, ok := m.sessions[sessionID]
+	if !ok {
+		return domaincall.ErrNotFound
+	}
+	current, ok := active.participants[key]
+	if !ok {
+		return domaincall.ErrForbidden
+	}
+	current.withVideo = participantRow.WithVideo
+	current.media = participantRow.Media
+	active.participants[key] = current
+
+	peerConn := active.peers[key]
+	if peerConn == nil {
+		return nil
+	}
+
+	peerConn.mu.Lock()
+	peerConn.withVideo = participantRow.WithVideo
+	peerConn.media = participantRow.Media
+	peerConn.applyRecommendationsLocked()
+	peerConn.stats.LastUpdatedAt = time.Now().UTC()
+	peerConn.mu.Unlock()
+
+	return nil
 }
 
 // PublishDescription applies one remote SDP description and returns server-generated signals.
@@ -600,6 +651,7 @@ func (m *Manager) newPeer(active *session, participantRow domaincall.RuntimePart
 		accountID: participantRow.AccountID,
 		deviceID:  participantRow.DeviceID,
 		withVideo: participantRow.WithVideo,
+		media:     participantRow.Media,
 		pc:        pc,
 		tracks:    make(map[string]*relayTrack),
 	}
@@ -775,9 +827,10 @@ func (m *Manager) prepareRelayTargets(
 			continue
 		}
 		target.tracks[trackKey] = &relayTrack{
-			sourceKey: sourceKey,
-			track:     localTrack,
-			sender:    sender,
+			sourceKey:   sourceKey,
+			track:       localTrack,
+			sender:      sender,
+			screenShare: isScreenShareTrack(track.ID(), track.StreamID()),
 		}
 		relays = append(relays, relayTarget{peer: target, track: localTrack})
 		targets = append(targets, target)
@@ -977,7 +1030,9 @@ func (p *peer) updateTelemetry(key string, value string) map[string]string {
 	prevProfile := p.stats.RecommendedProfile
 	prevReason := p.stats.RecommendationReason
 	prevVideo := p.stats.VideoFallbackRecommended
+	prevScreenSharePriority := p.stats.ScreenSharePriority
 	prevReconnect := p.stats.ReconnectRecommended
+	prevSuppressCameraVideo := p.stats.SuppressCameraVideo
 	changed := false
 	switch key {
 	case telemetryPCStateKey:
@@ -1022,7 +1077,9 @@ func (p *peer) updateTelemetry(key string, value string) map[string]string {
 	metadata[telemetryProfileKey] = p.stats.RecommendedProfile
 	metadata[telemetryReasonKey] = p.stats.RecommendationReason
 	metadata[telemetryVideoKey] = boolString(p.stats.VideoFallbackRecommended)
+	metadata[telemetryScreenSharePriorityKey] = boolString(p.stats.ScreenSharePriority)
 	metadata[telemetryReconnectKey] = boolString(p.stats.ReconnectRecommended)
+	metadata[telemetrySuppressCameraVideoKey] = boolString(p.stats.SuppressCameraVideo)
 	metadata[telemetrySuppressOutgoingVideoKey] = boolString(p.stats.SuppressOutgoingVideo)
 	metadata[telemetrySuppressIncomingVideoKey] = boolString(p.stats.SuppressIncomingVideo)
 	metadata[telemetrySuppressOutgoingAudioKey] = boolString(p.stats.SuppressOutgoingAudio)
@@ -1038,7 +1095,9 @@ func (p *peer) updateTelemetry(key string, value string) map[string]string {
 	if p.stats.RecommendedProfile == prevProfile &&
 		p.stats.RecommendationReason == prevReason &&
 		p.stats.VideoFallbackRecommended == prevVideo &&
-		p.stats.ReconnectRecommended == prevReconnect {
+		p.stats.ScreenSharePriority == prevScreenSharePriority &&
+		p.stats.ReconnectRecommended == prevReconnect &&
+		p.stats.SuppressCameraVideo == prevSuppressCameraVideo {
 		return metadata
 	}
 
@@ -1082,7 +1141,9 @@ func (p *peer) recordRelayWrite(size uint64, failed bool) map[string]string {
 	prevProfile := p.stats.RecommendedProfile
 	prevReason := p.stats.RecommendationReason
 	prevVideo := p.stats.VideoFallbackRecommended
+	prevScreenSharePriority := p.stats.ScreenSharePriority
 	prevReconnect := p.stats.ReconnectRecommended
+	prevSuppressCameraVideo := p.stats.SuppressCameraVideo
 	if failed {
 		p.consecutiveRelayErrors++
 		p.stats.RelayWriteErrors++
@@ -1092,13 +1153,16 @@ func (p *peer) recordRelayWrite(size uint64, failed bool) map[string]string {
 		p.stats.RelayBytes += size
 	}
 	p.stats.RelayTracks = uint32(len(p.tracks))
+	p.stats.ScreenShareRelayTracks = uint32(countScreenShareRelayTracks(p.tracks))
 	p.applyRecommendationsLocked()
 	p.recordQualityTransitionLocked(prevQuality)
 	p.stats.LastUpdatedAt = time.Now().UTC()
 	if p.stats.RecommendedProfile == prevProfile &&
 		p.stats.RecommendationReason == prevReason &&
 		p.stats.VideoFallbackRecommended == prevVideo &&
+		p.stats.ScreenSharePriority == prevScreenSharePriority &&
 		p.stats.ReconnectRecommended == prevReconnect &&
+		p.stats.SuppressCameraVideo == prevSuppressCameraVideo &&
 		p.stats.Quality == prevQuality {
 		return nil
 	}
@@ -1109,7 +1173,9 @@ func (p *peer) recordRelayWrite(size uint64, failed bool) map[string]string {
 		telemetryProfileKey:               p.stats.RecommendedProfile,
 		telemetryReasonKey:                p.stats.RecommendationReason,
 		telemetryVideoKey:                 boolString(p.stats.VideoFallbackRecommended),
+		telemetryScreenSharePriorityKey:   boolString(p.stats.ScreenSharePriority),
 		telemetryReconnectKey:             boolString(p.stats.ReconnectRecommended),
+		telemetrySuppressCameraVideoKey:   boolString(p.stats.SuppressCameraVideo),
 		telemetrySuppressOutgoingVideoKey: boolString(p.stats.SuppressOutgoingVideo),
 		telemetrySuppressIncomingVideoKey: boolString(p.stats.SuppressIncomingVideo),
 		telemetrySuppressOutgoingAudioKey: boolString(p.stats.SuppressOutgoingAudio),
@@ -1181,12 +1247,22 @@ func (p *peer) recordQoSFeedback(packets []rtcp.Packet) map[string]string {
 	}
 
 	return map[string]string{
-		telemetryKindKey:  telemetryKindTransport,
-		"packet_loss_pct": fmt.Sprintf("%.2f", p.stats.PacketLossPct),
-		"jitter_score":    fmt.Sprintf("%d", p.stats.JitterScore),
-		"qos_escalation":  p.stats.QoSEscalation,
-		"qos_trend":       p.stats.QoSTrend,
-		"qos_bad_streak":  fmt.Sprintf("%d", p.stats.QoSBadStreak),
+		telemetryKindKey:                  telemetryKindTransport,
+		"packet_loss_pct":                 fmt.Sprintf("%.2f", p.stats.PacketLossPct),
+		"jitter_score":                    fmt.Sprintf("%d", p.stats.JitterScore),
+		"qos_escalation":                  p.stats.QoSEscalation,
+		"qos_trend":                       p.stats.QoSTrend,
+		"qos_bad_streak":                  fmt.Sprintf("%d", p.stats.QoSBadStreak),
+		telemetryProfileKey:               p.stats.RecommendedProfile,
+		telemetryReasonKey:                p.stats.RecommendationReason,
+		telemetryVideoKey:                 boolString(p.stats.VideoFallbackRecommended),
+		telemetryScreenSharePriorityKey:   boolString(p.stats.ScreenSharePriority),
+		telemetryReconnectKey:             boolString(p.stats.ReconnectRecommended),
+		telemetrySuppressCameraVideoKey:   boolString(p.stats.SuppressCameraVideo),
+		telemetrySuppressOutgoingVideoKey: boolString(p.stats.SuppressOutgoingVideo),
+		telemetrySuppressIncomingVideoKey: boolString(p.stats.SuppressIncomingVideo),
+		telemetrySuppressOutgoingAudioKey: boolString(p.stats.SuppressOutgoingAudio),
+		telemetrySuppressIncomingAudioKey: boolString(p.stats.SuppressIncomingAudio),
 	}
 }
 
@@ -1194,7 +1270,9 @@ func (p *peer) applyRecommendationsLocked() {
 	prevProfile := p.stats.RecommendedProfile
 	prevReason := p.stats.RecommendationReason
 	prevVideo := p.stats.VideoFallbackRecommended
+	prevScreenSharePriority := p.stats.ScreenSharePriority
 	prevReconnect := p.stats.ReconnectRecommended
+	prevSuppressCameraVideo := p.stats.SuppressCameraVideo
 	prevSuppressOutgoingVideo := p.stats.SuppressOutgoingVideo
 	prevSuppressIncomingVideo := p.stats.SuppressIncomingVideo
 	prevSuppressOutgoingAudio := p.stats.SuppressOutgoingAudio
@@ -1203,7 +1281,9 @@ func (p *peer) applyRecommendationsLocked() {
 	profile := "full"
 	reason := ""
 	videoFallback := false
+	screenSharePriority := false
 	reconnect := false
+	suppressCameraVideo := false
 
 	switch p.stats.Quality {
 	case "failed":
@@ -1212,22 +1292,46 @@ func (p *peer) applyRecommendationsLocked() {
 		reconnect = true
 	case "degraded":
 		if p.withVideo {
-			profile = "audio_only"
-			reason = "transport_degraded"
-			videoFallback = true
+			if p.media.ScreenShareEnabled {
+				profile = "screen_share_only"
+				reason = "preserve_screen_share"
+				videoFallback = true
+				screenSharePriority = true
+				suppressCameraVideo = true
+			} else {
+				profile = "audio_only"
+				reason = "transport_degraded"
+				videoFallback = true
+			}
 		}
 	}
 	if !reconnect && p.withVideo && p.consecutiveRelayErrors >= 3 {
-		profile = "audio_only"
-		reason = "relay_write_errors"
-		videoFallback = true
+		if p.media.ScreenShareEnabled {
+			profile = "screen_share_only"
+			reason = "preserve_screen_share"
+			videoFallback = true
+			screenSharePriority = true
+			suppressCameraVideo = true
+		} else {
+			profile = "audio_only"
+			reason = "relay_write_errors"
+			videoFallback = true
+		}
 	}
 	switch p.stats.QoSEscalation {
 	case "elevated":
 		if profile == "full" && p.withVideo {
-			profile = "audio_only"
-			reason = "qos_elevated"
-			videoFallback = true
+			if p.media.ScreenShareEnabled {
+				profile = "screen_share_only"
+				reason = "preserve_screen_share"
+				videoFallback = true
+				screenSharePriority = true
+				suppressCameraVideo = true
+			} else {
+				profile = "audio_only"
+				reason = "qos_elevated"
+				videoFallback = true
+			}
 		}
 	case "critical":
 		profile = "reconnect"
@@ -1239,15 +1343,19 @@ func (p *peer) applyRecommendationsLocked() {
 	p.stats.RecommendedProfile = profile
 	p.stats.RecommendationReason = reason
 	p.stats.VideoFallbackRecommended = videoFallback
+	p.stats.ScreenSharePriority = screenSharePriority
 	p.stats.ReconnectRecommended = reconnect
-	p.stats.SuppressOutgoingVideo = videoFallback
-	p.stats.SuppressIncomingVideo = videoFallback
+	p.stats.SuppressCameraVideo = suppressCameraVideo
+	p.stats.SuppressOutgoingVideo = videoFallback && !screenSharePriority
+	p.stats.SuppressIncomingVideo = videoFallback && !screenSharePriority
 	p.stats.SuppressOutgoingAudio = reconnect
 	p.stats.SuppressIncomingAudio = reconnect
 	if p.stats.RecommendedProfile != prevProfile ||
 		p.stats.RecommendationReason != prevReason ||
 		p.stats.VideoFallbackRecommended != prevVideo ||
+		p.stats.ScreenSharePriority != prevScreenSharePriority ||
 		p.stats.ReconnectRecommended != prevReconnect ||
+		p.stats.SuppressCameraVideo != prevSuppressCameraVideo ||
 		p.stats.SuppressOutgoingVideo != prevSuppressOutgoingVideo ||
 		p.stats.SuppressIncomingVideo != prevSuppressIncomingVideo ||
 		p.stats.SuppressOutgoingAudio != prevSuppressOutgoingAudio ||
@@ -1382,6 +1490,7 @@ func (p *peer) snapshotStats() domaincall.TransportStats {
 
 	stats := p.stats
 	stats.RelayTracks = uint32(len(p.tracks))
+	stats.ScreenShareRelayTracks = uint32(countScreenShareRelayTracks(p.tracks))
 
 	return stats
 }
@@ -1515,6 +1624,28 @@ func (m *Manager) portInUseLocked(port int) bool {
 
 func participantKey(accountID string, deviceID string) string {
 	return accountID + "|" + deviceID
+}
+
+func countScreenShareRelayTracks(tracks map[string]*relayTrack) int {
+	if len(tracks) == 0 {
+		return 0
+	}
+
+	count := 0
+	for _, relay := range tracks {
+		if relay != nil && relay.screenShare {
+			count++
+		}
+	}
+
+	return count
+}
+
+func isScreenShareTrack(trackID string, streamID string) bool {
+	value := strings.ToLower(strings.TrimSpace(trackID + " " + streamID))
+	return strings.Contains(value, "screen") ||
+		strings.Contains(value, "share") ||
+		strings.Contains(value, "display")
 }
 
 func randomToken(size int) (string, error) {

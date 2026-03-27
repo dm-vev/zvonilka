@@ -387,6 +387,7 @@ func (s *Service) JoinCall(ctx context.Context, params JoinParams) (Call, JoinDe
 			AccountID: params.AccountID,
 			DeviceID:  params.DeviceID,
 			WithVideo: params.WithVideo,
+			Media:     defaultJoinMediaState(params.WithVideo),
 		})
 		if runtimeErr != nil {
 			return fmt.Errorf("join runtime session %s: %w", callRow.ActiveSessionID, runtimeErr)
@@ -588,6 +589,18 @@ func (s *Service) UpdateCallMediaState(
 			return fmt.Errorf("save participant media %s/%s: %w", participant.CallID, participant.DeviceID, saveErr)
 		}
 		saved = savedParticipant
+		if callRow.ActiveSessionID != "" {
+			runtimeErr := s.runtime.UpdateParticipant(ctx, callRow.ActiveSessionID, RuntimeParticipant{
+				CallID:    callRow.ID,
+				AccountID: params.AccountID,
+				DeviceID:  params.DeviceID,
+				WithVideo: params.Media.CameraEnabled,
+				Media:     params.Media,
+			})
+			if runtimeErr != nil {
+				return fmt.Errorf("update runtime participant %s/%s: %w", callRow.ID, params.DeviceID, runtimeErr)
+			}
+		}
 
 		event, appendErr := s.appendEvent(ctx, store, callRow, EventTypeMediaUpdated, params.AccountID, params.DeviceID, map[string]string{
 			"audio_muted":          boolString(params.Media.AudioMuted),
@@ -663,6 +676,7 @@ func (s *Service) AcknowledgeCallAdaptation(
 			AccountID: params.AccountID,
 			DeviceID:  params.DeviceID,
 			WithVideo: participant.MediaState.CameraEnabled,
+			Media:     participant.MediaState,
 		}, params.AdaptationRevision, params.AppliedProfile); runtimeErr != nil {
 			return fmt.Errorf("acknowledge runtime adaptation %s/%s: %w", callRow.ID, params.DeviceID, runtimeErr)
 		}

@@ -65,6 +65,7 @@ type RuntimeParticipant struct {
 	AccountID string
 	DeviceID  string
 	WithVideo bool
+	Media     MediaState
 }
 
 // Runtime manages media-room lifecycle in the external RTC plane.
@@ -83,6 +84,11 @@ type Runtime interface {
 		participant RuntimeParticipant,
 		candidate Candidate,
 	) ([]RuntimeSignal, error)
+	UpdateParticipant(
+		ctx context.Context,
+		sessionID string,
+		participant RuntimeParticipant,
+	) error
 	AcknowledgeAdaptation(
 		ctx context.Context,
 		sessionID string,

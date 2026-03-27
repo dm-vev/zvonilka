@@ -129,7 +129,9 @@ type TransportStats struct {
 	RecommendedProfile       string
 	RecommendationReason     string
 	VideoFallbackRecommended bool
+	ScreenSharePriority      bool
 	ReconnectRecommended     bool
+	SuppressCameraVideo      bool
 	SuppressOutgoingVideo    bool
 	SuppressIncomingVideo    bool
 	SuppressOutgoingAudio    bool
@@ -149,6 +151,7 @@ type TransportStats struct {
 	LastQoSUpdatedAt         time.Time
 	RecentQoSSamples         []TransportQoSSample
 	RelayTracks              uint32
+	ScreenShareRelayTracks   uint32
 	RelayPackets             uint64
 	RelayBytes               uint64
 	RelayWriteErrors         uint64
@@ -157,18 +160,20 @@ type TransportStats struct {
 
 // QualitySummary describes aggregated quality state for one call.
 type QualitySummary struct {
-	WorstQuality              string
-	DominantProfile           string
-	ParticipantCount          uint32
-	VideoFallbackParticipants uint32
-	ReconnectParticipants     uint32
-	OutgoingVideoSuppressed   uint32
-	IncomingVideoSuppressed   uint32
-	OutgoingAudioSuppressed   uint32
-	IncomingAudioSuppressed   uint32
-	DegradedTransitions       uint32
-	RecoveredTransitions      uint32
-	LastChangedAt             time.Time
+	WorstQuality                    string
+	DominantProfile                 string
+	ParticipantCount                uint32
+	VideoFallbackParticipants       uint32
+	ScreenSharePriorityParticipants uint32
+	ReconnectParticipants           uint32
+	CameraVideoSuppressed           uint32
+	OutgoingVideoSuppressed         uint32
+	IncomingVideoSuppressed         uint32
+	OutgoingAudioSuppressed         uint32
+	IncomingAudioSuppressed         uint32
+	DegradedTransitions             uint32
+	RecoveredTransitions            uint32
+	LastChangedAt                   time.Time
 }
 
 // Diagnostics describes one client-facing call diagnostics report.

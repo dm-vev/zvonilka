@@ -217,6 +217,7 @@ func (stubRuntime) PublishDescription(context.Context, string, RuntimeParticipan
 func (stubRuntime) PublishCandidate(context.Context, string, RuntimeParticipant, Candidate) ([]RuntimeSignal, error) {
 	return nil, nil
 }
+func (stubRuntime) UpdateParticipant(context.Context, string, RuntimeParticipant) error { return nil }
 func (stubRuntime) AcknowledgeAdaptation(context.Context, string, RuntimeParticipant, uint64, string) error {
 	return nil
 }

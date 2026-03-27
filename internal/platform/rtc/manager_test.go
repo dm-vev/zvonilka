@@ -16,7 +16,7 @@ func BenchmarkPeerEnqueueSignalTransport(b *testing.B) {
 	peerConn := &peer{}
 	signal := domaincall.RuntimeSignal{
 		Metadata: map[string]string{
-			telemetryKindKey: telemetryKindTransport,
+			telemetryKindKey:     telemetryKindTransport,
 			telemetryICEStateKey: "connected",
 		},
 	}
@@ -31,7 +31,7 @@ func BenchmarkPeerEnqueueSignalMixed(b *testing.B) {
 	peerConn := &peer{}
 	transport := domaincall.RuntimeSignal{
 		Metadata: map[string]string{
-			telemetryKindKey: telemetryKindTransport,
+			telemetryKindKey:     telemetryKindTransport,
 			telemetryICEStateKey: "connected",
 		},
 	}
@@ -74,7 +74,7 @@ func BenchmarkDrainSignalsWithTransport(b *testing.B) {
 		}
 		peerConn.enqueueSignal(domaincall.RuntimeSignal{
 			Metadata: map[string]string{
-				telemetryKindKey: telemetryKindTransport,
+				telemetryKindKey:     telemetryKindTransport,
 				telemetryICEStateKey: "connected",
 			},
 		})
@@ -756,6 +756,62 @@ func TestManagerAdaptiveRecommendationRecoversAfterHealthyRelayWrite(t *testing.
 	require.Len(t, stats, 1)
 	require.Equal(t, "stable", stats[0].Transport.QualityTrend)
 	require.Len(t, stats[0].Transport.RecentSamples, 3)
+}
+
+func TestManagerPrioritizesScreenShareBeforeFullVideoFallback(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager("webrtc://gateway/calls", 15*time.Minute)
+	session, err := manager.EnsureSession(context.Background(), domaincall.Call{
+		ID:             "call-screen-share",
+		ConversationID: "conv-screen-share",
+	})
+	require.NoError(t, err)
+
+	_, err = manager.JoinSession(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-screen-share",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		WithVideo: true,
+		Media: domaincall.MediaState{
+			CameraEnabled:      true,
+			ScreenShareEnabled: true,
+		},
+	})
+	require.NoError(t, err)
+
+	_, peerA, err := manager.ensurePeer(session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-screen-share",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		WithVideo: true,
+		Media: domaincall.MediaState{
+			CameraEnabled:      true,
+			ScreenShareEnabled: true,
+		},
+	})
+	require.NoError(t, err)
+
+	manager.emitPeerTelemetry(session.SessionID, peerA, telemetryICEStateKey, webrtc.ICEConnectionStateConnected.String())
+	peerA.recordRelayWrite(0, true)
+	peerA.recordRelayWrite(0, true)
+	metadata := peerA.recordRelayWrite(0, true)
+	require.Equal(t, "screen_share_only", metadata[telemetryProfileKey])
+	require.Equal(t, "preserve_screen_share", metadata[telemetryReasonKey])
+	require.Equal(t, "true", metadata[telemetryVideoKey])
+	require.Equal(t, "true", metadata["screen_share_priority"])
+	require.Equal(t, "true", metadata["suppress_camera_video"])
+	require.Equal(t, "false", metadata[telemetrySuppressOutgoingVideoKey])
+	require.Equal(t, "false", metadata[telemetrySuppressIncomingVideoKey])
+
+	stats, err := manager.SessionStats(context.Background(), session.SessionID)
+	require.NoError(t, err)
+	require.Len(t, stats, 1)
+	require.Equal(t, "screen_share_only", stats[0].Transport.RecommendedProfile)
+	require.True(t, stats[0].Transport.ScreenSharePriority)
+	require.True(t, stats[0].Transport.SuppressCameraVideo)
+	require.False(t, stats[0].Transport.SuppressOutgoingVideo)
+	require.False(t, stats[0].Transport.SuppressIncomingVideo)
 }
 
 func TestManagerFailedTransportRecommendsReconnect(t *testing.T) {

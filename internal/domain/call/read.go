@@ -313,8 +313,14 @@ func summarizeCallQuality(participants []Participant) QualitySummary {
 		if stats.VideoFallbackRecommended {
 			summary.VideoFallbackParticipants++
 		}
+		if stats.ScreenSharePriority {
+			summary.ScreenSharePriorityParticipants++
+		}
 		if stats.ReconnectRecommended {
 			summary.ReconnectParticipants++
+		}
+		if stats.SuppressCameraVideo {
+			summary.CameraVideoSuppressed++
 		}
 		if stats.SuppressOutgoingVideo {
 			summary.OutgoingVideoSuppressed++

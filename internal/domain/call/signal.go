@@ -141,6 +141,7 @@ func (s *Service) publishSignalEvent(
 				AccountID: accountID,
 				DeviceID:  deviceID,
 				WithVideo: participant.MediaState.CameraEnabled,
+				Media:     participant.MediaState,
 			}, SessionDescription{
 				Type: metadata[callMetadataDescriptionType],
 				SDP:  metadata[callMetadataDescriptionSDP],
@@ -159,6 +160,7 @@ func (s *Service) publishSignalEvent(
 				AccountID: accountID,
 				DeviceID:  deviceID,
 				WithVideo: participant.MediaState.CameraEnabled,
+				Media:     participant.MediaState,
 			}, Candidate{
 				Candidate:        metadata[callMetadataCandidateValue],
 				SDPMid:           metadata[callMetadataCandidateSDPMid],

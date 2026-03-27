@@ -18,6 +18,7 @@ type fakeRuntime struct {
 	session   domaincall.RuntimeSession
 	join      domaincall.RuntimeJoin
 	stats     map[string]domaincall.RuntimeStats
+	updated   []domaincall.RuntimeParticipant
 	acked     []ackCall
 	closed    []string
 	left      []string
@@ -99,6 +100,20 @@ func (f *fakeRuntime) PublishCandidate(
 	domaincall.Candidate,
 ) ([]domaincall.RuntimeSignal, error) {
 	return cloneRuntimeSignals(f.signals), nil
+}
+
+func (f *fakeRuntime) UpdateParticipant(
+	_ context.Context,
+	_ string,
+	participant domaincall.RuntimeParticipant,
+) error {
+	key := runtimeParticipantKey(participant.AccountID, participant.DeviceID)
+	item := f.stats[key]
+	item.AccountID = participant.AccountID
+	item.DeviceID = participant.DeviceID
+	f.stats[key] = item
+	f.updated = append(f.updated, participant)
+	return nil
 }
 
 func (f *fakeRuntime) AcknowledgeAdaptation(
@@ -514,6 +529,54 @@ func TestGetIceConfigAndAcknowledgeAdaptation(t *testing.T) {
 		AccountID: "acc-b",
 	})
 	require.ErrorIs(t, err, domaincall.ErrConflict)
+}
+
+func TestUpdateCallMediaStatePropagatesScreenShareToRuntime(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 27, 16, 0, 0, 0, time.UTC)
+	runtime := newFakeRuntime(now)
+	service := newTestService(t, now, runtime)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-direct",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+
+	_, _, err = service.AcceptCall(context.Background(), domaincall.AcceptParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.NoError(t, err)
+
+	_, _, _, err = service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	_, participant, _, err := service.UpdateCallMediaState(context.Background(), domaincall.UpdateParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		Media: domaincall.MediaState{
+			AudioMuted:         false,
+			VideoMuted:         false,
+			CameraEnabled:      true,
+			ScreenShareEnabled: true,
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, participant.MediaState.ScreenShareEnabled)
+	require.Len(t, runtime.updated, 1)
+	require.True(t, runtime.updated[0].Media.ScreenShareEnabled)
+	require.True(t, runtime.updated[0].WithVideo)
 }
 
 func TestAcknowledgeAdaptationPropagatesRuntimeError(t *testing.T) {
