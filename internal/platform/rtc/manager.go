@@ -62,6 +62,8 @@ type peer struct {
 	pc                     *webrtc.PeerConnection
 	signalMu               sync.Mutex
 	signals                []domaincall.RuntimeSignal
+	transportSignal        domaincall.RuntimeSignal
+	hasTransportSignal     bool
 	tracks                 map[string]*relayTrack
 	mu                     sync.Mutex
 	offering               bool
@@ -645,11 +647,21 @@ func (m *Manager) drainSignals(peerConn *peer) []domaincall.RuntimeSignal {
 		return nil
 	}
 
-	signals := make([]domaincall.RuntimeSignal, 0)
 	peerConn.signalMu.Lock()
-	signals = append(signals, peerConn.signals...)
+	signals := peerConn.signals
 	peerConn.signals = nil
+	var transportSignal domaincall.RuntimeSignal
+	hasTransportSignal := peerConn.hasTransportSignal
+	if hasTransportSignal {
+		transportSignal = peerConn.transportSignal
+		peerConn.transportSignal = domaincall.RuntimeSignal{}
+		peerConn.hasTransportSignal = false
+	}
 	peerConn.signalMu.Unlock()
+	if !hasTransportSignal {
+		return signals
+	}
+	signals = append(signals, transportSignal)
 	return signals
 }
 
@@ -1041,42 +1053,25 @@ func (p *peer) enqueueSignal(signal domaincall.RuntimeSignal) {
 	p.signalMu.Lock()
 	defer p.signalMu.Unlock()
 
-	isTransportMetadata := signal.Description == nil &&
-		signal.IceCandidate == nil &&
-		len(signal.Metadata) > 0 &&
-		signal.Metadata[telemetryKindKey] == telemetryKindTransport
-
-	if isTransportMetadata {
-		for i := len(p.signals) - 1; i >= 0; i-- {
-			item := p.signals[i]
-			if item.Description == nil &&
-				item.IceCandidate == nil &&
-				len(item.Metadata) > 0 &&
-				item.Metadata[telemetryKindKey] == telemetryKindTransport {
-				p.signals[i] = signal
-				return
-			}
-		}
+	if isTransportSignal(signal) {
+		p.transportSignal = signal
+		p.hasTransportSignal = true
+		return
 	}
 
 	if len(p.signals) >= maxPendingSignals {
-		for i := 0; i < len(p.signals); i++ {
-			item := p.signals[i]
-			if item.Description == nil &&
-				item.IceCandidate == nil &&
-				len(item.Metadata) > 0 &&
-				item.Metadata[telemetryKindKey] == telemetryKindTransport {
-				p.signals = append(p.signals[:i], p.signals[i+1:]...)
-				break
-			}
-		}
-		if len(p.signals) >= maxPendingSignals {
-			p.signals = append(p.signals[1:], signal)
-			return
-		}
+		p.signals = append(p.signals[1:], signal)
+		return
 	}
 
 	p.signals = append(p.signals, signal)
+}
+
+func isTransportSignal(signal domaincall.RuntimeSignal) bool {
+	return signal.Description == nil &&
+		signal.IceCandidate == nil &&
+		len(signal.Metadata) > 0 &&
+		signal.Metadata[telemetryKindKey] == telemetryKindTransport
 }
 
 func (p *peer) recordRelayWrite(size uint64, failed bool) map[string]string {

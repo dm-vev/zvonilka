@@ -12,6 +12,82 @@ import (
 	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 )
 
+func BenchmarkPeerEnqueueSignalTransport(b *testing.B) {
+	peerConn := &peer{}
+	signal := domaincall.RuntimeSignal{
+		Metadata: map[string]string{
+			telemetryKindKey: telemetryKindTransport,
+			telemetryICEStateKey: "connected",
+		},
+	}
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		peerConn.enqueueSignal(signal)
+	}
+}
+
+func BenchmarkPeerEnqueueSignalMixed(b *testing.B) {
+	peerConn := &peer{}
+	transport := domaincall.RuntimeSignal{
+		Metadata: map[string]string{
+			telemetryKindKey: telemetryKindTransport,
+			telemetryICEStateKey: "connected",
+		},
+	}
+	description := domaincall.RuntimeSignal{
+		Description: &domaincall.SessionDescription{
+			Type: "offer",
+			SDP:  "v=0",
+		},
+	}
+	candidate := domaincall.RuntimeSignal{
+		IceCandidate: &domaincall.Candidate{
+			Candidate: "candidate:1 1 udp 1 127.0.0.1 40000 typ host",
+		},
+	}
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		switch i % 3 {
+		case 0:
+			peerConn.enqueueSignal(transport)
+		case 1:
+			peerConn.enqueueSignal(description)
+		default:
+			peerConn.enqueueSignal(candidate)
+		}
+		if i%64 == 0 {
+			_ = (&Manager{}).drainSignals(peerConn)
+		}
+	}
+}
+
+func BenchmarkDrainSignalsWithTransport(b *testing.B) {
+	manager := &Manager{}
+	makePeer := func() *peer {
+		peerConn := &peer{}
+		for i := 0; i < 32; i++ {
+			peerConn.enqueueSignal(domaincall.RuntimeSignal{
+				Description: &domaincall.SessionDescription{Type: "offer", SDP: "v=0"},
+			})
+		}
+		peerConn.enqueueSignal(domaincall.RuntimeSignal{
+			Metadata: map[string]string{
+				telemetryKindKey: telemetryKindTransport,
+				telemetryICEStateKey: "connected",
+			},
+		})
+		return peerConn
+	}
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		peerConn := makePeer()
+		_ = manager.drainSignals(peerConn)
+	}
+}
+
 func TestManagerAllocatesUniqueCandidatePorts(t *testing.T) {
 	t.Parallel()
 
@@ -568,8 +644,14 @@ func TestPeerSignalQueueCoalescesTelemetryAndKeepsCriticalSignals(t *testing.T) 
 	manager := &Manager{}
 	signals := manager.drainSignals(target)
 	require.Len(t, signals, 2)
-	require.NotNil(t, signals[1].Description)
-	require.Equal(t, "offer", signals[1].Description.Type)
+	var foundOffer bool
+	for _, signal := range signals {
+		if signal.Description != nil && signal.Description.Type == "offer" {
+			foundOffer = true
+			break
+		}
+	}
+	require.True(t, foundOffer)
 }
 
 func TestManagerSessionStatsExposeTransportCounters(t *testing.T) {
