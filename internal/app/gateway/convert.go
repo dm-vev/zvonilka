@@ -162,6 +162,20 @@ func callMediaStateProto(state domaincall.MediaState) *callv1.CallMediaState {
 	}
 }
 
+func callTransportStatsProto(value domaincall.TransportStats) *callv1.CallTransportStats {
+	return &callv1.CallTransportStats{
+		PeerConnectionState: value.PeerConnectionState,
+		IceConnectionState:  value.IceConnectionState,
+		SignalingState:      value.SignalingState,
+		Quality:             value.Quality,
+		RelayTracks:         value.RelayTracks,
+		RelayPackets:        value.RelayPackets,
+		RelayBytes:          value.RelayBytes,
+		RelayWriteErrors:    value.RelayWriteErrors,
+		LastUpdatedAt:       protoTime(value.LastUpdatedAt),
+	}
+}
+
 func iceServerProto(server domaincall.IceServer) *callv1.IceServer {
 	return &callv1.IceServer{
 		Urls:       append([]string(nil), server.URLs...),
@@ -202,13 +216,14 @@ func callInviteProto(value domaincall.Invite) *callv1.CallInvite {
 
 func callParticipantProto(value domaincall.Participant) *callv1.CallParticipant {
 	return &callv1.CallParticipant{
-		UserId:     value.AccountID,
-		DeviceId:   value.DeviceID,
-		State:      callParticipantStateToProto(value.State),
-		MediaState: callMediaStateProto(value.MediaState),
-		JoinedAt:   protoTime(value.JoinedAt),
-		LeftAt:     protoTime(value.LeftAt),
-		UpdatedAt:  protoTime(value.UpdatedAt),
+		UserId:         value.AccountID,
+		DeviceId:       value.DeviceID,
+		State:          callParticipantStateToProto(value.State),
+		MediaState:     callMediaStateProto(value.MediaState),
+		JoinedAt:       protoTime(value.JoinedAt),
+		LeftAt:         protoTime(value.LeftAt),
+		UpdatedAt:      protoTime(value.UpdatedAt),
+		TransportStats: callTransportStatsProto(value.Transport),
 	}
 }
 

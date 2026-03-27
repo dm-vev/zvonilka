@@ -99,6 +99,19 @@ type MediaState struct {
 	CameraEnabled bool
 }
 
+// TransportStats describes live transport quality counters for one participant device.
+type TransportStats struct {
+	PeerConnectionState string
+	IceConnectionState  string
+	SignalingState      string
+	Quality             string
+	RelayTracks         uint32
+	RelayPackets        uint64
+	RelayBytes          uint64
+	RelayWriteErrors    uint64
+	LastUpdatedAt       time.Time
+}
+
 // IceServer describes one STUN or TURN server returned to a client.
 type IceServer struct {
 	URLs       []string
@@ -124,6 +137,7 @@ type Participant struct {
 	DeviceID   string
 	State      ParticipantState
 	MediaState MediaState
+	Transport  TransportStats
 	JoinedAt   time.Time
 	LeftAt     time.Time
 	UpdatedAt  time.Time

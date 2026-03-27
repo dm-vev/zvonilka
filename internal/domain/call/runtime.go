@@ -52,6 +52,13 @@ type RuntimeSignal struct {
 	Metadata        map[string]string
 }
 
+// RuntimeStats describes live transport stats for one joined participant device.
+type RuntimeStats struct {
+	AccountID string
+	DeviceID  string
+	Transport TransportStats
+}
+
 // RuntimeParticipant describes one participant join request for the media plane.
 type RuntimeParticipant struct {
 	CallID    string
@@ -76,6 +83,7 @@ type Runtime interface {
 		participant RuntimeParticipant,
 		candidate Candidate,
 	) ([]RuntimeSignal, error)
+	SessionStats(ctx context.Context, sessionID string) ([]RuntimeStats, error)
 	LeaveSession(ctx context.Context, sessionID string, accountID string, deviceID string) error
 	CloseSession(ctx context.Context, sessionID string) error
 }

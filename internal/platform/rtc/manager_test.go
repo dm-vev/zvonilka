@@ -536,6 +536,45 @@ func TestManagerEmitsDeduplicatedTelemetrySignals(t *testing.T) {
 	require.Equal(t, webrtc.PeerConnectionStateConnecting.String(), signals[1].Metadata[telemetryPCStateKey])
 }
 
+func TestManagerSessionStatsExposeTransportCounters(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager("webrtc://gateway/calls", 15*time.Minute)
+	session, err := manager.EnsureSession(context.Background(), domaincall.Call{
+		ID:             "call-stats",
+		ConversationID: "conv-stats",
+	})
+	require.NoError(t, err)
+	_, err = manager.JoinSession(context.Background(), session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-stats",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+	})
+	require.NoError(t, err)
+
+	_, peerA, err := manager.ensurePeer(session.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-stats",
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+	})
+	require.NoError(t, err)
+
+	manager.emitPeerTelemetry(session.SessionID, peerA, telemetryICEStateKey, webrtc.ICEConnectionStateConnected.String())
+	peerA.recordRelayWrite(321, false)
+	peerA.recordRelayWrite(0, true)
+
+	stats, err := manager.SessionStats(context.Background(), session.SessionID)
+	require.NoError(t, err)
+	require.Len(t, stats, 1)
+	require.Equal(t, "acc-a", stats[0].AccountID)
+	require.Equal(t, "dev-a", stats[0].DeviceID)
+	require.Equal(t, "connected", stats[0].Transport.Quality)
+	require.EqualValues(t, 1, stats[0].Transport.RelayPackets)
+	require.EqualValues(t, 321, stats[0].Transport.RelayBytes)
+	require.EqualValues(t, 1, stats[0].Transport.RelayWriteErrors)
+	require.False(t, stats[0].Transport.LastUpdatedAt.IsZero())
+}
+
 func mustNewPeerConnection(t *testing.T) *webrtc.PeerConnection {
 	t.Helper()
 

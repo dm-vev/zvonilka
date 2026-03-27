@@ -255,7 +255,34 @@ func (s *Service) hydrateCall(ctx context.Context, store Store, callID string) (
 
 	callRow.Invites = cloneInvites(invites)
 	callRow.Participants = cloneParticipants(participants)
+	if callRow.ActiveSessionID != "" && callRow.State == StateActive {
+		stats, statsErr := s.runtime.SessionStats(ctx, callRow.ActiveSessionID)
+		if statsErr != nil {
+			return Call{}, fmt.Errorf("load runtime stats for call %s: %w", callID, statsErr)
+		}
+		applyRuntimeStats(callRow.Participants, stats)
+	}
 	return cloneCall(callRow), nil
+}
+
+func applyRuntimeStats(participants []Participant, stats []RuntimeStats) {
+	if len(participants) == 0 || len(stats) == 0 {
+		return
+	}
+
+	byKey := make(map[string]TransportStats, len(stats))
+	for _, item := range stats {
+		byKey[callParticipantKey(item.AccountID, item.DeviceID)] = cloneTransportStats(item.Transport)
+	}
+	for i := range participants {
+		if transport, ok := byKey[callParticipantKey(participants[i].AccountID, participants[i].DeviceID)]; ok {
+			participants[i].Transport = transport
+		}
+	}
+}
+
+func callParticipantKey(accountID string, deviceID string) string {
+	return strings.TrimSpace(accountID) + "|" + strings.TrimSpace(deviceID)
 }
 
 func (s *Service) ensureDirectConversation(

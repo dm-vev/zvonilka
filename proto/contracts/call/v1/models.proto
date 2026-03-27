@@ -69,6 +69,18 @@ message CallMediaState {
   bool camera_enabled = 3;
 }
 
+message CallTransportStats {
+  string peer_connection_state = 1;
+  string ice_connection_state = 2;
+  string signaling_state = 3;
+  string quality = 4;
+  uint32 relay_tracks = 5;
+  uint64 relay_packets = 6;
+  uint64 relay_bytes = 7;
+  uint64 relay_write_errors = 8;
+  google.protobuf.Timestamp last_updated_at = 9;
+}
+
 message IceServer {
   repeated string urls = 1;
   string username = 2;
@@ -91,6 +103,7 @@ message CallParticipant {
   google.protobuf.Timestamp joined_at = 5;
   google.protobuf.Timestamp left_at = 6;
   google.protobuf.Timestamp updated_at = 7;
+  CallTransportStats transport_stats = 8;
 }
 
 message Call {

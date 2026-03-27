@@ -68,6 +68,7 @@ type peer struct {
 	lastPC    string
 	lastICE   string
 	lastSIG   string
+	stats     domaincall.TransportStats
 }
 
 type relayTrack struct {
@@ -375,6 +376,39 @@ func (m *Manager) PublishCandidate(
 	return m.drainSignals(peerConn), nil
 }
 
+// SessionStats returns live transport stats for joined peers in one runtime session.
+func (m *Manager) SessionStats(_ context.Context, sessionID string) ([]domaincall.RuntimeStats, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, domaincall.ErrInvalidInput
+	}
+
+	m.mu.Lock()
+	active := m.sessions[sessionID]
+	if active == nil {
+		m.mu.Unlock()
+		return nil, domaincall.ErrNotFound
+	}
+	peers := make([]*peer, 0, len(active.peers))
+	for _, value := range active.peers {
+		if value != nil {
+			peers = append(peers, value)
+		}
+	}
+	m.mu.Unlock()
+
+	stats := make([]domaincall.RuntimeStats, 0, len(peers))
+	for _, value := range peers {
+		stats = append(stats, domaincall.RuntimeStats{
+			AccountID: value.accountID,
+			DeviceID:  value.deviceID,
+			Transport: value.snapshotStats(),
+		})
+	}
+
+	return stats, nil
+}
+
 // LeaveSession removes one device from a running session.
 func (m *Manager) LeaveSession(_ context.Context, sessionID string, accountID string, deviceID string) error {
 	sessionID = strings.TrimSpace(sessionID)
@@ -583,6 +617,56 @@ func (m *Manager) emitPeerTelemetry(sessionID string, target *peer, key string, 
 	}
 }
 
+func (m *Manager) recordRelayWriteSuccess(sessionID string, trackKey string, size int) {
+	if strings.TrimSpace(sessionID) == "" || strings.TrimSpace(trackKey) == "" || size <= 0 {
+		return
+	}
+
+	m.mu.Lock()
+	active := m.sessions[sessionID]
+	if active == nil {
+		m.mu.Unlock()
+		return
+	}
+	targets := make([]*peer, 0, len(active.peers))
+	for _, target := range active.peers {
+		if target == nil || target.tracks[trackKey] == nil {
+			continue
+		}
+		targets = append(targets, target)
+	}
+	m.mu.Unlock()
+
+	for _, target := range targets {
+		target.recordRelayWrite(uint64(size), false)
+	}
+}
+
+func (m *Manager) recordRelayWriteFailure(sessionID string, trackKey string) {
+	if strings.TrimSpace(sessionID) == "" || strings.TrimSpace(trackKey) == "" {
+		return
+	}
+
+	m.mu.Lock()
+	active := m.sessions[sessionID]
+	if active == nil {
+		m.mu.Unlock()
+		return
+	}
+	targets := make([]*peer, 0, len(active.peers))
+	for _, target := range active.peers {
+		if target == nil || target.tracks[trackKey] == nil {
+			continue
+		}
+		targets = append(targets, target)
+	}
+	m.mu.Unlock()
+
+	for _, target := range targets {
+		target.recordRelayWrite(0, true)
+	}
+}
+
 func (m *Manager) handleRemoteTrack(sessionID string, sourceKey string, track *webrtc.TrackRemote) {
 	if track == nil {
 		return
@@ -618,7 +702,11 @@ func (m *Manager) handleRemoteTrack(sessionID string, sourceKey string, track *w
 			if relay == nil {
 				continue
 			}
-			_, _ = relay.Write(rawPacket)
+			if _, err := relay.Write(rawPacket); err != nil {
+				m.recordRelayWriteFailure(sessionID, trackKey)
+				continue
+			}
+			m.recordRelayWriteSuccess(sessionID, trackKey, len(rawPacket))
 		}
 	}
 }
@@ -892,8 +980,37 @@ func (p *peer) updateTelemetry(key string, value string) map[string]string {
 		telemetrySignalingKey: p.lastSIG,
 		telemetryQualityKey:   deriveTransportQuality(p.lastPC, p.lastICE),
 	}
+	p.stats.PeerConnectionState = p.lastPC
+	p.stats.IceConnectionState = p.lastICE
+	p.stats.SignalingState = p.lastSIG
+	p.stats.Quality = metadata[telemetryQualityKey]
+	p.stats.LastUpdatedAt = time.Now().UTC()
 
 	return metadata
+}
+
+func (p *peer) recordRelayWrite(size uint64, failed bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if failed {
+		p.stats.RelayWriteErrors++
+	} else {
+		p.stats.RelayPackets++
+		p.stats.RelayBytes += size
+	}
+	p.stats.RelayTracks = uint32(len(p.tracks))
+	p.stats.LastUpdatedAt = time.Now().UTC()
+}
+
+func (p *peer) snapshotStats() domaincall.TransportStats {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	stats := p.stats
+	stats.RelayTracks = uint32(len(p.tracks))
+
+	return stats
 }
 
 func deriveTransportQuality(peerState string, iceState string) string {

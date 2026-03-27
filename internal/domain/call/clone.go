@@ -4,6 +4,10 @@ func cloneMediaState(state MediaState) MediaState {
 	return state
 }
 
+func cloneTransportStats(stats TransportStats) TransportStats {
+	return stats
+}
+
 func cloneInvite(invite Invite) Invite {
 	return invite
 }
@@ -23,6 +27,7 @@ func cloneInvites(invites []Invite) []Invite {
 
 func cloneParticipant(participant Participant) Participant {
 	participant.MediaState = cloneMediaState(participant.MediaState)
+	participant.Transport = cloneTransportStats(participant.Transport)
 	return participant
 }
 
