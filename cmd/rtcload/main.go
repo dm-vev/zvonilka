@@ -6,8 +6,10 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"runtime"
 	"strings"
@@ -15,7 +17,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	callruntimev1 "github.com/dm-vev/zvonilka/internal/genproto/callruntime/v1"
 	"github.com/pion/webrtc/v4"
+	"google.golang.org/grpc"
 
 	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 	"github.com/dm-vev/zvonilka/internal/platform/rtc"
@@ -33,6 +37,7 @@ type result struct {
 	JoinAvg            time.Duration `json:"join_avg"`
 	NegotiateAvg       time.Duration `json:"negotiate_avg"`
 	StatsAvg           time.Duration `json:"stats_avg"`
+	MigrateAvg         time.Duration `json:"migrate_avg"`
 	CloseAvg           time.Duration `json:"close_avg"`
 	GoMaxProcs         int           `json:"gomaxprocs"`
 	GoRoutines         int           `json:"goroutines"`
@@ -46,12 +51,13 @@ type timings struct {
 	joinNanos      atomic.Int64
 	negotiateNanos atomic.Int64
 	statsNanos     atomic.Int64
+	migrateNanos   atomic.Int64
 	closeNanos     atomic.Int64
 }
 
 func main() {
 	var (
-		mode        = flag.String("mode", "negotiate", "load mode: lifecycle|negotiate")
+		mode        = flag.String("mode", "negotiate", "load mode: lifecycle|negotiate|cluster-lifecycle|cluster-migrate")
 		sessions    = flag.Int("sessions", 100, "number of sessions to execute")
 		concurrency = flag.Int("concurrency", 8, "number of concurrent workers")
 		withVideo   = flag.Bool("with-video", true, "whether participants join with video")
@@ -67,7 +73,7 @@ func main() {
 	if *concurrency <= 0 {
 		fatalf("concurrency must be > 0")
 	}
-	if *mode != "lifecycle" && *mode != "negotiate" {
+	if *mode != "lifecycle" && *mode != "negotiate" && *mode != "cluster-lifecycle" && *mode != "cluster-migrate" {
 		fatalf("unsupported mode %q", *mode)
 	}
 	if *relayOnly && (trim(*turnURL) == "" || trim(*turnSecret) == "") {
@@ -80,6 +86,19 @@ func main() {
 		rtc.WithCandidateHost("127.0.0.1"),
 		rtc.WithUDPPortRange(47000, 49000),
 	)
+	var harness *clusterHarness
+	if *mode == "cluster-lifecycle" || *mode == "cluster-migrate" {
+		var err error
+		harness, err = newClusterHarness()
+		if err != nil {
+			fatalf("create cluster harness: %v", err)
+		}
+		defer func() {
+			if err := harness.Close(context.Background()); err != nil {
+				fatalf("close cluster harness: %v", err)
+			}
+		}()
+	}
 	ctx := context.Background()
 
 	jobs := make(chan int)
@@ -93,7 +112,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			for index := range jobs {
-				if err := runScenario(ctx, manager, *mode, *withVideo, index, *relayOnly, *turnURL, *turnSecret, &samples); err != nil {
+				if err := runScenario(ctx, manager, harness, *mode, *withVideo, index, *relayOnly, *turnURL, *turnSecret, &samples); err != nil {
 					failures.Add(1)
 				}
 			}
@@ -119,6 +138,7 @@ func main() {
 		JoinAvg:            averageDuration(samples.joinNanos.Load(), *sessions*2),
 		NegotiateAvg:       averageDuration(samples.negotiateNanos.Load(), *sessions),
 		StatsAvg:           averageDuration(samples.statsNanos.Load(), *sessions),
+		MigrateAvg:         averageDuration(samples.migrateNanos.Load(), *sessions),
 		CloseAvg:           averageDuration(samples.closeNanos.Load(), *sessions),
 		GoMaxProcs:         runtime.GOMAXPROCS(0),
 		GoRoutines:         runtime.NumGoroutine(),
@@ -140,6 +160,7 @@ func main() {
 func runScenario(
 	ctx context.Context,
 	manager *rtc.Manager,
+	harness *clusterHarness,
 	mode string,
 	withVideo bool,
 	index int,
@@ -148,6 +169,10 @@ func runScenario(
 	turnSecret string,
 	samples *timings,
 ) error {
+	if mode == "cluster-lifecycle" || mode == "cluster-migrate" {
+		return runClusterScenario(ctx, harness, mode, withVideo, index, samples)
+	}
+
 	callID := fmt.Sprintf("load-call-%d", index)
 
 	ensureStart := time.Now()
@@ -196,6 +221,76 @@ func runScenario(
 	closeStart := time.Now()
 	if err := manager.CloseSession(ctx, session.SessionID); err != nil {
 		return err
+	}
+	samples.closeNanos.Add(time.Since(closeStart).Nanoseconds())
+
+	return nil
+}
+
+func runClusterScenario(
+	ctx context.Context,
+	harness *clusterHarness,
+	mode string,
+	withVideo bool,
+	index int,
+	samples *timings,
+) error {
+	if harness == nil {
+		return fmt.Errorf("missing cluster harness")
+	}
+
+	callID := fmt.Sprintf("cluster-load-call-%d", index)
+	sessionID := "node-b:rtc_" + callID
+
+	ensureStart := time.Now()
+	session, err := harness.cluster.EnsureSession(ctx, domaincall.Call{
+		ID:              callID,
+		ConversationID:  "cluster-load-conv-" + callID,
+		ActiveSessionID: sessionID,
+	})
+	if err != nil {
+		return err
+	}
+	samples.ensureNanos.Add(time.Since(ensureStart).Nanoseconds())
+
+	joinStart := time.Now()
+	for _, participant := range []domaincall.RuntimeParticipant{
+		{CallID: callID, AccountID: "acc-a", DeviceID: "dev-a", WithVideo: withVideo},
+		{CallID: callID, AccountID: "acc-b", DeviceID: "dev-b", WithVideo: withVideo},
+	} {
+		if _, err := harness.cluster.JoinSession(ctx, session.SessionID, participant); err != nil {
+			return err
+		}
+	}
+	samples.joinNanos.Add(time.Since(joinStart).Nanoseconds())
+
+	currentSessionID := session.SessionID
+	if mode == "cluster-migrate" {
+		migrateStart := time.Now()
+		migrated, err := harness.cluster.MigrateSession(ctx, domaincall.Call{
+			ID:              callID,
+			ConversationID:  "cluster-load-conv-" + callID,
+			ActiveSessionID: currentSessionID,
+		})
+		if err != nil {
+			return err
+		}
+		currentSessionID = migrated.SessionID
+		samples.migrateNanos.Add(time.Since(migrateStart).Nanoseconds())
+	}
+
+	statsStart := time.Now()
+	if _, err := harness.cluster.SessionStats(ctx, currentSessionID); err != nil {
+		return err
+	}
+	samples.statsNanos.Add(time.Since(statsStart).Nanoseconds())
+
+	closeStart := time.Now()
+	if err := harness.cluster.CloseSession(ctx, currentSessionID); err != nil {
+		return err
+	}
+	if currentSessionID != session.SessionID {
+		_ = harness.cluster.CloseSession(ctx, session.SessionID)
 	}
 	samples.closeNanos.Add(time.Since(closeStart).Nanoseconds())
 
@@ -302,4 +397,74 @@ func trim(value string) string {
 func fatalf(format string, args ...any) {
 	_, _ = fmt.Fprintf(os.Stderr, format+"\n", args...)
 	os.Exit(2)
+}
+
+type clusterHarness struct {
+	cluster       *rtc.Cluster
+	localManager  *rtc.Manager
+	remoteManager *rtc.Manager
+	server        *grpc.Server
+	listener      net.Listener
+}
+
+func newClusterHarness() (*clusterHarness, error) {
+	localManager := rtc.NewManager("webrtc://node-a/calls", 15*time.Minute, rtc.WithCandidateHost("127.0.0.1"), rtc.WithUDPPortRange(49100, 49599))
+	remoteManager := rtc.NewManager("webrtc://node-b/calls", 15*time.Minute, rtc.WithCandidateHost("127.0.0.1"), rtc.WithUDPPortRange(49600, 49999))
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, err
+	}
+
+	server := grpc.NewServer()
+	callruntimev1.RegisterCallRuntimeServiceServer(server, rtc.NewGRPCRuntimeServer(remoteManager))
+	go func() {
+		_ = server.Serve(listener)
+	}()
+
+	cluster, err := rtc.NewCluster(domaincall.RTCConfig{
+		PublicEndpoint: "webrtc://gateway/calls",
+		CredentialTTL:  15 * time.Minute,
+		NodeID:         "node-a",
+		CandidateHost:  "127.0.0.1",
+		UDPPortMin:     49100,
+		UDPPortMax:     49999,
+		Nodes: []domaincall.RTCNode{
+			{ID: "node-a", Endpoint: "webrtc://node-a/calls"},
+			{ID: "node-b", Endpoint: "webrtc://node-b/calls", ControlEndpoint: listener.Addr().String()},
+		},
+	}, localManager)
+	if err != nil {
+		server.Stop()
+		_ = listener.Close()
+		return nil, err
+	}
+
+	return &clusterHarness{
+		cluster:       cluster,
+		localManager:  localManager,
+		remoteManager: remoteManager,
+		server:        server,
+		listener:      listener,
+	}, nil
+}
+
+func (h *clusterHarness) Close(ctx context.Context) error {
+	if h == nil {
+		return nil
+	}
+	if h.cluster != nil {
+		if err := h.cluster.Close(ctx); err != nil {
+			return err
+		}
+	}
+	if h.server != nil {
+		h.server.Stop()
+	}
+	if h.listener != nil {
+		if err := h.listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			return err
+		}
+	}
+	return nil
 }
