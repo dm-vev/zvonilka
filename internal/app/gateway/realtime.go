@@ -7,7 +7,8 @@ import (
 )
 
 type syncSignal struct {
-	event *domainconversation.EventEnvelope
+	event     *domainconversation.EventEnvelope
+	synthetic bool
 }
 
 type syncNotifier struct {
@@ -53,6 +54,15 @@ func (n *syncNotifier) publish(event domainconversation.EventEnvelope) {
 	n.broadcast(syncSignal{event: &cloned})
 }
 
+func (n *syncNotifier) publishSynthetic(event domainconversation.EventEnvelope) {
+	if n == nil || event.EventID == "" {
+		return
+	}
+
+	cloned := cloneSyncEvent(event)
+	n.broadcast(syncSignal{event: &cloned, synthetic: true})
+}
+
 func (n *syncNotifier) broadcast(signal syncSignal) {
 	if n == nil {
 		return
@@ -83,6 +93,14 @@ func (a *api) publishSyncEvent(event domainconversation.EventEnvelope) {
 	}
 
 	a.syncNotifier.publish(event)
+}
+
+func (a *api) publishSyntheticSyncEvent(event domainconversation.EventEnvelope) {
+	if a == nil || a.syncNotifier == nil {
+		return
+	}
+
+	a.syncNotifier.publishSynthetic(event)
 }
 
 func (a *api) publishSyncEvents(events ...domainconversation.EventEnvelope) {

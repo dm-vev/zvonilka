@@ -261,6 +261,19 @@ func (a *api) tryDirectSyncSignal(
 	}
 
 	event := *signal.event
+	if signal.synthetic {
+		if !syncConversationAllowed(event.ConversationID, req.GetConversationIds()) {
+			return fromSequence, false, nil
+		}
+		if !includeSyncEvent(event, req.GetIncludePresence(), req.GetIncludeModeration()) {
+			return fromSequence, false, nil
+		}
+		if err := stream.Send(&syncv1.SubscribeEventsResponse{Event: eventProto(event)}); err != nil {
+			return fromSequence, false, err
+		}
+		return fromSequence, true, nil
+	}
+
 	if event.Sequence <= fromSequence {
 		return fromSequence, false, nil
 	}

@@ -10,6 +10,7 @@ import (
 
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
 	e2eev1 "github.com/dm-vev/zvonilka/gen/proto/contracts/e2ee/v1"
+	domainconversation "github.com/dm-vev/zvonilka/internal/domain/conversation"
 	domaine2ee "github.com/dm-vev/zvonilka/internal/domain/e2ee"
 )
 
@@ -202,6 +203,7 @@ func (a *api) VerifyDeviceSafetyNumber(
 		},
 		CreatedAt: timeNowUTC(),
 	})
+	a.publishConversationE2EERequiredActionEvents(ctx, authContext.Account.ID, authContext.Session.DeviceID, conversationIDs)
 	return &e2eev1.VerifyDeviceSafetyNumberResponse{Trust: deviceTrustProto(trust)}, nil
 }
 
@@ -245,6 +247,7 @@ func (a *api) SetDeviceTrust(
 		},
 		CreatedAt: timeNowUTC(),
 	})
+	a.publishConversationE2EERequiredActionEvents(ctx, authContext.Account.ID, authContext.Session.DeviceID, conversationIDs)
 	return &e2eev1.SetDeviceTrustResponse{Trust: deviceTrustProto(trust)}, nil
 }
 
@@ -596,6 +599,39 @@ func verificationRequiredDeviceProto(value domaine2ee.VerificationRequiredDevice
 		KeyFingerprint:     value.KeyFingerprint,
 		ConversationIds:    append([]string(nil), value.ConversationIDs...),
 		DirectConversation: value.DirectConversation,
+	}
+}
+
+func (a *api) publishConversationE2EERequiredActionEvents(
+	ctx context.Context,
+	accountID string,
+	deviceID string,
+	conversationIDs []string,
+) {
+	if a == nil || len(conversationIDs) == 0 {
+		return
+	}
+
+	overlays, err := a.conversationE2EEOverlays(ctx, accountID, deviceID)
+	if err != nil {
+		return
+	}
+
+	for _, conversationID := range conversationIDs {
+		overlay := overlays[conversationID]
+		a.publishSyntheticSyncEvent(domainconversation.EventEnvelope{
+			EventID:        newGatewayEventID("sync"),
+			EventType:      domainconversation.EventTypeConversationUpdated,
+			ConversationID: conversationID,
+			ActorAccountID: accountID,
+			ActorDeviceID:  deviceID,
+			PayloadType:    "e2ee_required_action",
+			Metadata: map[string]string{
+				"verification_required_devices": strconv.FormatUint(uint64(overlay.VerificationRequiredDevices), 10),
+				"e2ee_required_action":          overlay.RequiredAction.String(),
+			},
+			CreatedAt: timeNowUTC(),
+		})
 	}
 }
 

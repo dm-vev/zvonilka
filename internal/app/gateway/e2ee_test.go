@@ -10,6 +10,7 @@ import (
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
 	conversationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1"
 	e2eev1 "github.com/dm-vev/zvonilka/gen/proto/contracts/e2ee/v1"
+	syncv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/sync/v1"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -1393,6 +1394,121 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 	}
 	if cleared.Conversation.E2EeRequiredAction != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_NONE {
 		t.Fatalf("expected required action to clear after trust update, got %s", cleared.Conversation.E2EeRequiredAction)
+	}
+}
+
+func TestSubscribeEventsStreamsConversationE2EERequiredActionOverlay(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-sync-e2ee-overlay",
+		DisplayName: "Alice Sync E2EE Overlay",
+		Email:       "alice-sync-e2ee-overlay@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-sync-e2ee-overlay",
+		DisplayName: "Bob Sync E2EE Overlay",
+		Email:       "bob-sync-e2ee-overlay@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, _ := login(alice.Username, "alice-sync-overlay-phone", "alice-sync-overlay-device-key")
+	_, bobDeviceID := login(bob.Username, "bob-sync-overlay-phone", "bob-sync-overlay-device-key")
+
+	created, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{bob.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	stream := newTestSubscribeEventsStream(aliceCtx)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- api.SubscribeEvents(&syncv1.SubscribeEventsRequest{
+			FromSequence:    created.Conversation.LastSequence,
+			ConversationIds: []string{created.Conversation.ConversationId},
+		}, stream)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+
+	if _, err := api.SetDeviceTrust(aliceCtx, &e2eev1.SetDeviceTrustRequest{
+		TargetUserId:   bob.ID,
+		TargetDeviceId: bobDeviceID,
+		State:          e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_UNTRUSTED,
+	}); err != nil {
+		t.Fatalf("set device trust: %v", err)
+	}
+
+	select {
+	case response := <-stream.responses:
+		if response.GetEvent() == nil {
+			t.Fatalf("expected sync event, got %+v", response)
+		}
+		if response.Event.EventType != commonv1.EventType_EVENT_TYPE_CONVERSATION_UPDATED {
+			t.Fatalf("expected conversation updated event, got %s", response.Event.EventType)
+		}
+		if response.Event.PayloadType != "e2ee_required_action" {
+			t.Fatalf("expected e2ee_required_action payload, got %s", response.Event.PayloadType)
+		}
+		if response.Event.ConversationId != created.Conversation.ConversationId {
+			t.Fatalf("expected conversation %s, got %s", created.Conversation.ConversationId, response.Event.ConversationId)
+		}
+		if response.Event.Metadata["verification_required_devices"] != "1" {
+			t.Fatalf("expected one verification-required device, got %+v", response.Event.Metadata)
+		}
+		if response.Event.Metadata["e2ee_required_action"] != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES.String() {
+			t.Fatalf("unexpected required action metadata: %+v", response.Event.Metadata)
+		}
+		stream.cancel()
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("timed out waiting for synthetic e2ee sync event")
+	}
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("subscribe events returned error: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for subscribe loop to stop")
 	}
 }
 
