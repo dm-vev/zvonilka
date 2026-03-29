@@ -20,6 +20,7 @@ type fakeRuntime struct {
 	session   domaincall.RuntimeSession
 	join      domaincall.RuntimeJoin
 	stats     map[string]domaincall.RuntimeStats
+	statsErr  map[string]error
 	updated   []domaincall.RuntimeParticipant
 	acked     []ackCall
 	closed    []string
@@ -60,7 +61,8 @@ func newFakeRuntime(now time.Time) *fakeRuntime {
 			CandidateHost:   "127.0.0.1",
 			CandidatePort:   41000,
 		},
-		stats: make(map[string]domaincall.RuntimeStats),
+		stats:    make(map[string]domaincall.RuntimeStats),
+		statsErr: make(map[string]error),
 	}
 }
 
@@ -165,7 +167,11 @@ func (f *fakeRuntime) AcknowledgeAdaptation(
 	return nil
 }
 
-func (f *fakeRuntime) SessionStats(context.Context, string) ([]domaincall.RuntimeStats, error) {
+func (f *fakeRuntime) SessionStats(_ context.Context, sessionID string) ([]domaincall.RuntimeStats, error) {
+	if err := f.statsErr[sessionID]; err != nil {
+		return nil, err
+	}
+
 	result := make([]domaincall.RuntimeStats, 0, len(f.stats))
 	for _, item := range f.stats {
 		result = append(result, item)
@@ -952,4 +958,63 @@ func TestJoinCallMigratesSessionOnRuntimeUnavailable(t *testing.T) {
 	require.Equal(t, "sess-2", events[0].Metadata["session_id"])
 	require.Equal(t, "join", events[0].Metadata["failover_reason"])
 	require.Equal(t, domaincall.EventTypeJoined, events[1].EventType)
+}
+
+func TestGetCallMigratesSessionOnRuntimeStatsUnavailable(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 28, 1, 0, 0, 0, time.UTC)
+	runtime := newFakeRuntime(now)
+	service := newTestService(t, now, runtime)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-direct",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+
+	_, _, err = service.AcceptCall(context.Background(), domaincall.AcceptParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.NoError(t, err)
+
+	joined, _, _, err := service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "sess-1", joined.ActiveSessionID)
+
+	runtime.statsErr["sess-1"] = status.Error(codes.Unavailable, "rtc unavailable")
+
+	callRow, err := service.GetCall(context.Background(), domaincall.GetParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "sess-2", callRow.ActiveSessionID)
+
+	events, err := service.Events(context.Background(), domaincall.EventParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+	})
+	require.NoError(t, err)
+
+	var migrated *domaincall.Event
+	for i := range events {
+		if events[i].EventType == domaincall.EventTypeSessionMigrated {
+			migrated = &events[i]
+			break
+		}
+	}
+	require.NotNil(t, migrated)
+	require.Equal(t, "sess-1", migrated.Metadata["previous_session_id"])
+	require.Equal(t, "sess-2", migrated.Metadata["session_id"])
+	require.Equal(t, "stats", migrated.Metadata["failover_reason"])
 }

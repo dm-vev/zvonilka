@@ -236,6 +236,10 @@ func (s *Service) loadCall(ctx context.Context, store Store, callID string) (Cal
 }
 
 func (s *Service) hydrateCall(ctx context.Context, store Store, callID string) (Call, error) {
+	return s.hydrateCallWithFailover(ctx, store, callID, true)
+}
+
+func (s *Service) hydrateCallWithFailover(ctx context.Context, store Store, callID string, allowFailover bool) (Call, error) {
 	callRow, err := store.CallByID(ctx, callID)
 	if err != nil {
 		if err == ErrNotFound {
@@ -258,6 +262,14 @@ func (s *Service) hydrateCall(ctx context.Context, store Store, callID string) (
 	if callRow.ActiveSessionID != "" && callRow.State == StateActive {
 		stats, statsErr := s.runtime.SessionStats(ctx, callRow.ActiveSessionID)
 		if statsErr != nil {
+			if allowFailover && runtimeUnavailable(statsErr) {
+				now := s.currentTime()
+				migratedCall, _, _, migrateErr := s.failoverActiveSession(ctx, store, callRow, now, "stats")
+				if migrateErr != nil {
+					return Call{}, fmt.Errorf("fail over runtime session for call %s: %w", callID, migrateErr)
+				}
+				return s.hydrateCallWithFailover(ctx, store, migratedCall.ID, false)
+			}
 			return Call{}, fmt.Errorf("load runtime stats for call %s: %w", callID, statsErr)
 		}
 		applyRuntimeStats(callRow.Participants, stats)
