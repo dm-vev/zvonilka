@@ -194,6 +194,16 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.RTC.UDPPortMax = value
 	}
+	if value, ok, err := durationValue(serviceName, "RTC_HEALTH_TTL", cfg.RTC.HealthTTL); err != nil {
+		return err
+	} else if ok {
+		cfg.RTC.HealthTTL = value
+	}
+	if value, ok, err := durationValue(serviceName, "RTC_HEALTH_TIMEOUT", cfg.RTC.HealthTimeout); err != nil {
+		return err
+	} else if ok {
+		cfg.RTC.HealthTimeout = value
+	}
 	if value, ok, err := stringSliceValue(serviceName, "RTC_STUN_URLS", cfg.RTC.STUNURLs); err != nil {
 		return err
 	} else if ok {

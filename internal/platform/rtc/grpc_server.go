@@ -2,6 +2,7 @@ package rtc
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	callv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1"
@@ -214,6 +215,14 @@ func (s *grpcRuntimeServer) CloseSession(
 	}
 
 	return &callruntimev1.CloseSessionResponse{}, nil
+}
+
+func (s *grpcRuntimeServer) Health(context.Context, *callruntimev1.HealthRequest) (*callruntimev1.HealthResponse, error) {
+	if s == nil || s.local == nil {
+		return nil, domaincall.ErrInvalidInput
+	}
+
+	return &callruntimev1.HealthResponse{NodeId: strings.TrimSpace(s.local.endpoint)}, nil
 }
 
 func runtimeParticipantFromProto(value *callruntimev1.RuntimeParticipant) domaincall.RuntimeParticipant {

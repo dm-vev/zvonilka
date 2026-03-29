@@ -171,6 +171,11 @@ func (c *grpcRuntimeClient) CloseSession(ctx context.Context, sessionID string) 
 	return err
 }
 
+func (c *grpcRuntimeClient) Healthy(ctx context.Context) error {
+	_, err := c.client.Health(ctx, &callruntimev1.HealthRequest{})
+	return err
+}
+
 func (c *grpcRuntimeClient) Close(context.Context) error {
 	if c == nil || c.conn == nil {
 		return nil

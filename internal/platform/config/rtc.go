@@ -15,6 +15,8 @@ type RTCConfig struct {
 	CandidateHost  string
 	UDPPortMin     int
 	UDPPortMax     int
+	HealthTTL      time.Duration
+	HealthTimeout  time.Duration
 	STUNURLs       []string
 	TURNURLs       []string
 	TURNSecret     string
@@ -37,6 +39,8 @@ func (c RTCConfig) ToDomain() domaincall.RTCConfig {
 		CandidateHost:  strings.TrimSpace(c.CandidateHost),
 		UDPPortMin:     c.UDPPortMin,
 		UDPPortMax:     c.UDPPortMax,
+		HealthTTL:      c.HealthTTL,
+		HealthTimeout:  c.HealthTimeout,
 		STUNURLs:       append([]string(nil), c.STUNURLs...),
 		TURNURLs:       append([]string(nil), c.TURNURLs...),
 		TURNSecret:     strings.TrimSpace(c.TURNSecret),

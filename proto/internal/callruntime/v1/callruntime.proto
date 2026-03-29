@@ -124,6 +124,12 @@ message CloseSessionRequest {
 
 message CloseSessionResponse {}
 
+message HealthRequest {}
+
+message HealthResponse {
+  string node_id = 1;
+}
+
 service CallRuntimeService {
   rpc EnsureSession(EnsureSessionRequest) returns (EnsureSessionResponse);
   rpc JoinSession(JoinSessionRequest) returns (JoinSessionResponse);
@@ -134,4 +140,5 @@ service CallRuntimeService {
   rpc SessionStats(SessionStatsRequest) returns (SessionStatsResponse);
   rpc LeaveSession(LeaveSessionRequest) returns (LeaveSessionResponse);
   rpc CloseSession(CloseSessionRequest) returns (CloseSessionResponse);
+  rpc Health(HealthRequest) returns (HealthResponse);
 }

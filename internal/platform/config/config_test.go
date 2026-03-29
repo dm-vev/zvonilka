@@ -213,6 +213,39 @@ func TestLoadRejectsInvalidNotificationRetryWindow(t *testing.T) {
 	}
 }
 
+func TestLoadAppliesRTCHealthOverrides(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_RTC_HEALTH_TTL", "4s")
+	t.Setenv("ZVONILKA_RTC_HEALTH_TIMEOUT", "750ms")
+
+	cfg, err := Load("gateway")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.RTC.HealthTTL != 4*time.Second {
+		t.Fatalf("rtc health ttl: got %s, want 4s", cfg.RTC.HealthTTL)
+	}
+	if cfg.RTC.HealthTimeout != 750*time.Millisecond {
+		t.Fatalf("rtc health timeout: got %s, want 750ms", cfg.RTC.HealthTimeout)
+	}
+}
+
+func TestLoadRejectsInvalidRTCHealthWindow(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_RTC_HEALTH_TTL", "0s")
+
+	_, err := Load("gateway")
+	if err == nil {
+		t.Fatal("expected load to fail")
+	}
+	if !strings.Contains(err.Error(), "rtc health ttl must be positive") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestLoadIdentityDefaultsMatchDomainSettings(t *testing.T) {
 	resetConfigEnv(t)
 

@@ -28,6 +28,7 @@ const (
 	CallRuntimeService_SessionStats_FullMethodName          = "/zvonilka.internal.callruntime.v1.CallRuntimeService/SessionStats"
 	CallRuntimeService_LeaveSession_FullMethodName          = "/zvonilka.internal.callruntime.v1.CallRuntimeService/LeaveSession"
 	CallRuntimeService_CloseSession_FullMethodName          = "/zvonilka.internal.callruntime.v1.CallRuntimeService/CloseSession"
+	CallRuntimeService_Health_FullMethodName                = "/zvonilka.internal.callruntime.v1.CallRuntimeService/Health"
 )
 
 // CallRuntimeServiceClient is the client API for CallRuntimeService service.
@@ -43,6 +44,7 @@ type CallRuntimeServiceClient interface {
 	SessionStats(ctx context.Context, in *SessionStatsRequest, opts ...grpc.CallOption) (*SessionStatsResponse, error)
 	LeaveSession(ctx context.Context, in *LeaveSessionRequest, opts ...grpc.CallOption) (*LeaveSessionResponse, error)
 	CloseSession(ctx context.Context, in *CloseSessionRequest, opts ...grpc.CallOption) (*CloseSessionResponse, error)
+	Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
 }
 
 type callRuntimeServiceClient struct {
@@ -134,6 +136,15 @@ func (c *callRuntimeServiceClient) CloseSession(ctx context.Context, in *CloseSe
 	return out, nil
 }
 
+func (c *callRuntimeServiceClient) Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error) {
+	out := new(HealthResponse)
+	err := c.cc.Invoke(ctx, CallRuntimeService_Health_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CallRuntimeServiceServer is the server API for CallRuntimeService service.
 // All implementations must embed UnimplementedCallRuntimeServiceServer
 // for forward compatibility
@@ -147,6 +158,7 @@ type CallRuntimeServiceServer interface {
 	SessionStats(context.Context, *SessionStatsRequest) (*SessionStatsResponse, error)
 	LeaveSession(context.Context, *LeaveSessionRequest) (*LeaveSessionResponse, error)
 	CloseSession(context.Context, *CloseSessionRequest) (*CloseSessionResponse, error)
+	Health(context.Context, *HealthRequest) (*HealthResponse, error)
 	mustEmbedUnimplementedCallRuntimeServiceServer()
 }
 
@@ -180,6 +192,9 @@ func (UnimplementedCallRuntimeServiceServer) LeaveSession(context.Context, *Leav
 }
 func (UnimplementedCallRuntimeServiceServer) CloseSession(context.Context, *CloseSessionRequest) (*CloseSessionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CloseSession not implemented")
+}
+func (UnimplementedCallRuntimeServiceServer) Health(context.Context, *HealthRequest) (*HealthResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
 }
 func (UnimplementedCallRuntimeServiceServer) mustEmbedUnimplementedCallRuntimeServiceServer() {}
 
@@ -356,6 +371,24 @@ func _CallRuntimeService_CloseSession_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CallRuntimeService_Health_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HealthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallRuntimeServiceServer).Health(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallRuntimeService_Health_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallRuntimeServiceServer).Health(ctx, req.(*HealthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CallRuntimeService_ServiceDesc is the grpc.ServiceDesc for CallRuntimeService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -398,6 +431,10 @@ var CallRuntimeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CloseSession",
 			Handler:    _CallRuntimeService_CloseSession_Handler,
+		},
+		{
+			MethodName: "Health",
+			Handler:    _CallRuntimeService_Health_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -11,7 +11,17 @@ import (
 	"github.com/pion/webrtc/v4"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
+
+type unhealthyRuntimeServer struct {
+	callruntimev1.UnimplementedCallRuntimeServiceServer
+}
+
+func (unhealthyRuntimeServer) Health(context.Context, *callruntimev1.HealthRequest) (*callruntimev1.HealthResponse, error) {
+	return nil, status.Error(codes.Unavailable, "unhealthy")
+}
 
 func TestClusterRoutesSessionsThroughRemoteControlEndpoint(t *testing.T) {
 	t.Parallel()
@@ -165,4 +175,49 @@ func TestClusterPublishesRemoteDescriptionThroughControlEndpoint(t *testing.T) {
 		Type: webrtc.SDPTypeAnswer,
 		SDP:  answer.SDP,
 	}))
+}
+
+func TestClusterSkipsUnhealthyRemoteNodesForNewCalls(t *testing.T) {
+	t.Parallel()
+
+	localManager := NewManager("webrtc://node-a/calls", 15*time.Minute, WithCandidateHost("127.0.0.1"), WithUDPPortRange(43400, 43499))
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer listener.Close()
+
+	server := grpc.NewServer()
+	callruntimev1.RegisterCallRuntimeServiceServer(server, unhealthyRuntimeServer{})
+	defer server.Stop()
+
+	go func() {
+		_ = server.Serve(listener)
+	}()
+
+	cluster, err := NewCluster(domaincall.RTCConfig{
+		PublicEndpoint: "webrtc://gateway/calls",
+		CredentialTTL:  15 * time.Minute,
+		NodeID:         "node-a",
+		CandidateHost:  "127.0.0.1",
+		UDPPortMin:     43400,
+		UDPPortMax:     43599,
+		HealthTTL:      5 * time.Second,
+		HealthTimeout:  500 * time.Millisecond,
+		Nodes: []domaincall.RTCNode{
+			{ID: "node-a", Endpoint: "webrtc://node-a/calls"},
+			{ID: "node-b", Endpoint: "webrtc://node-b/calls", ControlEndpoint: listener.Addr().String()},
+		},
+	}, localManager)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, cluster.Close(context.Background()))
+	}()
+
+	session, err := cluster.EnsureSession(context.Background(), domaincall.Call{
+		ID:             "call-health-aware",
+		ConversationID: "conv-health-aware",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "webrtc://node-a/calls", session.RuntimeEndpoint)
+	require.Equal(t, "node-a", domaincall.NodeIDFromSessionID(session.SessionID))
 }

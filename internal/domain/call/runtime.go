@@ -14,6 +14,8 @@ type RTCConfig struct {
 	CandidateHost  string
 	UDPPortMin     int
 	UDPPortMax     int
+	HealthTTL      time.Duration
+	HealthTimeout  time.Duration
 	STUNURLs       []string
 	TURNURLs       []string
 	TURNSecret     string
@@ -122,6 +124,12 @@ func (c RTCConfig) normalize() RTCConfig {
 	}
 	if c.UDPPortMax < c.UDPPortMin {
 		c.UDPPortMax = c.UDPPortMin
+	}
+	if c.HealthTTL <= 0 {
+		c.HealthTTL = 2 * time.Second
+	}
+	if c.HealthTimeout <= 0 {
+		c.HealthTimeout = 1 * time.Second
 	}
 	c.PublicEndpoint = strings.TrimSpace(c.PublicEndpoint)
 	c.NodeID = strings.TrimSpace(c.NodeID)

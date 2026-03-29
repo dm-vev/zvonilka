@@ -93,6 +93,12 @@ func (c Configuration) Validate() error {
 	if c.RTC.UDPPortMax < c.RTC.UDPPortMin {
 		errs = append(errs, errors.New("rtc udp port max must be greater than or equal to min"))
 	}
+	if c.RTC.HealthTTL <= 0 {
+		errs = append(errs, errors.New("rtc health ttl must be positive"))
+	}
+	if c.RTC.HealthTimeout <= 0 {
+		errs = append(errs, errors.New("rtc health timeout must be positive"))
+	}
 	if len(c.RTC.TURNURLs) > 0 && c.RTC.TURNSecret == "" {
 		errs = append(errs, errors.New("rtc turn secret is required when turn urls are configured"))
 	}

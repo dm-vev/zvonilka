@@ -7,6 +7,7 @@ import (
 	"hash/fnv"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
@@ -14,18 +15,32 @@ import (
 
 // Cluster routes media sessions across logical in-server RTC nodes.
 type Cluster struct {
-	nodes []*clusterNode
-	byID  map[string]*clusterNode
+	nodes         []*clusterNode
+	byID          map[string]*clusterNode
+	healthTTL     time.Duration
+	healthTimeout time.Duration
+	now           func() time.Time
 }
 
 type clusterNode struct {
 	id      string
 	runtime nodeRuntime
+	mu      sync.Mutex
+	health  nodeHealth
 }
 
 type nodeRuntime interface {
 	domaincall.Runtime
 	Close(context.Context) error
+}
+
+type healthRuntime interface {
+	Healthy(context.Context) error
+}
+
+type nodeHealth struct {
+	checkedAt time.Time
+	healthy   bool
 }
 
 // NewCluster constructs a node-aware RTC runtime from the current RTC config.
@@ -42,14 +57,17 @@ func NewCluster(cfg domaincall.RTCConfig, local *Manager) (*Cluster, error) {
 	}
 
 	return &Cluster{
-		nodes: nodes,
-		byID:  byID,
+		nodes:         nodes,
+		byID:          byID,
+		healthTTL:     cfg.HealthTTL,
+		healthTimeout: cfg.HealthTimeout,
+		now:           func() time.Time { return time.Now().UTC() },
 	}, nil
 }
 
 // EnsureSession creates or resolves the active media session for a call on its assigned node.
 func (c *Cluster) EnsureSession(ctx context.Context, callRow domaincall.Call) (domaincall.RuntimeSession, error) {
-	node, err := c.nodeForCall(callRow)
+	node, err := c.nodeForCall(ctx, callRow)
 	if err != nil {
 		return domaincall.RuntimeSession{}, err
 	}
@@ -149,7 +167,7 @@ func (c *Cluster) CloseSession(ctx context.Context, sessionID string) error {
 	return node.runtime.CloseSession(ctx, sessionID)
 }
 
-func (c *Cluster) nodeForCall(callRow domaincall.Call) (*clusterNode, error) {
+func (c *Cluster) nodeForCall(ctx context.Context, callRow domaincall.Call) (*clusterNode, error) {
 	if c == nil || len(c.nodes) == 0 {
 		return nil, domaincall.ErrInvalidInput
 	}
@@ -164,8 +182,12 @@ func (c *Cluster) nodeForCall(callRow domaincall.Call) (*clusterNode, error) {
 		return nil, domaincall.ErrInvalidInput
 	}
 
-	index := rendezvousIndex(callID, len(c.nodes))
-	return c.nodes[index], nil
+	healthyNodes, err := c.healthyNodes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	index := rendezvousIndex(callID, len(healthyNodes))
+	return healthyNodes[index], nil
 }
 
 func (c *Cluster) nodeForSession(sessionID string) (*clusterNode, error) {
@@ -202,6 +224,68 @@ func (c *Cluster) Close(ctx context.Context) error {
 	}
 
 	return closeErr
+}
+
+func (c *Cluster) healthyNodes(ctx context.Context) ([]*clusterNode, error) {
+	if c == nil || len(c.nodes) == 0 {
+		return nil, domaincall.ErrInvalidInput
+	}
+
+	result := make([]*clusterNode, 0, len(c.nodes))
+	for _, node := range c.nodes {
+		healthy, err := c.nodeHealthy(ctx, node)
+		if err != nil {
+			continue
+		}
+		if healthy {
+			result = append(result, node)
+		}
+	}
+	if len(result) == 0 {
+		return nil, domaincall.ErrNotFound
+	}
+
+	return result, nil
+}
+
+func (c *Cluster) nodeHealthy(ctx context.Context, node *clusterNode) (bool, error) {
+	if c == nil || node == nil || node.runtime == nil {
+		return false, domaincall.ErrInvalidInput
+	}
+	if _, ok := node.runtime.(healthRuntime); !ok {
+		return true, nil
+	}
+
+	now := c.now()
+
+	node.mu.Lock()
+	if !node.health.checkedAt.IsZero() && now.Sub(node.health.checkedAt) < c.healthTTL {
+		healthy := node.health.healthy
+		node.mu.Unlock()
+		return healthy, nil
+	}
+	node.mu.Unlock()
+
+	probeCtx := ctx
+	cancel := func() {}
+	if c.healthTimeout > 0 {
+		probeCtx, cancel = context.WithTimeout(ctx, c.healthTimeout)
+	}
+	defer cancel()
+
+	err := node.runtime.(healthRuntime).Healthy(probeCtx)
+
+	node.mu.Lock()
+	node.health.checkedAt = now
+	node.health.healthy = err == nil
+	healthy := node.health.healthy
+	node.mu.Unlock()
+
+	if err != nil {
+		return false, err
+	}
+
+	return healthy, nil
 }
 
 func buildClusterNodes(cfg domaincall.RTCConfig, local *Manager) ([]*clusterNode, error) {

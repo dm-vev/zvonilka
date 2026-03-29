@@ -112,6 +112,8 @@ func defaultConfiguration(serviceName string) Configuration {
 			CandidateHost:  "127.0.0.1",
 			UDPPortMin:     40000,
 			UDPPortMax:     40100,
+			HealthTTL:      2 * time.Second,
+			HealthTimeout:  1 * time.Second,
 		},
 		Bot: BotConfig{
 			FanoutPollInterval:  botDefaults.FanoutPollInterval,
