@@ -45,6 +45,13 @@ type JoinParams struct {
 	WithVideo bool
 }
 
+// ReconnectParams describes one already-joined participant reconnect to the active media session.
+type ReconnectParams struct {
+	CallID    string
+	AccountID string
+	DeviceID  string
+}
+
 // HandoffParams describes one device handoff for the same account.
 type HandoffParams struct {
 	CallID       string

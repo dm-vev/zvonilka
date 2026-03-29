@@ -804,6 +804,53 @@ func TestSubscribeCallEventsFiltersTargetedSignals(t *testing.T) {
 	}
 }
 
+func TestReconnectCallReturnsFreshTransport(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	_, ownerCtx := fixture.mustCreateUserAndLogin(t, "call-reconnect-owner", "call-reconnect-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "call-reconnect-peer", "call-reconnect-peer@example.com")
+
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	started, err := fixture.api.StartCall(ownerCtx, &callv1.StartCallRequest{
+		ConversationId: created.Conversation.ConversationId,
+		WithVideo:      true,
+	})
+	if err != nil {
+		t.Fatalf("start call: %v", err)
+	}
+	if _, err := fixture.api.AcceptCall(peerCtx, &callv1.AcceptCallRequest{CallId: started.Call.CallId}); err != nil {
+		t.Fatalf("accept call: %v", err)
+	}
+	if _, err := fixture.api.JoinCall(peerCtx, &callv1.JoinCallRequest{
+		CallId:    started.Call.CallId,
+		WithVideo: true,
+	}); err != nil {
+		t.Fatalf("join call: %v", err)
+	}
+
+	reconnected, err := fixture.api.ReconnectCall(peerCtx, &callv1.ReconnectCallRequest{
+		CallId: started.Call.CallId,
+	})
+	if err != nil {
+		t.Fatalf("reconnect call: %v", err)
+	}
+	if reconnected.GetTransport() == nil || reconnected.GetTransport().GetSessionId() == "" {
+		t.Fatalf("expected reconnect transport, got %+v", reconnected)
+	}
+	if reconnected.GetCall() == nil || reconnected.GetCall().GetCallId() != started.Call.CallId {
+		t.Fatalf("unexpected reconnect call payload: %+v", reconnected.GetCall())
+	}
+}
+
 func TestSubscribeCallStatsStreamsDedicatedSnapshots(t *testing.T) {
 	t.Parallel()
 

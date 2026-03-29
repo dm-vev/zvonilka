@@ -226,6 +226,29 @@ func (a *api) JoinCall(ctx context.Context, req *callv1.JoinCallRequest) (*callv
 	}, nil
 }
 
+// ReconnectCall re-admits the authenticated device to the current active media session.
+func (a *api) ReconnectCall(ctx context.Context, req *callv1.ReconnectCallRequest) (*callv1.ReconnectCallResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	callRow, details, events, err := a.call.ReconnectCall(ctx, domaincall.ReconnectParams{
+		CallID:    req.GetCallId(),
+		AccountID: authContext.Account.ID,
+		DeviceID:  authContext.Device.ID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(events...)
+
+	return &callv1.ReconnectCallResponse{
+		Call:      callProto(callRow),
+		Transport: joinDetailsProto(details),
+	}, nil
+}
+
 // HandoffCall transfers one active call from another device of the same account to the current device.
 func (a *api) HandoffCall(ctx context.Context, req *callv1.HandoffCallRequest) (*callv1.HandoffCallResponse, error) {
 	authContext, err := a.requireAuth(ctx)
@@ -694,7 +717,7 @@ func (a *api) SubscribeCallEvents(
 	updates, unsubscribe := a.subscribeCallEvents()
 	defer unsubscribe()
 
-	reconcileTicker := time.NewTicker(30 * time.Second)
+	reconcileTicker := time.NewTicker(3 * time.Second)
 	defer reconcileTicker.Stop()
 
 	for {

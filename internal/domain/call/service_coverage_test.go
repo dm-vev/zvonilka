@@ -1017,4 +1017,76 @@ func TestGetCallMigratesSessionOnRuntimeStatsUnavailable(t *testing.T) {
 	require.Equal(t, "sess-1", migrated.Metadata["previous_session_id"])
 	require.Equal(t, "sess-2", migrated.Metadata["session_id"])
 	require.Equal(t, "stats", migrated.Metadata["failover_reason"])
+
+	targeted, err := service.Events(context.Background(), domaincall.EventParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.NoError(t, err)
+
+	var targetedMigration *domaincall.Event
+	for i := range targeted {
+		if targeted[i].EventType != domaincall.EventTypeSessionMigrated {
+			continue
+		}
+		if targeted[i].Metadata["target_account_id"] != "acc-b" || targeted[i].Metadata["target_device_id"] != "dev-b" {
+			continue
+		}
+		targetedMigration = &targeted[i]
+		break
+	}
+	require.NotNil(t, targetedMigration)
+	require.Equal(t, "true", targetedMigration.Metadata["reconnect_required"])
+	require.Equal(t, "token-1", targetedMigration.Metadata["session_token"])
+	require.Equal(t, "webrtc://runtime-2", targetedMigration.Metadata["runtime_endpoint"])
+	require.Equal(t, "42000", targetedMigration.Metadata["candidate_port"])
+}
+
+func TestReconnectCallMigratesSessionOnRuntimeUnavailable(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 28, 2, 0, 0, 0, time.UTC)
+	runtime := newFakeRuntime(now)
+	service := newTestService(t, now, runtime)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-direct",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+
+	_, _, err = service.AcceptCall(context.Background(), domaincall.AcceptParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.NoError(t, err)
+
+	_, _, _, err = service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	runtime.joinError = status.Error(codes.Unavailable, "rtc unavailable")
+
+	callRow, details, events, err := service.ReconnectCall(context.Background(), domaincall.ReconnectParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "sess-2", callRow.ActiveSessionID)
+	require.Equal(t, "sess-2", details.SessionID)
+	require.Len(t, events, 2)
+	require.Equal(t, domaincall.EventTypeSessionMigrated, events[0].EventType)
+	require.Equal(t, domaincall.EventTypeSessionMigrated, events[1].EventType)
+	require.Equal(t, "reconnect", events[0].Metadata["failover_reason"])
+	require.Equal(t, "acc-b", events[1].Metadata["target_account_id"])
+	require.Equal(t, "dev-b", events[1].Metadata["target_device_id"])
 }

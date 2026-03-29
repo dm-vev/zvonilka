@@ -439,12 +439,12 @@ func (s *Service) JoinCall(ctx context.Context, params JoinParams) (Call, JoinDe
 			Media:     defaultJoinMediaState(params.WithVideo),
 		})
 		if runtimeErr != nil && runtimeUnavailable(runtimeErr) {
-			migratedCall, _, migratedEvent, migrateErr := s.failoverActiveSession(ctx, store, callRow, now, "join")
+			migratedCall, _, migratedEvents, migrateErr := s.failoverActiveSession(ctx, store, callRow, now, "join")
 			if migrateErr != nil {
 				return fmt.Errorf("fail over runtime session %s: %w", callRow.ActiveSessionID, migrateErr)
 			}
 			callRow = migratedCall
-			events = append(events, migratedEvent)
+			events = append(events, migratedEvents...)
 			runtimeJoin, runtimeErr = s.runtime.JoinSession(ctx, callRow.ActiveSessionID, RuntimeParticipant{
 				CallID:    callRow.ID,
 				AccountID: params.AccountID,
@@ -583,12 +583,12 @@ func (s *Service) HandoffCall(
 			Media:     source.MediaState,
 		})
 		if runtimeErr != nil && runtimeUnavailable(runtimeErr) {
-			migratedCall, _, migratedEvent, migrateErr := s.failoverActiveSession(ctx, store, callRow, now, "handoff")
+			migratedCall, _, migratedEvents, migrateErr := s.failoverActiveSession(ctx, store, callRow, now, "handoff")
 			if migrateErr != nil {
 				return fmt.Errorf("fail over runtime session %s for handoff: %w", callRow.ActiveSessionID, migrateErr)
 			}
 			callRow = migratedCall
-			events = append(events, migratedEvent)
+			events = append(events, migratedEvents...)
 			runtimeJoin, runtimeErr = s.runtime.JoinSession(ctx, callRow.ActiveSessionID, RuntimeParticipant{
 				CallID:    callRow.ID,
 				AccountID: params.AccountID,
@@ -686,6 +686,93 @@ func (s *Service) HandoffCall(
 	}
 
 	return result, cloneParticipant(saved), details, cloneEvents(events), nil
+}
+
+// ReconnectCall re-admits one already joined participant device to the active media session.
+func (s *Service) ReconnectCall(
+	ctx context.Context,
+	params ReconnectParams,
+) (Call, JoinDetails, []Event, error) {
+	if err := s.validateContext(ctx, "reconnect call"); err != nil {
+		return Call{}, JoinDetails{}, nil, err
+	}
+	params.CallID = strings.TrimSpace(params.CallID)
+	params.AccountID = strings.TrimSpace(params.AccountID)
+	params.DeviceID = strings.TrimSpace(params.DeviceID)
+	if params.CallID == "" || params.AccountID == "" || params.DeviceID == "" {
+		return Call{}, JoinDetails{}, nil, ErrInvalidInput
+	}
+
+	now := s.currentTime()
+	var result Call
+	var details JoinDetails
+	var events []Event
+	err := s.runTx(ctx, func(store Store) error {
+		callRow, loadErr := s.visibleCall(ctx, store, params.CallID, params.AccountID)
+		if loadErr != nil {
+			return loadErr
+		}
+		if callRow.State != StateActive || strings.TrimSpace(callRow.ActiveSessionID) == "" {
+			return ErrConflict
+		}
+
+		participant, loadErr := store.ParticipantByCallAndDevice(ctx, callRow.ID, params.DeviceID)
+		if loadErr != nil {
+			if loadErr == ErrNotFound {
+				return ErrConflict
+			}
+			return fmt.Errorf("load participant %s/%s: %w", callRow.ID, params.DeviceID, loadErr)
+		}
+		if participant.AccountID != params.AccountID || participant.State != ParticipantStateJoined {
+			return ErrForbidden
+		}
+
+		runtimeJoin, runtimeErr := s.runtime.JoinSession(ctx, callRow.ActiveSessionID, runtimeParticipantFromParticipant(callRow.ID, participant))
+		if runtimeErr != nil && runtimeUnavailable(runtimeErr) {
+			migratedCall, _, migratedEvents, migrateErr := s.failoverActiveSession(ctx, store, callRow, now, "reconnect")
+			if migrateErr != nil {
+				return fmt.Errorf("fail over runtime session %s for reconnect: %w", callRow.ActiveSessionID, migrateErr)
+			}
+			callRow = migratedCall
+			events = append(events, migratedEvents...)
+			runtimeJoin, runtimeErr = s.runtime.JoinSession(ctx, callRow.ActiveSessionID, runtimeParticipantFromParticipant(callRow.ID, participant))
+		}
+		if runtimeErr != nil {
+			return fmt.Errorf("reconnect runtime session %s: %w", callRow.ActiveSessionID, runtimeErr)
+		}
+
+		result, loadErr = s.hydrateCall(ctx, store, callRow.ID)
+		if loadErr != nil {
+			return loadErr
+		}
+
+		iceServers, expiresAt, iceErr := s.iceServersForAccount(params.AccountID, runtimeJoin.ExpiresAt)
+		if iceErr != nil {
+			return iceErr
+		}
+		details = JoinDetails{
+			SessionID:       runtimeJoin.SessionID,
+			SessionToken:    runtimeJoin.SessionToken,
+			RuntimeEndpoint: s.resolveRuntimeEndpoint(runtimeJoin.RuntimeEndpoint),
+			ExpiresAt:       expiresAt,
+			IceUfrag:        runtimeJoin.IceUfrag,
+			IcePwd:          runtimeJoin.IcePwd,
+			DTLSFingerprint: runtimeJoin.DTLSFingerprint,
+			CandidateHost:   runtimeJoin.CandidateHost,
+			CandidatePort:   runtimeJoin.CandidatePort,
+			IceServers:      iceServers,
+		}
+		return nil
+	})
+	if err != nil {
+		return Call{}, JoinDetails{}, nil, err
+	}
+
+	for i := range events {
+		events[i].Call = cloneCall(result)
+	}
+
+	return result, details, cloneEvents(events), nil
 }
 
 // LeaveCall removes one device from the active participant set.
