@@ -38,6 +38,10 @@ var serviceListenDefaults = map[string]listenDefaults{
 		http: ":8084",
 		grpc: ":9094",
 	},
+	"callhooks": {
+		http: ":8085",
+		grpc: ":9095",
+	},
 }
 
 const (

@@ -297,7 +297,7 @@ func validateLogFormat(format string) error {
 func validateServiceName(serviceName string) error {
 	serviceName = strings.ToLower(strings.TrimSpace(serviceName))
 	switch serviceName {
-	case "controlplane", "gateway", "botapi", "notificationworker", "callworker":
+	case "controlplane", "gateway", "botapi", "notificationworker", "callworker", "callhooks":
 		return nil
 	case "":
 		return errors.New("service name is required")

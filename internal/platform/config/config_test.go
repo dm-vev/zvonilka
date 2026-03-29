@@ -60,6 +60,13 @@ func TestFromEnvUsesDistinctServiceDefaults(t *testing.T) {
 				grpc: ":9094",
 			},
 		},
+		{
+			service: "callhooks",
+			want: expected{
+				http: ":8085",
+				grpc: ":9095",
+			},
+		},
 	}
 
 	httpOwners := make(map[string]string, len(cases))
