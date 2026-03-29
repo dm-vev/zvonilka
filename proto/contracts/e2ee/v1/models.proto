@@ -61,6 +61,32 @@ message ConversationKeyCoverageEntry {
   google.protobuf.Timestamp expires_at = 5;
 }
 
+enum E2EEUpdateType {
+  E2EE_UPDATE_TYPE_UNSPECIFIED = 0;
+  E2EE_UPDATE_TYPE_DEVICE_PREKEYS_UPDATED = 1;
+  E2EE_UPDATE_TYPE_DEVICE_TRUST_UPDATED = 2;
+  E2EE_UPDATE_TYPE_DIRECT_SESSION_CREATED = 3;
+  E2EE_UPDATE_TYPE_DIRECT_SESSION_ACKNOWLEDGED = 4;
+  E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_PUBLISHED = 5;
+  E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_ACKNOWLEDGED = 6;
+  E2EE_UPDATE_TYPE_CONVERSATION_KEY_COVERAGE_CHANGED = 7;
+}
+
+message E2EEUpdate {
+  string update_id = 1;
+  E2EEUpdateType update_type = 2;
+  string actor_user_id = 3;
+  string actor_device_id = 4;
+  string target_user_id = 5;
+  string target_device_id = 6;
+  string conversation_id = 7;
+  string session_id = 8;
+  string distribution_id = 9;
+  string sender_key_id = 10;
+  map<string, string> metadata = 11;
+  google.protobuf.Timestamp created_at = 12;
+}
+
 enum DirectSessionState {
   DIRECT_SESSION_STATE_UNSPECIFIED = 0;
   DIRECT_SESSION_STATE_PENDING = 1;

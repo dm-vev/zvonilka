@@ -13,6 +13,7 @@ service E2EEService {
   rpc SetDeviceTrust(SetDeviceTrustRequest) returns (SetDeviceTrustResponse);
   rpc ListDeviceTrusts(ListDeviceTrustsRequest) returns (ListDeviceTrustsResponse);
   rpc GetConversationKeyCoverage(GetConversationKeyCoverageRequest) returns (GetConversationKeyCoverageResponse);
+  rpc SubscribeE2EEUpdates(SubscribeE2EEUpdatesRequest) returns (stream SubscribeE2EEUpdatesResponse);
   rpc CreateDirectSessions(CreateDirectSessionsRequest) returns (CreateDirectSessionsResponse);
   rpc ListDeviceSessions(ListDeviceSessionsRequest) returns (ListDeviceSessionsResponse);
   rpc AcknowledgeDirectSession(AcknowledgeDirectSessionRequest) returns (AcknowledgeDirectSessionResponse);

@@ -71,6 +71,14 @@ message GetConversationKeyCoverageResponse {
   repeated ConversationKeyCoverageEntry entries = 1;
 }
 
+message SubscribeE2EEUpdatesRequest {
+  string device_id = 1;
+}
+
+message SubscribeE2EEUpdatesResponse {
+  E2EEUpdate update = 1;
+}
+
 message CreateDirectSessionsRequest {
   string user_id = 1;
   string device_id = 2;

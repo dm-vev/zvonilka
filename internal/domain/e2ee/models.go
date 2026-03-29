@@ -72,6 +72,34 @@ type ConversationKeyCoverageEntry struct {
 	ExpiresAt   time.Time
 }
 
+type UpdateType string
+
+const (
+	UpdateTypeUnspecified                 UpdateType = ""
+	UpdateTypeDevicePreKeysUpdated        UpdateType = "device_prekeys.updated"
+	UpdateTypeDeviceTrustUpdated          UpdateType = "device_trust.updated"
+	UpdateTypeDirectSessionCreated        UpdateType = "direct_session.created"
+	UpdateTypeDirectSessionAcknowledged   UpdateType = "direct_session.acknowledged"
+	UpdateTypeGroupSenderKeyPublished     UpdateType = "group_sender_key.published"
+	UpdateTypeGroupSenderKeyAcknowledged  UpdateType = "group_sender_key.acknowledged"
+	UpdateTypeConversationCoverageChanged UpdateType = "conversation_key_coverage.changed"
+)
+
+type Update struct {
+	ID              string
+	Type            UpdateType
+	ActorAccountID  string
+	ActorDeviceID   string
+	TargetAccountID string
+	TargetDeviceID  string
+	ConversationID  string
+	SessionID       string
+	DistributionID  string
+	SenderKeyID     string
+	Metadata        map[string]string
+	CreatedAt       time.Time
+}
+
 type BootstrapPayload struct {
 	Algorithm  string
 	Nonce      []byte

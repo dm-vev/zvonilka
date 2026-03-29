@@ -3,7 +3,10 @@ package gateway
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
 	e2eev1 "github.com/dm-vev/zvonilka/gen/proto/contracts/e2ee/v1"
@@ -37,6 +40,15 @@ func (a *api) UploadDevicePreKeys(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.publishE2EEUpdates(domaine2ee.Update{
+		ID:              newGatewayEventID("e2ee"),
+		Type:            domaine2ee.UpdateTypeDevicePreKeysUpdated,
+		ActorAccountID:  authContext.Account.ID,
+		ActorDeviceID:   deviceID,
+		TargetAccountID: authContext.Account.ID,
+		TargetDeviceID:  deviceID,
+		CreatedAt:       timeNowUTC(),
+	})
 
 	return &e2eev1.UploadDevicePreKeysResponse{
 		Bundle: deviceBundleProto(bundle),
@@ -72,6 +84,30 @@ func (a *api) RotateE2EEKeys(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.publishE2EEUpdates(
+		domaine2ee.Update{
+			ID:              newGatewayEventID("e2ee"),
+			Type:            domaine2ee.UpdateTypeDevicePreKeysUpdated,
+			ActorAccountID:  authContext.Account.ID,
+			ActorDeviceID:   deviceID,
+			TargetAccountID: authContext.Account.ID,
+			TargetDeviceID:  deviceID,
+			CreatedAt:       timeNowUTC(),
+		},
+		domaine2ee.Update{
+			ID:              newGatewayEventID("e2ee"),
+			Type:            domaine2ee.UpdateTypeConversationCoverageChanged,
+			ActorAccountID:  authContext.Account.ID,
+			ActorDeviceID:   deviceID,
+			TargetAccountID: authContext.Account.ID,
+			TargetDeviceID:  deviceID,
+			Metadata: map[string]string{
+				"expired_pending_direct_sessions":   strconv.FormatUint(uint64(expiredDirect), 10),
+				"expired_pending_group_sender_keys": strconv.FormatUint(uint64(expiredGroup), 10),
+			},
+			CreatedAt: timeNowUTC(),
+		},
+	)
 	return &e2eev1.RotateE2EEKeysResponse{
 		Bundle:                        deviceBundleProto(bundle),
 		ExpiredPendingDirectSessions:  expiredDirect,
@@ -125,6 +161,18 @@ func (a *api) SetDeviceTrust(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.publishE2EEUpdates(domaine2ee.Update{
+		ID:              newGatewayEventID("e2ee"),
+		Type:            domaine2ee.UpdateTypeDeviceTrustUpdated,
+		ActorAccountID:  authContext.Account.ID,
+		ActorDeviceID:   authContext.Session.DeviceID,
+		TargetAccountID: trust.TargetAccountID,
+		TargetDeviceID:  trust.TargetDeviceID,
+		Metadata: map[string]string{
+			"state": string(trust.State),
+		},
+		CreatedAt: timeNowUTC(),
+	})
 	return &e2eev1.SetDeviceTrustResponse{Trust: deviceTrustProto(trust)}, nil
 }
 
@@ -177,6 +225,43 @@ func (a *api) GetConversationKeyCoverage(
 	return &e2eev1.GetConversationKeyCoverageResponse{Entries: result}, nil
 }
 
+func (a *api) SubscribeE2EEUpdates(
+	req *e2eev1.SubscribeE2EEUpdatesRequest,
+	stream e2eev1.E2EEService_SubscribeE2EEUpdatesServer,
+) error {
+	authContext, err := a.requireAuth(stream.Context())
+	if err != nil {
+		return err
+	}
+	deviceID := strings.TrimSpace(req.GetDeviceId())
+	if deviceID == "" {
+		deviceID = authContext.Session.DeviceID
+	}
+	if deviceID != authContext.Session.DeviceID {
+		return grpcError(domaine2ee.ErrForbidden)
+	}
+
+	updates, unsubscribe := a.subscribeE2EEUpdates()
+	defer unsubscribe()
+
+	for {
+		select {
+		case <-stream.Context().Done():
+			return nil
+		case signal := <-updates:
+			if signal.update == nil {
+				continue
+			}
+			if !e2eeUpdateVisible(*signal.update, authContext.Account.ID, deviceID) {
+				continue
+			}
+			if err := stream.Send(&e2eev1.SubscribeE2EEUpdatesResponse{Update: e2eeUpdateProto(*signal.update)}); err != nil {
+				return err
+			}
+		}
+	}
+}
+
 func (a *api) CreateDirectSessions(
 	ctx context.Context,
 	req *e2eev1.CreateDirectSessionsRequest,
@@ -201,6 +286,16 @@ func (a *api) CreateDirectSessions(
 
 	result := make([]*e2eev1.DirectSession, 0, len(sessions))
 	for _, session := range sessions {
+		a.publishE2EEUpdates(domaine2ee.Update{
+			ID:              newGatewayEventID("e2ee"),
+			Type:            domaine2ee.UpdateTypeDirectSessionCreated,
+			ActorAccountID:  authContext.Account.ID,
+			ActorDeviceID:   authContext.Session.DeviceID,
+			TargetAccountID: session.RecipientAccountID,
+			TargetDeviceID:  session.RecipientDeviceID,
+			SessionID:       session.ID,
+			CreatedAt:       timeNowUTC(),
+		})
 		result = append(result, directSessionProto(session))
 	}
 	return &e2eev1.CreateDirectSessionsResponse{Sessions: result}, nil
@@ -249,6 +344,16 @@ func (a *api) AcknowledgeDirectSession(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.publishE2EEUpdates(domaine2ee.Update{
+		ID:              newGatewayEventID("e2ee"),
+		Type:            domaine2ee.UpdateTypeDirectSessionAcknowledged,
+		ActorAccountID:  authContext.Account.ID,
+		ActorDeviceID:   authContext.Session.DeviceID,
+		TargetAccountID: session.InitiatorAccountID,
+		TargetDeviceID:  session.InitiatorDeviceID,
+		SessionID:       session.ID,
+		CreatedAt:       timeNowUTC(),
+	})
 
 	return &e2eev1.AcknowledgeDirectSessionResponse{Session: directSessionProto(session)}, nil
 }
@@ -275,6 +380,18 @@ func (a *api) PublishGroupSenderKeys(
 	}
 	result := make([]*e2eev1.GroupSenderKeyDistribution, 0, len(distributions))
 	for _, item := range distributions {
+		a.publishE2EEUpdates(domaine2ee.Update{
+			ID:              newGatewayEventID("e2ee"),
+			Type:            domaine2ee.UpdateTypeGroupSenderKeyPublished,
+			ActorAccountID:  authContext.Account.ID,
+			ActorDeviceID:   authContext.Session.DeviceID,
+			TargetAccountID: item.RecipientAccountID,
+			TargetDeviceID:  item.RecipientDeviceID,
+			ConversationID:  item.ConversationID,
+			DistributionID:  item.ID,
+			SenderKeyID:     item.SenderKeyID,
+			CreatedAt:       timeNowUTC(),
+		})
 		result = append(result, groupSenderKeyDistributionProto(item))
 	}
 	return &e2eev1.PublishGroupSenderKeysResponse{Distributions: result}, nil
@@ -322,6 +439,18 @@ func (a *api) AcknowledgeGroupSenderKey(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	a.publishE2EEUpdates(domaine2ee.Update{
+		ID:              newGatewayEventID("e2ee"),
+		Type:            domaine2ee.UpdateTypeGroupSenderKeyAcknowledged,
+		ActorAccountID:  authContext.Account.ID,
+		ActorDeviceID:   authContext.Session.DeviceID,
+		TargetAccountID: distribution.SenderAccountID,
+		TargetDeviceID:  distribution.SenderDeviceID,
+		ConversationID:  distribution.ConversationID,
+		DistributionID:  distribution.ID,
+		SenderKeyID:     distribution.SenderKeyID,
+		CreatedAt:       timeNowUTC(),
+	})
 	return &e2eev1.AcknowledgeGroupSenderKeyResponse{Distribution: groupSenderKeyDistributionProto(distribution)}, nil
 }
 
@@ -348,6 +477,23 @@ func deviceTrustProto(value domaine2ee.DeviceTrust) *e2eev1.DeviceTrust {
 		Note:             value.Note,
 		CreatedAt:        protoTime(value.CreatedAt),
 		UpdatedAt:        protoTime(value.UpdatedAt),
+	}
+}
+
+func e2eeUpdateProto(value domaine2ee.Update) *e2eev1.E2EEUpdate {
+	return &e2eev1.E2EEUpdate{
+		UpdateId:       value.ID,
+		UpdateType:     e2eeUpdateTypeProto(value.Type),
+		ActorUserId:    value.ActorAccountID,
+		ActorDeviceId:  value.ActorDeviceID,
+		TargetUserId:   value.TargetAccountID,
+		TargetDeviceId: value.TargetDeviceID,
+		ConversationId: value.ConversationID,
+		SessionId:      value.SessionID,
+		DistributionId: value.DistributionID,
+		SenderKeyId:    value.SenderKeyID,
+		Metadata:       cloneStringMap(value.Metadata),
+		CreatedAt:      protoTime(value.CreatedAt),
 	}
 }
 
@@ -600,6 +746,27 @@ func deviceTrustStateProto(value domaine2ee.DeviceTrustState) e2eev1.DeviceTrust
 	}
 }
 
+func e2eeUpdateTypeProto(value domaine2ee.UpdateType) e2eev1.E2EEUpdateType {
+	switch value {
+	case domaine2ee.UpdateTypeDevicePreKeysUpdated:
+		return e2eev1.E2EEUpdateType_E2EE_UPDATE_TYPE_DEVICE_PREKEYS_UPDATED
+	case domaine2ee.UpdateTypeDeviceTrustUpdated:
+		return e2eev1.E2EEUpdateType_E2EE_UPDATE_TYPE_DEVICE_TRUST_UPDATED
+	case domaine2ee.UpdateTypeDirectSessionCreated:
+		return e2eev1.E2EEUpdateType_E2EE_UPDATE_TYPE_DIRECT_SESSION_CREATED
+	case domaine2ee.UpdateTypeDirectSessionAcknowledged:
+		return e2eev1.E2EEUpdateType_E2EE_UPDATE_TYPE_DIRECT_SESSION_ACKNOWLEDGED
+	case domaine2ee.UpdateTypeGroupSenderKeyPublished:
+		return e2eev1.E2EEUpdateType_E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_PUBLISHED
+	case domaine2ee.UpdateTypeGroupSenderKeyAcknowledged:
+		return e2eev1.E2EEUpdateType_E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_ACKNOWLEDGED
+	case domaine2ee.UpdateTypeConversationCoverageChanged:
+		return e2eev1.E2EEUpdateType_E2EE_UPDATE_TYPE_CONVERSATION_KEY_COVERAGE_CHANGED
+	default:
+		return e2eev1.E2EEUpdateType_E2EE_UPDATE_TYPE_UNSPECIFIED
+	}
+}
+
 func deviceTrustStateFromProto(value e2eev1.DeviceTrustState) domaine2ee.DeviceTrustState {
 	switch value {
 	case e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_TRUSTED:
@@ -626,4 +793,22 @@ func conversationKeyCoverageStateProto(value domaine2ee.ConversationKeyCoverageS
 	default:
 		return e2eev1.ConversationKeyCoverageState_CONVERSATION_KEY_COVERAGE_STATE_UNSPECIFIED
 	}
+}
+
+func e2eeUpdateVisible(value domaine2ee.Update, accountID string, deviceID string) bool {
+	if value.TargetAccountID == "" && value.TargetDeviceID == "" {
+		return value.ActorAccountID == accountID && value.ActorDeviceID == deviceID
+	}
+	if value.TargetAccountID == accountID && (value.TargetDeviceID == "" || value.TargetDeviceID == deviceID) {
+		return true
+	}
+	return value.ActorAccountID == accountID && value.ActorDeviceID == deviceID
+}
+
+func newGatewayEventID(prefix string) string {
+	return fmt.Sprintf("%s_%d", prefix, time.Now().UTC().UnixNano())
+}
+
+func timeNowUTC() time.Time {
+	return time.Now().UTC()
 }

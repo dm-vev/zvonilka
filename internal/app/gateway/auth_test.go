@@ -88,6 +88,7 @@ func newTestAPI(t *testing.T) (*api, *recordingSender) {
 
 	return &api{
 		e2ee:         e2eeService,
+		e2eeNotifier: newE2EENotifier(),
 		identity:     identityService,
 		conversation: conversationService,
 		presence:     presenceService,

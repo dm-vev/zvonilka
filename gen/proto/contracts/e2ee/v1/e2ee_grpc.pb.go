@@ -25,6 +25,7 @@ const (
 	E2EEService_SetDeviceTrust_FullMethodName             = "/zvonilka.e2ee.v1.E2EEService/SetDeviceTrust"
 	E2EEService_ListDeviceTrusts_FullMethodName           = "/zvonilka.e2ee.v1.E2EEService/ListDeviceTrusts"
 	E2EEService_GetConversationKeyCoverage_FullMethodName = "/zvonilka.e2ee.v1.E2EEService/GetConversationKeyCoverage"
+	E2EEService_SubscribeE2EEUpdates_FullMethodName       = "/zvonilka.e2ee.v1.E2EEService/SubscribeE2EEUpdates"
 	E2EEService_CreateDirectSessions_FullMethodName       = "/zvonilka.e2ee.v1.E2EEService/CreateDirectSessions"
 	E2EEService_ListDeviceSessions_FullMethodName         = "/zvonilka.e2ee.v1.E2EEService/ListDeviceSessions"
 	E2EEService_AcknowledgeDirectSession_FullMethodName   = "/zvonilka.e2ee.v1.E2EEService/AcknowledgeDirectSession"
@@ -43,6 +44,7 @@ type E2EEServiceClient interface {
 	SetDeviceTrust(ctx context.Context, in *SetDeviceTrustRequest, opts ...grpc.CallOption) (*SetDeviceTrustResponse, error)
 	ListDeviceTrusts(ctx context.Context, in *ListDeviceTrustsRequest, opts ...grpc.CallOption) (*ListDeviceTrustsResponse, error)
 	GetConversationKeyCoverage(ctx context.Context, in *GetConversationKeyCoverageRequest, opts ...grpc.CallOption) (*GetConversationKeyCoverageResponse, error)
+	SubscribeE2EEUpdates(ctx context.Context, in *SubscribeE2EEUpdatesRequest, opts ...grpc.CallOption) (E2EEService_SubscribeE2EEUpdatesClient, error)
 	CreateDirectSessions(ctx context.Context, in *CreateDirectSessionsRequest, opts ...grpc.CallOption) (*CreateDirectSessionsResponse, error)
 	ListDeviceSessions(ctx context.Context, in *ListDeviceSessionsRequest, opts ...grpc.CallOption) (*ListDeviceSessionsResponse, error)
 	AcknowledgeDirectSession(ctx context.Context, in *AcknowledgeDirectSessionRequest, opts ...grpc.CallOption) (*AcknowledgeDirectSessionResponse, error)
@@ -113,6 +115,38 @@ func (c *e2EEServiceClient) GetConversationKeyCoverage(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *e2EEServiceClient) SubscribeE2EEUpdates(ctx context.Context, in *SubscribeE2EEUpdatesRequest, opts ...grpc.CallOption) (E2EEService_SubscribeE2EEUpdatesClient, error) {
+	stream, err := c.cc.NewStream(ctx, &E2EEService_ServiceDesc.Streams[0], E2EEService_SubscribeE2EEUpdates_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &e2EEServiceSubscribeE2EEUpdatesClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type E2EEService_SubscribeE2EEUpdatesClient interface {
+	Recv() (*SubscribeE2EEUpdatesResponse, error)
+	grpc.ClientStream
+}
+
+type e2EEServiceSubscribeE2EEUpdatesClient struct {
+	grpc.ClientStream
+}
+
+func (x *e2EEServiceSubscribeE2EEUpdatesClient) Recv() (*SubscribeE2EEUpdatesResponse, error) {
+	m := new(SubscribeE2EEUpdatesResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *e2EEServiceClient) CreateDirectSessions(ctx context.Context, in *CreateDirectSessionsRequest, opts ...grpc.CallOption) (*CreateDirectSessionsResponse, error) {
 	out := new(CreateDirectSessionsResponse)
 	err := c.cc.Invoke(ctx, E2EEService_CreateDirectSessions_FullMethodName, in, out, opts...)
@@ -177,6 +211,7 @@ type E2EEServiceServer interface {
 	SetDeviceTrust(context.Context, *SetDeviceTrustRequest) (*SetDeviceTrustResponse, error)
 	ListDeviceTrusts(context.Context, *ListDeviceTrustsRequest) (*ListDeviceTrustsResponse, error)
 	GetConversationKeyCoverage(context.Context, *GetConversationKeyCoverageRequest) (*GetConversationKeyCoverageResponse, error)
+	SubscribeE2EEUpdates(*SubscribeE2EEUpdatesRequest, E2EEService_SubscribeE2EEUpdatesServer) error
 	CreateDirectSessions(context.Context, *CreateDirectSessionsRequest) (*CreateDirectSessionsResponse, error)
 	ListDeviceSessions(context.Context, *ListDeviceSessionsRequest) (*ListDeviceSessionsResponse, error)
 	AcknowledgeDirectSession(context.Context, *AcknowledgeDirectSessionRequest) (*AcknowledgeDirectSessionResponse, error)
@@ -207,6 +242,9 @@ func (UnimplementedE2EEServiceServer) ListDeviceTrusts(context.Context, *ListDev
 }
 func (UnimplementedE2EEServiceServer) GetConversationKeyCoverage(context.Context, *GetConversationKeyCoverageRequest) (*GetConversationKeyCoverageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetConversationKeyCoverage not implemented")
+}
+func (UnimplementedE2EEServiceServer) SubscribeE2EEUpdates(*SubscribeE2EEUpdatesRequest, E2EEService_SubscribeE2EEUpdatesServer) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeE2EEUpdates not implemented")
 }
 func (UnimplementedE2EEServiceServer) CreateDirectSessions(context.Context, *CreateDirectSessionsRequest) (*CreateDirectSessionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateDirectSessions not implemented")
@@ -345,6 +383,27 @@ func _E2EEService_GetConversationKeyCoverage_Handler(srv interface{}, ctx contex
 		return srv.(E2EEServiceServer).GetConversationKeyCoverage(ctx, req.(*GetConversationKeyCoverageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
+}
+
+func _E2EEService_SubscribeE2EEUpdates_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(SubscribeE2EEUpdatesRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(E2EEServiceServer).SubscribeE2EEUpdates(m, &e2EEServiceSubscribeE2EEUpdatesServer{stream})
+}
+
+type E2EEService_SubscribeE2EEUpdatesServer interface {
+	Send(*SubscribeE2EEUpdatesResponse) error
+	grpc.ServerStream
+}
+
+type e2EEServiceSubscribeE2EEUpdatesServer struct {
+	grpc.ServerStream
+}
+
+func (x *e2EEServiceSubscribeE2EEUpdatesServer) Send(m *SubscribeE2EEUpdatesResponse) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 func _E2EEService_CreateDirectSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -511,6 +570,12 @@ var E2EEService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _E2EEService_AcknowledgeGroupSenderKey_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "SubscribeE2EEUpdates",
+			Handler:       _E2EEService_SubscribeE2EEUpdates_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "contracts/e2ee/v1/e2ee.proto",
 }

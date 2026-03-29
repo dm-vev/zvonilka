@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"testing"
+	"time"
 
 	authv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/auth/v1"
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
@@ -960,3 +961,124 @@ func TestGetConversationKeyCoverageRPC(t *testing.T) {
 		t.Fatalf("unexpected group coverage states: %+v", groupCoverage.Entries)
 	}
 }
+
+func TestSubscribeE2EEUpdatesStreamsTrustChanges(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-e2ee-stream",
+		DisplayName: "Alice E2EE Stream",
+		Email:       "alice-e2ee-stream@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-e2ee-stream",
+		DisplayName: "Bob E2EE Stream",
+		Email:       "bob-e2ee-stream@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, _ := login(alice.Username, "alice-e2ee-stream-phone", "alice-e2ee-stream-device")
+	_, bobDeviceID := login(bob.Username, "bob-e2ee-stream-phone", "bob-e2ee-stream-device")
+
+	stream := newTestSubscribeE2EEUpdatesStream(aliceCtx)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- api.SubscribeE2EEUpdates(&e2eev1.SubscribeE2EEUpdatesRequest{}, stream)
+	}()
+	time.Sleep(50 * time.Millisecond)
+
+	_, err = api.SetDeviceTrust(aliceCtx, &e2eev1.SetDeviceTrustRequest{
+		TargetUserId:   bob.ID,
+		TargetDeviceId: bobDeviceID,
+		State:          e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_TRUSTED,
+	})
+	if err != nil {
+		t.Fatalf("set device trust: %v", err)
+	}
+
+	select {
+	case resp := <-stream.responses:
+		if resp.Update == nil {
+			t.Fatal("expected update payload")
+		}
+		if resp.Update.UpdateType != e2eev1.E2EEUpdateType_E2EE_UPDATE_TYPE_DEVICE_TRUST_UPDATED {
+			t.Fatalf("unexpected update type: %+v", resp.Update)
+		}
+		if resp.Update.TargetUserId != bob.ID || resp.Update.TargetDeviceId != bobDeviceID {
+			t.Fatalf("unexpected update target: %+v", resp.Update)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for e2ee update")
+	}
+
+	stream.cancel()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("subscribe e2ee updates returned error: %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for stream shutdown")
+	}
+}
+
+type testSubscribeE2EEUpdatesStream struct {
+	ctx       context.Context
+	cancel    context.CancelFunc
+	responses chan *e2eev1.SubscribeE2EEUpdatesResponse
+}
+
+func newTestSubscribeE2EEUpdatesStream(ctx context.Context) *testSubscribeE2EEUpdatesStream {
+	streamCtx, cancel := context.WithCancel(ctx)
+	return &testSubscribeE2EEUpdatesStream{
+		ctx:       streamCtx,
+		cancel:    cancel,
+		responses: make(chan *e2eev1.SubscribeE2EEUpdatesResponse, 8),
+	}
+}
+
+func (s *testSubscribeE2EEUpdatesStream) Context() context.Context { return s.ctx }
+func (s *testSubscribeE2EEUpdatesStream) Send(resp *e2eev1.SubscribeE2EEUpdatesResponse) error {
+	s.responses <- resp
+	return nil
+}
+func (*testSubscribeE2EEUpdatesStream) SetHeader(metadata.MD) error  { return nil }
+func (*testSubscribeE2EEUpdatesStream) SendHeader(metadata.MD) error { return nil }
+func (*testSubscribeE2EEUpdatesStream) SetTrailer(metadata.MD)       {}
+func (*testSubscribeE2EEUpdatesStream) SendMsg(any) error            { return nil }
+func (*testSubscribeE2EEUpdatesStream) RecvMsg(any) error            { return nil }

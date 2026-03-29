@@ -129,6 +129,70 @@ func (ConversationKeyCoverageState) EnumDescriptor() ([]byte, []int) {
 	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{1}
 }
 
+type E2EEUpdateType int32
+
+const (
+	E2EEUpdateType_E2EE_UPDATE_TYPE_UNSPECIFIED                       E2EEUpdateType = 0
+	E2EEUpdateType_E2EE_UPDATE_TYPE_DEVICE_PREKEYS_UPDATED            E2EEUpdateType = 1
+	E2EEUpdateType_E2EE_UPDATE_TYPE_DEVICE_TRUST_UPDATED              E2EEUpdateType = 2
+	E2EEUpdateType_E2EE_UPDATE_TYPE_DIRECT_SESSION_CREATED            E2EEUpdateType = 3
+	E2EEUpdateType_E2EE_UPDATE_TYPE_DIRECT_SESSION_ACKNOWLEDGED       E2EEUpdateType = 4
+	E2EEUpdateType_E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_PUBLISHED        E2EEUpdateType = 5
+	E2EEUpdateType_E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_ACKNOWLEDGED     E2EEUpdateType = 6
+	E2EEUpdateType_E2EE_UPDATE_TYPE_CONVERSATION_KEY_COVERAGE_CHANGED E2EEUpdateType = 7
+)
+
+// Enum value maps for E2EEUpdateType.
+var (
+	E2EEUpdateType_name = map[int32]string{
+		0: "E2EE_UPDATE_TYPE_UNSPECIFIED",
+		1: "E2EE_UPDATE_TYPE_DEVICE_PREKEYS_UPDATED",
+		2: "E2EE_UPDATE_TYPE_DEVICE_TRUST_UPDATED",
+		3: "E2EE_UPDATE_TYPE_DIRECT_SESSION_CREATED",
+		4: "E2EE_UPDATE_TYPE_DIRECT_SESSION_ACKNOWLEDGED",
+		5: "E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_PUBLISHED",
+		6: "E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_ACKNOWLEDGED",
+		7: "E2EE_UPDATE_TYPE_CONVERSATION_KEY_COVERAGE_CHANGED",
+	}
+	E2EEUpdateType_value = map[string]int32{
+		"E2EE_UPDATE_TYPE_UNSPECIFIED":                       0,
+		"E2EE_UPDATE_TYPE_DEVICE_PREKEYS_UPDATED":            1,
+		"E2EE_UPDATE_TYPE_DEVICE_TRUST_UPDATED":              2,
+		"E2EE_UPDATE_TYPE_DIRECT_SESSION_CREATED":            3,
+		"E2EE_UPDATE_TYPE_DIRECT_SESSION_ACKNOWLEDGED":       4,
+		"E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_PUBLISHED":        5,
+		"E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_ACKNOWLEDGED":     6,
+		"E2EE_UPDATE_TYPE_CONVERSATION_KEY_COVERAGE_CHANGED": 7,
+	}
+)
+
+func (x E2EEUpdateType) Enum() *E2EEUpdateType {
+	p := new(E2EEUpdateType)
+	*p = x
+	return p
+}
+
+func (x E2EEUpdateType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (E2EEUpdateType) Descriptor() protoreflect.EnumDescriptor {
+	return file_contracts_e2ee_v1_models_proto_enumTypes[2].Descriptor()
+}
+
+func (E2EEUpdateType) Type() protoreflect.EnumType {
+	return &file_contracts_e2ee_v1_models_proto_enumTypes[2]
+}
+
+func (x E2EEUpdateType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use E2EEUpdateType.Descriptor instead.
+func (E2EEUpdateType) EnumDescriptor() ([]byte, []int) {
+	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{2}
+}
+
 type DirectSessionState int32
 
 const (
@@ -162,11 +226,11 @@ func (x DirectSessionState) String() string {
 }
 
 func (DirectSessionState) Descriptor() protoreflect.EnumDescriptor {
-	return file_contracts_e2ee_v1_models_proto_enumTypes[2].Descriptor()
+	return file_contracts_e2ee_v1_models_proto_enumTypes[3].Descriptor()
 }
 
 func (DirectSessionState) Type() protoreflect.EnumType {
-	return &file_contracts_e2ee_v1_models_proto_enumTypes[2]
+	return &file_contracts_e2ee_v1_models_proto_enumTypes[3]
 }
 
 func (x DirectSessionState) Number() protoreflect.EnumNumber {
@@ -175,7 +239,7 @@ func (x DirectSessionState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DirectSessionState.Descriptor instead.
 func (DirectSessionState) EnumDescriptor() ([]byte, []int) {
-	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{2}
+	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{3}
 }
 
 type GroupSenderKeyState int32
@@ -211,11 +275,11 @@ func (x GroupSenderKeyState) String() string {
 }
 
 func (GroupSenderKeyState) Descriptor() protoreflect.EnumDescriptor {
-	return file_contracts_e2ee_v1_models_proto_enumTypes[3].Descriptor()
+	return file_contracts_e2ee_v1_models_proto_enumTypes[4].Descriptor()
 }
 
 func (GroupSenderKeyState) Type() protoreflect.EnumType {
-	return &file_contracts_e2ee_v1_models_proto_enumTypes[3]
+	return &file_contracts_e2ee_v1_models_proto_enumTypes[4]
 }
 
 func (x GroupSenderKeyState) Number() protoreflect.EnumNumber {
@@ -224,7 +288,7 @@ func (x GroupSenderKeyState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use GroupSenderKeyState.Descriptor instead.
 func (GroupSenderKeyState) EnumDescriptor() ([]byte, []int) {
-	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{3}
+	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{4}
 }
 
 type PreKey struct {
@@ -614,6 +678,141 @@ func (x *ConversationKeyCoverageEntry) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type E2EEUpdate struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	UpdateId       string                 `protobuf:"bytes,1,opt,name=update_id,json=updateId,proto3" json:"update_id,omitempty"`
+	UpdateType     E2EEUpdateType         `protobuf:"varint,2,opt,name=update_type,json=updateType,proto3,enum=zvonilka.e2ee.v1.E2EEUpdateType" json:"update_type,omitempty"`
+	ActorUserId    string                 `protobuf:"bytes,3,opt,name=actor_user_id,json=actorUserId,proto3" json:"actor_user_id,omitempty"`
+	ActorDeviceId  string                 `protobuf:"bytes,4,opt,name=actor_device_id,json=actorDeviceId,proto3" json:"actor_device_id,omitempty"`
+	TargetUserId   string                 `protobuf:"bytes,5,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	TargetDeviceId string                 `protobuf:"bytes,6,opt,name=target_device_id,json=targetDeviceId,proto3" json:"target_device_id,omitempty"`
+	ConversationId string                 `protobuf:"bytes,7,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	SessionId      string                 `protobuf:"bytes,8,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	DistributionId string                 `protobuf:"bytes,9,opt,name=distribution_id,json=distributionId,proto3" json:"distribution_id,omitempty"`
+	SenderKeyId    string                 `protobuf:"bytes,10,opt,name=sender_key_id,json=senderKeyId,proto3" json:"sender_key_id,omitempty"`
+	Metadata       map[string]string      `protobuf:"bytes,11,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+}
+
+func (x *E2EEUpdate) Reset() {
+	*x = E2EEUpdate{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_e2ee_v1_models_proto_msgTypes[5]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *E2EEUpdate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*E2EEUpdate) ProtoMessage() {}
+
+func (x *E2EEUpdate) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_e2ee_v1_models_proto_msgTypes[5]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use E2EEUpdate.ProtoReflect.Descriptor instead.
+func (*E2EEUpdate) Descriptor() ([]byte, []int) {
+	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *E2EEUpdate) GetUpdateId() string {
+	if x != nil {
+		return x.UpdateId
+	}
+	return ""
+}
+
+func (x *E2EEUpdate) GetUpdateType() E2EEUpdateType {
+	if x != nil {
+		return x.UpdateType
+	}
+	return E2EEUpdateType_E2EE_UPDATE_TYPE_UNSPECIFIED
+}
+
+func (x *E2EEUpdate) GetActorUserId() string {
+	if x != nil {
+		return x.ActorUserId
+	}
+	return ""
+}
+
+func (x *E2EEUpdate) GetActorDeviceId() string {
+	if x != nil {
+		return x.ActorDeviceId
+	}
+	return ""
+}
+
+func (x *E2EEUpdate) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *E2EEUpdate) GetTargetDeviceId() string {
+	if x != nil {
+		return x.TargetDeviceId
+	}
+	return ""
+}
+
+func (x *E2EEUpdate) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *E2EEUpdate) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *E2EEUpdate) GetDistributionId() string {
+	if x != nil {
+		return x.DistributionId
+	}
+	return ""
+}
+
+func (x *E2EEUpdate) GetSenderKeyId() string {
+	if x != nil {
+		return x.SenderKeyId
+	}
+	return ""
+}
+
+func (x *E2EEUpdate) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *E2EEUpdate) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
 type SessionBootstrapPayload struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -628,7 +827,7 @@ type SessionBootstrapPayload struct {
 func (x *SessionBootstrapPayload) Reset() {
 	*x = SessionBootstrapPayload{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_e2ee_v1_models_proto_msgTypes[5]
+		mi := &file_contracts_e2ee_v1_models_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -641,7 +840,7 @@ func (x *SessionBootstrapPayload) String() string {
 func (*SessionBootstrapPayload) ProtoMessage() {}
 
 func (x *SessionBootstrapPayload) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_e2ee_v1_models_proto_msgTypes[5]
+	mi := &file_contracts_e2ee_v1_models_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -654,7 +853,7 @@ func (x *SessionBootstrapPayload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionBootstrapPayload.ProtoReflect.Descriptor instead.
 func (*SessionBootstrapPayload) Descriptor() ([]byte, []int) {
-	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{5}
+	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SessionBootstrapPayload) GetAlgorithm() string {
@@ -709,7 +908,7 @@ type DirectSession struct {
 func (x *DirectSession) Reset() {
 	*x = DirectSession{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_e2ee_v1_models_proto_msgTypes[6]
+		mi := &file_contracts_e2ee_v1_models_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -722,7 +921,7 @@ func (x *DirectSession) String() string {
 func (*DirectSession) ProtoMessage() {}
 
 func (x *DirectSession) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_e2ee_v1_models_proto_msgTypes[6]
+	mi := &file_contracts_e2ee_v1_models_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -735,7 +934,7 @@ func (x *DirectSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DirectSession.ProtoReflect.Descriptor instead.
 func (*DirectSession) Descriptor() ([]byte, []int) {
-	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{6}
+	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DirectSession) GetSessionId() string {
@@ -850,7 +1049,7 @@ type SenderKeyPayload struct {
 func (x *SenderKeyPayload) Reset() {
 	*x = SenderKeyPayload{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_e2ee_v1_models_proto_msgTypes[7]
+		mi := &file_contracts_e2ee_v1_models_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -863,7 +1062,7 @@ func (x *SenderKeyPayload) String() string {
 func (*SenderKeyPayload) ProtoMessage() {}
 
 func (x *SenderKeyPayload) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_e2ee_v1_models_proto_msgTypes[7]
+	mi := &file_contracts_e2ee_v1_models_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -876,7 +1075,7 @@ func (x *SenderKeyPayload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SenderKeyPayload.ProtoReflect.Descriptor instead.
 func (*SenderKeyPayload) Descriptor() ([]byte, []int) {
-	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{7}
+	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SenderKeyPayload) GetAlgorithm() string {
@@ -920,7 +1119,7 @@ type RecipientSenderKey struct {
 func (x *RecipientSenderKey) Reset() {
 	*x = RecipientSenderKey{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_e2ee_v1_models_proto_msgTypes[8]
+		mi := &file_contracts_e2ee_v1_models_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -933,7 +1132,7 @@ func (x *RecipientSenderKey) String() string {
 func (*RecipientSenderKey) ProtoMessage() {}
 
 func (x *RecipientSenderKey) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_e2ee_v1_models_proto_msgTypes[8]
+	mi := &file_contracts_e2ee_v1_models_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -946,7 +1145,7 @@ func (x *RecipientSenderKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecipientSenderKey.ProtoReflect.Descriptor instead.
 func (*RecipientSenderKey) Descriptor() ([]byte, []int) {
-	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{8}
+	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RecipientSenderKey) GetRecipientUserId() string {
@@ -992,7 +1191,7 @@ type GroupSenderKeyDistribution struct {
 func (x *GroupSenderKeyDistribution) Reset() {
 	*x = GroupSenderKeyDistribution{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_e2ee_v1_models_proto_msgTypes[9]
+		mi := &file_contracts_e2ee_v1_models_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1005,7 +1204,7 @@ func (x *GroupSenderKeyDistribution) String() string {
 func (*GroupSenderKeyDistribution) ProtoMessage() {}
 
 func (x *GroupSenderKeyDistribution) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_e2ee_v1_models_proto_msgTypes[9]
+	mi := &file_contracts_e2ee_v1_models_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1018,7 +1217,7 @@ func (x *GroupSenderKeyDistribution) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GroupSenderKeyDistribution.ProtoReflect.Descriptor instead.
 func (*GroupSenderKeyDistribution) Descriptor() ([]byte, []int) {
-	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{9}
+	return file_contracts_e2ee_v1_models_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GroupSenderKeyDistribution) GetDistributionId() string {
@@ -1194,7 +1393,45 @@ var file_contracts_e2ee_v1_models_proto_rawDesc = []byte{
 	0x73, 0x5f, 0x61, 0x74, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f,
 	0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d,
 	0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x09, 0x65, 0x78, 0x70, 0x69, 0x72, 0x65, 0x73, 0x41,
-	0x74, 0x22, 0xff, 0x01, 0x0a, 0x17, 0x53, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x42, 0x6f, 0x6f,
+	0x74, 0x22, 0xdd, 0x04, 0x0a, 0x0a, 0x45, 0x32, 0x45, 0x45, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65,
+	0x12, 0x1b, 0x0a, 0x09, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x08, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x49, 0x64, 0x12, 0x41, 0x0a,
+	0x0b, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x0e, 0x32, 0x20, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x65, 0x32,
+	0x65, 0x65, 0x2e, 0x76, 0x31, 0x2e, 0x45, 0x32, 0x45, 0x45, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65,
+	0x54, 0x79, 0x70, 0x65, 0x52, 0x0a, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x54, 0x79, 0x70, 0x65,
+	0x12, 0x22, 0x0a, 0x0d, 0x61, 0x63, 0x74, 0x6f, 0x72, 0x5f, 0x75, 0x73, 0x65, 0x72, 0x5f, 0x69,
+	0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x61, 0x63, 0x74, 0x6f, 0x72, 0x55, 0x73,
+	0x65, 0x72, 0x49, 0x64, 0x12, 0x26, 0x0a, 0x0f, 0x61, 0x63, 0x74, 0x6f, 0x72, 0x5f, 0x64, 0x65,
+	0x76, 0x69, 0x63, 0x65, 0x5f, 0x69, 0x64, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0d, 0x61,
+	0x63, 0x74, 0x6f, 0x72, 0x44, 0x65, 0x76, 0x69, 0x63, 0x65, 0x49, 0x64, 0x12, 0x24, 0x0a, 0x0e,
+	0x74, 0x61, 0x72, 0x67, 0x65, 0x74, 0x5f, 0x75, 0x73, 0x65, 0x72, 0x5f, 0x69, 0x64, 0x18, 0x05,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x74, 0x61, 0x72, 0x67, 0x65, 0x74, 0x55, 0x73, 0x65, 0x72,
+	0x49, 0x64, 0x12, 0x28, 0x0a, 0x10, 0x74, 0x61, 0x72, 0x67, 0x65, 0x74, 0x5f, 0x64, 0x65, 0x76,
+	0x69, 0x63, 0x65, 0x5f, 0x69, 0x64, 0x18, 0x06, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x74, 0x61,
+	0x72, 0x67, 0x65, 0x74, 0x44, 0x65, 0x76, 0x69, 0x63, 0x65, 0x49, 0x64, 0x12, 0x27, 0x0a, 0x0f,
+	0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x69, 0x64, 0x18,
+	0x07, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x49, 0x64, 0x12, 0x1d, 0x0a, 0x0a, 0x73, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e,
+	0x5f, 0x69, 0x64, 0x18, 0x08, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x73, 0x65, 0x73, 0x73, 0x69,
+	0x6f, 0x6e, 0x49, 0x64, 0x12, 0x27, 0x0a, 0x0f, 0x64, 0x69, 0x73, 0x74, 0x72, 0x69, 0x62, 0x75,
+	0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x69, 0x64, 0x18, 0x09, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x64,
+	0x69, 0x73, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x69, 0x6f, 0x6e, 0x49, 0x64, 0x12, 0x22, 0x0a,
+	0x0d, 0x73, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x5f, 0x6b, 0x65, 0x79, 0x5f, 0x69, 0x64, 0x18, 0x0a,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x73, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x4b, 0x65, 0x79, 0x49,
+	0x64, 0x12, 0x46, 0x0a, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x18, 0x0b, 0x20,
+	0x03, 0x28, 0x0b, 0x32, 0x2a, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x65,
+	0x32, 0x65, 0x65, 0x2e, 0x76, 0x31, 0x2e, 0x45, 0x32, 0x45, 0x45, 0x55, 0x70, 0x64, 0x61, 0x74,
+	0x65, 0x2e, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52,
+	0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x12, 0x39, 0x0a, 0x0a, 0x63, 0x72, 0x65,
+	0x61, 0x74, 0x65, 0x64, 0x5f, 0x61, 0x74, 0x18, 0x0c, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e,
+	0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e,
+	0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x09, 0x63, 0x72, 0x65, 0x61, 0x74,
+	0x65, 0x64, 0x41, 0x74, 0x1a, 0x3b, 0x0a, 0x0d, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61,
+	0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38,
+	0x01, 0x22, 0xff, 0x01, 0x0a, 0x17, 0x53, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x42, 0x6f, 0x6f,
 	0x74, 0x73, 0x74, 0x72, 0x61, 0x70, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x12, 0x1c, 0x0a,
 	0x09, 0x61, 0x6c, 0x67, 0x6f, 0x72, 0x69, 0x74, 0x68, 0x6d, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
 	0x52, 0x09, 0x61, 0x6c, 0x67, 0x6f, 0x72, 0x69, 0x74, 0x68, 0x6d, 0x12, 0x14, 0x0a, 0x05, 0x6e,
@@ -1355,29 +1592,53 @@ var file_contracts_e2ee_v1_models_proto_rawDesc = []byte{
 	0x5f, 0x45, 0x58, 0x50, 0x49, 0x52, 0x45, 0x44, 0x10, 0x03, 0x12, 0x2b, 0x0a, 0x27, 0x43, 0x4f,
 	0x4e, 0x56, 0x45, 0x52, 0x53, 0x41, 0x54, 0x49, 0x4f, 0x4e, 0x5f, 0x4b, 0x45, 0x59, 0x5f, 0x43,
 	0x4f, 0x56, 0x45, 0x52, 0x41, 0x47, 0x45, 0x5f, 0x53, 0x54, 0x41, 0x54, 0x45, 0x5f, 0x4d, 0x49,
-	0x53, 0x53, 0x49, 0x4e, 0x47, 0x10, 0x04, 0x2a, 0x83, 0x01, 0x0a, 0x12, 0x44, 0x69, 0x72, 0x65,
-	0x63, 0x74, 0x53, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x53, 0x74, 0x61, 0x74, 0x65, 0x12, 0x24,
-	0x0a, 0x20, 0x44, 0x49, 0x52, 0x45, 0x43, 0x54, 0x5f, 0x53, 0x45, 0x53, 0x53, 0x49, 0x4f, 0x4e,
-	0x5f, 0x53, 0x54, 0x41, 0x54, 0x45, 0x5f, 0x55, 0x4e, 0x53, 0x50, 0x45, 0x43, 0x49, 0x46, 0x49,
-	0x45, 0x44, 0x10, 0x00, 0x12, 0x20, 0x0a, 0x1c, 0x44, 0x49, 0x52, 0x45, 0x43, 0x54, 0x5f, 0x53,
-	0x45, 0x53, 0x53, 0x49, 0x4f, 0x4e, 0x5f, 0x53, 0x54, 0x41, 0x54, 0x45, 0x5f, 0x50, 0x45, 0x4e,
-	0x44, 0x49, 0x4e, 0x47, 0x10, 0x01, 0x12, 0x25, 0x0a, 0x21, 0x44, 0x49, 0x52, 0x45, 0x43, 0x54,
-	0x5f, 0x53, 0x45, 0x53, 0x53, 0x49, 0x4f, 0x4e, 0x5f, 0x53, 0x54, 0x41, 0x54, 0x45, 0x5f, 0x41,
-	0x43, 0x4b, 0x4e, 0x4f, 0x57, 0x4c, 0x45, 0x44, 0x47, 0x45, 0x44, 0x10, 0x02, 0x2a, 0x8a, 0x01,
-	0x0a, 0x13, 0x47, 0x72, 0x6f, 0x75, 0x70, 0x53, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x4b, 0x65, 0x79,
-	0x53, 0x74, 0x61, 0x74, 0x65, 0x12, 0x26, 0x0a, 0x22, 0x47, 0x52, 0x4f, 0x55, 0x50, 0x5f, 0x53,
-	0x45, 0x4e, 0x44, 0x45, 0x52, 0x5f, 0x4b, 0x45, 0x59, 0x5f, 0x53, 0x54, 0x41, 0x54, 0x45, 0x5f,
-	0x55, 0x4e, 0x53, 0x50, 0x45, 0x43, 0x49, 0x46, 0x49, 0x45, 0x44, 0x10, 0x00, 0x12, 0x22, 0x0a,
-	0x1e, 0x47, 0x52, 0x4f, 0x55, 0x50, 0x5f, 0x53, 0x45, 0x4e, 0x44, 0x45, 0x52, 0x5f, 0x4b, 0x45,
-	0x59, 0x5f, 0x53, 0x54, 0x41, 0x54, 0x45, 0x5f, 0x50, 0x45, 0x4e, 0x44, 0x49, 0x4e, 0x47, 0x10,
-	0x01, 0x12, 0x27, 0x0a, 0x23, 0x47, 0x52, 0x4f, 0x55, 0x50, 0x5f, 0x53, 0x45, 0x4e, 0x44, 0x45,
-	0x52, 0x5f, 0x4b, 0x45, 0x59, 0x5f, 0x53, 0x54, 0x41, 0x54, 0x45, 0x5f, 0x41, 0x43, 0x4b, 0x4e,
-	0x4f, 0x57, 0x4c, 0x45, 0x44, 0x47, 0x45, 0x44, 0x10, 0x02, 0x42, 0x3f, 0x5a, 0x3d, 0x67, 0x69,
-	0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6d, 0x2d, 0x76, 0x65, 0x76, 0x2f,
-	0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2f, 0x67, 0x65, 0x6e, 0x2f, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74, 0x73, 0x2f, 0x65, 0x32, 0x65,
-	0x65, 0x2f, 0x76, 0x31, 0x3b, 0x65, 0x32, 0x65, 0x65, 0x76, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x33,
+	0x53, 0x53, 0x49, 0x4e, 0x47, 0x10, 0x04, 0x2a, 0x86, 0x03, 0x0a, 0x0e, 0x45, 0x32, 0x45, 0x45,
+	0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x54, 0x79, 0x70, 0x65, 0x12, 0x20, 0x0a, 0x1c, 0x45, 0x32,
+	0x45, 0x45, 0x5f, 0x55, 0x50, 0x44, 0x41, 0x54, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x55,
+	0x4e, 0x53, 0x50, 0x45, 0x43, 0x49, 0x46, 0x49, 0x45, 0x44, 0x10, 0x00, 0x12, 0x2b, 0x0a, 0x27,
+	0x45, 0x32, 0x45, 0x45, 0x5f, 0x55, 0x50, 0x44, 0x41, 0x54, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45,
+	0x5f, 0x44, 0x45, 0x56, 0x49, 0x43, 0x45, 0x5f, 0x50, 0x52, 0x45, 0x4b, 0x45, 0x59, 0x53, 0x5f,
+	0x55, 0x50, 0x44, 0x41, 0x54, 0x45, 0x44, 0x10, 0x01, 0x12, 0x29, 0x0a, 0x25, 0x45, 0x32, 0x45,
+	0x45, 0x5f, 0x55, 0x50, 0x44, 0x41, 0x54, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x44, 0x45,
+	0x56, 0x49, 0x43, 0x45, 0x5f, 0x54, 0x52, 0x55, 0x53, 0x54, 0x5f, 0x55, 0x50, 0x44, 0x41, 0x54,
+	0x45, 0x44, 0x10, 0x02, 0x12, 0x2b, 0x0a, 0x27, 0x45, 0x32, 0x45, 0x45, 0x5f, 0x55, 0x50, 0x44,
+	0x41, 0x54, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x44, 0x49, 0x52, 0x45, 0x43, 0x54, 0x5f,
+	0x53, 0x45, 0x53, 0x53, 0x49, 0x4f, 0x4e, 0x5f, 0x43, 0x52, 0x45, 0x41, 0x54, 0x45, 0x44, 0x10,
+	0x03, 0x12, 0x30, 0x0a, 0x2c, 0x45, 0x32, 0x45, 0x45, 0x5f, 0x55, 0x50, 0x44, 0x41, 0x54, 0x45,
+	0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x44, 0x49, 0x52, 0x45, 0x43, 0x54, 0x5f, 0x53, 0x45, 0x53,
+	0x53, 0x49, 0x4f, 0x4e, 0x5f, 0x41, 0x43, 0x4b, 0x4e, 0x4f, 0x57, 0x4c, 0x45, 0x44, 0x47, 0x45,
+	0x44, 0x10, 0x04, 0x12, 0x2f, 0x0a, 0x2b, 0x45, 0x32, 0x45, 0x45, 0x5f, 0x55, 0x50, 0x44, 0x41,
+	0x54, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x47, 0x52, 0x4f, 0x55, 0x50, 0x5f, 0x53, 0x45,
+	0x4e, 0x44, 0x45, 0x52, 0x5f, 0x4b, 0x45, 0x59, 0x5f, 0x50, 0x55, 0x42, 0x4c, 0x49, 0x53, 0x48,
+	0x45, 0x44, 0x10, 0x05, 0x12, 0x32, 0x0a, 0x2e, 0x45, 0x32, 0x45, 0x45, 0x5f, 0x55, 0x50, 0x44,
+	0x41, 0x54, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x47, 0x52, 0x4f, 0x55, 0x50, 0x5f, 0x53,
+	0x45, 0x4e, 0x44, 0x45, 0x52, 0x5f, 0x4b, 0x45, 0x59, 0x5f, 0x41, 0x43, 0x4b, 0x4e, 0x4f, 0x57,
+	0x4c, 0x45, 0x44, 0x47, 0x45, 0x44, 0x10, 0x06, 0x12, 0x36, 0x0a, 0x32, 0x45, 0x32, 0x45, 0x45,
+	0x5f, 0x55, 0x50, 0x44, 0x41, 0x54, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x43, 0x4f, 0x4e,
+	0x56, 0x45, 0x52, 0x53, 0x41, 0x54, 0x49, 0x4f, 0x4e, 0x5f, 0x4b, 0x45, 0x59, 0x5f, 0x43, 0x4f,
+	0x56, 0x45, 0x52, 0x41, 0x47, 0x45, 0x5f, 0x43, 0x48, 0x41, 0x4e, 0x47, 0x45, 0x44, 0x10, 0x07,
+	0x2a, 0x83, 0x01, 0x0a, 0x12, 0x44, 0x69, 0x72, 0x65, 0x63, 0x74, 0x53, 0x65, 0x73, 0x73, 0x69,
+	0x6f, 0x6e, 0x53, 0x74, 0x61, 0x74, 0x65, 0x12, 0x24, 0x0a, 0x20, 0x44, 0x49, 0x52, 0x45, 0x43,
+	0x54, 0x5f, 0x53, 0x45, 0x53, 0x53, 0x49, 0x4f, 0x4e, 0x5f, 0x53, 0x54, 0x41, 0x54, 0x45, 0x5f,
+	0x55, 0x4e, 0x53, 0x50, 0x45, 0x43, 0x49, 0x46, 0x49, 0x45, 0x44, 0x10, 0x00, 0x12, 0x20, 0x0a,
+	0x1c, 0x44, 0x49, 0x52, 0x45, 0x43, 0x54, 0x5f, 0x53, 0x45, 0x53, 0x53, 0x49, 0x4f, 0x4e, 0x5f,
+	0x53, 0x54, 0x41, 0x54, 0x45, 0x5f, 0x50, 0x45, 0x4e, 0x44, 0x49, 0x4e, 0x47, 0x10, 0x01, 0x12,
+	0x25, 0x0a, 0x21, 0x44, 0x49, 0x52, 0x45, 0x43, 0x54, 0x5f, 0x53, 0x45, 0x53, 0x53, 0x49, 0x4f,
+	0x4e, 0x5f, 0x53, 0x54, 0x41, 0x54, 0x45, 0x5f, 0x41, 0x43, 0x4b, 0x4e, 0x4f, 0x57, 0x4c, 0x45,
+	0x44, 0x47, 0x45, 0x44, 0x10, 0x02, 0x2a, 0x8a, 0x01, 0x0a, 0x13, 0x47, 0x72, 0x6f, 0x75, 0x70,
+	0x53, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x4b, 0x65, 0x79, 0x53, 0x74, 0x61, 0x74, 0x65, 0x12, 0x26,
+	0x0a, 0x22, 0x47, 0x52, 0x4f, 0x55, 0x50, 0x5f, 0x53, 0x45, 0x4e, 0x44, 0x45, 0x52, 0x5f, 0x4b,
+	0x45, 0x59, 0x5f, 0x53, 0x54, 0x41, 0x54, 0x45, 0x5f, 0x55, 0x4e, 0x53, 0x50, 0x45, 0x43, 0x49,
+	0x46, 0x49, 0x45, 0x44, 0x10, 0x00, 0x12, 0x22, 0x0a, 0x1e, 0x47, 0x52, 0x4f, 0x55, 0x50, 0x5f,
+	0x53, 0x45, 0x4e, 0x44, 0x45, 0x52, 0x5f, 0x4b, 0x45, 0x59, 0x5f, 0x53, 0x54, 0x41, 0x54, 0x45,
+	0x5f, 0x50, 0x45, 0x4e, 0x44, 0x49, 0x4e, 0x47, 0x10, 0x01, 0x12, 0x27, 0x0a, 0x23, 0x47, 0x52,
+	0x4f, 0x55, 0x50, 0x5f, 0x53, 0x45, 0x4e, 0x44, 0x45, 0x52, 0x5f, 0x4b, 0x45, 0x59, 0x5f, 0x53,
+	0x54, 0x41, 0x54, 0x45, 0x5f, 0x41, 0x43, 0x4b, 0x4e, 0x4f, 0x57, 0x4c, 0x45, 0x44, 0x47, 0x45,
+	0x44, 0x10, 0x02, 0x42, 0x3f, 0x5a, 0x3d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f,
+	0x6d, 0x2f, 0x64, 0x6d, 0x2d, 0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b,
+	0x61, 0x2f, 0x67, 0x65, 0x6e, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x74,
+	0x72, 0x61, 0x63, 0x74, 0x73, 0x2f, 0x65, 0x32, 0x65, 0x65, 0x2f, 0x76, 0x31, 0x3b, 0x65, 0x32,
+	0x65, 0x65, 0x76, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1392,62 +1653,68 @@ func file_contracts_e2ee_v1_models_proto_rawDescGZIP() []byte {
 	return file_contracts_e2ee_v1_models_proto_rawDescData
 }
 
-var file_contracts_e2ee_v1_models_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_contracts_e2ee_v1_models_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_contracts_e2ee_v1_models_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_contracts_e2ee_v1_models_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_contracts_e2ee_v1_models_proto_goTypes = []interface{}{
 	(DeviceTrustState)(0),                // 0: zvonilka.e2ee.v1.DeviceTrustState
 	(ConversationKeyCoverageState)(0),    // 1: zvonilka.e2ee.v1.ConversationKeyCoverageState
-	(DirectSessionState)(0),              // 2: zvonilka.e2ee.v1.DirectSessionState
-	(GroupSenderKeyState)(0),             // 3: zvonilka.e2ee.v1.GroupSenderKeyState
-	(*PreKey)(nil),                       // 4: zvonilka.e2ee.v1.PreKey
-	(*SignedPreKey)(nil),                 // 5: zvonilka.e2ee.v1.SignedPreKey
-	(*DevicePreKeyBundle)(nil),           // 6: zvonilka.e2ee.v1.DevicePreKeyBundle
-	(*DeviceTrust)(nil),                  // 7: zvonilka.e2ee.v1.DeviceTrust
-	(*ConversationKeyCoverageEntry)(nil), // 8: zvonilka.e2ee.v1.ConversationKeyCoverageEntry
-	(*SessionBootstrapPayload)(nil),      // 9: zvonilka.e2ee.v1.SessionBootstrapPayload
-	(*DirectSession)(nil),                // 10: zvonilka.e2ee.v1.DirectSession
-	(*SenderKeyPayload)(nil),             // 11: zvonilka.e2ee.v1.SenderKeyPayload
-	(*RecipientSenderKey)(nil),           // 12: zvonilka.e2ee.v1.RecipientSenderKey
-	(*GroupSenderKeyDistribution)(nil),   // 13: zvonilka.e2ee.v1.GroupSenderKeyDistribution
-	nil,                                  // 14: zvonilka.e2ee.v1.SessionBootstrapPayload.MetadataEntry
-	nil,                                  // 15: zvonilka.e2ee.v1.SenderKeyPayload.MetadataEntry
-	(*v1.PublicKeyBundle)(nil),           // 16: zvonilka.common.v1.PublicKeyBundle
-	(*timestamppb.Timestamp)(nil),        // 17: google.protobuf.Timestamp
+	(E2EEUpdateType)(0),                  // 2: zvonilka.e2ee.v1.E2EEUpdateType
+	(DirectSessionState)(0),              // 3: zvonilka.e2ee.v1.DirectSessionState
+	(GroupSenderKeyState)(0),             // 4: zvonilka.e2ee.v1.GroupSenderKeyState
+	(*PreKey)(nil),                       // 5: zvonilka.e2ee.v1.PreKey
+	(*SignedPreKey)(nil),                 // 6: zvonilka.e2ee.v1.SignedPreKey
+	(*DevicePreKeyBundle)(nil),           // 7: zvonilka.e2ee.v1.DevicePreKeyBundle
+	(*DeviceTrust)(nil),                  // 8: zvonilka.e2ee.v1.DeviceTrust
+	(*ConversationKeyCoverageEntry)(nil), // 9: zvonilka.e2ee.v1.ConversationKeyCoverageEntry
+	(*E2EEUpdate)(nil),                   // 10: zvonilka.e2ee.v1.E2EEUpdate
+	(*SessionBootstrapPayload)(nil),      // 11: zvonilka.e2ee.v1.SessionBootstrapPayload
+	(*DirectSession)(nil),                // 12: zvonilka.e2ee.v1.DirectSession
+	(*SenderKeyPayload)(nil),             // 13: zvonilka.e2ee.v1.SenderKeyPayload
+	(*RecipientSenderKey)(nil),           // 14: zvonilka.e2ee.v1.RecipientSenderKey
+	(*GroupSenderKeyDistribution)(nil),   // 15: zvonilka.e2ee.v1.GroupSenderKeyDistribution
+	nil,                                  // 16: zvonilka.e2ee.v1.E2EEUpdate.MetadataEntry
+	nil,                                  // 17: zvonilka.e2ee.v1.SessionBootstrapPayload.MetadataEntry
+	nil,                                  // 18: zvonilka.e2ee.v1.SenderKeyPayload.MetadataEntry
+	(*v1.PublicKeyBundle)(nil),           // 19: zvonilka.common.v1.PublicKeyBundle
+	(*timestamppb.Timestamp)(nil),        // 20: google.protobuf.Timestamp
 }
 var file_contracts_e2ee_v1_models_proto_depIdxs = []int32{
-	16, // 0: zvonilka.e2ee.v1.PreKey.key:type_name -> zvonilka.common.v1.PublicKeyBundle
-	16, // 1: zvonilka.e2ee.v1.SignedPreKey.key:type_name -> zvonilka.common.v1.PublicKeyBundle
-	16, // 2: zvonilka.e2ee.v1.DevicePreKeyBundle.identity_key:type_name -> zvonilka.common.v1.PublicKeyBundle
-	5,  // 3: zvonilka.e2ee.v1.DevicePreKeyBundle.signed_prekey:type_name -> zvonilka.e2ee.v1.SignedPreKey
-	4,  // 4: zvonilka.e2ee.v1.DevicePreKeyBundle.one_time_prekey:type_name -> zvonilka.e2ee.v1.PreKey
-	17, // 5: zvonilka.e2ee.v1.DevicePreKeyBundle.device_last_seen_at:type_name -> google.protobuf.Timestamp
+	19, // 0: zvonilka.e2ee.v1.PreKey.key:type_name -> zvonilka.common.v1.PublicKeyBundle
+	19, // 1: zvonilka.e2ee.v1.SignedPreKey.key:type_name -> zvonilka.common.v1.PublicKeyBundle
+	19, // 2: zvonilka.e2ee.v1.DevicePreKeyBundle.identity_key:type_name -> zvonilka.common.v1.PublicKeyBundle
+	6,  // 3: zvonilka.e2ee.v1.DevicePreKeyBundle.signed_prekey:type_name -> zvonilka.e2ee.v1.SignedPreKey
+	5,  // 4: zvonilka.e2ee.v1.DevicePreKeyBundle.one_time_prekey:type_name -> zvonilka.e2ee.v1.PreKey
+	20, // 5: zvonilka.e2ee.v1.DevicePreKeyBundle.device_last_seen_at:type_name -> google.protobuf.Timestamp
 	0,  // 6: zvonilka.e2ee.v1.DeviceTrust.state:type_name -> zvonilka.e2ee.v1.DeviceTrustState
-	17, // 7: zvonilka.e2ee.v1.DeviceTrust.created_at:type_name -> google.protobuf.Timestamp
-	17, // 8: zvonilka.e2ee.v1.DeviceTrust.updated_at:type_name -> google.protobuf.Timestamp
+	20, // 7: zvonilka.e2ee.v1.DeviceTrust.created_at:type_name -> google.protobuf.Timestamp
+	20, // 8: zvonilka.e2ee.v1.DeviceTrust.updated_at:type_name -> google.protobuf.Timestamp
 	1,  // 9: zvonilka.e2ee.v1.ConversationKeyCoverageEntry.state:type_name -> zvonilka.e2ee.v1.ConversationKeyCoverageState
-	17, // 10: zvonilka.e2ee.v1.ConversationKeyCoverageEntry.expires_at:type_name -> google.protobuf.Timestamp
-	14, // 11: zvonilka.e2ee.v1.SessionBootstrapPayload.metadata:type_name -> zvonilka.e2ee.v1.SessionBootstrapPayload.MetadataEntry
-	16, // 12: zvonilka.e2ee.v1.DirectSession.initiator_ephemeral_key:type_name -> zvonilka.common.v1.PublicKeyBundle
-	16, // 13: zvonilka.e2ee.v1.DirectSession.identity_key:type_name -> zvonilka.common.v1.PublicKeyBundle
-	5,  // 14: zvonilka.e2ee.v1.DirectSession.signed_prekey:type_name -> zvonilka.e2ee.v1.SignedPreKey
-	4,  // 15: zvonilka.e2ee.v1.DirectSession.one_time_prekey:type_name -> zvonilka.e2ee.v1.PreKey
-	9,  // 16: zvonilka.e2ee.v1.DirectSession.bootstrap:type_name -> zvonilka.e2ee.v1.SessionBootstrapPayload
-	2,  // 17: zvonilka.e2ee.v1.DirectSession.state:type_name -> zvonilka.e2ee.v1.DirectSessionState
-	17, // 18: zvonilka.e2ee.v1.DirectSession.created_at:type_name -> google.protobuf.Timestamp
-	17, // 19: zvonilka.e2ee.v1.DirectSession.acknowledged_at:type_name -> google.protobuf.Timestamp
-	17, // 20: zvonilka.e2ee.v1.DirectSession.expires_at:type_name -> google.protobuf.Timestamp
-	15, // 21: zvonilka.e2ee.v1.SenderKeyPayload.metadata:type_name -> zvonilka.e2ee.v1.SenderKeyPayload.MetadataEntry
-	11, // 22: zvonilka.e2ee.v1.RecipientSenderKey.payload:type_name -> zvonilka.e2ee.v1.SenderKeyPayload
-	11, // 23: zvonilka.e2ee.v1.GroupSenderKeyDistribution.payload:type_name -> zvonilka.e2ee.v1.SenderKeyPayload
-	3,  // 24: zvonilka.e2ee.v1.GroupSenderKeyDistribution.state:type_name -> zvonilka.e2ee.v1.GroupSenderKeyState
-	17, // 25: zvonilka.e2ee.v1.GroupSenderKeyDistribution.created_at:type_name -> google.protobuf.Timestamp
-	17, // 26: zvonilka.e2ee.v1.GroupSenderKeyDistribution.acknowledged_at:type_name -> google.protobuf.Timestamp
-	17, // 27: zvonilka.e2ee.v1.GroupSenderKeyDistribution.expires_at:type_name -> google.protobuf.Timestamp
-	28, // [28:28] is the sub-list for method output_type
-	28, // [28:28] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	20, // 10: zvonilka.e2ee.v1.ConversationKeyCoverageEntry.expires_at:type_name -> google.protobuf.Timestamp
+	2,  // 11: zvonilka.e2ee.v1.E2EEUpdate.update_type:type_name -> zvonilka.e2ee.v1.E2EEUpdateType
+	16, // 12: zvonilka.e2ee.v1.E2EEUpdate.metadata:type_name -> zvonilka.e2ee.v1.E2EEUpdate.MetadataEntry
+	20, // 13: zvonilka.e2ee.v1.E2EEUpdate.created_at:type_name -> google.protobuf.Timestamp
+	17, // 14: zvonilka.e2ee.v1.SessionBootstrapPayload.metadata:type_name -> zvonilka.e2ee.v1.SessionBootstrapPayload.MetadataEntry
+	19, // 15: zvonilka.e2ee.v1.DirectSession.initiator_ephemeral_key:type_name -> zvonilka.common.v1.PublicKeyBundle
+	19, // 16: zvonilka.e2ee.v1.DirectSession.identity_key:type_name -> zvonilka.common.v1.PublicKeyBundle
+	6,  // 17: zvonilka.e2ee.v1.DirectSession.signed_prekey:type_name -> zvonilka.e2ee.v1.SignedPreKey
+	5,  // 18: zvonilka.e2ee.v1.DirectSession.one_time_prekey:type_name -> zvonilka.e2ee.v1.PreKey
+	11, // 19: zvonilka.e2ee.v1.DirectSession.bootstrap:type_name -> zvonilka.e2ee.v1.SessionBootstrapPayload
+	3,  // 20: zvonilka.e2ee.v1.DirectSession.state:type_name -> zvonilka.e2ee.v1.DirectSessionState
+	20, // 21: zvonilka.e2ee.v1.DirectSession.created_at:type_name -> google.protobuf.Timestamp
+	20, // 22: zvonilka.e2ee.v1.DirectSession.acknowledged_at:type_name -> google.protobuf.Timestamp
+	20, // 23: zvonilka.e2ee.v1.DirectSession.expires_at:type_name -> google.protobuf.Timestamp
+	18, // 24: zvonilka.e2ee.v1.SenderKeyPayload.metadata:type_name -> zvonilka.e2ee.v1.SenderKeyPayload.MetadataEntry
+	13, // 25: zvonilka.e2ee.v1.RecipientSenderKey.payload:type_name -> zvonilka.e2ee.v1.SenderKeyPayload
+	13, // 26: zvonilka.e2ee.v1.GroupSenderKeyDistribution.payload:type_name -> zvonilka.e2ee.v1.SenderKeyPayload
+	4,  // 27: zvonilka.e2ee.v1.GroupSenderKeyDistribution.state:type_name -> zvonilka.e2ee.v1.GroupSenderKeyState
+	20, // 28: zvonilka.e2ee.v1.GroupSenderKeyDistribution.created_at:type_name -> google.protobuf.Timestamp
+	20, // 29: zvonilka.e2ee.v1.GroupSenderKeyDistribution.acknowledged_at:type_name -> google.protobuf.Timestamp
+	20, // 30: zvonilka.e2ee.v1.GroupSenderKeyDistribution.expires_at:type_name -> google.protobuf.Timestamp
+	31, // [31:31] is the sub-list for method output_type
+	31, // [31:31] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_contracts_e2ee_v1_models_proto_init() }
@@ -1517,7 +1784,7 @@ func file_contracts_e2ee_v1_models_proto_init() {
 			}
 		}
 		file_contracts_e2ee_v1_models_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SessionBootstrapPayload); i {
+			switch v := v.(*E2EEUpdate); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1529,7 +1796,7 @@ func file_contracts_e2ee_v1_models_proto_init() {
 			}
 		}
 		file_contracts_e2ee_v1_models_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*DirectSession); i {
+			switch v := v.(*SessionBootstrapPayload); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1541,7 +1808,7 @@ func file_contracts_e2ee_v1_models_proto_init() {
 			}
 		}
 		file_contracts_e2ee_v1_models_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SenderKeyPayload); i {
+			switch v := v.(*DirectSession); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1553,7 +1820,7 @@ func file_contracts_e2ee_v1_models_proto_init() {
 			}
 		}
 		file_contracts_e2ee_v1_models_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RecipientSenderKey); i {
+			switch v := v.(*SenderKeyPayload); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1565,6 +1832,18 @@ func file_contracts_e2ee_v1_models_proto_init() {
 			}
 		}
 		file_contracts_e2ee_v1_models_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RecipientSenderKey); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_e2ee_v1_models_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GroupSenderKeyDistribution); i {
 			case 0:
 				return &v.state
@@ -1582,8 +1861,8 @@ func file_contracts_e2ee_v1_models_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_contracts_e2ee_v1_models_proto_rawDesc,
-			NumEnums:      4,
-			NumMessages:   12,
+			NumEnums:      5,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -56,6 +56,7 @@ type api struct {
 
 	call         *domaincall.Service
 	e2ee         *domaine2ee.Service
+	e2eeNotifier *e2eeNotifier
 	identity     *identity.Service
 	conversation *conversation.Service
 	media        *media.Service
@@ -113,6 +114,7 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 		api: &api{
 			call:         callService,
 			e2ee:         e2eeService,
+			e2eeNotifier: newE2EENotifier(),
 			identity:     identityService,
 			conversation: conversationService,
 			media:        mediaService,
