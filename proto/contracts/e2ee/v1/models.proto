@@ -55,3 +55,37 @@ message DirectSession {
   google.protobuf.Timestamp acknowledged_at = 13;
   google.protobuf.Timestamp expires_at = 14;
 }
+
+message SenderKeyPayload {
+  string algorithm = 1;
+  bytes nonce = 2;
+  bytes ciphertext = 3;
+  map<string, string> metadata = 4;
+}
+
+enum GroupSenderKeyState {
+  GROUP_SENDER_KEY_STATE_UNSPECIFIED = 0;
+  GROUP_SENDER_KEY_STATE_PENDING = 1;
+  GROUP_SENDER_KEY_STATE_ACKNOWLEDGED = 2;
+}
+
+message RecipientSenderKey {
+  string recipient_user_id = 1;
+  string recipient_device_id = 2;
+  SenderKeyPayload payload = 3;
+}
+
+message GroupSenderKeyDistribution {
+  string distribution_id = 1;
+  string conversation_id = 2;
+  string sender_user_id = 3;
+  string sender_device_id = 4;
+  string recipient_user_id = 5;
+  string recipient_device_id = 6;
+  string sender_key_id = 7;
+  SenderKeyPayload payload = 8;
+  GroupSenderKeyState state = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp acknowledged_at = 11;
+  google.protobuf.Timestamp expires_at = 12;
+}

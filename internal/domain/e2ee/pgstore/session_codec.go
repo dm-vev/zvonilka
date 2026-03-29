@@ -95,3 +95,44 @@ func unmarshalMetadata(value []byte) map[string]string {
 	}
 	return result
 }
+
+func (s *Store) scanGroupSenderKeyDistribution(ctx context.Context, query string, args ...any) (e2ee.GroupSenderKeyDistribution, error) {
+	value, err := scanGroupSenderKeyDistribution(s.conn().QueryRowContext(ctx, query, args...))
+	if errors.Is(err, sql.ErrNoRows) {
+		return e2ee.GroupSenderKeyDistribution{}, e2ee.ErrNotFound
+	}
+	return value, err
+}
+
+func scanGroupSenderKeyDistribution(row rowScanner) (e2ee.GroupSenderKeyDistribution, error) {
+	var (
+		value          e2ee.GroupSenderKeyDistribution
+		metadata       []byte
+		acknowledgedAt sql.NullTime
+		expiresAt      sql.NullTime
+	)
+	err := row.Scan(
+		&value.ID,
+		&value.ConversationID,
+		&value.SenderAccountID,
+		&value.SenderDeviceID,
+		&value.RecipientAccountID,
+		&value.RecipientDeviceID,
+		&value.SenderKeyID,
+		&value.Payload.Algorithm,
+		&value.Payload.Nonce,
+		&value.Payload.Ciphertext,
+		&metadata,
+		&value.State,
+		&value.CreatedAt,
+		&acknowledgedAt,
+		&expiresAt,
+	)
+	if err != nil {
+		return e2ee.GroupSenderKeyDistribution{}, err
+	}
+	value.Payload.Metadata = unmarshalMetadata(metadata)
+	value.AcknowledgedAt = acknowledgedAt.Time
+	value.ExpiresAt = expiresAt.Time
+	return value, nil
+}

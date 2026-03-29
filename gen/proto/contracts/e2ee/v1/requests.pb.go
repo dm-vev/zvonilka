@@ -564,6 +564,320 @@ func (x *AcknowledgeDirectSessionResponse) GetSession() *DirectSession {
 	return nil
 }
 
+type PublishGroupSenderKeysRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ConversationId string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	SenderKeyId    string                 `protobuf:"bytes,2,opt,name=sender_key_id,json=senderKeyId,proto3" json:"sender_key_id,omitempty"`
+	Recipients     []*RecipientSenderKey  `protobuf:"bytes,3,rep,name=recipients,proto3" json:"recipients,omitempty"`
+	ExpiresAt      *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+}
+
+func (x *PublishGroupSenderKeysRequest) Reset() {
+	*x = PublishGroupSenderKeysRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_e2ee_v1_requests_proto_msgTypes[10]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PublishGroupSenderKeysRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishGroupSenderKeysRequest) ProtoMessage() {}
+
+func (x *PublishGroupSenderKeysRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_e2ee_v1_requests_proto_msgTypes[10]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishGroupSenderKeysRequest.ProtoReflect.Descriptor instead.
+func (*PublishGroupSenderKeysRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_e2ee_v1_requests_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *PublishGroupSenderKeysRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *PublishGroupSenderKeysRequest) GetSenderKeyId() string {
+	if x != nil {
+		return x.SenderKeyId
+	}
+	return ""
+}
+
+func (x *PublishGroupSenderKeysRequest) GetRecipients() []*RecipientSenderKey {
+	if x != nil {
+		return x.Recipients
+	}
+	return nil
+}
+
+func (x *PublishGroupSenderKeysRequest) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+type PublishGroupSenderKeysResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Distributions []*GroupSenderKeyDistribution `protobuf:"bytes,1,rep,name=distributions,proto3" json:"distributions,omitempty"`
+}
+
+func (x *PublishGroupSenderKeysResponse) Reset() {
+	*x = PublishGroupSenderKeysResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_e2ee_v1_requests_proto_msgTypes[11]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PublishGroupSenderKeysResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishGroupSenderKeysResponse) ProtoMessage() {}
+
+func (x *PublishGroupSenderKeysResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_e2ee_v1_requests_proto_msgTypes[11]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishGroupSenderKeysResponse.ProtoReflect.Descriptor instead.
+func (*PublishGroupSenderKeysResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_e2ee_v1_requests_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *PublishGroupSenderKeysResponse) GetDistributions() []*GroupSenderKeyDistribution {
+	if x != nil {
+		return x.Distributions
+	}
+	return nil
+}
+
+type ListGroupSenderKeysRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ConversationId      string `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	IncludeAcknowledged bool   `protobuf:"varint,2,opt,name=include_acknowledged,json=includeAcknowledged,proto3" json:"include_acknowledged,omitempty"`
+}
+
+func (x *ListGroupSenderKeysRequest) Reset() {
+	*x = ListGroupSenderKeysRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_e2ee_v1_requests_proto_msgTypes[12]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ListGroupSenderKeysRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListGroupSenderKeysRequest) ProtoMessage() {}
+
+func (x *ListGroupSenderKeysRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_e2ee_v1_requests_proto_msgTypes[12]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListGroupSenderKeysRequest.ProtoReflect.Descriptor instead.
+func (*ListGroupSenderKeysRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_e2ee_v1_requests_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ListGroupSenderKeysRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *ListGroupSenderKeysRequest) GetIncludeAcknowledged() bool {
+	if x != nil {
+		return x.IncludeAcknowledged
+	}
+	return false
+}
+
+type ListGroupSenderKeysResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Distributions []*GroupSenderKeyDistribution `protobuf:"bytes,1,rep,name=distributions,proto3" json:"distributions,omitempty"`
+}
+
+func (x *ListGroupSenderKeysResponse) Reset() {
+	*x = ListGroupSenderKeysResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_e2ee_v1_requests_proto_msgTypes[13]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ListGroupSenderKeysResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListGroupSenderKeysResponse) ProtoMessage() {}
+
+func (x *ListGroupSenderKeysResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_e2ee_v1_requests_proto_msgTypes[13]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListGroupSenderKeysResponse.ProtoReflect.Descriptor instead.
+func (*ListGroupSenderKeysResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_e2ee_v1_requests_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ListGroupSenderKeysResponse) GetDistributions() []*GroupSenderKeyDistribution {
+	if x != nil {
+		return x.Distributions
+	}
+	return nil
+}
+
+type AcknowledgeGroupSenderKeyRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	DistributionId string `protobuf:"bytes,1,opt,name=distribution_id,json=distributionId,proto3" json:"distribution_id,omitempty"`
+}
+
+func (x *AcknowledgeGroupSenderKeyRequest) Reset() {
+	*x = AcknowledgeGroupSenderKeyRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_e2ee_v1_requests_proto_msgTypes[14]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *AcknowledgeGroupSenderKeyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AcknowledgeGroupSenderKeyRequest) ProtoMessage() {}
+
+func (x *AcknowledgeGroupSenderKeyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_e2ee_v1_requests_proto_msgTypes[14]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AcknowledgeGroupSenderKeyRequest.ProtoReflect.Descriptor instead.
+func (*AcknowledgeGroupSenderKeyRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_e2ee_v1_requests_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *AcknowledgeGroupSenderKeyRequest) GetDistributionId() string {
+	if x != nil {
+		return x.DistributionId
+	}
+	return ""
+}
+
+type AcknowledgeGroupSenderKeyResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Distribution *GroupSenderKeyDistribution `protobuf:"bytes,1,opt,name=distribution,proto3" json:"distribution,omitempty"`
+}
+
+func (x *AcknowledgeGroupSenderKeyResponse) Reset() {
+	*x = AcknowledgeGroupSenderKeyResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_e2ee_v1_requests_proto_msgTypes[15]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *AcknowledgeGroupSenderKeyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AcknowledgeGroupSenderKeyResponse) ProtoMessage() {}
+
+func (x *AcknowledgeGroupSenderKeyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_e2ee_v1_requests_proto_msgTypes[15]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AcknowledgeGroupSenderKeyResponse.ProtoReflect.Descriptor instead.
+func (*AcknowledgeGroupSenderKeyResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_e2ee_v1_requests_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *AcknowledgeGroupSenderKeyResponse) GetDistribution() *GroupSenderKeyDistribution {
+	if x != nil {
+		return x.Distribution
+	}
+	return nil
+}
+
 var File_contracts_e2ee_v1_requests_proto protoreflect.FileDescriptor
 
 var file_contracts_e2ee_v1_requests_proto_rawDesc = []byte{
@@ -659,12 +973,61 @@ var file_contracts_e2ee_v1_requests_proto_rawDesc = []byte{
 	0x73, 0x65, 0x12, 0x39, 0x0a, 0x07, 0x73, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x01, 0x20,
 	0x01, 0x28, 0x0b, 0x32, 0x1f, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x65,
 	0x32, 0x65, 0x65, 0x2e, 0x76, 0x31, 0x2e, 0x44, 0x69, 0x72, 0x65, 0x63, 0x74, 0x53, 0x65, 0x73,
-	0x73, 0x69, 0x6f, 0x6e, 0x52, 0x07, 0x73, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x42, 0x3f, 0x5a,
-	0x3d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6d, 0x2d, 0x76,
-	0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2f, 0x67, 0x65, 0x6e, 0x2f,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74, 0x73, 0x2f,
-	0x65, 0x32, 0x65, 0x65, 0x2f, 0x76, 0x31, 0x3b, 0x65, 0x32, 0x65, 0x65, 0x76, 0x31, 0x62, 0x06,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x73, 0x69, 0x6f, 0x6e, 0x52, 0x07, 0x73, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x22, 0xed, 0x01,
+	0x0a, 0x1d, 0x50, 0x75, 0x62, 0x6c, 0x69, 0x73, 0x68, 0x47, 0x72, 0x6f, 0x75, 0x70, 0x53, 0x65,
+	0x6e, 0x64, 0x65, 0x72, 0x4b, 0x65, 0x79, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12,
+	0x27, 0x0a, 0x0f, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f,
+	0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72,
+	0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x49, 0x64, 0x12, 0x22, 0x0a, 0x0d, 0x73, 0x65, 0x6e, 0x64,
+	0x65, 0x72, 0x5f, 0x6b, 0x65, 0x79, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x0b, 0x73, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x4b, 0x65, 0x79, 0x49, 0x64, 0x12, 0x44, 0x0a, 0x0a,
+	0x72, 0x65, 0x63, 0x69, 0x70, 0x69, 0x65, 0x6e, 0x74, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0b,
+	0x32, 0x24, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x65, 0x32, 0x65, 0x65,
+	0x2e, 0x76, 0x31, 0x2e, 0x52, 0x65, 0x63, 0x69, 0x70, 0x69, 0x65, 0x6e, 0x74, 0x53, 0x65, 0x6e,
+	0x64, 0x65, 0x72, 0x4b, 0x65, 0x79, 0x52, 0x0a, 0x72, 0x65, 0x63, 0x69, 0x70, 0x69, 0x65, 0x6e,
+	0x74, 0x73, 0x12, 0x39, 0x0a, 0x0a, 0x65, 0x78, 0x70, 0x69, 0x72, 0x65, 0x73, 0x5f, 0x61, 0x74,
+	0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61,
+	0x6d, 0x70, 0x52, 0x09, 0x65, 0x78, 0x70, 0x69, 0x72, 0x65, 0x73, 0x41, 0x74, 0x22, 0x74, 0x0a,
+	0x1e, 0x50, 0x75, 0x62, 0x6c, 0x69, 0x73, 0x68, 0x47, 0x72, 0x6f, 0x75, 0x70, 0x53, 0x65, 0x6e,
+	0x64, 0x65, 0x72, 0x4b, 0x65, 0x79, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12,
+	0x52, 0x0a, 0x0d, 0x64, 0x69, 0x73, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x69, 0x6f, 0x6e, 0x73,
+	0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x2c, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b,
+	0x61, 0x2e, 0x65, 0x32, 0x65, 0x65, 0x2e, 0x76, 0x31, 0x2e, 0x47, 0x72, 0x6f, 0x75, 0x70, 0x53,
+	0x65, 0x6e, 0x64, 0x65, 0x72, 0x4b, 0x65, 0x79, 0x44, 0x69, 0x73, 0x74, 0x72, 0x69, 0x62, 0x75,
+	0x74, 0x69, 0x6f, 0x6e, 0x52, 0x0d, 0x64, 0x69, 0x73, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x69,
+	0x6f, 0x6e, 0x73, 0x22, 0x78, 0x0a, 0x1a, 0x4c, 0x69, 0x73, 0x74, 0x47, 0x72, 0x6f, 0x75, 0x70,
+	0x53, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x4b, 0x65, 0x79, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x74, 0x12, 0x27, 0x0a, 0x0f, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f,
+	0x6e, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x63, 0x6f, 0x6e, 0x76,
+	0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x49, 0x64, 0x12, 0x31, 0x0a, 0x14, 0x69, 0x6e,
+	0x63, 0x6c, 0x75, 0x64, 0x65, 0x5f, 0x61, 0x63, 0x6b, 0x6e, 0x6f, 0x77, 0x6c, 0x65, 0x64, 0x67,
+	0x65, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x08, 0x52, 0x13, 0x69, 0x6e, 0x63, 0x6c, 0x75, 0x64,
+	0x65, 0x41, 0x63, 0x6b, 0x6e, 0x6f, 0x77, 0x6c, 0x65, 0x64, 0x67, 0x65, 0x64, 0x22, 0x71, 0x0a,
+	0x1b, 0x4c, 0x69, 0x73, 0x74, 0x47, 0x72, 0x6f, 0x75, 0x70, 0x53, 0x65, 0x6e, 0x64, 0x65, 0x72,
+	0x4b, 0x65, 0x79, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x52, 0x0a, 0x0d,
+	0x64, 0x69, 0x73, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x18, 0x01, 0x20,
+	0x03, 0x28, 0x0b, 0x32, 0x2c, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x65,
+	0x32, 0x65, 0x65, 0x2e, 0x76, 0x31, 0x2e, 0x47, 0x72, 0x6f, 0x75, 0x70, 0x53, 0x65, 0x6e, 0x64,
+	0x65, 0x72, 0x4b, 0x65, 0x79, 0x44, 0x69, 0x73, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x69, 0x6f,
+	0x6e, 0x52, 0x0d, 0x64, 0x69, 0x73, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x69, 0x6f, 0x6e, 0x73,
+	0x22, 0x4b, 0x0a, 0x20, 0x41, 0x63, 0x6b, 0x6e, 0x6f, 0x77, 0x6c, 0x65, 0x64, 0x67, 0x65, 0x47,
+	0x72, 0x6f, 0x75, 0x70, 0x53, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x4b, 0x65, 0x79, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x12, 0x27, 0x0a, 0x0f, 0x64, 0x69, 0x73, 0x74, 0x72, 0x69, 0x62, 0x75,
+	0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x64,
+	0x69, 0x73, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x69, 0x6f, 0x6e, 0x49, 0x64, 0x22, 0x75, 0x0a,
+	0x21, 0x41, 0x63, 0x6b, 0x6e, 0x6f, 0x77, 0x6c, 0x65, 0x64, 0x67, 0x65, 0x47, 0x72, 0x6f, 0x75,
+	0x70, 0x53, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x4b, 0x65, 0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x12, 0x50, 0x0a, 0x0c, 0x64, 0x69, 0x73, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x69,
+	0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x2c, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69,
+	0x6c, 0x6b, 0x61, 0x2e, 0x65, 0x32, 0x65, 0x65, 0x2e, 0x76, 0x31, 0x2e, 0x47, 0x72, 0x6f, 0x75,
+	0x70, 0x53, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x4b, 0x65, 0x79, 0x44, 0x69, 0x73, 0x74, 0x72, 0x69,
+	0x62, 0x75, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x0c, 0x64, 0x69, 0x73, 0x74, 0x72, 0x69, 0x62, 0x75,
+	0x74, 0x69, 0x6f, 0x6e, 0x42, 0x3f, 0x5a, 0x3d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63,
+	0x6f, 0x6d, 0x2f, 0x64, 0x6d, 0x2d, 0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c,
+	0x6b, 0x61, 0x2f, 0x67, 0x65, 0x6e, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e,
+	0x74, 0x72, 0x61, 0x63, 0x74, 0x73, 0x2f, 0x65, 0x32, 0x65, 0x65, 0x2f, 0x76, 0x31, 0x3b, 0x65,
+	0x32, 0x65, 0x65, 0x76, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -679,42 +1042,55 @@ func file_contracts_e2ee_v1_requests_proto_rawDescGZIP() []byte {
 	return file_contracts_e2ee_v1_requests_proto_rawDescData
 }
 
-var file_contracts_e2ee_v1_requests_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_contracts_e2ee_v1_requests_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_contracts_e2ee_v1_requests_proto_goTypes = []interface{}{
-	(*UploadDevicePreKeysRequest)(nil),       // 0: zvonilka.e2ee.v1.UploadDevicePreKeysRequest
-	(*UploadDevicePreKeysResponse)(nil),      // 1: zvonilka.e2ee.v1.UploadDevicePreKeysResponse
-	(*GetAccountPreKeyBundlesRequest)(nil),   // 2: zvonilka.e2ee.v1.GetAccountPreKeyBundlesRequest
-	(*GetAccountPreKeyBundlesResponse)(nil),  // 3: zvonilka.e2ee.v1.GetAccountPreKeyBundlesResponse
-	(*CreateDirectSessionsRequest)(nil),      // 4: zvonilka.e2ee.v1.CreateDirectSessionsRequest
-	(*CreateDirectSessionsResponse)(nil),     // 5: zvonilka.e2ee.v1.CreateDirectSessionsResponse
-	(*ListDeviceSessionsRequest)(nil),        // 6: zvonilka.e2ee.v1.ListDeviceSessionsRequest
-	(*ListDeviceSessionsResponse)(nil),       // 7: zvonilka.e2ee.v1.ListDeviceSessionsResponse
-	(*AcknowledgeDirectSessionRequest)(nil),  // 8: zvonilka.e2ee.v1.AcknowledgeDirectSessionRequest
-	(*AcknowledgeDirectSessionResponse)(nil), // 9: zvonilka.e2ee.v1.AcknowledgeDirectSessionResponse
-	(*SignedPreKey)(nil),                     // 10: zvonilka.e2ee.v1.SignedPreKey
-	(*PreKey)(nil),                           // 11: zvonilka.e2ee.v1.PreKey
-	(*DevicePreKeyBundle)(nil),               // 12: zvonilka.e2ee.v1.DevicePreKeyBundle
-	(*v1.PublicKeyBundle)(nil),               // 13: zvonilka.common.v1.PublicKeyBundle
-	(*SessionBootstrapPayload)(nil),          // 14: zvonilka.e2ee.v1.SessionBootstrapPayload
-	(*timestamppb.Timestamp)(nil),            // 15: google.protobuf.Timestamp
-	(*DirectSession)(nil),                    // 16: zvonilka.e2ee.v1.DirectSession
+	(*UploadDevicePreKeysRequest)(nil),        // 0: zvonilka.e2ee.v1.UploadDevicePreKeysRequest
+	(*UploadDevicePreKeysResponse)(nil),       // 1: zvonilka.e2ee.v1.UploadDevicePreKeysResponse
+	(*GetAccountPreKeyBundlesRequest)(nil),    // 2: zvonilka.e2ee.v1.GetAccountPreKeyBundlesRequest
+	(*GetAccountPreKeyBundlesResponse)(nil),   // 3: zvonilka.e2ee.v1.GetAccountPreKeyBundlesResponse
+	(*CreateDirectSessionsRequest)(nil),       // 4: zvonilka.e2ee.v1.CreateDirectSessionsRequest
+	(*CreateDirectSessionsResponse)(nil),      // 5: zvonilka.e2ee.v1.CreateDirectSessionsResponse
+	(*ListDeviceSessionsRequest)(nil),         // 6: zvonilka.e2ee.v1.ListDeviceSessionsRequest
+	(*ListDeviceSessionsResponse)(nil),        // 7: zvonilka.e2ee.v1.ListDeviceSessionsResponse
+	(*AcknowledgeDirectSessionRequest)(nil),   // 8: zvonilka.e2ee.v1.AcknowledgeDirectSessionRequest
+	(*AcknowledgeDirectSessionResponse)(nil),  // 9: zvonilka.e2ee.v1.AcknowledgeDirectSessionResponse
+	(*PublishGroupSenderKeysRequest)(nil),     // 10: zvonilka.e2ee.v1.PublishGroupSenderKeysRequest
+	(*PublishGroupSenderKeysResponse)(nil),    // 11: zvonilka.e2ee.v1.PublishGroupSenderKeysResponse
+	(*ListGroupSenderKeysRequest)(nil),        // 12: zvonilka.e2ee.v1.ListGroupSenderKeysRequest
+	(*ListGroupSenderKeysResponse)(nil),       // 13: zvonilka.e2ee.v1.ListGroupSenderKeysResponse
+	(*AcknowledgeGroupSenderKeyRequest)(nil),  // 14: zvonilka.e2ee.v1.AcknowledgeGroupSenderKeyRequest
+	(*AcknowledgeGroupSenderKeyResponse)(nil), // 15: zvonilka.e2ee.v1.AcknowledgeGroupSenderKeyResponse
+	(*SignedPreKey)(nil),                      // 16: zvonilka.e2ee.v1.SignedPreKey
+	(*PreKey)(nil),                            // 17: zvonilka.e2ee.v1.PreKey
+	(*DevicePreKeyBundle)(nil),                // 18: zvonilka.e2ee.v1.DevicePreKeyBundle
+	(*v1.PublicKeyBundle)(nil),                // 19: zvonilka.common.v1.PublicKeyBundle
+	(*SessionBootstrapPayload)(nil),           // 20: zvonilka.e2ee.v1.SessionBootstrapPayload
+	(*timestamppb.Timestamp)(nil),             // 21: google.protobuf.Timestamp
+	(*DirectSession)(nil),                     // 22: zvonilka.e2ee.v1.DirectSession
+	(*RecipientSenderKey)(nil),                // 23: zvonilka.e2ee.v1.RecipientSenderKey
+	(*GroupSenderKeyDistribution)(nil),        // 24: zvonilka.e2ee.v1.GroupSenderKeyDistribution
 }
 var file_contracts_e2ee_v1_requests_proto_depIdxs = []int32{
-	10, // 0: zvonilka.e2ee.v1.UploadDevicePreKeysRequest.signed_prekey:type_name -> zvonilka.e2ee.v1.SignedPreKey
-	11, // 1: zvonilka.e2ee.v1.UploadDevicePreKeysRequest.one_time_prekeys:type_name -> zvonilka.e2ee.v1.PreKey
-	12, // 2: zvonilka.e2ee.v1.UploadDevicePreKeysResponse.bundle:type_name -> zvonilka.e2ee.v1.DevicePreKeyBundle
-	12, // 3: zvonilka.e2ee.v1.GetAccountPreKeyBundlesResponse.bundles:type_name -> zvonilka.e2ee.v1.DevicePreKeyBundle
-	13, // 4: zvonilka.e2ee.v1.CreateDirectSessionsRequest.initiator_ephemeral_key:type_name -> zvonilka.common.v1.PublicKeyBundle
-	14, // 5: zvonilka.e2ee.v1.CreateDirectSessionsRequest.bootstrap:type_name -> zvonilka.e2ee.v1.SessionBootstrapPayload
-	15, // 6: zvonilka.e2ee.v1.CreateDirectSessionsRequest.expires_at:type_name -> google.protobuf.Timestamp
-	16, // 7: zvonilka.e2ee.v1.CreateDirectSessionsResponse.sessions:type_name -> zvonilka.e2ee.v1.DirectSession
-	16, // 8: zvonilka.e2ee.v1.ListDeviceSessionsResponse.sessions:type_name -> zvonilka.e2ee.v1.DirectSession
-	16, // 9: zvonilka.e2ee.v1.AcknowledgeDirectSessionResponse.session:type_name -> zvonilka.e2ee.v1.DirectSession
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	16, // 0: zvonilka.e2ee.v1.UploadDevicePreKeysRequest.signed_prekey:type_name -> zvonilka.e2ee.v1.SignedPreKey
+	17, // 1: zvonilka.e2ee.v1.UploadDevicePreKeysRequest.one_time_prekeys:type_name -> zvonilka.e2ee.v1.PreKey
+	18, // 2: zvonilka.e2ee.v1.UploadDevicePreKeysResponse.bundle:type_name -> zvonilka.e2ee.v1.DevicePreKeyBundle
+	18, // 3: zvonilka.e2ee.v1.GetAccountPreKeyBundlesResponse.bundles:type_name -> zvonilka.e2ee.v1.DevicePreKeyBundle
+	19, // 4: zvonilka.e2ee.v1.CreateDirectSessionsRequest.initiator_ephemeral_key:type_name -> zvonilka.common.v1.PublicKeyBundle
+	20, // 5: zvonilka.e2ee.v1.CreateDirectSessionsRequest.bootstrap:type_name -> zvonilka.e2ee.v1.SessionBootstrapPayload
+	21, // 6: zvonilka.e2ee.v1.CreateDirectSessionsRequest.expires_at:type_name -> google.protobuf.Timestamp
+	22, // 7: zvonilka.e2ee.v1.CreateDirectSessionsResponse.sessions:type_name -> zvonilka.e2ee.v1.DirectSession
+	22, // 8: zvonilka.e2ee.v1.ListDeviceSessionsResponse.sessions:type_name -> zvonilka.e2ee.v1.DirectSession
+	22, // 9: zvonilka.e2ee.v1.AcknowledgeDirectSessionResponse.session:type_name -> zvonilka.e2ee.v1.DirectSession
+	23, // 10: zvonilka.e2ee.v1.PublishGroupSenderKeysRequest.recipients:type_name -> zvonilka.e2ee.v1.RecipientSenderKey
+	21, // 11: zvonilka.e2ee.v1.PublishGroupSenderKeysRequest.expires_at:type_name -> google.protobuf.Timestamp
+	24, // 12: zvonilka.e2ee.v1.PublishGroupSenderKeysResponse.distributions:type_name -> zvonilka.e2ee.v1.GroupSenderKeyDistribution
+	24, // 13: zvonilka.e2ee.v1.ListGroupSenderKeysResponse.distributions:type_name -> zvonilka.e2ee.v1.GroupSenderKeyDistribution
+	24, // 14: zvonilka.e2ee.v1.AcknowledgeGroupSenderKeyResponse.distribution:type_name -> zvonilka.e2ee.v1.GroupSenderKeyDistribution
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_contracts_e2ee_v1_requests_proto_init() }
@@ -844,6 +1220,78 @@ func file_contracts_e2ee_v1_requests_proto_init() {
 				return nil
 			}
 		}
+		file_contracts_e2ee_v1_requests_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*PublishGroupSenderKeysRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_e2ee_v1_requests_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*PublishGroupSenderKeysResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_e2ee_v1_requests_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ListGroupSenderKeysRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_e2ee_v1_requests_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ListGroupSenderKeysResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_e2ee_v1_requests_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*AcknowledgeGroupSenderKeyRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_e2ee_v1_requests_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*AcknowledgeGroupSenderKeyResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -851,7 +1299,7 @@ func file_contracts_e2ee_v1_requests_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_contracts_e2ee_v1_requests_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

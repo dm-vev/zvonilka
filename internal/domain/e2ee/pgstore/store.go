@@ -356,6 +356,102 @@ ORDER BY created_at DESC, id DESC
 	return result, nil
 }
 
+func (s *Store) SaveGroupSenderKeyDistribution(ctx context.Context, value e2ee.GroupSenderKeyDistribution) (e2ee.GroupSenderKeyDistribution, error) {
+	if err := s.requireContext(ctx); err != nil {
+		return e2ee.GroupSenderKeyDistribution{}, err
+	}
+	query := fmt.Sprintf(`
+INSERT INTO %s (
+	id, conversation_id, sender_account_id, sender_device_id, recipient_account_id, recipient_device_id,
+	sender_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_metadata,
+	state, created_at, acknowledged_at, expires_at, updated_at
+) VALUES (
+	$1,$2,$3,$4,$5,$6,
+	$7,$8,$9,$10,$11,
+	$12,$13,$14,$15,NOW()
+)
+ON CONFLICT (id)
+DO UPDATE SET
+	state = EXCLUDED.state,
+	acknowledged_at = EXCLUDED.acknowledged_at,
+	expires_at = EXCLUDED.expires_at,
+	payload_algorithm = EXCLUDED.payload_algorithm,
+	payload_nonce = EXCLUDED.payload_nonce,
+	payload_ciphertext = EXCLUDED.payload_ciphertext,
+	payload_metadata = EXCLUDED.payload_metadata,
+	updated_at = NOW()
+RETURNING
+	id, conversation_id, sender_account_id, sender_device_id, recipient_account_id, recipient_device_id,
+	sender_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_metadata,
+	state, created_at, acknowledged_at, expires_at
+`, s.table("e2ee_group_sender_keys"))
+	saved, err := scanGroupSenderKeyDistribution(s.conn().QueryRowContext(
+		ctx,
+		query,
+		value.ID,
+		value.ConversationID,
+		value.SenderAccountID,
+		value.SenderDeviceID,
+		value.RecipientAccountID,
+		value.RecipientDeviceID,
+		value.SenderKeyID,
+		value.Payload.Algorithm,
+		value.Payload.Nonce,
+		value.Payload.Ciphertext,
+		marshalMetadata(value.Payload.Metadata),
+		value.State,
+		value.CreatedAt.UTC(),
+		nullTime(value.AcknowledgedAt),
+		nullTime(value.ExpiresAt),
+	))
+	if err != nil {
+		return e2ee.GroupSenderKeyDistribution{}, mapConstraintError(err)
+	}
+	return saved, nil
+}
+
+func (s *Store) GroupSenderKeyDistributionByID(ctx context.Context, distributionID string) (e2ee.GroupSenderKeyDistribution, error) {
+	query := fmt.Sprintf(`
+SELECT
+	id, conversation_id, sender_account_id, sender_device_id, recipient_account_id, recipient_device_id,
+	sender_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_metadata,
+	state, created_at, acknowledged_at, expires_at
+FROM %s
+WHERE id = $1
+`, s.table("e2ee_group_sender_keys"))
+	return s.scanGroupSenderKeyDistribution(ctx, query, distributionID)
+}
+
+func (s *Store) GroupSenderKeyDistributionsByRecipientDevice(ctx context.Context, conversationID string, accountID string, deviceID string) ([]e2ee.GroupSenderKeyDistribution, error) {
+	query := fmt.Sprintf(`
+SELECT
+	id, conversation_id, sender_account_id, sender_device_id, recipient_account_id, recipient_device_id,
+	sender_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_metadata,
+	state, created_at, acknowledged_at, expires_at
+FROM %s
+WHERE conversation_id = $1 AND recipient_account_id = $2 AND recipient_device_id = $3
+ORDER BY created_at DESC, id DESC
+`, s.table("e2ee_group_sender_keys"))
+	rows, err := s.conn().QueryContext(ctx, query, conversationID, accountID, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]e2ee.GroupSenderKeyDistribution, 0)
+	for rows.Next() {
+		value, scanErr := scanGroupSenderKeyDistribution(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		result = append(result, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (s *Store) conn() sqlConn {
 	if s.tx != nil {
 		return s.tx

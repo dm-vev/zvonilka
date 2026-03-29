@@ -64,3 +64,33 @@ type DirectSession struct {
 	AcknowledgedAt     time.Time
 	ExpiresAt          time.Time
 }
+
+type SenderKeyPayload struct {
+	Algorithm  string
+	Nonce      []byte
+	Ciphertext []byte
+	Metadata   map[string]string
+}
+
+type GroupSenderKeyState string
+
+const (
+	GroupSenderKeyStateUnspecified  GroupSenderKeyState = ""
+	GroupSenderKeyStatePending      GroupSenderKeyState = "pending"
+	GroupSenderKeyStateAcknowledged GroupSenderKeyState = "acknowledged"
+)
+
+type GroupSenderKeyDistribution struct {
+	ID                 string
+	ConversationID     string
+	SenderAccountID    string
+	SenderDeviceID     string
+	RecipientAccountID string
+	RecipientDeviceID  string
+	SenderKeyID        string
+	Payload            SenderKeyPayload
+	State              GroupSenderKeyState
+	CreatedAt          time.Time
+	AcknowledgedAt     time.Time
+	ExpiresAt          time.Time
+}

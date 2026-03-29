@@ -6,6 +6,7 @@ import (
 
 	authv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/auth/v1"
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
+	conversationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1"
 	e2eev1 "github.com/dm-vev/zvonilka/gen/proto/contracts/e2ee/v1"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	"google.golang.org/grpc/metadata"
@@ -153,7 +154,7 @@ func TestCreateListAndAcknowledgeDirectSessionsRPC(t *testing.T) {
 		t.Fatalf("create bob: %v", err)
 	}
 
-	login := func(username string, deviceName string, publicKey string) context.Context {
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
 		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
 			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
 			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
@@ -173,11 +174,11 @@ func TestCreateListAndAcknowledgeDirectSessionsRPC(t *testing.T) {
 		if verifyErr != nil {
 			t.Fatalf("verify login for %s: %v", username, verifyErr)
 		}
-		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken))
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
 	}
 
-	aliceCtx := login(alice.Username, "alice-phone", "alice-device-key")
-	bobCtx := login(bob.Username, "bob-phone", "bob-device-key")
+	aliceCtx, _ := login(alice.Username, "alice-phone", "alice-device-key")
+	bobCtx, _ := login(bob.Username, "bob-phone", "bob-device-key")
 
 	_, err = api.UploadDevicePreKeys(bobCtx, &e2eev1.UploadDevicePreKeysRequest{
 		SignedPrekey: &e2eev1.SignedPreKey{
@@ -236,5 +237,111 @@ func TestCreateListAndAcknowledgeDirectSessionsRPC(t *testing.T) {
 	}
 	if acked.Session == nil || acked.Session.State != e2eev1.DirectSessionState_DIRECT_SESSION_STATE_ACKNOWLEDGED {
 		t.Fatalf("unexpected acknowledged session: %+v", acked.Session)
+	}
+}
+
+func TestPublishListAndAcknowledgeGroupSenderKeysRPC(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-group-keys",
+		DisplayName: "Alice Group Keys",
+		Email:       "alice-group-keys@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-group-keys",
+		DisplayName: "Bob Group Keys",
+		Email:       "bob-group-keys@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, _ := login(alice.Username, "alice-group-phone", "alice-group-device")
+	bobCtx, bobDeviceID := login(bob.Username, "bob-group-phone", "bob-group-device")
+
+	group, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
+		Kind:        commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:       "Encrypted Group",
+		MemberUserIds: []string{bob.ID},
+	})
+	if err != nil {
+		t.Fatalf("create group conversation: %v", err)
+	}
+
+	published, err := api.PublishGroupSenderKeys(aliceCtx, &e2eev1.PublishGroupSenderKeysRequest{
+		ConversationId: group.Conversation.ConversationId,
+		SenderKeyId:    "sender-key-1",
+		Recipients: []*e2eev1.RecipientSenderKey{
+			{
+				RecipientUserId:   bob.ID,
+				RecipientDeviceId: bobDeviceID,
+				Payload: &e2eev1.SenderKeyPayload{
+					Algorithm:  "sender-key-v1",
+					Nonce:      []byte("nonce"),
+					Ciphertext: []byte("ciphertext"),
+					Metadata:   map[string]string{"epoch": "1"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("publish group sender keys: %v", err)
+	}
+	if len(published.Distributions) != 1 {
+		t.Fatalf("expected one published distribution, got %d", len(published.Distributions))
+	}
+
+	listed, err := api.ListGroupSenderKeys(bobCtx, &e2eev1.ListGroupSenderKeysRequest{
+		ConversationId: group.Conversation.ConversationId,
+	})
+	if err != nil {
+		t.Fatalf("list group sender keys: %v", err)
+	}
+	if len(listed.Distributions) != 1 || listed.Distributions[0].SenderKeyId != "sender-key-1" {
+		t.Fatalf("unexpected listed distributions: %+v", listed.Distributions)
+	}
+
+	acked, err := api.AcknowledgeGroupSenderKey(bobCtx, &e2eev1.AcknowledgeGroupSenderKeyRequest{
+		DistributionId: listed.Distributions[0].DistributionId,
+	})
+	if err != nil {
+		t.Fatalf("ack group sender key: %v", err)
+	}
+	if acked.Distribution == nil || acked.Distribution.State != e2eev1.GroupSenderKeyState_GROUP_SENDER_KEY_STATE_ACKNOWLEDGED {
+		t.Fatalf("unexpected acknowledged distribution: %+v", acked.Distribution)
 	}
 }

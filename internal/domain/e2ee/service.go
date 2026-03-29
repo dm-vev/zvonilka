@@ -7,23 +7,26 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 )
 
 type Service struct {
 	store     Store
 	directory Directory
+	chats     Conversations
 	now       func() time.Time
 }
 
-func NewService(store Store, directory Directory) (*Service, error) {
-	if store == nil || directory == nil {
+func NewService(store Store, directory Directory, chats Conversations) (*Service, error) {
+	if store == nil || directory == nil || chats == nil {
 		return nil, ErrInvalidInput
 	}
 
 	return &Service{
 		store:     store,
 		directory: directory,
+		chats:     chats,
 		now:       func() time.Time { return time.Now().UTC() },
 	}, nil
 }
@@ -323,6 +326,223 @@ func (s *Service) AcknowledgeDirectSession(ctx context.Context, params Acknowled
 	return updated, nil
 }
 
+func (s *Service) PublishGroupSenderKeys(ctx context.Context, params PublishGroupSenderKeysParams) ([]GroupSenderKeyDistribution, error) {
+	if err := s.validateContext(ctx, "publish group sender keys"); err != nil {
+		return nil, err
+	}
+	params.ConversationID = strings.TrimSpace(params.ConversationID)
+	params.SenderAccountID = strings.TrimSpace(params.SenderAccountID)
+	params.SenderDeviceID = strings.TrimSpace(params.SenderDeviceID)
+	params.SenderKeyID = strings.TrimSpace(params.SenderKeyID)
+	if params.ConversationID == "" || params.SenderAccountID == "" || params.SenderDeviceID == "" || params.SenderKeyID == "" {
+		return nil, ErrInvalidInput
+	}
+	if params.ExpiresAt.IsZero() {
+		params.ExpiresAt = s.now().Add(30 * 24 * time.Hour)
+	}
+	if !params.ExpiresAt.After(s.now()) {
+		return nil, ErrInvalidInput
+	}
+
+	device, err := s.directory.DeviceByID(ctx, params.SenderDeviceID)
+	if err != nil {
+		if err == identity.ErrNotFound {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("load sender device %s: %w", params.SenderDeviceID, err)
+	}
+	if device.AccountID != params.SenderAccountID || device.Status != identity.DeviceStatusActive {
+		return nil, ErrForbidden
+	}
+
+	conversationRow, err := s.chats.ConversationByID(ctx, params.ConversationID)
+	if err != nil {
+		return nil, mapConversationError("load conversation", params.ConversationID, err)
+	}
+	if conversationRow.Kind != conversation.ConversationKindGroup {
+		return nil, ErrForbidden
+	}
+	member, err := s.chats.ConversationMemberByConversationAndAccount(ctx, params.ConversationID, params.SenderAccountID)
+	if err != nil {
+		return nil, mapConversationError("authorize sender", params.ConversationID, err)
+	}
+	if !isActiveConversationMember(member) {
+		return nil, ErrForbidden
+	}
+	if len(params.Recipients) == 0 {
+		return nil, ErrInvalidInput
+	}
+
+	members, err := s.chats.ConversationMembersByConversationID(ctx, params.ConversationID)
+	if err != nil {
+		return nil, mapConversationError("list conversation members", params.ConversationID, err)
+	}
+	activeMembers := make(map[string]struct{}, len(members))
+	for _, item := range members {
+		if isActiveConversationMember(item) {
+			activeMembers[item.AccountID] = struct{}{}
+		}
+	}
+
+	distributions := make([]GroupSenderKeyDistribution, 0, len(params.Recipients))
+	seen := make(map[string]struct{}, len(params.Recipients))
+	err = s.store.WithinTx(ctx, func(tx Store) error {
+		for _, recipient := range params.Recipients {
+			recipient.RecipientAccountID = strings.TrimSpace(recipient.RecipientAccountID)
+			recipient.RecipientDeviceID = strings.TrimSpace(recipient.RecipientDeviceID)
+			if recipient.RecipientAccountID == "" || recipient.RecipientDeviceID == "" {
+				return ErrInvalidInput
+			}
+			if recipient.RecipientAccountID == params.SenderAccountID && recipient.RecipientDeviceID == params.SenderDeviceID {
+				continue
+			}
+			if _, ok := activeMembers[recipient.RecipientAccountID]; !ok {
+				return ErrForbidden
+			}
+			if err := validateSenderKeyPayload(recipient.Payload); err != nil {
+				return err
+			}
+			targetDevice, loadErr := s.directory.DeviceByID(ctx, recipient.RecipientDeviceID)
+			if loadErr != nil {
+				if loadErr == identity.ErrNotFound {
+					return ErrNotFound
+				}
+				return fmt.Errorf("load recipient device %s: %w", recipient.RecipientDeviceID, loadErr)
+			}
+			if targetDevice.AccountID != recipient.RecipientAccountID || targetDevice.Status != identity.DeviceStatusActive {
+				return ErrForbidden
+			}
+			key := recipient.RecipientAccountID + "|" + recipient.RecipientDeviceID
+			if _, ok := seen[key]; ok {
+				return ErrConflict
+			}
+			seen[key] = struct{}{}
+
+			distributionID, idErr := newID("gsk")
+			if idErr != nil {
+				return idErr
+			}
+			saved, saveErr := tx.SaveGroupSenderKeyDistribution(ctx, GroupSenderKeyDistribution{
+				ID:                 distributionID,
+				ConversationID:     params.ConversationID,
+				SenderAccountID:    params.SenderAccountID,
+				SenderDeviceID:     params.SenderDeviceID,
+				RecipientAccountID: recipient.RecipientAccountID,
+				RecipientDeviceID:  recipient.RecipientDeviceID,
+				SenderKeyID:        params.SenderKeyID,
+				Payload:            normalizeSenderKeyPayload(recipient.Payload),
+				State:              GroupSenderKeyStatePending,
+				CreatedAt:          s.now(),
+				ExpiresAt:          params.ExpiresAt.UTC(),
+			})
+			if saveErr != nil {
+				return saveErr
+			}
+			distributions = append(distributions, saved)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(distributions) == 0 {
+		return nil, ErrConflict
+	}
+
+	return distributions, nil
+}
+
+func (s *Service) ListGroupSenderKeys(ctx context.Context, params ListGroupSenderKeysParams) ([]GroupSenderKeyDistribution, error) {
+	if err := s.validateContext(ctx, "list group sender keys"); err != nil {
+		return nil, err
+	}
+	params.ConversationID = strings.TrimSpace(params.ConversationID)
+	params.RecipientAccountID = strings.TrimSpace(params.RecipientAccountID)
+	params.RecipientDeviceID = strings.TrimSpace(params.RecipientDeviceID)
+	if params.ConversationID == "" || params.RecipientAccountID == "" || params.RecipientDeviceID == "" {
+		return nil, ErrInvalidInput
+	}
+
+	member, err := s.chats.ConversationMemberByConversationAndAccount(ctx, params.ConversationID, params.RecipientAccountID)
+	if err != nil {
+		return nil, mapConversationError("authorize recipient", params.ConversationID, err)
+	}
+	if !isActiveConversationMember(member) {
+		return nil, ErrForbidden
+	}
+	device, err := s.directory.DeviceByID(ctx, params.RecipientDeviceID)
+	if err != nil {
+		if err == identity.ErrNotFound {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("load recipient device %s: %w", params.RecipientDeviceID, err)
+	}
+	if device.AccountID != params.RecipientAccountID || device.Status != identity.DeviceStatusActive {
+		return nil, ErrForbidden
+	}
+
+	distributions, err := s.store.GroupSenderKeyDistributionsByRecipientDevice(
+		ctx,
+		params.ConversationID,
+		params.RecipientAccountID,
+		params.RecipientDeviceID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	filtered := distributions[:0]
+	now := s.now()
+	for _, item := range distributions {
+		if !item.ExpiresAt.IsZero() && !now.Before(item.ExpiresAt) {
+			continue
+		}
+		if !params.IncludeAcknowledged && item.State == GroupSenderKeyStateAcknowledged {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered, nil
+}
+
+func (s *Service) AcknowledgeGroupSenderKey(ctx context.Context, params AcknowledgeGroupSenderKeyParams) (GroupSenderKeyDistribution, error) {
+	if err := s.validateContext(ctx, "acknowledge group sender key"); err != nil {
+		return GroupSenderKeyDistribution{}, err
+	}
+	params.DistributionID = strings.TrimSpace(params.DistributionID)
+	params.RecipientAccountID = strings.TrimSpace(params.RecipientAccountID)
+	params.RecipientDeviceID = strings.TrimSpace(params.RecipientDeviceID)
+	if params.DistributionID == "" || params.RecipientAccountID == "" || params.RecipientDeviceID == "" {
+		return GroupSenderKeyDistribution{}, ErrInvalidInput
+	}
+
+	var updated GroupSenderKeyDistribution
+	err := s.store.WithinTx(ctx, func(tx Store) error {
+		row, loadErr := tx.GroupSenderKeyDistributionByID(ctx, params.DistributionID)
+		if loadErr != nil {
+			return loadErr
+		}
+		if row.RecipientAccountID != params.RecipientAccountID || row.RecipientDeviceID != params.RecipientDeviceID {
+			return ErrForbidden
+		}
+		if row.State == GroupSenderKeyStateAcknowledged {
+			updated = row
+			return nil
+		}
+		if !row.ExpiresAt.IsZero() && !s.now().Before(row.ExpiresAt) {
+			return ErrConflict
+		}
+		row.State = GroupSenderKeyStateAcknowledged
+		row.AcknowledgedAt = s.now()
+		var saveErr error
+		updated, saveErr = tx.SaveGroupSenderKeyDistribution(ctx, row)
+		return saveErr
+	})
+	if err != nil {
+		return GroupSenderKeyDistribution{}, err
+	}
+	return updated, nil
+}
+
 func (s *Service) fetchAccountBundles(ctx context.Context, store Store, params FetchAccountBundlesParams) ([]DeviceBundle, error) {
 	account, err := s.directory.AccountByID(ctx, strings.TrimSpace(params.TargetAccountID))
 	if err != nil {
@@ -465,6 +685,39 @@ func trimMetadata(value map[string]string) map[string]string {
 		return nil
 	}
 	return result
+}
+
+func validateSenderKeyPayload(value SenderKeyPayload) error {
+	value.Algorithm = strings.TrimSpace(value.Algorithm)
+	if value.Algorithm == "" || len(value.Ciphertext) == 0 {
+		return ErrInvalidInput
+	}
+	return nil
+}
+
+func normalizeSenderKeyPayload(value SenderKeyPayload) SenderKeyPayload {
+	value.Algorithm = strings.TrimSpace(value.Algorithm)
+	value.Nonce = append([]byte(nil), value.Nonce...)
+	value.Ciphertext = append([]byte(nil), value.Ciphertext...)
+	value.Metadata = trimMetadata(value.Metadata)
+	return value
+}
+
+func isActiveConversationMember(member conversation.ConversationMember) bool {
+	return member.LeftAt.IsZero() && !member.Banned
+}
+
+func mapConversationError(action string, conversationID string, err error) error {
+	switch err {
+	case nil:
+		return nil
+	case conversation.ErrNotFound:
+		return ErrNotFound
+	case conversation.ErrForbidden:
+		return ErrForbidden
+	default:
+		return fmt.Errorf("%s %s: %w", action, conversationID, err)
+	}
 }
 
 func normalizeSignedPreKey(value SignedPreKey) SignedPreKey {

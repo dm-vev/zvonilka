@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dm-vev/zvonilka/internal/domain/conversation"
+	conversationtest "github.com/dm-vev/zvonilka/internal/domain/conversation/teststore"
 	domaine2ee "github.com/dm-vev/zvonilka/internal/domain/e2ee"
 	"github.com/dm-vev/zvonilka/internal/domain/e2ee/teststore"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
@@ -14,8 +16,9 @@ import (
 func TestUploadAndClaimBundles(t *testing.T) {
 	ctx := context.Background()
 	directory := identitytest.NewMemoryStore()
+	chats := conversationtest.NewMemoryStore()
 	e2eeStore := teststore.NewMemoryStore()
-	service, err := domaine2ee.NewService(e2eeStore, directory)
+	service, err := domaine2ee.NewService(e2eeStore, directory, chats)
 	if err != nil {
 		t.Fatalf("new service: %v", err)
 	}
@@ -70,8 +73,9 @@ func TestUploadAndClaimBundles(t *testing.T) {
 func TestCreateListAndAcknowledgeDirectSessions(t *testing.T) {
 	ctx := context.Background()
 	directory := identitytest.NewMemoryStore()
+	chats := conversationtest.NewMemoryStore()
 	e2eeStore := teststore.NewMemoryStore()
-	service, err := domaine2ee.NewService(e2eeStore, directory)
+	service, err := domaine2ee.NewService(e2eeStore, directory, chats)
 	if err != nil {
 		t.Fatalf("new service: %v", err)
 	}
@@ -165,6 +169,84 @@ func TestCreateListAndAcknowledgeDirectSessions(t *testing.T) {
 	}
 	if len(listed) != 1 || listed[0].State != domaine2ee.DirectSessionStateAcknowledged {
 		t.Fatalf("unexpected acknowledged sessions: %+v", listed)
+	}
+}
+
+func TestPublishListAndAcknowledgeGroupSenderKeys(t *testing.T) {
+	ctx := context.Background()
+	directory := identitytest.NewMemoryStore()
+	chats := conversationtest.NewMemoryStore()
+	e2eeStore := teststore.NewMemoryStore()
+	service, err := domaine2ee.NewService(e2eeStore, directory, chats)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	seedIdentity(t, ctx, directory, "acc-a", "dev-a", "device-key-a")
+	seedIdentity(t, ctx, directory, "acc-b", "dev-b", "device-key-b")
+
+	conversationService, err := conversation.NewService(chats)
+	if err != nil {
+		t.Fatalf("new conversation service: %v", err)
+	}
+	group, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-a",
+		Kind:             conversation.ConversationKindGroup,
+		Title:            "Secret group",
+		MemberAccountIDs: []string{"acc-b"},
+		CreatedAt:        time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("create group conversation: %v", err)
+	}
+
+	published, err := service.PublishGroupSenderKeys(ctx, domaine2ee.PublishGroupSenderKeysParams{
+		ConversationID:  group.ID,
+		SenderAccountID: "acc-a",
+		SenderDeviceID:  "dev-a",
+		SenderKeyID:     "sender-key-1",
+		Recipients: []domaine2ee.RecipientSenderKey{
+			{
+				RecipientAccountID: "acc-b",
+				RecipientDeviceID:  "dev-b",
+				Payload: domaine2ee.SenderKeyPayload{
+					Algorithm:  "sender-key-v1",
+					Nonce:      []byte("nonce"),
+					Ciphertext: []byte("ciphertext"),
+					Metadata:   map[string]string{"epoch": "1"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("publish group sender keys: %v", err)
+	}
+	if len(published) != 1 {
+		t.Fatalf("expected one distribution, got %d", len(published))
+	}
+
+	listed, err := service.ListGroupSenderKeys(ctx, domaine2ee.ListGroupSenderKeysParams{
+		ConversationID:     group.ID,
+		RecipientAccountID: "acc-b",
+		RecipientDeviceID:  "dev-b",
+	})
+	if err != nil {
+		t.Fatalf("list group sender keys: %v", err)
+	}
+	if len(listed) != 1 || listed[0].SenderKeyID != "sender-key-1" {
+		t.Fatalf("unexpected listed distributions: %+v", listed)
+	}
+
+	acknowledged, err := service.AcknowledgeGroupSenderKey(ctx, domaine2ee.AcknowledgeGroupSenderKeyParams{
+		DistributionID:     listed[0].ID,
+		RecipientAccountID: "acc-b",
+		RecipientDeviceID:  "dev-b",
+	})
+	if err != nil {
+		t.Fatalf("ack group sender key: %v", err)
+	}
+	if acknowledged.State != domaine2ee.GroupSenderKeyStateAcknowledged {
+		t.Fatalf("expected acknowledged state, got %s", acknowledged.State)
 	}
 }
 

@@ -19,11 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	E2EEService_UploadDevicePreKeys_FullMethodName      = "/zvonilka.e2ee.v1.E2EEService/UploadDevicePreKeys"
-	E2EEService_GetAccountPreKeyBundles_FullMethodName  = "/zvonilka.e2ee.v1.E2EEService/GetAccountPreKeyBundles"
-	E2EEService_CreateDirectSessions_FullMethodName     = "/zvonilka.e2ee.v1.E2EEService/CreateDirectSessions"
-	E2EEService_ListDeviceSessions_FullMethodName       = "/zvonilka.e2ee.v1.E2EEService/ListDeviceSessions"
-	E2EEService_AcknowledgeDirectSession_FullMethodName = "/zvonilka.e2ee.v1.E2EEService/AcknowledgeDirectSession"
+	E2EEService_UploadDevicePreKeys_FullMethodName       = "/zvonilka.e2ee.v1.E2EEService/UploadDevicePreKeys"
+	E2EEService_GetAccountPreKeyBundles_FullMethodName   = "/zvonilka.e2ee.v1.E2EEService/GetAccountPreKeyBundles"
+	E2EEService_CreateDirectSessions_FullMethodName      = "/zvonilka.e2ee.v1.E2EEService/CreateDirectSessions"
+	E2EEService_ListDeviceSessions_FullMethodName        = "/zvonilka.e2ee.v1.E2EEService/ListDeviceSessions"
+	E2EEService_AcknowledgeDirectSession_FullMethodName  = "/zvonilka.e2ee.v1.E2EEService/AcknowledgeDirectSession"
+	E2EEService_PublishGroupSenderKeys_FullMethodName    = "/zvonilka.e2ee.v1.E2EEService/PublishGroupSenderKeys"
+	E2EEService_ListGroupSenderKeys_FullMethodName       = "/zvonilka.e2ee.v1.E2EEService/ListGroupSenderKeys"
+	E2EEService_AcknowledgeGroupSenderKey_FullMethodName = "/zvonilka.e2ee.v1.E2EEService/AcknowledgeGroupSenderKey"
 )
 
 // E2EEServiceClient is the client API for E2EEService service.
@@ -35,6 +38,9 @@ type E2EEServiceClient interface {
 	CreateDirectSessions(ctx context.Context, in *CreateDirectSessionsRequest, opts ...grpc.CallOption) (*CreateDirectSessionsResponse, error)
 	ListDeviceSessions(ctx context.Context, in *ListDeviceSessionsRequest, opts ...grpc.CallOption) (*ListDeviceSessionsResponse, error)
 	AcknowledgeDirectSession(ctx context.Context, in *AcknowledgeDirectSessionRequest, opts ...grpc.CallOption) (*AcknowledgeDirectSessionResponse, error)
+	PublishGroupSenderKeys(ctx context.Context, in *PublishGroupSenderKeysRequest, opts ...grpc.CallOption) (*PublishGroupSenderKeysResponse, error)
+	ListGroupSenderKeys(ctx context.Context, in *ListGroupSenderKeysRequest, opts ...grpc.CallOption) (*ListGroupSenderKeysResponse, error)
+	AcknowledgeGroupSenderKey(ctx context.Context, in *AcknowledgeGroupSenderKeyRequest, opts ...grpc.CallOption) (*AcknowledgeGroupSenderKeyResponse, error)
 }
 
 type e2EEServiceClient struct {
@@ -90,6 +96,33 @@ func (c *e2EEServiceClient) AcknowledgeDirectSession(ctx context.Context, in *Ac
 	return out, nil
 }
 
+func (c *e2EEServiceClient) PublishGroupSenderKeys(ctx context.Context, in *PublishGroupSenderKeysRequest, opts ...grpc.CallOption) (*PublishGroupSenderKeysResponse, error) {
+	out := new(PublishGroupSenderKeysResponse)
+	err := c.cc.Invoke(ctx, E2EEService_PublishGroupSenderKeys_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *e2EEServiceClient) ListGroupSenderKeys(ctx context.Context, in *ListGroupSenderKeysRequest, opts ...grpc.CallOption) (*ListGroupSenderKeysResponse, error) {
+	out := new(ListGroupSenderKeysResponse)
+	err := c.cc.Invoke(ctx, E2EEService_ListGroupSenderKeys_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *e2EEServiceClient) AcknowledgeGroupSenderKey(ctx context.Context, in *AcknowledgeGroupSenderKeyRequest, opts ...grpc.CallOption) (*AcknowledgeGroupSenderKeyResponse, error) {
+	out := new(AcknowledgeGroupSenderKeyResponse)
+	err := c.cc.Invoke(ctx, E2EEService_AcknowledgeGroupSenderKey_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // E2EEServiceServer is the server API for E2EEService service.
 // All implementations must embed UnimplementedE2EEServiceServer
 // for forward compatibility
@@ -99,6 +132,9 @@ type E2EEServiceServer interface {
 	CreateDirectSessions(context.Context, *CreateDirectSessionsRequest) (*CreateDirectSessionsResponse, error)
 	ListDeviceSessions(context.Context, *ListDeviceSessionsRequest) (*ListDeviceSessionsResponse, error)
 	AcknowledgeDirectSession(context.Context, *AcknowledgeDirectSessionRequest) (*AcknowledgeDirectSessionResponse, error)
+	PublishGroupSenderKeys(context.Context, *PublishGroupSenderKeysRequest) (*PublishGroupSenderKeysResponse, error)
+	ListGroupSenderKeys(context.Context, *ListGroupSenderKeysRequest) (*ListGroupSenderKeysResponse, error)
+	AcknowledgeGroupSenderKey(context.Context, *AcknowledgeGroupSenderKeyRequest) (*AcknowledgeGroupSenderKeyResponse, error)
 	mustEmbedUnimplementedE2EEServiceServer()
 }
 
@@ -120,6 +156,15 @@ func (UnimplementedE2EEServiceServer) ListDeviceSessions(context.Context, *ListD
 }
 func (UnimplementedE2EEServiceServer) AcknowledgeDirectSession(context.Context, *AcknowledgeDirectSessionRequest) (*AcknowledgeDirectSessionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AcknowledgeDirectSession not implemented")
+}
+func (UnimplementedE2EEServiceServer) PublishGroupSenderKeys(context.Context, *PublishGroupSenderKeysRequest) (*PublishGroupSenderKeysResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PublishGroupSenderKeys not implemented")
+}
+func (UnimplementedE2EEServiceServer) ListGroupSenderKeys(context.Context, *ListGroupSenderKeysRequest) (*ListGroupSenderKeysResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListGroupSenderKeys not implemented")
+}
+func (UnimplementedE2EEServiceServer) AcknowledgeGroupSenderKey(context.Context, *AcknowledgeGroupSenderKeyRequest) (*AcknowledgeGroupSenderKeyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AcknowledgeGroupSenderKey not implemented")
 }
 func (UnimplementedE2EEServiceServer) mustEmbedUnimplementedE2EEServiceServer() {}
 
@@ -224,6 +269,60 @@ func _E2EEService_AcknowledgeDirectSession_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _E2EEService_PublishGroupSenderKeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublishGroupSenderKeysRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(E2EEServiceServer).PublishGroupSenderKeys(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: E2EEService_PublishGroupSenderKeys_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(E2EEServiceServer).PublishGroupSenderKeys(ctx, req.(*PublishGroupSenderKeysRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _E2EEService_ListGroupSenderKeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListGroupSenderKeysRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(E2EEServiceServer).ListGroupSenderKeys(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: E2EEService_ListGroupSenderKeys_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(E2EEServiceServer).ListGroupSenderKeys(ctx, req.(*ListGroupSenderKeysRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _E2EEService_AcknowledgeGroupSenderKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AcknowledgeGroupSenderKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(E2EEServiceServer).AcknowledgeGroupSenderKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: E2EEService_AcknowledgeGroupSenderKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(E2EEServiceServer).AcknowledgeGroupSenderKey(ctx, req.(*AcknowledgeGroupSenderKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // E2EEService_ServiceDesc is the grpc.ServiceDesc for E2EEService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -250,6 +349,18 @@ var E2EEService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AcknowledgeDirectSession",
 			Handler:    _E2EEService_AcknowledgeDirectSession_Handler,
+		},
+		{
+			MethodName: "PublishGroupSenderKeys",
+			Handler:    _E2EEService_PublishGroupSenderKeys_Handler,
+		},
+		{
+			MethodName: "ListGroupSenderKeys",
+			Handler:    _E2EEService_ListGroupSenderKeys_Handler,
+		},
+		{
+			MethodName: "AcknowledgeGroupSenderKey",
+			Handler:    _E2EEService_AcknowledgeGroupSenderKey_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

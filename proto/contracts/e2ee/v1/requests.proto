@@ -56,3 +56,31 @@ message AcknowledgeDirectSessionRequest {
 message AcknowledgeDirectSessionResponse {
   DirectSession session = 1;
 }
+
+message PublishGroupSenderKeysRequest {
+  string conversation_id = 1;
+  string sender_key_id = 2;
+  repeated RecipientSenderKey recipients = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message PublishGroupSenderKeysResponse {
+  repeated GroupSenderKeyDistribution distributions = 1;
+}
+
+message ListGroupSenderKeysRequest {
+  string conversation_id = 1;
+  bool include_acknowledged = 2;
+}
+
+message ListGroupSenderKeysResponse {
+  repeated GroupSenderKeyDistribution distributions = 1;
+}
+
+message AcknowledgeGroupSenderKeyRequest {
+  string distribution_id = 1;
+}
+
+message AcknowledgeGroupSenderKeyResponse {
+  GroupSenderKeyDistribution distribution = 1;
+}

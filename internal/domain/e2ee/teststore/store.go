@@ -9,17 +9,19 @@ import (
 
 func NewMemoryStore() e2ee.Store {
 	return &memoryStore{
-		signed:   make(map[string]e2ee.SignedPreKey),
-		oneTime:  make(map[string][]e2ee.OneTimePreKey),
-		sessions: make(map[string]e2ee.DirectSession),
+		signed:        make(map[string]e2ee.SignedPreKey),
+		oneTime:       make(map[string][]e2ee.OneTimePreKey),
+		sessions:      make(map[string]e2ee.DirectSession),
+		groupSender:   make(map[string]e2ee.GroupSenderKeyDistribution),
 	}
 }
 
 type memoryStore struct {
-	mu      sync.RWMutex
-	signed   map[string]e2ee.SignedPreKey
-	oneTime  map[string][]e2ee.OneTimePreKey
-	sessions map[string]e2ee.DirectSession
+	mu          sync.RWMutex
+	signed      map[string]e2ee.SignedPreKey
+	oneTime     map[string][]e2ee.OneTimePreKey
+	sessions    map[string]e2ee.DirectSession
+	groupSender map[string]e2ee.GroupSenderKeyDistribution
 }
 
 func (s *memoryStore) WithinTx(_ context.Context, fn func(e2ee.Store) error) error {
@@ -130,6 +132,36 @@ func (s *memoryStore) DirectSessionsByRecipientDevice(_ context.Context, account
 	return result, nil
 }
 
+func (s *memoryStore) SaveGroupSenderKeyDistribution(_ context.Context, value e2ee.GroupSenderKeyDistribution) (e2ee.GroupSenderKeyDistribution, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.groupSender[value.ID] = cloneGroupSenderKeyDistribution(value)
+	return cloneGroupSenderKeyDistribution(value), nil
+}
+
+func (s *memoryStore) GroupSenderKeyDistributionByID(_ context.Context, distributionID string) (e2ee.GroupSenderKeyDistribution, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	value, ok := s.groupSender[distributionID]
+	if !ok {
+		return e2ee.GroupSenderKeyDistribution{}, e2ee.ErrNotFound
+	}
+	return cloneGroupSenderKeyDistribution(value), nil
+}
+
+func (s *memoryStore) GroupSenderKeyDistributionsByRecipientDevice(_ context.Context, conversationID string, accountID string, deviceID string) ([]e2ee.GroupSenderKeyDistribution, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]e2ee.GroupSenderKeyDistribution, 0)
+	for _, value := range s.groupSender {
+		if value.ConversationID != conversationID || value.RecipientAccountID != accountID || value.RecipientDeviceID != deviceID {
+			continue
+		}
+		result = append(result, cloneGroupSenderKeyDistribution(value))
+	}
+	return result, nil
+}
+
 func key(accountID string, deviceID string) string {
 	return accountID + "|" + deviceID
 }
@@ -163,6 +195,21 @@ func cloneDirectSession(value e2ee.DirectSession) e2ee.DirectSession {
 
 func clonePublicKey(value e2ee.PublicKey) e2ee.PublicKey {
 	value.PublicKey = append([]byte(nil), value.PublicKey...)
+	return value
+}
+
+func cloneGroupSenderKeyDistribution(value e2ee.GroupSenderKeyDistribution) e2ee.GroupSenderKeyDistribution {
+	value.Payload = e2ee.SenderKeyPayload{
+		Algorithm:  value.Payload.Algorithm,
+		Nonce:      append([]byte(nil), value.Payload.Nonce...),
+		Ciphertext: append([]byte(nil), value.Payload.Ciphertext...),
+	}
+	if len(value.Payload.Metadata) > 0 {
+		value.Payload.Metadata = make(map[string]string, len(value.Payload.Metadata))
+		for key, item := range value.Payload.Metadata {
+			value.Payload.Metadata[key] = item
+		}
+	}
 	return value
 }
 

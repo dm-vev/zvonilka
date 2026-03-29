@@ -202,21 +202,6 @@ func buildAppStorage(
 			closeStorageCatalog(ctx, catalog),
 		)
 	}
-	e2eeStore, err := newE2EEStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
-	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
-			fmt.Errorf("construct postgres e2ee store: %w", err),
-			closeStorageCatalog(ctx, catalog),
-		)
-	}
-	e2eeService, err := domaine2ee.NewService(e2eeStore, identityStore)
-	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
-			fmt.Errorf("construct e2ee service: %w", err),
-			closeStorageCatalog(ctx, catalog),
-		)
-	}
-
 	userStore, err := newUserStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
@@ -236,6 +221,20 @@ func buildAppStorage(
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
 			fmt.Errorf("construct postgres conversation store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	e2eeStore, err := newE2EEStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres e2ee store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	e2eeService, err := domaine2ee.NewService(e2eeStore, identityStore, conversationStore)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct e2ee service: %w", err),
 			closeStorageCatalog(ctx, catalog),
 		)
 	}

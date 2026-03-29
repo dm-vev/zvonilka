@@ -39,3 +39,31 @@ type AcknowledgeDirectSessionParams struct {
 	RecipientAccountID  string
 	RecipientDeviceID   string
 }
+
+type RecipientSenderKey struct {
+	RecipientAccountID string
+	RecipientDeviceID  string
+	Payload            SenderKeyPayload
+}
+
+type PublishGroupSenderKeysParams struct {
+	ConversationID   string
+	SenderAccountID  string
+	SenderDeviceID   string
+	SenderKeyID      string
+	Recipients       []RecipientSenderKey
+	ExpiresAt        time.Time
+}
+
+type ListGroupSenderKeysParams struct {
+	ConversationID        string
+	RecipientAccountID    string
+	RecipientDeviceID     string
+	IncludeAcknowledged   bool
+}
+
+type AcknowledgeGroupSenderKeyParams struct {
+	DistributionID      string
+	RecipientAccountID  string
+	RecipientDeviceID   string
+}

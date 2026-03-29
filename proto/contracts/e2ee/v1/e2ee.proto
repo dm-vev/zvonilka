@@ -12,4 +12,7 @@ service E2EEService {
   rpc CreateDirectSessions(CreateDirectSessionsRequest) returns (CreateDirectSessionsResponse);
   rpc ListDeviceSessions(ListDeviceSessionsRequest) returns (ListDeviceSessionsResponse);
   rpc AcknowledgeDirectSession(AcknowledgeDirectSessionRequest) returns (AcknowledgeDirectSessionResponse);
+  rpc PublishGroupSenderKeys(PublishGroupSenderKeysRequest) returns (PublishGroupSenderKeysResponse);
+  rpc ListGroupSenderKeys(ListGroupSenderKeysRequest) returns (ListGroupSenderKeysResponse);
+  rpc AcknowledgeGroupSenderKey(AcknowledgeGroupSenderKeyRequest) returns (AcknowledgeGroupSenderKeyResponse);
 }

@@ -3,6 +3,7 @@ package e2ee
 import (
 	"context"
 
+	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 )
 
@@ -23,10 +24,19 @@ type Store interface {
 	SaveDirectSession(ctx context.Context, value DirectSession) (DirectSession, error)
 	DirectSessionByID(ctx context.Context, sessionID string) (DirectSession, error)
 	DirectSessionsByRecipientDevice(ctx context.Context, accountID string, deviceID string) ([]DirectSession, error)
+	SaveGroupSenderKeyDistribution(ctx context.Context, value GroupSenderKeyDistribution) (GroupSenderKeyDistribution, error)
+	GroupSenderKeyDistributionByID(ctx context.Context, distributionID string) (GroupSenderKeyDistribution, error)
+	GroupSenderKeyDistributionsByRecipientDevice(ctx context.Context, conversationID string, accountID string, deviceID string) ([]GroupSenderKeyDistribution, error)
 }
 
 type Directory interface {
 	AccountByID(ctx context.Context, accountID string) (identity.Account, error)
 	DeviceByID(ctx context.Context, deviceID string) (identity.Device, error)
 	DevicesByAccountID(ctx context.Context, accountID string) ([]identity.Device, error)
+}
+
+type Conversations interface {
+	ConversationByID(ctx context.Context, conversationID string) (conversation.Conversation, error)
+	ConversationMemberByConversationAndAccount(ctx context.Context, conversationID string, accountID string) (conversation.ConversationMember, error)
+	ConversationMembersByConversationID(ctx context.Context, conversationID string) ([]conversation.ConversationMember, error)
 }

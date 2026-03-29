@@ -69,8 +69,9 @@ func newTestAPI(t *testing.T) (*api, *recordingSender) {
 	if err != nil {
 		t.Fatalf("new presence service: %v", err)
 	}
+	conversationStore := conversationtest.NewMemoryStore()
 	conversationService, err := conversation.NewService(
-		conversationtest.NewMemoryStore(),
+		conversationStore,
 		conversation.WithIndexer(searchService),
 	)
 	if err != nil {
@@ -80,7 +81,7 @@ func newTestAPI(t *testing.T) (*api, *recordingSender) {
 	if err != nil {
 		t.Fatalf("new user service: %v", err)
 	}
-	e2eeService, err := domaine2ee.NewService(e2eetest.NewMemoryStore(), identityStore)
+	e2eeService, err := domaine2ee.NewService(e2eetest.NewMemoryStore(), identityStore, conversationStore)
 	if err != nil {
 		t.Fatalf("new e2ee service: %v", err)
 	}

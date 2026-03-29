@@ -145,6 +145,78 @@ func (a *api) AcknowledgeDirectSession(
 	return &e2eev1.AcknowledgeDirectSessionResponse{Session: directSessionProto(session)}, nil
 }
 
+func (a *api) PublishGroupSenderKeys(
+	ctx context.Context,
+	req *e2eev1.PublishGroupSenderKeysRequest,
+) (*e2eev1.PublishGroupSenderKeysResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	distributions, err := a.e2ee.PublishGroupSenderKeys(ctx, domaine2ee.PublishGroupSenderKeysParams{
+		ConversationID:  req.GetConversationId(),
+		SenderAccountID: authContext.Account.ID,
+		SenderDeviceID:  authContext.Session.DeviceID,
+		SenderKeyID:     req.GetSenderKeyId(),
+		Recipients:      recipientSenderKeysFromProto(req.GetRecipients()),
+		ExpiresAt:       zeroTime(req.GetExpiresAt()),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	result := make([]*e2eev1.GroupSenderKeyDistribution, 0, len(distributions))
+	for _, item := range distributions {
+		result = append(result, groupSenderKeyDistributionProto(item))
+	}
+	return &e2eev1.PublishGroupSenderKeysResponse{Distributions: result}, nil
+}
+
+func (a *api) ListGroupSenderKeys(
+	ctx context.Context,
+	req *e2eev1.ListGroupSenderKeysRequest,
+) (*e2eev1.ListGroupSenderKeysResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	distributions, err := a.e2ee.ListGroupSenderKeys(ctx, domaine2ee.ListGroupSenderKeysParams{
+		ConversationID:      req.GetConversationId(),
+		RecipientAccountID:  authContext.Account.ID,
+		RecipientDeviceID:   authContext.Session.DeviceID,
+		IncludeAcknowledged: req.GetIncludeAcknowledged(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	result := make([]*e2eev1.GroupSenderKeyDistribution, 0, len(distributions))
+	for _, item := range distributions {
+		result = append(result, groupSenderKeyDistributionProto(item))
+	}
+	return &e2eev1.ListGroupSenderKeysResponse{Distributions: result}, nil
+}
+
+func (a *api) AcknowledgeGroupSenderKey(
+	ctx context.Context,
+	req *e2eev1.AcknowledgeGroupSenderKeyRequest,
+) (*e2eev1.AcknowledgeGroupSenderKeyResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	distribution, err := a.e2ee.AcknowledgeGroupSenderKey(ctx, domaine2ee.AcknowledgeGroupSenderKeyParams{
+		DistributionID:     req.GetDistributionId(),
+		RecipientAccountID: authContext.Account.ID,
+		RecipientDeviceID:  authContext.Session.DeviceID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &e2eev1.AcknowledgeGroupSenderKeyResponse{Distribution: groupSenderKeyDistributionProto(distribution)}, nil
+}
+
 func deviceBundleProto(value domaine2ee.DeviceBundle) *e2eev1.DevicePreKeyBundle {
 	return &e2eev1.DevicePreKeyBundle{
 		UserId:                  value.AccountID,
@@ -225,6 +297,41 @@ func bootstrapPayloadProto(value domaine2ee.BootstrapPayload) *e2eev1.SessionBoo
 	return result
 }
 
+func groupSenderKeyDistributionProto(value domaine2ee.GroupSenderKeyDistribution) *e2eev1.GroupSenderKeyDistribution {
+	return &e2eev1.GroupSenderKeyDistribution{
+		DistributionId:   value.ID,
+		ConversationId:   value.ConversationID,
+		SenderUserId:     value.SenderAccountID,
+		SenderDeviceId:   value.SenderDeviceID,
+		RecipientUserId:  value.RecipientAccountID,
+		RecipientDeviceId:value.RecipientDeviceID,
+		SenderKeyId:      value.SenderKeyID,
+		Payload:          senderKeyPayloadProto(value.Payload),
+		State:            groupSenderKeyStateProto(value.State),
+		CreatedAt:        protoTime(value.CreatedAt),
+		AcknowledgedAt:   protoTime(value.AcknowledgedAt),
+		ExpiresAt:        protoTime(value.ExpiresAt),
+	}
+}
+
+func senderKeyPayloadProto(value domaine2ee.SenderKeyPayload) *e2eev1.SenderKeyPayload {
+	if strings.TrimSpace(value.Algorithm) == "" && len(value.Ciphertext) == 0 {
+		return nil
+	}
+	result := &e2eev1.SenderKeyPayload{
+		Algorithm:  value.Algorithm,
+		Nonce:      append([]byte(nil), value.Nonce...),
+		Ciphertext: append([]byte(nil), value.Ciphertext...),
+	}
+	if len(value.Metadata) > 0 {
+		result.Metadata = make(map[string]string, len(value.Metadata))
+		for key, item := range value.Metadata {
+			result.Metadata[key] = item
+		}
+	}
+	return result
+}
+
 func signedPreKeyFromProto(value *e2eev1.SignedPreKey) domaine2ee.SignedPreKey {
 	if value == nil {
 		return domaine2ee.SignedPreKey{}
@@ -290,6 +397,42 @@ func bootstrapPayloadFromProto(value *e2eev1.SessionBootstrapPayload) domaine2ee
 	return result
 }
 
+func senderKeyPayloadFromProto(value *e2eev1.SenderKeyPayload) domaine2ee.SenderKeyPayload {
+	if value == nil {
+		return domaine2ee.SenderKeyPayload{}
+	}
+	result := domaine2ee.SenderKeyPayload{
+		Algorithm:  strings.TrimSpace(value.GetAlgorithm()),
+		Nonce:      append([]byte(nil), value.GetNonce()...),
+		Ciphertext: append([]byte(nil), value.GetCiphertext()...),
+	}
+	if len(value.GetMetadata()) > 0 {
+		result.Metadata = make(map[string]string, len(value.GetMetadata()))
+		for key, item := range value.GetMetadata() {
+			result.Metadata[key] = item
+		}
+	}
+	return result
+}
+
+func recipientSenderKeysFromProto(values []*e2eev1.RecipientSenderKey) []domaine2ee.RecipientSenderKey {
+	if len(values) == 0 {
+		return nil
+	}
+	result := make([]domaine2ee.RecipientSenderKey, 0, len(values))
+	for _, value := range values {
+		if value == nil {
+			continue
+		}
+		result = append(result, domaine2ee.RecipientSenderKey{
+			RecipientAccountID: strings.TrimSpace(value.GetRecipientUserId()),
+			RecipientDeviceID:  strings.TrimSpace(value.GetRecipientDeviceId()),
+			Payload:            senderKeyPayloadFromProto(value.GetPayload()),
+		})
+	}
+	return result
+}
+
 func directSessionStateProto(value domaine2ee.DirectSessionState) e2eev1.DirectSessionState {
 	switch value {
 	case domaine2ee.DirectSessionStatePending:
@@ -298,5 +441,16 @@ func directSessionStateProto(value domaine2ee.DirectSessionState) e2eev1.DirectS
 		return e2eev1.DirectSessionState_DIRECT_SESSION_STATE_ACKNOWLEDGED
 	default:
 		return e2eev1.DirectSessionState_DIRECT_SESSION_STATE_UNSPECIFIED
+	}
+}
+
+func groupSenderKeyStateProto(value domaine2ee.GroupSenderKeyState) e2eev1.GroupSenderKeyState {
+	switch value {
+	case domaine2ee.GroupSenderKeyStatePending:
+		return e2eev1.GroupSenderKeyState_GROUP_SENDER_KEY_STATE_PENDING
+	case domaine2ee.GroupSenderKeyStateAcknowledged:
+		return e2eev1.GroupSenderKeyState_GROUP_SENDER_KEY_STATE_ACKNOWLEDGED
+	default:
+		return e2eev1.GroupSenderKeyState_GROUP_SENDER_KEY_STATE_UNSPECIFIED
 	}
 }
