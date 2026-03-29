@@ -21,6 +21,7 @@ message ConversationSettings {
   google.protobuf.Duration slow_mode_interval = 8;
   bool require_encrypted_messages = 9;
   bool require_trusted_devices = 10;
+  ConversationE2EETrustPolicy e2ee_trust_policy = 11;
 }
 
 message Conversation {
@@ -51,6 +52,12 @@ enum ConversationE2EERequiredAction {
   CONVERSATION_E2EE_REQUIRED_ACTION_UNSPECIFIED = 0;
   CONVERSATION_E2EE_REQUIRED_ACTION_NONE = 1;
   CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES = 2;
+}
+
+enum ConversationE2EETrustPolicy {
+  CONVERSATION_E2EE_TRUST_POLICY_UNSPECIFIED = 0;
+  CONVERSATION_E2EE_TRUST_POLICY_ALLOW_UNTRUSTED = 1;
+  CONVERSATION_E2EE_TRUST_POLICY_TRUSTED_ONLY = 2;
 }
 
 message ConversationMember {

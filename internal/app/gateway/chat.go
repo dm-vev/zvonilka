@@ -892,6 +892,13 @@ func conversationSettingsFromProto(settings *conversationv1.ConversationSettings
 	}
 
 	slowMode := timeDuration(settings.GetSlowModeInterval())
+	requireTrustedDevices := settings.GetRequireTrustedDevices()
+	switch settings.GetE2EeTrustPolicy() {
+	case conversationv1.ConversationE2EETrustPolicy_CONVERSATION_E2EE_TRUST_POLICY_ALLOW_UNTRUSTED:
+		requireTrustedDevices = false
+	case conversationv1.ConversationE2EETrustPolicy_CONVERSATION_E2EE_TRUST_POLICY_TRUSTED_ONLY:
+		requireTrustedDevices = true
+	}
 	return domainconversation.ConversationSettings{
 		OnlyAdminsCanWrite:       settings.GetOnlyAdminsCanWrite(),
 		OnlyAdminsCanAddMembers:  settings.GetOnlyAdminsCanAddMembers(),
@@ -902,7 +909,7 @@ func conversationSettingsFromProto(settings *conversationv1.ConversationSettings
 		PinnedMessagesOnlyAdmins: settings.GetPinnedMessagesOnlyAdmins(),
 		SlowModeInterval:         slowMode,
 		RequireEncryptedMessages: settings.GetRequireEncryptedMessages(),
-		RequireTrustedDevices:    settings.GetRequireTrustedDevices(),
+		RequireTrustedDevices:    requireTrustedDevices,
 	}
 }
 
@@ -1008,7 +1015,15 @@ func conversationSettingsProto(settings domainconversation.ConversationSettings)
 		SlowModeInterval:         protoDuration(settings.SlowModeInterval),
 		RequireEncryptedMessages: settings.RequireEncryptedMessages,
 		RequireTrustedDevices:    settings.RequireTrustedDevices,
+		E2EeTrustPolicy:          conversationE2EETrustPolicyProto(settings.RequireTrustedDevices),
 	}
+}
+
+func conversationE2EETrustPolicyProto(requireTrustedDevices bool) conversationv1.ConversationE2EETrustPolicy {
+	if requireTrustedDevices {
+		return conversationv1.ConversationE2EETrustPolicy_CONVERSATION_E2EE_TRUST_POLICY_TRUSTED_ONLY
+	}
+	return conversationv1.ConversationE2EETrustPolicy_CONVERSATION_E2EE_TRUST_POLICY_ALLOW_UNTRUSTED
 }
 
 func membersProto(
@@ -1294,6 +1309,12 @@ func conversationUpdateParamsFromRequest(
 				return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
 			}
 			currentSettings.RequireTrustedDevices = row.GetSettings().GetRequireTrustedDevices()
+			settingsChanged = true
+		case "settings.e2ee_trust_policy":
+			if row.GetSettings() == nil {
+				return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
+			}
+			currentSettings.RequireTrustedDevices = conversationSettingsFromProto(row.GetSettings()).RequireTrustedDevices
 			settingsChanged = true
 		default:
 			return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput

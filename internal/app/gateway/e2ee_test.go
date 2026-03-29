@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
 func TestUploadAndFetchPreKeysRPC(t *testing.T) {
@@ -422,11 +423,17 @@ func TestSendMessageRequiresDirectSessionReferenceRPC(t *testing.T) {
 		MemberUserIds: []string{bob.ID},
 		Settings: &conversationv1.ConversationSettings{
 			RequireEncryptedMessages: true,
-			RequireTrustedDevices:    true,
+			E2EeTrustPolicy:          conversationv1.ConversationE2EETrustPolicy_CONVERSATION_E2EE_TRUST_POLICY_TRUSTED_ONLY,
 		},
 	})
 	if err != nil {
 		t.Fatalf("create direct conversation: %v", err)
+	}
+	if !created.Conversation.Settings.RequireTrustedDevices {
+		t.Fatalf("expected trusted-only shorthand to stay true")
+	}
+	if created.Conversation.Settings.E2EeTrustPolicy != conversationv1.ConversationE2EETrustPolicy_CONVERSATION_E2EE_TRUST_POLICY_TRUSTED_ONLY {
+		t.Fatalf("expected trusted-only policy, got %s", created.Conversation.Settings.E2EeTrustPolicy)
 	}
 
 	sessionResp, err := api.CreateDirectSessions(aliceCtx, &e2eev1.CreateDirectSessionsRequest{
@@ -504,6 +511,29 @@ func TestSendMessageRequiresDirectSessionReferenceRPC(t *testing.T) {
 	}
 	if sent.Message == nil || sent.Message.MessageId == "" {
 		t.Fatalf("unexpected sent message: %+v", sent.Message)
+	}
+
+	allowUntrusted, err := api.UpdateConversation(aliceCtx, &conversationv1.UpdateConversationRequest{
+		Conversation: &conversationv1.Conversation{
+			ConversationId: created.Conversation.ConversationId,
+			Settings: &conversationv1.ConversationSettings{
+				RequireEncryptedMessages: true,
+				E2EeTrustPolicy:          conversationv1.ConversationE2EETrustPolicy_CONVERSATION_E2EE_TRUST_POLICY_ALLOW_UNTRUSTED,
+			},
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{
+			"settings.e2ee_trust_policy",
+			"settings.require_encrypted_messages",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("update conversation trust policy: %v", err)
+	}
+	if allowUntrusted.Conversation.Settings.RequireTrustedDevices {
+		t.Fatalf("expected allow-untrusted policy to clear trusted-only shorthand")
+	}
+	if allowUntrusted.Conversation.Settings.E2EeTrustPolicy != conversationv1.ConversationE2EETrustPolicy_CONVERSATION_E2EE_TRUST_POLICY_ALLOW_UNTRUSTED {
+		t.Fatalf("expected allow-untrusted policy, got %s", allowUntrusted.Conversation.Settings.E2EeTrustPolicy)
 	}
 }
 
