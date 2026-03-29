@@ -48,6 +48,7 @@ type session struct {
 	port         int
 	participants map[string]participant
 	standbyStats map[string]domaincall.TransportStats
+	standbyRelay map[string][]snapshotRelayTrack
 	peers        map[string]*peer
 }
 
@@ -81,10 +82,14 @@ type peer struct {
 }
 
 type relayTrack struct {
-	sourceKey   string
-	track       *webrtc.TrackLocalStaticRTP
-	sender      *webrtc.RTPSender
-	screenShare bool
+	sourceKey    string
+	sourceTrack  string
+	sourceStream string
+	kind         string
+	codec        webrtc.RTPCodecCapability
+	track        *webrtc.TrackLocalStaticRTP
+	sender       *webrtc.RTPSender
+	screenShare  bool
 }
 
 type relayTarget struct {
@@ -235,6 +240,7 @@ func (m *Manager) EnsureSession(_ context.Context, callRow domaincall.Call) (dom
 		port:         port,
 		participants: make(map[string]participant),
 		standbyStats: make(map[string]domaincall.TransportStats),
+		standbyRelay: make(map[string][]snapshotRelayTrack),
 		peers:        make(map[string]*peer),
 	}
 
@@ -576,6 +582,7 @@ func (m *Manager) LeaveSession(_ context.Context, sessionID string, accountID st
 	}
 	delete(active.participants, participantKey(accountID, deviceID))
 	delete(active.standbyStats, participantKey(accountID, deviceID))
+	delete(active.standbyRelay, participantKey(accountID, deviceID))
 	peerConn = active.peers[participantKey(accountID, deviceID)]
 	delete(active.peers, participantKey(accountID, deviceID))
 	affected = m.removeSourceRelayTracksLocked(active, participantKey(accountID, deviceID))
@@ -667,6 +674,10 @@ func (m *Manager) ensurePeer(sessionID string, participantRow domaincall.Runtime
 	if standby, ok := active.standbyStats[key]; ok {
 		created.restoreTransportStats(standby)
 		delete(active.standbyStats, key)
+	}
+	if relayBlueprints, ok := active.standbyRelay[key]; ok {
+		m.restorePeerRelayBlueprints(active.id, created, relayBlueprints)
+		delete(active.standbyRelay, key)
 	}
 	active.peers[key] = created
 
@@ -887,10 +898,14 @@ func (m *Manager) prepareRelayTargets(
 			continue
 		}
 		target.tracks[trackKey] = &relayTrack{
-			sourceKey:   sourceKey,
-			track:       localTrack,
-			sender:      sender,
-			screenShare: isScreenShareTrack(track.ID(), track.StreamID()),
+			sourceKey:    sourceKey,
+			sourceTrack:  track.ID(),
+			sourceStream: track.StreamID(),
+			kind:         track.Kind().String(),
+			codec:        track.Codec().RTPCodecCapability,
+			track:        localTrack,
+			sender:       sender,
+			screenShare:  isScreenShareTrack(track.ID(), track.StreamID()),
 		}
 		relays = append(relays, relayTarget{peer: target, track: localTrack})
 		targets = append(targets, target)
@@ -1573,6 +1588,103 @@ func (p *peer) snapshotStats() domaincall.TransportStats {
 	return stats
 }
 
+func (p *peer) snapshotRelayBlueprints() []snapshotRelayTrack {
+	if p == nil {
+		return nil
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if len(p.tracks) == 0 {
+		return nil
+	}
+
+	result := make([]snapshotRelayTrack, 0, len(p.tracks))
+	for _, relay := range p.tracks {
+		if relay == nil {
+			continue
+		}
+		sourceAccountID, sourceDeviceID, ok := splitParticipantKey(relay.sourceKey)
+		if !ok {
+			continue
+		}
+		result = append(result, snapshotRelayTrack{
+			SourceAccountID: sourceAccountID,
+			SourceDeviceID:  sourceDeviceID,
+			TrackID:         relay.sourceTrack,
+			StreamID:        relay.sourceStream,
+			Kind:            relay.kind,
+			ScreenShare:     relay.screenShare,
+			CodecMimeType:   relay.codec.MimeType,
+			CodecClockRate:  relay.codec.ClockRate,
+			CodecChannels:   uint32(relay.codec.Channels),
+		})
+	}
+
+	return result
+}
+
+func (m *Manager) restorePeerRelayBlueprints(sessionID string, target *peer, blueprints []snapshotRelayTrack) {
+	if m == nil || target == nil || target.pc == nil || len(blueprints) == 0 {
+		return
+	}
+
+	for _, blueprint := range blueprints {
+		sourceKey := participantKey(blueprint.SourceAccountID, blueprint.SourceDeviceID)
+		trackKey := relayTrackKey(sourceKey, blueprint.TrackID, blueprint.StreamID, blueprint.Kind)
+		if strings.TrimSpace(trackKey) == "" {
+			continue
+		}
+
+		target.mu.Lock()
+		if target.tracks[trackKey] != nil {
+			target.mu.Unlock()
+			continue
+		}
+		target.mu.Unlock()
+
+		codec := webrtc.RTPCodecCapability{
+			MimeType:  blueprint.CodecMimeType,
+			ClockRate: blueprint.CodecClockRate,
+			Channels:  uint16(blueprint.CodecChannels),
+		}
+		if strings.TrimSpace(codec.MimeType) == "" {
+			codec = defaultCodecForKind(blueprint.Kind)
+		}
+
+		localTrack, err := webrtc.NewTrackLocalStaticRTP(codec, blueprint.TrackID, blueprint.StreamID)
+		if err != nil {
+			continue
+		}
+		sender, err := target.pc.AddTrack(localTrack)
+		if err != nil {
+			continue
+		}
+
+		var relay *relayTrack
+		target.mu.Lock()
+		if target.tracks[trackKey] == nil {
+			target.tracks[trackKey] = &relayTrack{
+				sourceKey:    sourceKey,
+				sourceTrack:  blueprint.TrackID,
+				sourceStream: blueprint.StreamID,
+				kind:         blueprint.Kind,
+				codec:        codec,
+				track:        localTrack,
+				sender:       sender,
+				screenShare:  blueprint.ScreenShare,
+			}
+			relay = target.tracks[trackKey]
+		} else {
+			relay = target.tracks[trackKey]
+		}
+		target.mu.Unlock()
+
+		go m.forwardSenderRTCP(sessionID, relay)
+	}
+}
+
 func (p *peer) restoreTransportStats(stats domaincall.TransportStats) {
 	if p == nil {
 		return
@@ -1747,6 +1859,14 @@ func participantKey(accountID string, deviceID string) string {
 	return accountID + "|" + deviceID
 }
 
+func splitParticipantKey(value string) (string, string, bool) {
+	left, right, ok := strings.Cut(strings.TrimSpace(value), "|")
+	if !ok || strings.TrimSpace(left) == "" || strings.TrimSpace(right) == "" {
+		return "", "", false
+	}
+	return left, right, true
+}
+
 func countScreenShareRelayTracks(tracks map[string]*relayTrack) int {
 	if len(tracks) == 0 {
 		return 0
@@ -1805,6 +1925,22 @@ func isScreenShareTrack(trackID string, streamID string) bool {
 	return strings.Contains(value, "screen") ||
 		strings.Contains(value, "share") ||
 		strings.Contains(value, "display")
+}
+
+func defaultCodecForKind(kind string) webrtc.RTPCodecCapability {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case webrtc.RTPCodecTypeAudio.String():
+		return webrtc.RTPCodecCapability{
+			MimeType:  webrtc.MimeTypeOpus,
+			ClockRate: 48000,
+			Channels:  2,
+		}
+	default:
+		return webrtc.RTPCodecCapability{
+			MimeType:  webrtc.MimeTypeVP8,
+			ClockRate: 90000,
+		}
+	}
 }
 
 func randomToken(size int) (string, error) {

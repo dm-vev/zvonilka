@@ -363,6 +363,19 @@ func TestClusterMigrateSessionCutsOverToDifferentNode(t *testing.T) {
 	require.NoError(t, err)
 	peerConn.updateTelemetry(telemetryICEStateKey, webrtc.ICEConnectionStateConnected.String())
 	peerConn.updateTelemetry(telemetryPCStateKey, webrtc.PeerConnectionStateConnected.String())
+	peerConn.mu.Lock()
+	peerConn.tracks[relayTrackKey(participantKey("acc-source", "dev-source"), "track-screen", "stream-screen", webrtc.RTPCodecTypeVideo.String())] = &relayTrack{
+		sourceKey:    participantKey("acc-source", "dev-source"),
+		sourceTrack:  "track-screen",
+		sourceStream: "stream-screen",
+		kind:         webrtc.RTPCodecTypeVideo.String(),
+		codec: webrtc.RTPCodecCapability{
+			MimeType:  webrtc.MimeTypeVP8,
+			ClockRate: 90000,
+		},
+		screenShare: true,
+	}
+	peerConn.mu.Unlock()
 
 	migrated, err := cluster.MigrateSession(context.Background(), domaincall.Call{
 		ID:              "call-cutover",
@@ -387,7 +400,7 @@ func TestClusterMigrateSessionCutsOverToDifferentNode(t *testing.T) {
 	require.Equal(t, "connected", stats[0].Transport.Quality)
 	require.Equal(t, webrtc.PeerConnectionStateConnected.String(), stats[0].Transport.PeerConnectionState)
 
-	_, _, err = localManager.ensurePeer(migrated.SessionID, domaincall.RuntimeParticipant{
+	_, migratedPeer, err := localManager.ensurePeer(migrated.SessionID, domaincall.RuntimeParticipant{
 		CallID:    "call-cutover",
 		AccountID: "acc-cutover",
 		DeviceID:  "dev-cutover",
@@ -397,6 +410,12 @@ func TestClusterMigrateSessionCutsOverToDifferentNode(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+	migratedPeer.mu.Lock()
+	relay := migratedPeer.tracks[relayTrackKey(participantKey("acc-source", "dev-source"), "track-screen", "stream-screen", webrtc.RTPCodecTypeVideo.String())]
+	migratedPeer.mu.Unlock()
+	require.NotNil(t, relay)
+	require.True(t, relay.screenShare)
+	require.Equal(t, webrtc.MimeTypeVP8, relay.codec.MimeType)
 
 	stats, err = localManager.SessionStats(context.Background(), migrated.SessionID)
 	require.NoError(t, err)

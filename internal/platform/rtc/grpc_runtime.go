@@ -271,6 +271,7 @@ func sessionSnapshotProto(value sessionSnapshot) *callruntimev1.SessionSnapshot 
 				ScreenShareEnabled: participant.Media.ScreenShareEnabled,
 			},
 			TransportStats: runtimeTransportStatsProto(participant.Transport),
+			RelayTracks:    relayTrackBlueprintsProto(participant.Relay),
 		})
 	}
 	return result
@@ -298,6 +299,7 @@ func sessionSnapshotFromProto(value *callruntimev1.SessionSnapshot) sessionSnaps
 				ScreenShareEnabled: participant.GetMediaState().GetScreenShareEnabled(),
 			},
 			Transport: runtimeTransportStatsFromProto(participant.GetTransportStats()),
+			Relay:     relayTrackBlueprintsFromProto(participant.GetRelayTracks()),
 		})
 	}
 
@@ -375,6 +377,53 @@ func copyMetadata(values map[string]string) map[string]string {
 	result := make(map[string]string, len(values))
 	for key, value := range values {
 		result[key] = value
+	}
+	return result
+}
+
+func relayTrackBlueprintsProto(values []snapshotRelayTrack) []*callruntimev1.SnapshotRelayTrack {
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]*callruntimev1.SnapshotRelayTrack, 0, len(values))
+	for _, value := range values {
+		result = append(result, &callruntimev1.SnapshotRelayTrack{
+			SourceAccountId: value.SourceAccountID,
+			SourceDeviceId:  value.SourceDeviceID,
+			TrackId:         value.TrackID,
+			StreamId:        value.StreamID,
+			Kind:            value.Kind,
+			ScreenShare:     value.ScreenShare,
+			CodecMimeType:   value.CodecMimeType,
+			CodecClockRate:  value.CodecClockRate,
+			CodecChannels:   value.CodecChannels,
+		})
+	}
+	return result
+}
+
+func relayTrackBlueprintsFromProto(values []*callruntimev1.SnapshotRelayTrack) []snapshotRelayTrack {
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]snapshotRelayTrack, 0, len(values))
+	for _, value := range values {
+		if value == nil {
+			continue
+		}
+		result = append(result, snapshotRelayTrack{
+			SourceAccountID: value.GetSourceAccountId(),
+			SourceDeviceID:  value.GetSourceDeviceId(),
+			TrackID:         value.GetTrackId(),
+			StreamID:        value.GetStreamId(),
+			Kind:            value.GetKind(),
+			ScreenShare:     value.GetScreenShare(),
+			CodecMimeType:   value.GetCodecMimeType(),
+			CodecClockRate:  value.GetCodecClockRate(),
+			CodecChannels:   value.GetCodecChannels(),
+		})
 	}
 	return result
 }

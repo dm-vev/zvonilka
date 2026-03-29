@@ -19,6 +19,19 @@ type snapshotParticipant struct {
 	WithVideo bool
 	Media     domaincall.MediaState
 	Transport domaincall.TransportStats
+	Relay     []snapshotRelayTrack
+}
+
+type snapshotRelayTrack struct {
+	SourceAccountID string
+	SourceDeviceID  string
+	TrackID         string
+	StreamID        string
+	Kind            string
+	ScreenShare     bool
+	CodecMimeType   string
+	CodecClockRate  uint32
+	CodecChannels   uint32
 }
 
 func cloneSessionSnapshot(value sessionSnapshot) sessionSnapshot {
@@ -39,6 +52,9 @@ func cloneSessionSnapshot(value sessionSnapshot) sessionSnapshot {
 
 func cloneSnapshotParticipant(value snapshotParticipant) snapshotParticipant {
 	value.Transport = cloneTransportStats(value.Transport)
+	if len(value.Relay) > 0 {
+		value.Relay = append([]snapshotRelayTrack(nil), value.Relay...)
+	}
 	return value
 }
 
@@ -89,8 +105,10 @@ func (m *Manager) ExportSessionSnapshot(_ context.Context, sessionID string) (se
 	}
 	for key, participant := range active.participants {
 		transport := cloneTransportStats(active.standbyStats[key])
+		relay := append([]snapshotRelayTrack(nil), active.standbyRelay[key]...)
 		if value := active.peers[key]; value != nil {
 			transport = cloneTransportStats(value.snapshotStats())
+			relay = value.snapshotRelayBlueprints()
 		}
 		snapshot.Participants = append(snapshot.Participants, snapshotParticipant{
 			AccountID: participant.accountID,
@@ -98,6 +116,7 @@ func (m *Manager) ExportSessionSnapshot(_ context.Context, sessionID string) (se
 			WithVideo: participant.withVideo,
 			Media:     participant.media,
 			Transport: transport,
+			Relay:     relay,
 		})
 	}
 
@@ -147,6 +166,9 @@ func (m *Manager) RestoreReplica(_ context.Context, callID string, sessionID str
 	if active.standbyStats == nil {
 		active.standbyStats = make(map[string]domaincall.TransportStats)
 	}
+	if active.standbyRelay == nil {
+		active.standbyRelay = make(map[string][]snapshotRelayTrack)
+	}
 	for _, item := range snapshot.Participants {
 		key := participantKey(item.AccountID, item.DeviceID)
 		active.participants[key] = participant{
@@ -157,9 +179,14 @@ func (m *Manager) RestoreReplica(_ context.Context, callID string, sessionID str
 		}
 		if hasTransportStats(item.Transport) {
 			active.standbyStats[key] = cloneTransportStats(item.Transport)
-			continue
+		} else {
+			delete(active.standbyStats, key)
 		}
-		delete(active.standbyStats, key)
+		if len(item.Relay) > 0 {
+			active.standbyRelay[key] = append([]snapshotRelayTrack(nil), item.Relay...)
+		} else {
+			delete(active.standbyRelay, key)
+		}
 	}
 
 	return nil
