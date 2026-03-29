@@ -1157,6 +1157,110 @@ func TestGetAndVerifyDeviceSafetyNumberRPC(t *testing.T) {
 	}
 }
 
+func TestListVerificationRequiredDevicesRPC(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-e2ee-queue",
+		DisplayName: "Alice E2EE Queue",
+		Email:       "alice-e2ee-queue@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-e2ee-queue",
+		DisplayName: "Bob E2EE Queue",
+		Email:       "bob-e2ee-queue@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+	carol, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "carol-e2ee-queue",
+		DisplayName: "Carol E2EE Queue",
+		Email:       "carol-e2ee-queue@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create carol: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, _ := login(alice.Username, "alice-queue-phone", "alice-queue-device")
+	_, bobDeviceID := login(bob.Username, "bob-queue-phone", "bob-queue-device")
+	_, carolDeviceID := login(carol.Username, "carol-queue-phone", "carol-queue-device")
+
+	if _, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{bob.ID},
+	}); err != nil {
+		t.Fatalf("create direct conversation: %v", err)
+	}
+	group, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "verification queue",
+		MemberUserIds: []string{bob.ID, carol.ID},
+	})
+	if err != nil {
+		t.Fatalf("create group conversation: %v", err)
+	}
+	if _, err := api.SetDeviceTrust(aliceCtx, &e2eev1.SetDeviceTrustRequest{
+		TargetUserId:   carol.ID,
+		TargetDeviceId: carolDeviceID,
+		State:          e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_COMPROMISED,
+	}); err != nil {
+		t.Fatalf("set compromised trust: %v", err)
+	}
+
+	resp, err := api.ListVerificationRequiredDevices(aliceCtx, &e2eev1.ListVerificationRequiredDevicesRequest{})
+	if err != nil {
+		t.Fatalf("list verification required devices: %v", err)
+	}
+	if len(resp.Devices) != 2 {
+		t.Fatalf("expected two devices, got %+v", resp.Devices)
+	}
+	if resp.Devices[0].UserId != bob.ID || !resp.Devices[0].DirectConversation {
+		t.Fatalf("expected bob direct entry first, got %+v", resp.Devices[0])
+	}
+	if resp.Devices[1].UserId != carol.ID || resp.Devices[1].TrustState != e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_COMPROMISED || len(resp.Devices[1].ConversationIds) != 1 || resp.Devices[1].ConversationIds[0] != group.Conversation.ConversationId {
+		t.Fatalf("unexpected group verification entry: %+v", resp.Devices[1])
+	}
+	if resp.Devices[0].DeviceId != bobDeviceID || resp.Devices[1].KeyFingerprint == "" {
+		t.Fatalf("unexpected verification device payloads: %+v", resp.Devices)
+	}
+}
+
 type testSubscribeE2EEUpdatesStream struct {
 	ctx       context.Context
 	cancel    context.CancelFunc

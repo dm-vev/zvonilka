@@ -55,6 +55,15 @@ message DeviceVerificationCode {
   DeviceTrustState current_trust_state = 7;
 }
 
+message VerificationRequiredDevice {
+  string user_id = 1;
+  string device_id = 2;
+  DeviceTrustState trust_state = 3;
+  string key_fingerprint = 4;
+  repeated string conversation_ids = 5;
+  bool direct_conversation = 6;
+}
+
 enum ConversationKeyCoverageState {
   CONVERSATION_KEY_COVERAGE_STATE_UNSPECIFIED = 0;
   CONVERSATION_KEY_COVERAGE_STATE_READY = 1;

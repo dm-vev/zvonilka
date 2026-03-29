@@ -64,6 +64,15 @@ type DeviceVerificationCode struct {
 	CurrentTrustState    DeviceTrustState
 }
 
+type VerificationRequiredDevice struct {
+	AccountID          string
+	DeviceID           string
+	TrustState         DeviceTrustState
+	KeyFingerprint     string
+	ConversationIDs    []string
+	DirectConversation bool
+}
+
 type ConversationKeyCoverageState string
 
 const (

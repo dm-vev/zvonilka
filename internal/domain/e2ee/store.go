@@ -45,6 +45,7 @@ type Directory interface {
 
 type Conversations interface {
 	ConversationByID(ctx context.Context, conversationID string) (conversation.Conversation, error)
+	ConversationsByAccountID(ctx context.Context, accountID string) ([]conversation.Conversation, error)
 	ConversationMemberByConversationAndAccount(ctx context.Context, conversationID string, accountID string) (conversation.ConversationMember, error)
 	ConversationMembersByConversationID(ctx context.Context, conversationID string) ([]conversation.ConversationMember, error)
 }

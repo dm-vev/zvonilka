@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -378,6 +379,115 @@ func (s *Service) ListDeviceTrusts(ctx context.Context, params ListDeviceTrustsP
 		return nil, err
 	}
 	return rows, nil
+}
+
+func (s *Service) ListVerificationRequiredDevices(
+	ctx context.Context,
+	params ListVerificationRequiredDevicesParams,
+) ([]VerificationRequiredDevice, error) {
+	if err := s.validateContext(ctx, "list verification required devices"); err != nil {
+		return nil, err
+	}
+	params.ObserverAccountID = strings.TrimSpace(params.ObserverAccountID)
+	params.ObserverDeviceID = strings.TrimSpace(params.ObserverDeviceID)
+	if params.ObserverAccountID == "" || params.ObserverDeviceID == "" {
+		return nil, ErrInvalidInput
+	}
+
+	observer, err := s.directory.DeviceByID(ctx, params.ObserverDeviceID)
+	if err != nil {
+		if err == identity.ErrNotFound {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("load observer device %s: %w", params.ObserverDeviceID, err)
+	}
+	if observer.AccountID != params.ObserverAccountID || observer.Status != identity.DeviceStatusActive {
+		return nil, ErrForbidden
+	}
+
+	conversations, err := s.chats.ConversationsByAccountID(ctx, params.ObserverAccountID)
+	if err != nil {
+		return nil, fmt.Errorf("list conversations for %s: %w", params.ObserverAccountID, err)
+	}
+	trusts, err := s.store.DeviceTrustsByObserverDevice(ctx, params.ObserverAccountID, params.ObserverDeviceID, "")
+	if err != nil {
+		return nil, fmt.Errorf("load trust map for %s/%s: %w", params.ObserverAccountID, params.ObserverDeviceID, err)
+	}
+
+	trustByDevice := make(map[string]DeviceTrust, len(trusts))
+	for _, item := range trusts {
+		key := trustMapKey(item.TargetAccountID, item.TargetDeviceID)
+		if _, exists := trustByDevice[key]; exists {
+			continue
+		}
+		trustByDevice[key] = item
+	}
+
+	byDevice := make(map[string]*VerificationRequiredDevice)
+	for _, convo := range conversations {
+		members, err := s.chats.ConversationMembersByConversationID(ctx, convo.ID)
+		if err != nil {
+			return nil, mapConversationError("list conversation members", convo.ID, err)
+		}
+		for _, member := range members {
+			if !isActiveConversationMember(member) || member.AccountID == params.ObserverAccountID {
+				continue
+			}
+			devices, err := s.directory.DevicesByAccountID(ctx, member.AccountID)
+			if err != nil {
+				return nil, fmt.Errorf("list devices for %s: %w", member.AccountID, err)
+			}
+			for _, device := range devices {
+				if device.Status != identity.DeviceStatusActive || strings.TrimSpace(device.PublicKey) == "" {
+					continue
+				}
+				key := trustMapKey(member.AccountID, device.ID)
+				trust := trustByDevice[key]
+				if !trustRequiresVerification(trust.State) {
+					continue
+				}
+				item, exists := byDevice[key]
+				if !exists {
+					item = &VerificationRequiredDevice{
+						AccountID:          member.AccountID,
+						DeviceID:           device.ID,
+						TrustState:         trust.State,
+						KeyFingerprint:     deviceKeyFingerprint(device),
+						DirectConversation: convo.Kind == conversation.ConversationKindDirect,
+					}
+					byDevice[key] = item
+				}
+				if convo.Kind == conversation.ConversationKindDirect {
+					item.DirectConversation = true
+				}
+				if !containsString(item.ConversationIDs, convo.ID) {
+					item.ConversationIDs = append(item.ConversationIDs, convo.ID)
+				}
+			}
+		}
+	}
+
+	result := make([]VerificationRequiredDevice, 0, len(byDevice))
+	for _, item := range byDevice {
+		result = append(result, VerificationRequiredDevice{
+			AccountID:          item.AccountID,
+			DeviceID:           item.DeviceID,
+			TrustState:         item.TrustState,
+			KeyFingerprint:     item.KeyFingerprint,
+			ConversationIDs:    append([]string(nil), item.ConversationIDs...),
+			DirectConversation: item.DirectConversation,
+		})
+	}
+	sort.Slice(result, func(i int, j int) bool {
+		if result[i].DirectConversation != result[j].DirectConversation {
+			return result[i].DirectConversation
+		}
+		if result[i].AccountID != result[j].AccountID {
+			return result[i].AccountID < result[j].AccountID
+		}
+		return result[i].DeviceID < result[j].DeviceID
+	})
+	return result, nil
 }
 
 func (s *Service) GetConversationKeyCoverage(ctx context.Context, params GetConversationKeyCoverageParams) ([]ConversationKeyCoverageEntry, error) {
@@ -1345,6 +1455,15 @@ func trustMapKey(accountID string, deviceID string) string {
 
 func trustRequiresVerification(state DeviceTrustState) bool {
 	return state != DeviceTrustStateTrusted
+}
+
+func containsString(values []string, expected string) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeSignedPreKey(value SignedPreKey) SignedPreKey {

@@ -82,6 +82,12 @@ message ListDeviceTrustsResponse {
   repeated DeviceTrust trusts = 1;
 }
 
+message ListVerificationRequiredDevicesRequest {}
+
+message ListVerificationRequiredDevicesResponse {
+  repeated VerificationRequiredDevice devices = 1;
+}
+
 message GetConversationKeyCoverageRequest {
   string conversation_id = 1;
   string sender_key_id = 2;

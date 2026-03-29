@@ -58,6 +58,11 @@ type ListDeviceTrustsParams struct {
 	TargetAccountID   string
 }
 
+type ListVerificationRequiredDevicesParams struct {
+	ObserverAccountID string
+	ObserverDeviceID  string
+}
+
 type GetConversationKeyCoverageParams struct {
 	ConversationID  string
 	SenderAccountID string

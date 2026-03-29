@@ -628,6 +628,71 @@ func TestGetAndVerifyDeviceSafetyNumber(t *testing.T) {
 	}
 }
 
+func TestListVerificationRequiredDevices(t *testing.T) {
+	ctx := context.Background()
+	directory := identitytest.NewMemoryStore()
+	chats := conversationtest.NewMemoryStore()
+	e2eeStore := teststore.NewMemoryStore()
+	service, err := domaine2ee.NewService(e2eeStore, directory, chats)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	now := time.Now().UTC()
+	seedIdentity(t, ctx, directory, "acc-a", "dev-a", "device-key-a")
+	seedIdentity(t, ctx, directory, "acc-b", "dev-b", "device-key-b")
+	seedIdentity(t, ctx, directory, "acc-c", "dev-c", "device-key-c")
+
+	conversationService, err := conversation.NewService(chats)
+	if err != nil {
+		t.Fatalf("new conversation service: %v", err)
+	}
+	if _, _, err = conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-a",
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{"acc-b"},
+		CreatedAt:        now,
+	}); err != nil {
+		t.Fatalf("create direct: %v", err)
+	}
+	group, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-a",
+		Kind:             conversation.ConversationKindGroup,
+		MemberAccountIDs: []string{"acc-b", "acc-c"},
+		Title:            "verify queue",
+		CreatedAt:        now,
+	})
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err = service.SetDeviceTrust(ctx, domaine2ee.SetDeviceTrustParams{
+		ObserverAccountID: "acc-a",
+		ObserverDeviceID:  "dev-a",
+		TargetAccountID:   "acc-c",
+		TargetDeviceID:    "dev-c",
+		State:             domaine2ee.DeviceTrustStateCompromised,
+	}); err != nil {
+		t.Fatalf("set compromised trust: %v", err)
+	}
+
+	devices, err := service.ListVerificationRequiredDevices(ctx, domaine2ee.ListVerificationRequiredDevicesParams{
+		ObserverAccountID: "acc-a",
+		ObserverDeviceID:  "dev-a",
+	})
+	if err != nil {
+		t.Fatalf("list verification required devices: %v", err)
+	}
+	if len(devices) != 2 {
+		t.Fatalf("expected two devices requiring verification, got %+v", devices)
+	}
+	if devices[0].AccountID != "acc-b" || !devices[0].DirectConversation {
+		t.Fatalf("expected direct conversation device first, got %+v", devices[0])
+	}
+	if devices[1].AccountID != "acc-c" || devices[1].TrustState != domaine2ee.DeviceTrustStateCompromised || len(devices[1].ConversationIDs) != 1 || devices[1].ConversationIDs[0] != group.ID {
+		t.Fatalf("unexpected group verification queue entry: %+v", devices[1])
+	}
+}
+
 func seedIdentity(t *testing.T, ctx context.Context, store identity.Store, accountID string, deviceID string, publicKey string) {
 	t.Helper()
 	if _, err := store.SaveAccount(ctx, identity.Account{

@@ -262,6 +262,30 @@ func (a *api) ListDeviceTrusts(
 	return &e2eev1.ListDeviceTrustsResponse{Trusts: result}, nil
 }
 
+func (a *api) ListVerificationRequiredDevices(
+	ctx context.Context,
+	_ *e2eev1.ListVerificationRequiredDevicesRequest,
+) (*e2eev1.ListVerificationRequiredDevicesResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	devices, err := a.e2ee.ListVerificationRequiredDevices(ctx, domaine2ee.ListVerificationRequiredDevicesParams{
+		ObserverAccountID: authContext.Account.ID,
+		ObserverDeviceID:  authContext.Session.DeviceID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	result := make([]*e2eev1.VerificationRequiredDevice, 0, len(devices))
+	for _, item := range devices {
+		result = append(result, verificationRequiredDeviceProto(item))
+	}
+	return &e2eev1.ListVerificationRequiredDevicesResponse{Devices: result}, nil
+}
+
 func (a *api) GetConversationKeyCoverage(
 	ctx context.Context,
 	req *e2eev1.GetConversationKeyCoverageRequest,
@@ -551,6 +575,17 @@ func deviceVerificationCodeProto(value domaine2ee.DeviceVerificationCode) *e2eev
 		TargetKeyFingerprint: value.TargetKeyFingerprint,
 		SafetyNumber:         value.SafetyNumber,
 		CurrentTrustState:    deviceTrustStateProto(value.CurrentTrustState),
+	}
+}
+
+func verificationRequiredDeviceProto(value domaine2ee.VerificationRequiredDevice) *e2eev1.VerificationRequiredDevice {
+	return &e2eev1.VerificationRequiredDevice{
+		UserId:             value.AccountID,
+		DeviceId:           value.DeviceID,
+		TrustState:         deviceTrustStateProto(value.TrustState),
+		KeyFingerprint:     value.KeyFingerprint,
+		ConversationIds:    append([]string(nil), value.ConversationIDs...),
+		DirectConversation: value.DirectConversation,
 	}
 }
 
