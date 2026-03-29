@@ -920,6 +920,7 @@ type conversationE2EEOverlay struct {
 	UntrustedDevices            uint32
 	CompromisedDevices          uint32
 	RequiredAction              conversationv1.ConversationE2EERequiredAction
+	PrimaryRemediationHint      conversationv1.ConversationE2EERemediationHint
 	BlockedDevices              []*conversationv1.ConversationBlockedDevice
 }
 
@@ -930,6 +931,10 @@ func conversationProto(
 	requiredAction := overlay.RequiredAction
 	if requiredAction == conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_UNSPECIFIED {
 		requiredAction = conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_NONE
+	}
+	primaryRemediationHint := overlay.PrimaryRemediationHint
+	if primaryRemediationHint == conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_UNSPECIFIED {
+		primaryRemediationHint = conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_NONE
 	}
 
 	return &conversationv1.Conversation{
@@ -954,6 +959,7 @@ func conversationProto(
 		UntrustedDevices:            overlay.UntrustedDevices,
 		CompromisedDevices:          overlay.CompromisedDevices,
 		BlockedDevices:              cloneBlockedDevices(overlay.BlockedDevices),
+		PrimaryE2EeRemediationHint:  primaryRemediationHint,
 		E2EeRequiredAction:          requiredAction,
 	}
 }
@@ -1033,13 +1039,16 @@ func (a *api) conversationE2EEOverlays(
 			if trustState == 0 {
 				trustState = e2eeDeviceTrustStateForConversationPreview(device.TrustState)
 			}
+			remediationHint := conversationE2EERemediationHintForTrustState(device.TrustState)
 			overlay.BlockedDevices = append(overlay.BlockedDevices, &conversationv1.ConversationBlockedDevice{
-				UserId:         device.AccountID,
-				DeviceId:       device.DeviceID,
-				TrustState:     trustState,
-				KeyFingerprint: device.KeyFingerprint,
+				UserId:          device.AccountID,
+				DeviceId:        device.DeviceID,
+				TrustState:      trustState,
+				KeyFingerprint:  device.KeyFingerprint,
+				RemediationHint: remediationHint,
 			})
 		}
+		overlay.PrimaryRemediationHint = conversationPrimaryE2EERemediationHint(overlay)
 		overlays[conversationID] = overlay
 	}
 	return overlays, nil
@@ -1056,10 +1065,11 @@ func cloneBlockedDevices(values []*conversationv1.ConversationBlockedDevice) []*
 			continue
 		}
 		cloned = append(cloned, &conversationv1.ConversationBlockedDevice{
-			UserId:         value.UserId,
-			DeviceId:       value.DeviceId,
-			TrustState:     value.TrustState,
-			KeyFingerprint: value.KeyFingerprint,
+			UserId:          value.UserId,
+			DeviceId:        value.DeviceId,
+			TrustState:      value.TrustState,
+			KeyFingerprint:  value.KeyFingerprint,
+			RemediationHint: value.RemediationHint,
 		})
 	}
 	return cloned
@@ -1072,6 +1082,29 @@ func e2eeDeviceTrustStateForConversationPreview(value domaine2ee.DeviceTrustStat
 	default:
 		return e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_UNTRUSTED
 	}
+}
+
+func conversationE2EERemediationHintForTrustState(
+	value domaine2ee.DeviceTrustState,
+) conversationv1.ConversationE2EERemediationHint {
+	switch value {
+	case domaine2ee.DeviceTrustStateCompromised:
+		return conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_REMOVE_COMPROMISED_DEVICE
+	default:
+		return conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_VERIFY_DEVICE
+	}
+}
+
+func conversationPrimaryE2EERemediationHint(
+	overlay conversationE2EEOverlay,
+) conversationv1.ConversationE2EERemediationHint {
+	if overlay.CompromisedDevices > 0 {
+		return conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_REMOVE_COMPROMISED_DEVICE
+	}
+	if overlay.VerificationRequiredDevices > 0 {
+		return conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_VERIFY_DEVICE
+	}
+	return conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_NONE
 }
 
 func conversationSettingsProto(settings domainconversation.ConversationSettings) *conversationv1.ConversationSettings {

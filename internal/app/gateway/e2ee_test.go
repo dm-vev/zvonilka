@@ -1355,6 +1355,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 	if flaggedConversation.Conversation.VerificationRequiredDevices != 1 {
 		t.Fatalf("expected create response to expose one verification-required device, got %d", flaggedConversation.Conversation.VerificationRequiredDevices)
 	}
+	if flaggedConversation.Conversation.PrimaryE2EeRemediationHint != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_VERIFY_DEVICE {
+		t.Fatalf("expected verify-device remediation hint, got %s", flaggedConversation.Conversation.PrimaryE2EeRemediationHint)
+	}
 	if flaggedConversation.Conversation.UntrustedDevices != 1 || flaggedConversation.Conversation.CompromisedDevices != 0 {
 		t.Fatalf("expected untrusted=1 compromised=0, got untrusted=%d compromised=%d", flaggedConversation.Conversation.UntrustedDevices, flaggedConversation.Conversation.CompromisedDevices)
 	}
@@ -1363,6 +1366,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 	}
 	if flaggedConversation.Conversation.BlockedDevices[0].UserId != bob.ID || flaggedConversation.Conversation.BlockedDevices[0].TrustState != e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_UNTRUSTED {
 		t.Fatalf("unexpected blocked device preview: %+v", flaggedConversation.Conversation.BlockedDevices[0])
+	}
+	if flaggedConversation.Conversation.BlockedDevices[0].RemediationHint != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_VERIFY_DEVICE {
+		t.Fatalf("unexpected blocked device remediation hint: %+v", flaggedConversation.Conversation.BlockedDevices[0])
 	}
 	if flaggedConversation.Conversation.E2EeRequiredAction != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES {
 		t.Fatalf("expected verify-devices action, got %s", flaggedConversation.Conversation.E2EeRequiredAction)
@@ -1412,6 +1418,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 			if item.E2EeRequiredAction != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES {
 				t.Fatalf("expected verify-devices action in list, got %s", item.E2EeRequiredAction)
 			}
+			if item.PrimaryE2EeRemediationHint != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_VERIFY_DEVICE {
+				t.Fatalf("expected verify-device remediation hint in list, got %s", item.PrimaryE2EeRemediationHint)
+			}
 		case plainConversation.Conversation.ConversationId:
 			seenPlain = true
 			if item.VerificationRequiredDevices != 0 {
@@ -1425,6 +1434,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 			}
 			if item.E2EeRequiredAction != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_NONE {
 				t.Fatalf("expected no action for plain conversation, got %s", item.E2EeRequiredAction)
+			}
+			if item.PrimaryE2EeRemediationHint != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_NONE {
+				t.Fatalf("expected no remediation hint for plain conversation, got %s", item.PrimaryE2EeRemediationHint)
 			}
 		}
 	}
@@ -1457,6 +1469,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 	}
 	if cleared.Conversation.E2EeRequiredAction != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_NONE {
 		t.Fatalf("expected required action to clear after trust update, got %s", cleared.Conversation.E2EeRequiredAction)
+	}
+	if cleared.Conversation.PrimaryE2EeRemediationHint != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_NONE {
+		t.Fatalf("expected remediation hint to clear after trust update, got %s", cleared.Conversation.PrimaryE2EeRemediationHint)
 	}
 }
 
@@ -1562,6 +1577,9 @@ func TestSubscribeEventsStreamsConversationE2EERequiredActionOverlay(t *testing.
 		}
 		if response.Event.Metadata["e2ee_required_action"] != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES.String() {
 			t.Fatalf("unexpected required action metadata: %+v", response.Event.Metadata)
+		}
+		if response.Event.Metadata["primary_e2ee_remediation_hint"] != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_VERIFY_DEVICE.String() {
+			t.Fatalf("unexpected remediation hint metadata: %+v", response.Event.Metadata)
 		}
 		stream.cancel()
 	case <-time.After(300 * time.Millisecond):
@@ -1669,6 +1687,9 @@ func TestPullEventsIncludesConversationE2EERequiredActionOverlay(t *testing.T) {
 	if pulled.Events[0].Metadata["untrusted_devices"] != "1" || pulled.Events[0].Metadata["compromised_devices"] != "0" {
 		t.Fatalf("expected untrusted=1 compromised=0 metadata, got %+v", pulled.Events[0].Metadata)
 	}
+	if pulled.Events[0].Metadata["primary_e2ee_remediation_hint"] != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_VERIFY_DEVICE.String() {
+		t.Fatalf("unexpected remediation hint metadata, got %+v", pulled.Events[0].Metadata)
+	}
 }
 
 func TestConversationResponsesTrackCompromisedDeviceCounts(t *testing.T) {
@@ -1752,11 +1773,17 @@ func TestConversationResponsesTrackCompromisedDeviceCounts(t *testing.T) {
 	if loaded.Conversation.UntrustedDevices != 0 || loaded.Conversation.CompromisedDevices != 1 {
 		t.Fatalf("expected untrusted=0 compromised=1, got untrusted=%d compromised=%d", loaded.Conversation.UntrustedDevices, loaded.Conversation.CompromisedDevices)
 	}
+	if loaded.Conversation.PrimaryE2EeRemediationHint != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_REMOVE_COMPROMISED_DEVICE {
+		t.Fatalf("expected remove-compromised remediation hint, got %s", loaded.Conversation.PrimaryE2EeRemediationHint)
+	}
 	if len(loaded.Conversation.BlockedDevices) != 1 {
 		t.Fatalf("expected one blocked device preview, got %+v", loaded.Conversation.BlockedDevices)
 	}
 	if loaded.Conversation.BlockedDevices[0].TrustState != e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_COMPROMISED {
 		t.Fatalf("expected compromised blocked device preview, got %+v", loaded.Conversation.BlockedDevices[0])
+	}
+	if loaded.Conversation.BlockedDevices[0].RemediationHint != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_REMOVE_COMPROMISED_DEVICE {
+		t.Fatalf("expected remove-compromised device remediation hint, got %+v", loaded.Conversation.BlockedDevices[0])
 	}
 }
 

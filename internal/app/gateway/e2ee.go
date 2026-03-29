@@ -629,6 +629,7 @@ func (a *api) publishConversationE2EERequiredActionEvents(
 				"untrusted_devices":             strconv.FormatUint(uint64(overlay.UntrustedDevices), 10),
 				"compromised_devices":           strconv.FormatUint(uint64(overlay.CompromisedDevices), 10),
 				"e2ee_required_action":          overlay.RequiredAction.String(),
+				"primary_e2ee_remediation_hint": overlay.PrimaryRemediationHint.String(),
 			},
 			CreatedAt: timeNowUTC(),
 		})
