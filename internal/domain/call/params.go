@@ -105,6 +105,32 @@ type ModerateParticipantParams struct {
 	LowerHand      bool
 }
 
+// MuteAllParticipantsParams describes one moderator-issued mute-all update.
+type MuteAllParticipantsParams struct {
+	CallID     string
+	AccountID  string
+	DeviceID   string
+	MuteAudio  bool
+	MuteVideo  bool
+	LowerHands bool
+}
+
+// RemoveParticipantParams describes one moderator-issued participant removal.
+type RemoveParticipantParams struct {
+	CallID         string
+	AccountID      string
+	DeviceID       string
+	TargetDeviceID string
+}
+
+// TransferHostParams describes one group-call host transfer.
+type TransferHostParams struct {
+	CallID          string
+	AccountID       string
+	DeviceID        string
+	TargetAccountID string
+}
+
 // AcknowledgeAdaptationParams describes one acknowledged server-issued adaptation revision.
 type AcknowledgeAdaptationParams struct {
 	CallID             string

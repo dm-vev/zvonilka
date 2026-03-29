@@ -35,6 +35,10 @@ const (
 	CallService_UpdateCallMediaState_FullMethodName      = "/zvonilka.call.v1.CallService/UpdateCallMediaState"
 	CallService_RaiseCallHand_FullMethodName             = "/zvonilka.call.v1.CallService/RaiseCallHand"
 	CallService_ModerateCallParticipant_FullMethodName   = "/zvonilka.call.v1.CallService/ModerateCallParticipant"
+	CallService_MuteAllCallParticipants_FullMethodName   = "/zvonilka.call.v1.CallService/MuteAllCallParticipants"
+	CallService_RemoveCallParticipant_FullMethodName     = "/zvonilka.call.v1.CallService/RemoveCallParticipant"
+	CallService_TransferCallHost_FullMethodName          = "/zvonilka.call.v1.CallService/TransferCallHost"
+	CallService_ListRaisedHands_FullMethodName           = "/zvonilka.call.v1.CallService/ListRaisedHands"
 	CallService_AcknowledgeCallAdaptation_FullMethodName = "/zvonilka.call.v1.CallService/AcknowledgeCallAdaptation"
 	CallService_GetIceConfig_FullMethodName              = "/zvonilka.call.v1.CallService/GetIceConfig"
 	CallService_SubscribeCallEvents_FullMethodName       = "/zvonilka.call.v1.CallService/SubscribeCallEvents"
@@ -61,6 +65,10 @@ type CallServiceClient interface {
 	UpdateCallMediaState(ctx context.Context, in *UpdateCallMediaStateRequest, opts ...grpc.CallOption) (*UpdateCallMediaStateResponse, error)
 	RaiseCallHand(ctx context.Context, in *RaiseCallHandRequest, opts ...grpc.CallOption) (*RaiseCallHandResponse, error)
 	ModerateCallParticipant(ctx context.Context, in *ModerateCallParticipantRequest, opts ...grpc.CallOption) (*ModerateCallParticipantResponse, error)
+	MuteAllCallParticipants(ctx context.Context, in *MuteAllCallParticipantsRequest, opts ...grpc.CallOption) (*MuteAllCallParticipantsResponse, error)
+	RemoveCallParticipant(ctx context.Context, in *RemoveCallParticipantRequest, opts ...grpc.CallOption) (*RemoveCallParticipantResponse, error)
+	TransferCallHost(ctx context.Context, in *TransferCallHostRequest, opts ...grpc.CallOption) (*TransferCallHostResponse, error)
+	ListRaisedHands(ctx context.Context, in *ListRaisedHandsRequest, opts ...grpc.CallOption) (*ListRaisedHandsResponse, error)
 	AcknowledgeCallAdaptation(ctx context.Context, in *AcknowledgeCallAdaptationRequest, opts ...grpc.CallOption) (*AcknowledgeCallAdaptationResponse, error)
 	GetIceConfig(ctx context.Context, in *GetIceConfigRequest, opts ...grpc.CallOption) (*GetIceConfigResponse, error)
 	SubscribeCallEvents(ctx context.Context, in *SubscribeCallEventsRequest, opts ...grpc.CallOption) (CallService_SubscribeCallEventsClient, error)
@@ -219,6 +227,42 @@ func (c *callServiceClient) ModerateCallParticipant(ctx context.Context, in *Mod
 	return out, nil
 }
 
+func (c *callServiceClient) MuteAllCallParticipants(ctx context.Context, in *MuteAllCallParticipantsRequest, opts ...grpc.CallOption) (*MuteAllCallParticipantsResponse, error) {
+	out := new(MuteAllCallParticipantsResponse)
+	err := c.cc.Invoke(ctx, CallService_MuteAllCallParticipants_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *callServiceClient) RemoveCallParticipant(ctx context.Context, in *RemoveCallParticipantRequest, opts ...grpc.CallOption) (*RemoveCallParticipantResponse, error) {
+	out := new(RemoveCallParticipantResponse)
+	err := c.cc.Invoke(ctx, CallService_RemoveCallParticipant_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *callServiceClient) TransferCallHost(ctx context.Context, in *TransferCallHostRequest, opts ...grpc.CallOption) (*TransferCallHostResponse, error) {
+	out := new(TransferCallHostResponse)
+	err := c.cc.Invoke(ctx, CallService_TransferCallHost_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *callServiceClient) ListRaisedHands(ctx context.Context, in *ListRaisedHandsRequest, opts ...grpc.CallOption) (*ListRaisedHandsResponse, error) {
+	out := new(ListRaisedHandsResponse)
+	err := c.cc.Invoke(ctx, CallService_ListRaisedHands_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *callServiceClient) AcknowledgeCallAdaptation(ctx context.Context, in *AcknowledgeCallAdaptationRequest, opts ...grpc.CallOption) (*AcknowledgeCallAdaptationResponse, error) {
 	out := new(AcknowledgeCallAdaptationResponse)
 	err := c.cc.Invoke(ctx, CallService_AcknowledgeCallAdaptation_FullMethodName, in, out, opts...)
@@ -321,6 +365,10 @@ type CallServiceServer interface {
 	UpdateCallMediaState(context.Context, *UpdateCallMediaStateRequest) (*UpdateCallMediaStateResponse, error)
 	RaiseCallHand(context.Context, *RaiseCallHandRequest) (*RaiseCallHandResponse, error)
 	ModerateCallParticipant(context.Context, *ModerateCallParticipantRequest) (*ModerateCallParticipantResponse, error)
+	MuteAllCallParticipants(context.Context, *MuteAllCallParticipantsRequest) (*MuteAllCallParticipantsResponse, error)
+	RemoveCallParticipant(context.Context, *RemoveCallParticipantRequest) (*RemoveCallParticipantResponse, error)
+	TransferCallHost(context.Context, *TransferCallHostRequest) (*TransferCallHostResponse, error)
+	ListRaisedHands(context.Context, *ListRaisedHandsRequest) (*ListRaisedHandsResponse, error)
 	AcknowledgeCallAdaptation(context.Context, *AcknowledgeCallAdaptationRequest) (*AcknowledgeCallAdaptationResponse, error)
 	GetIceConfig(context.Context, *GetIceConfigRequest) (*GetIceConfigResponse, error)
 	SubscribeCallEvents(*SubscribeCallEventsRequest, CallService_SubscribeCallEventsServer) error
@@ -379,6 +427,18 @@ func (UnimplementedCallServiceServer) RaiseCallHand(context.Context, *RaiseCallH
 }
 func (UnimplementedCallServiceServer) ModerateCallParticipant(context.Context, *ModerateCallParticipantRequest) (*ModerateCallParticipantResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ModerateCallParticipant not implemented")
+}
+func (UnimplementedCallServiceServer) MuteAllCallParticipants(context.Context, *MuteAllCallParticipantsRequest) (*MuteAllCallParticipantsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method MuteAllCallParticipants not implemented")
+}
+func (UnimplementedCallServiceServer) RemoveCallParticipant(context.Context, *RemoveCallParticipantRequest) (*RemoveCallParticipantResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveCallParticipant not implemented")
+}
+func (UnimplementedCallServiceServer) TransferCallHost(context.Context, *TransferCallHostRequest) (*TransferCallHostResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TransferCallHost not implemented")
+}
+func (UnimplementedCallServiceServer) ListRaisedHands(context.Context, *ListRaisedHandsRequest) (*ListRaisedHandsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListRaisedHands not implemented")
 }
 func (UnimplementedCallServiceServer) AcknowledgeCallAdaptation(context.Context, *AcknowledgeCallAdaptationRequest) (*AcknowledgeCallAdaptationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AcknowledgeCallAdaptation not implemented")
@@ -693,6 +753,78 @@ func _CallService_ModerateCallParticipant_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CallService_MuteAllCallParticipants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MuteAllCallParticipantsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).MuteAllCallParticipants(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_MuteAllCallParticipants_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).MuteAllCallParticipants(ctx, req.(*MuteAllCallParticipantsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CallService_RemoveCallParticipant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveCallParticipantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).RemoveCallParticipant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_RemoveCallParticipant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).RemoveCallParticipant(ctx, req.(*RemoveCallParticipantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CallService_TransferCallHost_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TransferCallHostRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).TransferCallHost(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_TransferCallHost_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).TransferCallHost(ctx, req.(*TransferCallHostRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CallService_ListRaisedHands_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRaisedHandsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).ListRaisedHands(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_ListRaisedHands_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).ListRaisedHands(ctx, req.(*ListRaisedHandsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CallService_AcknowledgeCallAdaptation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AcknowledgeCallAdaptationRequest)
 	if err := dec(in); err != nil {
@@ -841,6 +973,22 @@ var CallService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ModerateCallParticipant",
 			Handler:    _CallService_ModerateCallParticipant_Handler,
+		},
+		{
+			MethodName: "MuteAllCallParticipants",
+			Handler:    _CallService_MuteAllCallParticipants_Handler,
+		},
+		{
+			MethodName: "RemoveCallParticipant",
+			Handler:    _CallService_RemoveCallParticipant_Handler,
+		},
+		{
+			MethodName: "TransferCallHost",
+			Handler:    _CallService_TransferCallHost_Handler,
+		},
+		{
+			MethodName: "ListRaisedHands",
+			Handler:    _CallService_ListRaisedHands_Handler,
 		},
 		{
 			MethodName: "AcknowledgeCallAdaptation",

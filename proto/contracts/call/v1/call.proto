@@ -23,6 +23,10 @@ service CallService {
   rpc UpdateCallMediaState(UpdateCallMediaStateRequest) returns (UpdateCallMediaStateResponse);
   rpc RaiseCallHand(RaiseCallHandRequest) returns (RaiseCallHandResponse);
   rpc ModerateCallParticipant(ModerateCallParticipantRequest) returns (ModerateCallParticipantResponse);
+  rpc MuteAllCallParticipants(MuteAllCallParticipantsRequest) returns (MuteAllCallParticipantsResponse);
+  rpc RemoveCallParticipant(RemoveCallParticipantRequest) returns (RemoveCallParticipantResponse);
+  rpc TransferCallHost(TransferCallHostRequest) returns (TransferCallHostResponse);
+  rpc ListRaisedHands(ListRaisedHandsRequest) returns (ListRaisedHandsResponse);
   rpc AcknowledgeCallAdaptation(AcknowledgeCallAdaptationRequest) returns (AcknowledgeCallAdaptationResponse);
   rpc GetIceConfig(GetIceConfigRequest) returns (GetIceConfigResponse);
   rpc SubscribeCallEvents(SubscribeCallEventsRequest) returns (stream SubscribeCallEventsResponse);

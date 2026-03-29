@@ -341,6 +341,7 @@ func callProto(value domaincall.Call) *callv1.Call {
 		CallId:          value.ID,
 		ConversationId:  value.ConversationID,
 		InitiatorUserId: value.InitiatorAccountID,
+		HostUserId:      value.HostAccountID,
 		ActiveSessionId: value.ActiveSessionID,
 		RequestedVideo:  value.RequestedVideo,
 		State:           callStateToProto(value.State),

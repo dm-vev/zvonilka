@@ -198,17 +198,18 @@ message Call {
   string call_id = 1;
   string conversation_id = 2;
   string initiator_user_id = 3;
-  string active_session_id = 4;
-  bool requested_video = 5;
-  CallState state = 6;
-  CallEndReason end_reason = 7;
-  google.protobuf.Timestamp started_at = 8;
-  google.protobuf.Timestamp answered_at = 9;
-  google.protobuf.Timestamp ended_at = 10;
-  google.protobuf.Timestamp updated_at = 11;
-  repeated CallInvite invites = 12;
-  repeated CallParticipant participants = 13;
-  CallQualitySummary quality_summary = 14;
+  string host_user_id = 4;
+  string active_session_id = 5;
+  bool requested_video = 6;
+  CallState state = 7;
+  CallEndReason end_reason = 8;
+  google.protobuf.Timestamp started_at = 9;
+  google.protobuf.Timestamp answered_at = 10;
+  google.protobuf.Timestamp ended_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  repeated CallInvite invites = 13;
+  repeated CallParticipant participants = 14;
+  CallQualitySummary quality_summary = 15;
 }
 
 message CallEvent {

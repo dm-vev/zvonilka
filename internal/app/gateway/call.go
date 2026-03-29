@@ -413,6 +413,117 @@ func (a *api) ModerateCallParticipant(
 	}, nil
 }
 
+// MuteAllCallParticipants applies host mute flags to every joined group-call participant except the acting device.
+func (a *api) MuteAllCallParticipants(
+	ctx context.Context,
+	req *callv1.MuteAllCallParticipantsRequest,
+) (*callv1.MuteAllCallParticipantsResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	callRow, participants, events, err := a.call.MuteAllParticipants(ctx, domaincall.MuteAllParticipantsParams{
+		CallID:     req.GetCallId(),
+		AccountID:  authContext.Account.ID,
+		DeviceID:   authContext.Device.ID,
+		MuteAudio:  req.GetMuteAudio(),
+		MuteVideo:  req.GetMuteVideo(),
+		LowerHands: req.GetLowerHands(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(events...)
+
+	result := make([]*callv1.CallParticipant, 0, len(participants))
+	for _, participant := range participants {
+		result = append(result, callParticipantProto(participant))
+	}
+
+	return &callv1.MuteAllCallParticipantsResponse{
+		Call:         callProto(callRow),
+		Participants: result,
+	}, nil
+}
+
+// RemoveCallParticipant removes one participant from an active group call.
+func (a *api) RemoveCallParticipant(
+	ctx context.Context,
+	req *callv1.RemoveCallParticipantRequest,
+) (*callv1.RemoveCallParticipantResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	callRow, participant, events, err := a.call.RemoveParticipant(ctx, domaincall.RemoveParticipantParams{
+		CallID:         req.GetCallId(),
+		AccountID:      authContext.Account.ID,
+		DeviceID:       authContext.Device.ID,
+		TargetDeviceID: req.GetTargetDeviceId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(events...)
+
+	return &callv1.RemoveCallParticipantResponse{
+		Call:        callProto(callRow),
+		Participant: callParticipantProto(participant),
+	}, nil
+}
+
+// TransferCallHost transfers group-call host controls to another joined account.
+func (a *api) TransferCallHost(
+	ctx context.Context,
+	req *callv1.TransferCallHostRequest,
+) (*callv1.TransferCallHostResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	callRow, events, err := a.call.TransferHost(ctx, domaincall.TransferHostParams{
+		CallID:          req.GetCallId(),
+		AccountID:       authContext.Account.ID,
+		DeviceID:        authContext.Device.ID,
+		TargetAccountID: req.GetTargetUserId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(events...)
+
+	return &callv1.TransferCallHostResponse{Call: callProto(callRow)}, nil
+}
+
+// ListRaisedHands returns the current raised-hand queue for one visible group call.
+func (a *api) ListRaisedHands(
+	ctx context.Context,
+	req *callv1.ListRaisedHandsRequest,
+) (*callv1.ListRaisedHandsResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := a.call.RaisedHands(ctx, domaincall.GetParams{
+		CallID:    req.GetCallId(),
+		AccountID: authContext.Account.ID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	result := make([]*callv1.CallParticipant, 0, len(rows))
+	for _, participant := range rows {
+		result = append(result, callParticipantProto(participant))
+	}
+
+	return &callv1.ListRaisedHandsResponse{Participants: result}, nil
+}
+
 // AcknowledgeCallAdaptation confirms application of a server-issued adaptation revision.
 func (a *api) AcknowledgeCallAdaptation(
 	ctx context.Context,

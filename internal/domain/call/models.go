@@ -235,6 +235,7 @@ type Call struct {
 	ID                 string
 	ConversationID     string
 	InitiatorAccountID string
+	HostAccountID      string
 	ActiveSessionID    string
 	RequestedVideo     bool
 	State              State

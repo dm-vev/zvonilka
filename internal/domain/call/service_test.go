@@ -349,6 +349,57 @@ func TestGroupCallModerationLifecycle(t *testing.T) {
 		HostMutedAudio: true,
 	})
 	require.ErrorIs(t, err, domaincall.ErrForbidden)
+
+	raisedAgain, _, _, err := service.RaiseHand(context.Background(), domaincall.RaiseHandParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		Raised:    true,
+	})
+	require.NoError(t, err)
+	require.Len(t, raisedAgain.Participants, 2)
+
+	queued, err := service.RaisedHands(context.Background(), domaincall.GetParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+	})
+	require.NoError(t, err)
+	require.Len(t, queued, 1)
+	require.Equal(t, "dev-b", queued[0].DeviceID)
+
+	callRow, muted, _, err := service.MuteAllParticipants(context.Background(), domaincall.MuteAllParticipantsParams{
+		CallID:     started.ID,
+		AccountID:  "acc-a",
+		DeviceID:   "dev-a",
+		MuteAudio:  true,
+		MuteVideo:  true,
+		LowerHands: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, started.ID, callRow.ID)
+	require.Len(t, muted, 1)
+	require.True(t, muted[0].HostMutedAudio)
+	require.True(t, muted[0].HostMutedVideo)
+	require.False(t, muted[0].HandRaised)
+
+	callRow, _, err = service.TransferHost(context.Background(), domaincall.TransferHostParams{
+		CallID:          started.ID,
+		AccountID:       "acc-a",
+		DeviceID:        "dev-a",
+		TargetAccountID: "acc-b",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "acc-b", callRow.HostAccountID)
+
+	callRow, removed, _, err := service.RemoveParticipant(context.Background(), domaincall.RemoveParticipantParams{
+		CallID:         started.ID,
+		AccountID:      "acc-b",
+		DeviceID:       "dev-b",
+		TargetDeviceID: "dev-a",
+	})
+	require.NoError(t, err)
+	require.Equal(t, started.ID, callRow.ID)
+	require.Equal(t, domaincall.ParticipantStateLeft, removed.State)
 }
 
 func TestGroupCallJoinRespectsParticipantLimit(t *testing.T) {

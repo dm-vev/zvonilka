@@ -52,6 +52,7 @@ func (s *Service) StartCall(ctx context.Context, params StartParams) (Call, []Ev
 			ID:                 callID,
 			ConversationID:     conversationRow.ID,
 			InitiatorAccountID: params.AccountID,
+			HostAccountID:      params.AccountID,
 			RequestedVideo:     params.WithVideo,
 			State:              stateForConversationKind(conversationRow.Kind),
 			StartedAt:          now,

@@ -10,7 +10,7 @@ import (
 )
 
 const callColumnList = `
-call_id, conversation_id, initiator_account_id, active_session_id, requested_video,
+call_id, conversation_id, initiator_account_id, host_account_id, active_session_id, requested_video,
 state, end_reason, started_at, answered_at, ended_at, updated_at
 `
 
@@ -41,22 +41,27 @@ func (s *Store) saveCall(ctx context.Context, value call.Call) (call.Call, error
 	value.ID = strings.TrimSpace(value.ID)
 	value.ConversationID = strings.TrimSpace(value.ConversationID)
 	value.InitiatorAccountID = strings.TrimSpace(value.InitiatorAccountID)
+	value.HostAccountID = strings.TrimSpace(value.HostAccountID)
 	value.ActiveSessionID = strings.TrimSpace(value.ActiveSessionID)
 	if value.ID == "" || value.ConversationID == "" || value.InitiatorAccountID == "" || value.State == call.StateUnspecified {
 		return call.Call{}, call.ErrInvalidInput
 	}
+	if value.HostAccountID == "" {
+		value.HostAccountID = value.InitiatorAccountID
+	}
 
 	query := fmt.Sprintf(`
 INSERT INTO %s (
-	call_id, conversation_id, initiator_account_id, active_session_id, requested_video,
+	call_id, conversation_id, initiator_account_id, host_account_id, active_session_id, requested_video,
 	state, end_reason, started_at, answered_at, ended_at, updated_at
 ) VALUES (
-	$1, $2, $3, $4, $5,
-	$6, $7, $8, $9, $10, $11
+	$1, $2, $3, $4, $5, $6,
+	$7, $8, $9, $10, $11, $12
 )
 ON CONFLICT (call_id) DO UPDATE SET
 	conversation_id = EXCLUDED.conversation_id,
 	initiator_account_id = EXCLUDED.initiator_account_id,
+	host_account_id = EXCLUDED.host_account_id,
 	active_session_id = EXCLUDED.active_session_id,
 	requested_video = EXCLUDED.requested_video,
 	state = EXCLUDED.state,
@@ -74,6 +79,7 @@ RETURNING %s
 		value.ID,
 		value.ConversationID,
 		value.InitiatorAccountID,
+		value.HostAccountID,
 		nullString(value.ActiveSessionID),
 		value.RequestedVideo,
 		value.State,

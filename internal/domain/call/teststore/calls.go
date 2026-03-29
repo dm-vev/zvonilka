@@ -100,9 +100,13 @@ func normalizeCall(value call.Call) (call.Call, error) {
 	value.ID = strings.TrimSpace(value.ID)
 	value.ConversationID = strings.TrimSpace(value.ConversationID)
 	value.InitiatorAccountID = strings.TrimSpace(value.InitiatorAccountID)
+	value.HostAccountID = strings.TrimSpace(value.HostAccountID)
 	value.ActiveSessionID = strings.TrimSpace(value.ActiveSessionID)
 	if value.ID == "" || value.ConversationID == "" || value.InitiatorAccountID == "" {
 		return call.Call{}, call.ErrInvalidInput
+	}
+	if value.HostAccountID == "" {
+		value.HostAccountID = value.InitiatorAccountID
 	}
 	if value.State == call.StateUnspecified {
 		return call.Call{}, call.ErrInvalidInput

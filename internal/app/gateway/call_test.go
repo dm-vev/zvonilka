@@ -305,6 +305,61 @@ func TestGroupCallModerationRPC(t *testing.T) {
 	}); err == nil {
 		t.Fatal("expected member moderation to fail")
 	}
+
+	raisedHands, err := fixture.api.ListRaisedHands(ownerCtx, &callv1.ListRaisedHandsRequest{
+		CallId: started.Call.CallId,
+	})
+	if err != nil {
+		t.Fatalf("list raised hands: %v", err)
+	}
+	if len(raisedHands.Participants) != 0 {
+		t.Fatalf("expected lowered hands after moderation, got %+v", raisedHands.Participants)
+	}
+
+	mutedAll, err := fixture.api.MuteAllCallParticipants(ownerCtx, &callv1.MuteAllCallParticipantsRequest{
+		CallId:     started.Call.CallId,
+		MuteAudio:  true,
+		MuteVideo:  true,
+		LowerHands: true,
+	})
+	if err != nil {
+		t.Fatalf("mute all participants: %v", err)
+	}
+	if len(mutedAll.Participants) != 2 {
+		t.Fatalf("unexpected muted participants: %+v", mutedAll.Participants)
+	}
+	var removedDeviceID string
+	for _, participant := range mutedAll.Participants {
+		if participant.UserId == extra.ID {
+			removedDeviceID = participant.DeviceId
+			break
+		}
+	}
+	if removedDeviceID == "" {
+		t.Fatalf("expected extra participant in muted set: %+v", mutedAll.Participants)
+	}
+
+	transferred, err := fixture.api.TransferCallHost(ownerCtx, &callv1.TransferCallHostRequest{
+		CallId:       started.Call.CallId,
+		TargetUserId: peer.ID,
+	})
+	if err != nil {
+		t.Fatalf("transfer call host: %v", err)
+	}
+	if transferred.Call == nil || transferred.Call.HostUserId != peer.ID {
+		t.Fatalf("unexpected transferred host: %+v", transferred.Call)
+	}
+
+	removed, err := fixture.api.RemoveCallParticipant(peerCtx, &callv1.RemoveCallParticipantRequest{
+		CallId:         started.Call.CallId,
+		TargetDeviceId: removedDeviceID,
+	})
+	if err != nil {
+		t.Fatalf("remove participant: %v", err)
+	}
+	if removed.Participant == nil || removed.Participant.State != callv1.CallParticipantState_CALL_PARTICIPANT_STATE_LEFT {
+		t.Fatalf("unexpected removed participant: %+v", removed.Participant)
+	}
 }
 
 func TestGetCallDiagnosticsRPC(t *testing.T) {

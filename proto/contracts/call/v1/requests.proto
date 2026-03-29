@@ -159,6 +159,45 @@ message ModerateCallParticipantResponse {
   CallParticipant participant = 2;
 }
 
+message MuteAllCallParticipantsRequest {
+  string call_id = 1;
+  bool mute_audio = 2;
+  bool mute_video = 3;
+  bool lower_hands = 4;
+}
+
+message MuteAllCallParticipantsResponse {
+  Call call = 1;
+  repeated CallParticipant participants = 2;
+}
+
+message RemoveCallParticipantRequest {
+  string call_id = 1;
+  string target_device_id = 2;
+}
+
+message RemoveCallParticipantResponse {
+  Call call = 1;
+  CallParticipant participant = 2;
+}
+
+message TransferCallHostRequest {
+  string call_id = 1;
+  string target_user_id = 2;
+}
+
+message TransferCallHostResponse {
+  Call call = 1;
+}
+
+message ListRaisedHandsRequest {
+  string call_id = 1;
+}
+
+message ListRaisedHandsResponse {
+  repeated CallParticipant participants = 1;
+}
+
 message AcknowledgeCallAdaptationRequest {
   string call_id = 1;
   string session_id = 2;

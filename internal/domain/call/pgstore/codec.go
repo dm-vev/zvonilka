@@ -57,6 +57,7 @@ func scanCall(row rowScanner) (call.Call, error) {
 		&value.ID,
 		&value.ConversationID,
 		&value.InitiatorAccountID,
+		&value.HostAccountID,
 		&value.ActiveSessionID,
 		&value.RequestedVideo,
 		&value.State,

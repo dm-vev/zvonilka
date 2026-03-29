@@ -297,6 +297,15 @@ func callParticipantKey(accountID string, deviceID string) string {
 	return strings.TrimSpace(accountID) + "|" + strings.TrimSpace(deviceID)
 }
 
+func currentGroupCallHost(callRow Call) string {
+	hostAccountID := strings.TrimSpace(callRow.HostAccountID)
+	if hostAccountID != "" {
+		return hostAccountID
+	}
+
+	return strings.TrimSpace(callRow.InitiatorAccountID)
+}
+
 func applyParticipantPolicies(
 	participants []Participant,
 	kind conversation.ConversationKind,
