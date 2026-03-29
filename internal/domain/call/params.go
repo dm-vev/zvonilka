@@ -131,6 +131,23 @@ type TransferHostParams struct {
 	TargetAccountID string
 }
 
+// UpdateStageModeParams describes one stage-mode toggle for a group call.
+type UpdateStageModeParams struct {
+	CallID    string
+	AccountID string
+	DeviceID  string
+	Enabled   bool
+}
+
+// PinSpeakerParams describes one pinned-speaker update for a group call.
+type PinSpeakerParams struct {
+	CallID         string
+	AccountID      string
+	DeviceID       string
+	TargetDeviceID string
+	Pinned         bool
+}
+
 // AcknowledgeAdaptationParams describes one acknowledged server-issued adaptation revision.
 type AcknowledgeAdaptationParams struct {
 	CallID             string

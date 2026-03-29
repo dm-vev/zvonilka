@@ -709,6 +709,16 @@ func (s *Service) LeaveCall(ctx context.Context, params LeaveParams) (Call, []Ev
 			}
 			events = append(events, event)
 		}
+		if callRow.PinnedSpeakerAccountID == participant.AccountID && callRow.PinnedSpeakerDeviceID == participant.DeviceID {
+			callRow.PinnedSpeakerAccountID = ""
+			callRow.PinnedSpeakerDeviceID = ""
+			callRow.UpdatedAt = now
+			savedCall, saveErr := store.SaveCall(ctx, callRow)
+			if saveErr != nil {
+				return fmt.Errorf("clear pinned speaker for %s: %w", callRow.ID, saveErr)
+			}
+			callRow = savedCall
+		}
 
 		participants, loadErr := store.ParticipantsByCall(ctx, callRow.ID)
 		if loadErr != nil {

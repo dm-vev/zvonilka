@@ -49,16 +49,22 @@ func decodeTime(value sql.NullTime) time.Time {
 
 func scanCall(row rowScanner) (call.Call, error) {
 	var (
-		value      call.Call
-		answeredAt sql.NullTime
-		endedAt    sql.NullTime
+		value                call.Call
+		activeSessionID      sql.NullString
+		pinnedSpeakerAccount sql.NullString
+		pinnedSpeakerDevice  sql.NullString
+		answeredAt           sql.NullTime
+		endedAt              sql.NullTime
 	)
 	if err := row.Scan(
 		&value.ID,
 		&value.ConversationID,
 		&value.InitiatorAccountID,
 		&value.HostAccountID,
-		&value.ActiveSessionID,
+		&value.StageModeEnabled,
+		&pinnedSpeakerAccount,
+		&pinnedSpeakerDevice,
+		&activeSessionID,
 		&value.RequestedVideo,
 		&value.State,
 		&value.EndReason,
@@ -70,6 +76,9 @@ func scanCall(row rowScanner) (call.Call, error) {
 		return call.Call{}, err
 	}
 	value.StartedAt = value.StartedAt.UTC()
+	value.ActiveSessionID = activeSessionID.String
+	value.PinnedSpeakerAccountID = pinnedSpeakerAccount.String
+	value.PinnedSpeakerDeviceID = pinnedSpeakerDevice.String
 	value.AnsweredAt = decodeTime(answeredAt)
 	value.EndedAt = decodeTime(endedAt)
 	value.UpdatedAt = value.UpdatedAt.UTC()

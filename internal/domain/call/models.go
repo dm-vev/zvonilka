@@ -220,6 +220,8 @@ type Participant struct {
 	DeviceID       string
 	State          ParticipantState
 	MediaState     MediaState
+	PinnedSpeaker  bool
+	StageSlot      bool
 	HandRaised     bool
 	RaisedHandAt   time.Time
 	HostMutedAudio bool
@@ -232,21 +234,24 @@ type Participant struct {
 
 // Call describes one direct call and its current state.
 type Call struct {
-	ID                 string
-	ConversationID     string
-	InitiatorAccountID string
-	HostAccountID      string
-	ActiveSessionID    string
-	RequestedVideo     bool
-	State              State
-	EndReason          EndReason
-	StartedAt          time.Time
-	AnsweredAt         time.Time
-	EndedAt            time.Time
-	UpdatedAt          time.Time
-	Invites            []Invite
-	Participants       []Participant
-	QualitySummary     QualitySummary
+	ID                     string
+	ConversationID         string
+	InitiatorAccountID     string
+	HostAccountID          string
+	StageModeEnabled       bool
+	PinnedSpeakerAccountID string
+	PinnedSpeakerDeviceID  string
+	ActiveSessionID        string
+	RequestedVideo         bool
+	State                  State
+	EndReason              EndReason
+	StartedAt              time.Time
+	AnsweredAt             time.Time
+	EndedAt                time.Time
+	UpdatedAt              time.Time
+	Invites                []Invite
+	Participants           []Participant
+	QualitySummary         QualitySummary
 }
 
 // Event describes one persisted call event.

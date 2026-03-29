@@ -524,6 +524,58 @@ func (a *api) ListRaisedHands(
 	return &callv1.ListRaisedHandsResponse{Participants: result}, nil
 }
 
+// UpdateCallStageMode toggles stage mode for one active group call.
+func (a *api) UpdateCallStageMode(
+	ctx context.Context,
+	req *callv1.UpdateCallStageModeRequest,
+) (*callv1.UpdateCallStageModeResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	callRow, events, err := a.call.UpdateStageMode(ctx, domaincall.UpdateStageModeParams{
+		CallID:    req.GetCallId(),
+		AccountID: authContext.Account.ID,
+		DeviceID:  authContext.Device.ID,
+		Enabled:   req.GetEnabled(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(events...)
+
+	return &callv1.UpdateCallStageModeResponse{Call: callProto(callRow)}, nil
+}
+
+// PinCallSpeaker pins or unpins one group-call speaker.
+func (a *api) PinCallSpeaker(
+	ctx context.Context,
+	req *callv1.PinCallSpeakerRequest,
+) (*callv1.PinCallSpeakerResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	callRow, participant, events, err := a.call.PinSpeaker(ctx, domaincall.PinSpeakerParams{
+		CallID:         req.GetCallId(),
+		AccountID:      authContext.Account.ID,
+		DeviceID:       authContext.Device.ID,
+		TargetDeviceID: req.GetTargetDeviceId(),
+		Pinned:         req.GetPinned(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(events...)
+
+	return &callv1.PinCallSpeakerResponse{
+		Call:        callProto(callRow),
+		Participant: callParticipantProto(participant),
+	}, nil
+}
+
 // AcknowledgeCallAdaptation confirms application of a server-issued adaptation revision.
 func (a *api) AcknowledgeCallAdaptation(
 	ctx context.Context,

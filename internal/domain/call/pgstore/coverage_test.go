@@ -86,11 +86,13 @@ func TestScanHelpers(t *testing.T) {
 	now := time.Date(2026, time.March, 27, 23, 50, 0, 0, time.UTC)
 
 	callRow, err := scanCall(scanRow{values: []any{
-		"call-1", "conv-1", "acc-a", "acc-a", "sess-1", true, call.StateActive, call.EndReasonEnded,
+		"call-1", "conv-1", "acc-a", "acc-a", true, "acc-b", "dev-b", "sess-1", true, call.StateActive, call.EndReasonEnded,
 		now, now, now, now,
 	}})
 	require.NoError(t, err)
 	require.Equal(t, "call-1", callRow.ID)
+	require.True(t, callRow.StageModeEnabled)
+	require.Equal(t, "dev-b", callRow.PinnedSpeakerDeviceID)
 
 	inviteRow, err := scanInvite(scanRow{values: []any{"call-1", "acc-b", call.InviteStateAccepted, now, now, now}})
 	require.NoError(t, err)
@@ -124,10 +126,10 @@ func TestCallInviteParticipantQueries(t *testing.T) {
 	mock.ExpectQuery(`SELECT .* FROM "call"\."call_calls" WHERE call_id = \$1`).
 		WithArgs("call-1").
 		WillReturnRows(sqlmock.NewRows([]string{
-			"call_id", "conversation_id", "initiator_account_id", "host_account_id", "active_session_id", "requested_video",
+			"call_id", "conversation_id", "initiator_account_id", "host_account_id", "stage_mode_enabled", "pinned_speaker_account_id", "pinned_speaker_device_id", "active_session_id", "requested_video",
 			"state", "end_reason", "started_at", "answered_at", "ended_at", "updated_at",
 		}).AddRow(
-			"call-1", "conv-1", "acc-a", "acc-a", "sess-1", true, call.StateActive, "", now, nil, nil, now,
+			"call-1", "conv-1", "acc-a", "acc-a", false, nil, nil, "sess-1", true, call.StateActive, "", now, nil, nil, now,
 		))
 
 	row, err := store.CallByID(context.Background(), "call-1")
@@ -137,10 +139,10 @@ func TestCallInviteParticipantQueries(t *testing.T) {
 	mock.ExpectQuery(`SELECT .* FROM "call"\."call_calls".*state IN \('ringing', 'active'\)`).
 		WithArgs("conv-1").
 		WillReturnRows(sqlmock.NewRows([]string{
-			"call_id", "conversation_id", "initiator_account_id", "host_account_id", "active_session_id", "requested_video",
+			"call_id", "conversation_id", "initiator_account_id", "host_account_id", "stage_mode_enabled", "pinned_speaker_account_id", "pinned_speaker_device_id", "active_session_id", "requested_video",
 			"state", "end_reason", "started_at", "answered_at", "ended_at", "updated_at",
 		}).AddRow(
-			"call-1", "conv-1", "acc-a", "acc-a", "sess-1", true, call.StateActive, "", now, nil, nil, now,
+			"call-1", "conv-1", "acc-a", "acc-a", false, nil, nil, "sess-1", true, call.StateActive, "", now, nil, nil, now,
 		))
 
 	row, err = store.ActiveCallByConversation(context.Background(), "conv-1")
@@ -150,10 +152,10 @@ func TestCallInviteParticipantQueries(t *testing.T) {
 	mock.ExpectQuery(`SELECT .* FROM "call"\."call_calls".*WHERE conversation_id = \$1.*ORDER BY started_at DESC, call_id ASC`).
 		WithArgs("conv-1").
 		WillReturnRows(sqlmock.NewRows([]string{
-			"call_id", "conversation_id", "initiator_account_id", "host_account_id", "active_session_id", "requested_video",
+			"call_id", "conversation_id", "initiator_account_id", "host_account_id", "stage_mode_enabled", "pinned_speaker_account_id", "pinned_speaker_device_id", "active_session_id", "requested_video",
 			"state", "end_reason", "started_at", "answered_at", "ended_at", "updated_at",
 		}).AddRow(
-			"call-1", "conv-1", "acc-a", "acc-a", "", true, call.StateActive, "", now, nil, nil, now,
+			"call-1", "conv-1", "acc-a", "acc-a", false, nil, nil, "", true, call.StateActive, "", now, nil, nil, now,
 		))
 
 	rows, err := store.CallsByConversation(context.Background(), "conv-1", false)

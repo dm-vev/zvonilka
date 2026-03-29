@@ -155,6 +155,8 @@ message CallParticipant {
   google.protobuf.Timestamp raised_hand_at = 10;
   bool host_muted_audio = 11;
   bool host_muted_video = 12;
+  bool pinned_speaker = 13;
+  bool stage_slot = 14;
 }
 
 message CallQualitySummary {
@@ -210,6 +212,9 @@ message Call {
   repeated CallInvite invites = 13;
   repeated CallParticipant participants = 14;
   CallQualitySummary quality_summary = 15;
+  bool stage_mode_enabled = 16;
+  string pinned_speaker_user_id = 17;
+  string pinned_speaker_device_id = 18;
 }
 
 message CallEvent {

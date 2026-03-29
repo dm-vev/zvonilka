@@ -39,6 +39,8 @@ const (
 	CallService_RemoveCallParticipant_FullMethodName     = "/zvonilka.call.v1.CallService/RemoveCallParticipant"
 	CallService_TransferCallHost_FullMethodName          = "/zvonilka.call.v1.CallService/TransferCallHost"
 	CallService_ListRaisedHands_FullMethodName           = "/zvonilka.call.v1.CallService/ListRaisedHands"
+	CallService_UpdateCallStageMode_FullMethodName       = "/zvonilka.call.v1.CallService/UpdateCallStageMode"
+	CallService_PinCallSpeaker_FullMethodName            = "/zvonilka.call.v1.CallService/PinCallSpeaker"
 	CallService_AcknowledgeCallAdaptation_FullMethodName = "/zvonilka.call.v1.CallService/AcknowledgeCallAdaptation"
 	CallService_GetIceConfig_FullMethodName              = "/zvonilka.call.v1.CallService/GetIceConfig"
 	CallService_SubscribeCallEvents_FullMethodName       = "/zvonilka.call.v1.CallService/SubscribeCallEvents"
@@ -69,6 +71,8 @@ type CallServiceClient interface {
 	RemoveCallParticipant(ctx context.Context, in *RemoveCallParticipantRequest, opts ...grpc.CallOption) (*RemoveCallParticipantResponse, error)
 	TransferCallHost(ctx context.Context, in *TransferCallHostRequest, opts ...grpc.CallOption) (*TransferCallHostResponse, error)
 	ListRaisedHands(ctx context.Context, in *ListRaisedHandsRequest, opts ...grpc.CallOption) (*ListRaisedHandsResponse, error)
+	UpdateCallStageMode(ctx context.Context, in *UpdateCallStageModeRequest, opts ...grpc.CallOption) (*UpdateCallStageModeResponse, error)
+	PinCallSpeaker(ctx context.Context, in *PinCallSpeakerRequest, opts ...grpc.CallOption) (*PinCallSpeakerResponse, error)
 	AcknowledgeCallAdaptation(ctx context.Context, in *AcknowledgeCallAdaptationRequest, opts ...grpc.CallOption) (*AcknowledgeCallAdaptationResponse, error)
 	GetIceConfig(ctx context.Context, in *GetIceConfigRequest, opts ...grpc.CallOption) (*GetIceConfigResponse, error)
 	SubscribeCallEvents(ctx context.Context, in *SubscribeCallEventsRequest, opts ...grpc.CallOption) (CallService_SubscribeCallEventsClient, error)
@@ -263,6 +267,24 @@ func (c *callServiceClient) ListRaisedHands(ctx context.Context, in *ListRaisedH
 	return out, nil
 }
 
+func (c *callServiceClient) UpdateCallStageMode(ctx context.Context, in *UpdateCallStageModeRequest, opts ...grpc.CallOption) (*UpdateCallStageModeResponse, error) {
+	out := new(UpdateCallStageModeResponse)
+	err := c.cc.Invoke(ctx, CallService_UpdateCallStageMode_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *callServiceClient) PinCallSpeaker(ctx context.Context, in *PinCallSpeakerRequest, opts ...grpc.CallOption) (*PinCallSpeakerResponse, error) {
+	out := new(PinCallSpeakerResponse)
+	err := c.cc.Invoke(ctx, CallService_PinCallSpeaker_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *callServiceClient) AcknowledgeCallAdaptation(ctx context.Context, in *AcknowledgeCallAdaptationRequest, opts ...grpc.CallOption) (*AcknowledgeCallAdaptationResponse, error) {
 	out := new(AcknowledgeCallAdaptationResponse)
 	err := c.cc.Invoke(ctx, CallService_AcknowledgeCallAdaptation_FullMethodName, in, out, opts...)
@@ -369,6 +391,8 @@ type CallServiceServer interface {
 	RemoveCallParticipant(context.Context, *RemoveCallParticipantRequest) (*RemoveCallParticipantResponse, error)
 	TransferCallHost(context.Context, *TransferCallHostRequest) (*TransferCallHostResponse, error)
 	ListRaisedHands(context.Context, *ListRaisedHandsRequest) (*ListRaisedHandsResponse, error)
+	UpdateCallStageMode(context.Context, *UpdateCallStageModeRequest) (*UpdateCallStageModeResponse, error)
+	PinCallSpeaker(context.Context, *PinCallSpeakerRequest) (*PinCallSpeakerResponse, error)
 	AcknowledgeCallAdaptation(context.Context, *AcknowledgeCallAdaptationRequest) (*AcknowledgeCallAdaptationResponse, error)
 	GetIceConfig(context.Context, *GetIceConfigRequest) (*GetIceConfigResponse, error)
 	SubscribeCallEvents(*SubscribeCallEventsRequest, CallService_SubscribeCallEventsServer) error
@@ -439,6 +463,12 @@ func (UnimplementedCallServiceServer) TransferCallHost(context.Context, *Transfe
 }
 func (UnimplementedCallServiceServer) ListRaisedHands(context.Context, *ListRaisedHandsRequest) (*ListRaisedHandsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListRaisedHands not implemented")
+}
+func (UnimplementedCallServiceServer) UpdateCallStageMode(context.Context, *UpdateCallStageModeRequest) (*UpdateCallStageModeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateCallStageMode not implemented")
+}
+func (UnimplementedCallServiceServer) PinCallSpeaker(context.Context, *PinCallSpeakerRequest) (*PinCallSpeakerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PinCallSpeaker not implemented")
 }
 func (UnimplementedCallServiceServer) AcknowledgeCallAdaptation(context.Context, *AcknowledgeCallAdaptationRequest) (*AcknowledgeCallAdaptationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AcknowledgeCallAdaptation not implemented")
@@ -825,6 +855,42 @@ func _CallService_ListRaisedHands_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CallService_UpdateCallStageMode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateCallStageModeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).UpdateCallStageMode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_UpdateCallStageMode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).UpdateCallStageMode(ctx, req.(*UpdateCallStageModeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CallService_PinCallSpeaker_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PinCallSpeakerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).PinCallSpeaker(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_PinCallSpeaker_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).PinCallSpeaker(ctx, req.(*PinCallSpeakerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CallService_AcknowledgeCallAdaptation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AcknowledgeCallAdaptationRequest)
 	if err := dec(in); err != nil {
@@ -989,6 +1055,14 @@ var CallService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListRaisedHands",
 			Handler:    _CallService_ListRaisedHands_Handler,
+		},
+		{
+			MethodName: "UpdateCallStageMode",
+			Handler:    _CallService_UpdateCallStageMode_Handler,
+		},
+		{
+			MethodName: "PinCallSpeaker",
+			Handler:    _CallService_PinCallSpeaker_Handler,
 		},
 		{
 			MethodName: "AcknowledgeCallAdaptation",

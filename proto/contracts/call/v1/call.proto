@@ -27,6 +27,8 @@ service CallService {
   rpc RemoveCallParticipant(RemoveCallParticipantRequest) returns (RemoveCallParticipantResponse);
   rpc TransferCallHost(TransferCallHostRequest) returns (TransferCallHostResponse);
   rpc ListRaisedHands(ListRaisedHandsRequest) returns (ListRaisedHandsResponse);
+  rpc UpdateCallStageMode(UpdateCallStageModeRequest) returns (UpdateCallStageModeResponse);
+  rpc PinCallSpeaker(PinCallSpeakerRequest) returns (PinCallSpeakerResponse);
   rpc AcknowledgeCallAdaptation(AcknowledgeCallAdaptationRequest) returns (AcknowledgeCallAdaptationResponse);
   rpc GetIceConfig(GetIceConfigRequest) returns (GetIceConfigResponse);
   rpc SubscribeCallEvents(SubscribeCallEventsRequest) returns (stream SubscribeCallEventsResponse);

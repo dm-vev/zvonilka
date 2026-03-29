@@ -324,6 +324,8 @@ func callParticipantProto(value domaincall.Participant) *callv1.CallParticipant 
 		RaisedHandAt:   protoTime(value.RaisedHandAt),
 		HostMutedAudio: value.HostMutedAudio,
 		HostMutedVideo: value.HostMutedVideo,
+		PinnedSpeaker:  value.PinnedSpeaker,
+		StageSlot:      value.StageSlot,
 	}
 }
 
@@ -338,21 +340,24 @@ func callProto(value domaincall.Call) *callv1.Call {
 	}
 
 	return &callv1.Call{
-		CallId:          value.ID,
-		ConversationId:  value.ConversationID,
-		InitiatorUserId: value.InitiatorAccountID,
-		HostUserId:      value.HostAccountID,
-		ActiveSessionId: value.ActiveSessionID,
-		RequestedVideo:  value.RequestedVideo,
-		State:           callStateToProto(value.State),
-		EndReason:       callEndReasonToProto(value.EndReason),
-		StartedAt:       protoTime(value.StartedAt),
-		AnsweredAt:      protoTime(value.AnsweredAt),
-		EndedAt:         protoTime(value.EndedAt),
-		UpdatedAt:       protoTime(value.UpdatedAt),
-		Invites:         invites,
-		Participants:    participants,
-		QualitySummary:  callQualitySummaryProto(value.QualitySummary),
+		CallId:                value.ID,
+		ConversationId:        value.ConversationID,
+		InitiatorUserId:       value.InitiatorAccountID,
+		HostUserId:            value.HostAccountID,
+		ActiveSessionId:       value.ActiveSessionID,
+		RequestedVideo:        value.RequestedVideo,
+		State:                 callStateToProto(value.State),
+		EndReason:             callEndReasonToProto(value.EndReason),
+		StartedAt:             protoTime(value.StartedAt),
+		AnsweredAt:            protoTime(value.AnsweredAt),
+		EndedAt:               protoTime(value.EndedAt),
+		UpdatedAt:             protoTime(value.UpdatedAt),
+		Invites:               invites,
+		Participants:          participants,
+		QualitySummary:        callQualitySummaryProto(value.QualitySummary),
+		StageModeEnabled:      value.StageModeEnabled,
+		PinnedSpeakerUserId:   value.PinnedSpeakerAccountID,
+		PinnedSpeakerDeviceId: value.PinnedSpeakerDeviceID,
 	}
 }
 

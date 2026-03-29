@@ -362,6 +362,86 @@ func TestGroupCallModerationRPC(t *testing.T) {
 	}
 }
 
+func TestGroupCallStageModeRPC(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	_, ownerCtx := fixture.mustCreateUserAndLogin(t, "group-stage-owner", "group-stage-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "group-stage-peer", "group-stage-peer@example.com")
+	extra, extraCtx := fixture.mustCreateUserAndLogin(t, "group-stage-extra", "group-stage-extra@example.com")
+
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Stage Group Call",
+		MemberUserIds: []string{peer.ID, extra.ID},
+	})
+	if err != nil {
+		t.Fatalf("create group conversation: %v", err)
+	}
+
+	started, err := fixture.api.StartCall(ownerCtx, &callv1.StartCallRequest{
+		ConversationId: created.Conversation.ConversationId,
+		WithVideo:      true,
+	})
+	if err != nil {
+		t.Fatalf("start group call: %v", err)
+	}
+	if _, err := fixture.api.JoinCall(peerCtx, &callv1.JoinCallRequest{
+		CallId:    started.Call.CallId,
+		WithVideo: true,
+	}); err != nil {
+		t.Fatalf("join peer: %v", err)
+	}
+	if _, err := fixture.api.JoinCall(extraCtx, &callv1.JoinCallRequest{
+		CallId:    started.Call.CallId,
+		WithVideo: true,
+	}); err != nil {
+		t.Fatalf("join extra: %v", err)
+	}
+
+	stage, err := fixture.api.UpdateCallStageMode(ownerCtx, &callv1.UpdateCallStageModeRequest{
+		CallId:  started.Call.CallId,
+		Enabled: true,
+	})
+	if err != nil {
+		t.Fatalf("update stage mode: %v", err)
+	}
+	if stage.Call == nil || !stage.Call.StageModeEnabled {
+		t.Fatalf("unexpected stage mode call: %+v", stage.Call)
+	}
+
+	current, err := fixture.api.GetCall(ownerCtx, &callv1.GetCallRequest{CallId: started.Call.CallId})
+	if err != nil {
+		t.Fatalf("get call: %v", err)
+	}
+	peerDeviceID := ""
+	for _, participant := range current.Call.Participants {
+		if participant.UserId == peer.ID {
+			peerDeviceID = participant.DeviceId
+			break
+		}
+	}
+	if peerDeviceID == "" {
+		t.Fatalf("expected joined peer participant in %+v", current.Call.Participants)
+	}
+
+	pinned, err := fixture.api.PinCallSpeaker(ownerCtx, &callv1.PinCallSpeakerRequest{
+		CallId:         started.Call.CallId,
+		TargetDeviceId: peerDeviceID,
+		Pinned:         true,
+	})
+	if err != nil {
+		t.Fatalf("pin speaker: %v", err)
+	}
+	if pinned.Call == nil || pinned.Call.PinnedSpeakerUserId != peer.ID || pinned.Call.PinnedSpeakerDeviceId != peerDeviceID {
+		t.Fatalf("unexpected pinned call: %+v", pinned.Call)
+	}
+	if pinned.Participant == nil || !pinned.Participant.PinnedSpeaker || !pinned.Participant.StageSlot {
+		t.Fatalf("unexpected pinned participant: %+v", pinned.Participant)
+	}
+}
+
 func TestGetCallDiagnosticsRPC(t *testing.T) {
 	t.Parallel()
 

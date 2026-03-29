@@ -198,6 +198,26 @@ message ListRaisedHandsResponse {
   repeated CallParticipant participants = 1;
 }
 
+message UpdateCallStageModeRequest {
+  string call_id = 1;
+  bool enabled = 2;
+}
+
+message UpdateCallStageModeResponse {
+  Call call = 1;
+}
+
+message PinCallSpeakerRequest {
+  string call_id = 1;
+  string target_device_id = 2;
+  bool pinned = 3;
+}
+
+message PinCallSpeakerResponse {
+  Call call = 1;
+  CallParticipant participant = 2;
+}
+
 message AcknowledgeCallAdaptationRequest {
   string call_id = 1;
   string session_id = 2;

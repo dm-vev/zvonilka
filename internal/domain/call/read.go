@@ -264,7 +264,7 @@ func (s *Service) hydrateCall(ctx context.Context, store Store, callID string) (
 	}
 	conversationRow, conversationErr := s.conversations.ConversationByID(ctx, callRow.ConversationID)
 	if conversationErr == nil {
-		applyParticipantPolicies(callRow.Participants, conversationRow.Kind, s.settings)
+		applyParticipantPolicies(&callRow, conversationRow.Kind, s.settings)
 	}
 	callRow.QualitySummary = summarizeCallQuality(callRow.Participants)
 	if callRow.State == StateEnded {
@@ -307,19 +307,40 @@ func currentGroupCallHost(callRow Call) string {
 }
 
 func applyParticipantPolicies(
-	participants []Participant,
+	callRow *Call,
 	kind conversation.ConversationKind,
 	settings Settings,
 ) {
-	if len(participants) == 0 {
+	if callRow == nil || len(callRow.Participants) == 0 {
 		return
 	}
 
-	applyHostMutePolicies(participants)
+	applyPinnedSpeakerFlags(callRow)
+	applyHostMutePolicies(callRow.Participants)
 	if kind != conversation.ConversationKindGroup {
 		return
 	}
-	applyGroupVideoScaling(participants, settings)
+	applyGroupVideoScaling(callRow, settings)
+}
+
+func applyPinnedSpeakerFlags(callRow *Call) {
+	if callRow == nil {
+		return
+	}
+
+	accountID := strings.TrimSpace(callRow.PinnedSpeakerAccountID)
+	deviceID := strings.TrimSpace(callRow.PinnedSpeakerDeviceID)
+	for i := range callRow.Participants {
+		callRow.Participants[i].PinnedSpeaker = false
+		callRow.Participants[i].StageSlot = false
+		if accountID == "" || deviceID == "" {
+			continue
+		}
+		if callRow.Participants[i].AccountID != accountID || callRow.Participants[i].DeviceID != deviceID {
+			continue
+		}
+		callRow.Participants[i].PinnedSpeaker = true
+	}
 }
 
 func applyHostMutePolicies(participants []Participant) {
@@ -334,7 +355,37 @@ func applyHostMutePolicies(participants []Participant) {
 	}
 }
 
-func applyGroupVideoScaling(participants []Participant, settings Settings) {
+func applyGroupVideoScaling(callRow *Call, settings Settings) {
+	if callRow == nil {
+		return
+	}
+	participants := callRow.Participants
+	for i := range participants {
+		participants[i].StageSlot =
+			participants[i].PinnedSpeaker ||
+				participants[i].Transport.DominantSpeaker ||
+				participants[i].MediaState.ScreenShareEnabled
+	}
+
+	if callRow.StageModeEnabled {
+		for i := range participants {
+			participant := &participants[i]
+			if participant.State != ParticipantStateJoined {
+				continue
+			}
+			if participant.StageSlot {
+				continue
+			}
+			if !participantWantsVideo(*participant) {
+				continue
+			}
+			participant.Transport.RecommendedProfile = "audio_only"
+			participant.Transport.RecommendationReason = "stage_mode"
+			participant.Transport.VideoFallbackRecommended = true
+			participant.Transport.SuppressOutgoingVideo = true
+			participant.Transport.SuppressIncomingVideo = true
+		}
+	}
 	if settings.MaxVideoParticipants == 0 {
 		return
 	}

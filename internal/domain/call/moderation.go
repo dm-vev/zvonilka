@@ -191,6 +191,177 @@ func canManageGroupCall(callRow Call, role conversation.MemberRole, accountID st
 	return canModerateGroupCall(role)
 }
 
+// UpdateStageMode toggles stage mode for one active group call.
+func (s *Service) UpdateStageMode(
+	ctx context.Context,
+	params UpdateStageModeParams,
+) (Call, []Event, error) {
+	if err := s.validateContext(ctx, "update stage mode"); err != nil {
+		return Call{}, nil, err
+	}
+	params.CallID = strings.TrimSpace(params.CallID)
+	params.AccountID = strings.TrimSpace(params.AccountID)
+	params.DeviceID = strings.TrimSpace(params.DeviceID)
+	if params.CallID == "" || params.AccountID == "" || params.DeviceID == "" {
+		return Call{}, nil, ErrInvalidInput
+	}
+
+	now := s.currentTime()
+	var result Call
+	var events []Event
+	err := s.runTx(ctx, func(store Store) error {
+		callRow, loadErr := s.visibleCall(ctx, store, params.CallID, params.AccountID)
+		if loadErr != nil {
+			return loadErr
+		}
+		conversationRow, member, loadErr := s.visibleConversation(ctx, callRow.ConversationID, params.AccountID)
+		if loadErr != nil {
+			return loadErr
+		}
+		if conversationRow.Kind != conversation.ConversationKindGroup || callRow.State != StateActive {
+			return ErrConflict
+		}
+		if !canManageGroupCall(callRow, member.Role, params.AccountID) {
+			return ErrForbidden
+		}
+		if callRow.StageModeEnabled == params.Enabled {
+			result, loadErr = s.hydrateCall(ctx, store, callRow.ID)
+			return loadErr
+		}
+
+		callRow.StageModeEnabled = params.Enabled
+		callRow.UpdatedAt = now
+		saved, saveErr := store.SaveCall(ctx, callRow)
+		if saveErr != nil {
+			return fmt.Errorf("save stage mode for %s: %w", callRow.ID, saveErr)
+		}
+		callRow = saved
+
+		event, appendErr := s.appendEvent(ctx, store, callRow, EventTypeMediaUpdated, params.AccountID, params.DeviceID, map[string]string{
+			"stage_mode_enabled": boolString(params.Enabled),
+		}, now)
+		if appendErr != nil {
+			return appendErr
+		}
+		events = append(events, event)
+
+		result, loadErr = s.hydrateCall(ctx, store, callRow.ID)
+		return loadErr
+	})
+	if err != nil {
+		return Call{}, nil, err
+	}
+
+	for i := range events {
+		events[i].Call = cloneCall(result)
+	}
+
+	return result, cloneEvents(events), nil
+}
+
+// PinSpeaker pins or unpins one joined participant device in a group call.
+func (s *Service) PinSpeaker(
+	ctx context.Context,
+	params PinSpeakerParams,
+) (Call, Participant, []Event, error) {
+	if err := s.validateContext(ctx, "pin speaker"); err != nil {
+		return Call{}, Participant{}, nil, err
+	}
+	params.CallID = strings.TrimSpace(params.CallID)
+	params.AccountID = strings.TrimSpace(params.AccountID)
+	params.DeviceID = strings.TrimSpace(params.DeviceID)
+	params.TargetDeviceID = strings.TrimSpace(params.TargetDeviceID)
+	if params.CallID == "" || params.AccountID == "" || params.DeviceID == "" {
+		return Call{}, Participant{}, nil, ErrInvalidInput
+	}
+	if params.Pinned && params.TargetDeviceID == "" {
+		return Call{}, Participant{}, nil, ErrInvalidInput
+	}
+
+	now := s.currentTime()
+	var result Call
+	var pinned Participant
+	var events []Event
+	err := s.runTx(ctx, func(store Store) error {
+		callRow, loadErr := s.visibleCall(ctx, store, params.CallID, params.AccountID)
+		if loadErr != nil {
+			return loadErr
+		}
+		conversationRow, member, loadErr := s.visibleConversation(ctx, callRow.ConversationID, params.AccountID)
+		if loadErr != nil {
+			return loadErr
+		}
+		if conversationRow.Kind != conversation.ConversationKindGroup || callRow.State != StateActive {
+			return ErrConflict
+		}
+		if !canManageGroupCall(callRow, member.Role, params.AccountID) {
+			return ErrForbidden
+		}
+
+		callRow.PinnedSpeakerAccountID = ""
+		callRow.PinnedSpeakerDeviceID = ""
+		if params.Pinned {
+			target, targetErr := store.ParticipantByCallAndDevice(ctx, callRow.ID, params.TargetDeviceID)
+			if targetErr != nil {
+				if targetErr == ErrNotFound {
+					return ErrNotFound
+				}
+				return fmt.Errorf("load pinned participant %s/%s: %w", callRow.ID, params.TargetDeviceID, targetErr)
+			}
+			if target.State != ParticipantStateJoined {
+				return ErrConflict
+			}
+			callRow.PinnedSpeakerAccountID = target.AccountID
+			callRow.PinnedSpeakerDeviceID = target.DeviceID
+			pinned = target
+		}
+		callRow.UpdatedAt = now
+
+		saved, saveErr := store.SaveCall(ctx, callRow)
+		if saveErr != nil {
+			return fmt.Errorf("save pinned speaker for %s: %w", callRow.ID, saveErr)
+		}
+		callRow = saved
+
+		metadata := map[string]string{
+			"pinned_speaker": boolString(params.Pinned),
+		}
+		if params.Pinned {
+			metadata[callMetadataTargetAccountID] = pinned.AccountID
+			metadata[callMetadataTargetDeviceID] = pinned.DeviceID
+		}
+		event, appendErr := s.appendEvent(ctx, store, callRow, EventTypeMediaUpdated, params.AccountID, params.DeviceID, metadata, now)
+		if appendErr != nil {
+			return appendErr
+		}
+		events = append(events, event)
+
+		result, loadErr = s.hydrateCall(ctx, store, callRow.ID)
+		if loadErr != nil {
+			return loadErr
+		}
+		if !params.Pinned {
+			return nil
+		}
+		for _, participant := range result.Participants {
+			if participant.AccountID == pinned.AccountID && participant.DeviceID == pinned.DeviceID {
+				pinned = participant
+				break
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return Call{}, Participant{}, nil, err
+	}
+
+	for i := range events {
+		events[i].Call = cloneCall(result)
+	}
+
+	return result, cloneParticipant(pinned), cloneEvents(events), nil
+}
+
 // MuteAllParticipants applies host mute flags to every joined participant except the acting host device.
 func (s *Service) MuteAllParticipants(
 	ctx context.Context,
@@ -335,6 +506,16 @@ func (s *Service) RemoveParticipant(
 		}
 		removed = saved
 		sessionID = callRow.ActiveSessionID
+		if callRow.PinnedSpeakerAccountID == target.AccountID && callRow.PinnedSpeakerDeviceID == target.DeviceID {
+			callRow.PinnedSpeakerAccountID = ""
+			callRow.PinnedSpeakerDeviceID = ""
+			callRow.UpdatedAt = now
+			savedCall, saveErr := store.SaveCall(ctx, callRow)
+			if saveErr != nil {
+				return fmt.Errorf("clear pinned speaker for %s: %w", callRow.ID, saveErr)
+			}
+			callRow = savedCall
+		}
 
 		event, appendErr := s.appendEvent(ctx, store, callRow, EventTypeLeft, params.AccountID, params.DeviceID, map[string]string{
 			callMetadataTargetAccountID: target.AccountID,
