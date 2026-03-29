@@ -57,6 +57,15 @@ func (c Configuration) Validate() error {
 	if c.Call.MaxDuration <= 0 {
 		errs = append(errs, errors.New("call max duration must be positive"))
 	}
+	if c.Call.MaxGroupParticipants == 0 {
+		errs = append(errs, errors.New("call max group participants must be positive"))
+	}
+	if c.Call.MaxVideoParticipants == 0 {
+		errs = append(errs, errors.New("call max video participants must be positive"))
+	}
+	if c.Call.MaxVideoParticipants > c.Call.MaxGroupParticipants {
+		errs = append(errs, errors.New("call max video participants must be less than or equal to max group participants"))
+	}
 	if c.RTC.CredentialTTL <= 0 {
 		errs = append(errs, errors.New("rtc credential ttl must be positive"))
 	}

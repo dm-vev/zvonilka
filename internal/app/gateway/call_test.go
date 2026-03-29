@@ -362,6 +362,68 @@ func TestGroupCallModerationRPC(t *testing.T) {
 	}
 }
 
+func TestCallRecordingAndTranscriptionRPC(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	_, ownerCtx := fixture.mustCreateUserAndLogin(t, "group-rec-owner", "group-rec-owner@example.com")
+	peer, _ := fixture.mustCreateUserAndLogin(t, "group-rec-peer", "group-rec-peer@example.com")
+
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Recorded Group Call",
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create group conversation: %v", err)
+	}
+
+	started, err := fixture.api.StartCall(ownerCtx, &callv1.StartCallRequest{
+		ConversationId: created.Conversation.ConversationId,
+		WithVideo:      true,
+	})
+	if err != nil {
+		t.Fatalf("start group call: %v", err)
+	}
+
+	recording, err := fixture.api.UpdateCallRecording(ownerCtx, &callv1.UpdateCallRecordingRequest{
+		CallId:  started.Call.CallId,
+		Enabled: true,
+	})
+	if err != nil {
+		t.Fatalf("update call recording: %v", err)
+	}
+	if recording.Call.GetRecordingState() != callv1.CallRecordingState_CALL_RECORDING_STATE_ACTIVE {
+		t.Fatalf("unexpected recording state: %+v", recording.Call)
+	}
+
+	transcription, err := fixture.api.UpdateCallTranscription(ownerCtx, &callv1.UpdateCallTranscriptionRequest{
+		CallId:  started.Call.CallId,
+		Enabled: true,
+	})
+	if err != nil {
+		t.Fatalf("update call transcription: %v", err)
+	}
+	if transcription.Call.GetTranscriptionState() != callv1.CallTranscriptionState_CALL_TRANSCRIPTION_STATE_ACTIVE {
+		t.Fatalf("unexpected transcription state: %+v", transcription.Call)
+	}
+
+	stopped, err := fixture.api.UpdateCallRecording(ownerCtx, &callv1.UpdateCallRecordingRequest{
+		CallId:  started.Call.CallId,
+		Enabled: false,
+	})
+	if err != nil {
+		t.Fatalf("stop call recording: %v", err)
+	}
+	if stopped.Call.GetRecordingState() != callv1.CallRecordingState_CALL_RECORDING_STATE_INACTIVE {
+		t.Fatalf("unexpected stopped recording state: %+v", stopped.Call)
+	}
+	if stopped.Call.GetTranscriptionState() != callv1.CallTranscriptionState_CALL_TRANSCRIPTION_STATE_INACTIVE {
+		t.Fatalf("expected transcription cascade stop, got %+v", stopped.Call)
+	}
+}
+
 func TestGroupCallStageModeRPC(t *testing.T) {
 	t.Parallel()
 

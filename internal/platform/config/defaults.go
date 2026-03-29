@@ -87,10 +87,12 @@ func defaultConfiguration(serviceName string) Configuration {
 			LoginCodeLength: identityDefaults.LoginCodeLength,
 		},
 		Call: CallConfig{
-			InviteTimeout:  callDefaults.InviteTimeout,
-			RingingTimeout: callDefaults.RingingTimeout,
-			ReconnectGrace: callDefaults.ReconnectGrace,
-			MaxDuration:    callDefaults.MaxDuration,
+			InviteTimeout:        callDefaults.InviteTimeout,
+			RingingTimeout:       callDefaults.RingingTimeout,
+			ReconnectGrace:       callDefaults.ReconnectGrace,
+			MaxDuration:          callDefaults.MaxDuration,
+			MaxGroupParticipants: callDefaults.MaxGroupParticipants,
+			MaxVideoParticipants: callDefaults.MaxVideoParticipants,
 		},
 		RTC: RTCConfig{
 			PublicEndpoint: "webrtc://gateway/calls",

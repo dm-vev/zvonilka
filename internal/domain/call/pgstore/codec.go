@@ -53,6 +53,12 @@ func scanCall(row rowScanner) (call.Call, error) {
 		activeSessionID      sql.NullString
 		pinnedSpeakerAccount sql.NullString
 		pinnedSpeakerDevice  sql.NullString
+		recordingState       sql.NullString
+		recordingStartedAt   sql.NullTime
+		recordingStoppedAt   sql.NullTime
+		transcriptionState   sql.NullString
+		transcriptionStarted sql.NullTime
+		transcriptionStopped sql.NullTime
 		answeredAt           sql.NullTime
 		endedAt              sql.NullTime
 	)
@@ -68,6 +74,12 @@ func scanCall(row rowScanner) (call.Call, error) {
 		&value.RequestedVideo,
 		&value.State,
 		&value.EndReason,
+		&recordingState,
+		&recordingStartedAt,
+		&recordingStoppedAt,
+		&transcriptionState,
+		&transcriptionStarted,
+		&transcriptionStopped,
 		&value.StartedAt,
 		&answeredAt,
 		&endedAt,
@@ -79,6 +91,12 @@ func scanCall(row rowScanner) (call.Call, error) {
 	value.ActiveSessionID = activeSessionID.String
 	value.PinnedSpeakerAccountID = pinnedSpeakerAccount.String
 	value.PinnedSpeakerDeviceID = pinnedSpeakerDevice.String
+	value.RecordingState = call.RecordingState(recordingState.String)
+	value.RecordingStartedAt = decodeTime(recordingStartedAt)
+	value.RecordingStoppedAt = decodeTime(recordingStoppedAt)
+	value.TranscriptionState = call.TranscriptionState(transcriptionState.String)
+	value.TranscriptionStartedAt = decodeTime(transcriptionStarted)
+	value.TranscriptionStoppedAt = decodeTime(transcriptionStopped)
 	value.AnsweredAt = decodeTime(answeredAt)
 	value.EndedAt = decodeTime(endedAt)
 	value.UpdatedAt = value.UpdatedAt.UTC()

@@ -12,7 +12,9 @@ import (
 const callColumnList = `
 call_id, conversation_id, initiator_account_id, host_account_id, stage_mode_enabled,
 pinned_speaker_account_id, pinned_speaker_device_id, active_session_id, requested_video,
-state, end_reason, started_at, answered_at, ended_at, updated_at
+state, end_reason, recording_state, recording_started_at, recording_stopped_at,
+transcription_state, transcription_started_at, transcription_stopped_at,
+started_at, answered_at, ended_at, updated_at
 `
 
 func (s *Store) SaveCall(ctx context.Context, value call.Call) (call.Call, error) {
@@ -57,10 +59,12 @@ func (s *Store) saveCall(ctx context.Context, value call.Call) (call.Call, error
 INSERT INTO %s (
 	call_id, conversation_id, initiator_account_id, host_account_id, stage_mode_enabled,
 	pinned_speaker_account_id, pinned_speaker_device_id, active_session_id, requested_video,
-	state, end_reason, started_at, answered_at, ended_at, updated_at
+	state, end_reason, recording_state, recording_started_at, recording_stopped_at,
+	transcription_state, transcription_started_at, transcription_stopped_at,
+	started_at, answered_at, ended_at, updated_at
 ) VALUES (
 	$1, $2, $3, $4, $5, $6, $7, $8, $9,
-	$10, $11, $12, $13, $14, $15
+	$10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
 )
 ON CONFLICT (call_id) DO UPDATE SET
 	conversation_id = EXCLUDED.conversation_id,
@@ -73,6 +77,12 @@ ON CONFLICT (call_id) DO UPDATE SET
 	requested_video = EXCLUDED.requested_video,
 	state = EXCLUDED.state,
 	end_reason = EXCLUDED.end_reason,
+	recording_state = EXCLUDED.recording_state,
+	recording_started_at = EXCLUDED.recording_started_at,
+	recording_stopped_at = EXCLUDED.recording_stopped_at,
+	transcription_state = EXCLUDED.transcription_state,
+	transcription_started_at = EXCLUDED.transcription_started_at,
+	transcription_stopped_at = EXCLUDED.transcription_stopped_at,
 	started_at = EXCLUDED.started_at,
 	answered_at = EXCLUDED.answered_at,
 	ended_at = EXCLUDED.ended_at,
@@ -94,6 +104,12 @@ RETURNING %s
 		value.RequestedVideo,
 		value.State,
 		nullString(string(value.EndReason)),
+		nullString(string(value.RecordingState)),
+		nullTime(value.RecordingStartedAt),
+		nullTime(value.RecordingStoppedAt),
+		nullString(string(value.TranscriptionState)),
+		nullTime(value.TranscriptionStartedAt),
+		nullTime(value.TranscriptionStoppedAt),
 		value.StartedAt.UTC(),
 		nullTime(value.AnsweredAt),
 		nullTime(value.EndedAt),

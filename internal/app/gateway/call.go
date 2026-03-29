@@ -356,6 +356,54 @@ func (a *api) UpdateCallMediaState(
 	}, nil
 }
 
+// UpdateCallRecording updates call-level recording state.
+func (a *api) UpdateCallRecording(
+	ctx context.Context,
+	req *callv1.UpdateCallRecordingRequest,
+) (*callv1.UpdateCallRecordingResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	callRow, events, err := a.call.UpdateRecording(ctx, domaincall.UpdateRecordingParams{
+		CallID:    req.GetCallId(),
+		AccountID: authContext.Account.ID,
+		DeviceID:  authContext.Device.ID,
+		Enabled:   req.GetEnabled(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(events...)
+
+	return &callv1.UpdateCallRecordingResponse{Call: callProto(callRow)}, nil
+}
+
+// UpdateCallTranscription updates call-level transcription state.
+func (a *api) UpdateCallTranscription(
+	ctx context.Context,
+	req *callv1.UpdateCallTranscriptionRequest,
+) (*callv1.UpdateCallTranscriptionResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	callRow, events, err := a.call.UpdateTranscription(ctx, domaincall.UpdateTranscriptionParams{
+		CallID:    req.GetCallId(),
+		AccountID: authContext.Account.ID,
+		DeviceID:  authContext.Device.ID,
+		Enabled:   req.GetEnabled(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(events...)
+
+	return &callv1.UpdateCallTranscriptionResponse{Call: callProto(callRow)}, nil
+}
+
 // RaiseCallHand updates the caller's hand state in one active group call.
 func (a *api) RaiseCallHand(
 	ctx context.Context,

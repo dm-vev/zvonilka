@@ -86,6 +86,22 @@ type UpdateParams struct {
 	Media     MediaState
 }
 
+// UpdateRecordingParams describes one call-recording state update.
+type UpdateRecordingParams struct {
+	CallID    string
+	AccountID string
+	DeviceID  string
+	Enabled   bool
+}
+
+// UpdateTranscriptionParams describes one call-transcription state update.
+type UpdateTranscriptionParams struct {
+	CallID    string
+	AccountID string
+	DeviceID  string
+	Enabled   bool
+}
+
 // RaiseHandParams describes one raise-hand update for a joined participant.
 type RaiseHandParams struct {
 	CallID    string

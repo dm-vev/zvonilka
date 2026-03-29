@@ -137,8 +137,38 @@ func callEventTypeToProto(eventType domaincall.EventType) callv1.CallEventType {
 		return callv1.CallEventType_CALL_EVENT_TYPE_SIGNAL_DESCRIPTION
 	case domaincall.EventTypeSignalCandidate:
 		return callv1.CallEventType_CALL_EVENT_TYPE_SIGNAL_CANDIDATE
+	case domaincall.EventTypeRecordingUpdated:
+		return callv1.CallEventType_CALL_EVENT_TYPE_RECORDING_UPDATED
+	case domaincall.EventTypeTranscriptionUpdated:
+		return callv1.CallEventType_CALL_EVENT_TYPE_TRANSCRIPTION_UPDATED
 	default:
 		return callv1.CallEventType_CALL_EVENT_TYPE_UNSPECIFIED
+	}
+}
+
+func callRecordingStateToProto(state domaincall.RecordingState) callv1.CallRecordingState {
+	switch state {
+	case domaincall.RecordingStateInactive:
+		return callv1.CallRecordingState_CALL_RECORDING_STATE_INACTIVE
+	case domaincall.RecordingStateActive:
+		return callv1.CallRecordingState_CALL_RECORDING_STATE_ACTIVE
+	case domaincall.RecordingStateFailed:
+		return callv1.CallRecordingState_CALL_RECORDING_STATE_FAILED
+	default:
+		return callv1.CallRecordingState_CALL_RECORDING_STATE_UNSPECIFIED
+	}
+}
+
+func callTranscriptionStateToProto(state domaincall.TranscriptionState) callv1.CallTranscriptionState {
+	switch state {
+	case domaincall.TranscriptionStateInactive:
+		return callv1.CallTranscriptionState_CALL_TRANSCRIPTION_STATE_INACTIVE
+	case domaincall.TranscriptionStateActive:
+		return callv1.CallTranscriptionState_CALL_TRANSCRIPTION_STATE_ACTIVE
+	case domaincall.TranscriptionStateFailed:
+		return callv1.CallTranscriptionState_CALL_TRANSCRIPTION_STATE_FAILED
+	default:
+		return callv1.CallTranscriptionState_CALL_TRANSCRIPTION_STATE_UNSPECIFIED
 	}
 }
 
@@ -340,24 +370,30 @@ func callProto(value domaincall.Call) *callv1.Call {
 	}
 
 	return &callv1.Call{
-		CallId:                value.ID,
-		ConversationId:        value.ConversationID,
-		InitiatorUserId:       value.InitiatorAccountID,
-		HostUserId:            value.HostAccountID,
-		ActiveSessionId:       value.ActiveSessionID,
-		RequestedVideo:        value.RequestedVideo,
-		State:                 callStateToProto(value.State),
-		EndReason:             callEndReasonToProto(value.EndReason),
-		StartedAt:             protoTime(value.StartedAt),
-		AnsweredAt:            protoTime(value.AnsweredAt),
-		EndedAt:               protoTime(value.EndedAt),
-		UpdatedAt:             protoTime(value.UpdatedAt),
-		Invites:               invites,
-		Participants:          participants,
-		QualitySummary:        callQualitySummaryProto(value.QualitySummary),
-		StageModeEnabled:      value.StageModeEnabled,
-		PinnedSpeakerUserId:   value.PinnedSpeakerAccountID,
-		PinnedSpeakerDeviceId: value.PinnedSpeakerDeviceID,
+		CallId:                 value.ID,
+		ConversationId:         value.ConversationID,
+		InitiatorUserId:        value.InitiatorAccountID,
+		HostUserId:             value.HostAccountID,
+		ActiveSessionId:        value.ActiveSessionID,
+		RequestedVideo:         value.RequestedVideo,
+		State:                  callStateToProto(value.State),
+		EndReason:              callEndReasonToProto(value.EndReason),
+		StartedAt:              protoTime(value.StartedAt),
+		AnsweredAt:             protoTime(value.AnsweredAt),
+		EndedAt:                protoTime(value.EndedAt),
+		UpdatedAt:              protoTime(value.UpdatedAt),
+		Invites:                invites,
+		Participants:           participants,
+		QualitySummary:         callQualitySummaryProto(value.QualitySummary),
+		StageModeEnabled:       value.StageModeEnabled,
+		PinnedSpeakerUserId:    value.PinnedSpeakerAccountID,
+		PinnedSpeakerDeviceId:  value.PinnedSpeakerDeviceID,
+		RecordingState:         callRecordingStateToProto(value.RecordingState),
+		RecordingStartedAt:     protoTime(value.RecordingStartedAt),
+		RecordingStoppedAt:     protoTime(value.RecordingStoppedAt),
+		TranscriptionState:     callTranscriptionStateToProto(value.TranscriptionState),
+		TranscriptionStartedAt: protoTime(value.TranscriptionStartedAt),
+		TranscriptionStoppedAt: protoTime(value.TranscriptionStoppedAt),
 	}
 }
 

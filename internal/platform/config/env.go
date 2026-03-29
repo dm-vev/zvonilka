@@ -129,6 +129,16 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Call.MaxDuration = value
 	}
+	if value, ok, err := intValue(serviceName, "CALL_MAX_GROUP_PARTICIPANTS", int(cfg.Call.MaxGroupParticipants)); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.MaxGroupParticipants = uint32(value)
+	}
+	if value, ok, err := intValue(serviceName, "CALL_MAX_VIDEO_PARTICIPANTS", int(cfg.Call.MaxVideoParticipants)); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.MaxVideoParticipants = uint32(value)
+	}
 	if value, ok, err := stringValueWithPresence(serviceName, "RTC_PUBLIC_ENDPOINT", cfg.RTC.PublicEndpoint); err != nil {
 		return err
 	} else if ok {

@@ -136,6 +136,24 @@ message UpdateCallMediaStateResponse {
   CallParticipant participant = 2;
 }
 
+message UpdateCallRecordingRequest {
+  string call_id = 1;
+  bool enabled = 2;
+}
+
+message UpdateCallRecordingResponse {
+  Call call = 1;
+}
+
+message UpdateCallTranscriptionRequest {
+  string call_id = 1;
+  bool enabled = 2;
+}
+
+message UpdateCallTranscriptionResponse {
+  Call call = 1;
+}
+
 message RaiseCallHandRequest {
   string call_id = 1;
   bool raised = 2;

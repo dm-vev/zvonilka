@@ -87,12 +87,15 @@ func TestScanHelpers(t *testing.T) {
 
 	callRow, err := scanCall(scanRow{values: []any{
 		"call-1", "conv-1", "acc-a", "acc-a", true, "acc-b", "dev-b", "sess-1", true, call.StateActive, call.EndReasonEnded,
+		"active", now, nil, "inactive", nil, now,
 		now, now, now, now,
 	}})
 	require.NoError(t, err)
 	require.Equal(t, "call-1", callRow.ID)
 	require.True(t, callRow.StageModeEnabled)
 	require.Equal(t, "dev-b", callRow.PinnedSpeakerDeviceID)
+	require.Equal(t, call.RecordingStateActive, callRow.RecordingState)
+	require.Equal(t, call.TranscriptionStateInactive, callRow.TranscriptionState)
 
 	inviteRow, err := scanInvite(scanRow{values: []any{"call-1", "acc-b", call.InviteStateAccepted, now, now, now}})
 	require.NoError(t, err)
@@ -127,9 +130,9 @@ func TestCallInviteParticipantQueries(t *testing.T) {
 		WithArgs("call-1").
 		WillReturnRows(sqlmock.NewRows([]string{
 			"call_id", "conversation_id", "initiator_account_id", "host_account_id", "stage_mode_enabled", "pinned_speaker_account_id", "pinned_speaker_device_id", "active_session_id", "requested_video",
-			"state", "end_reason", "started_at", "answered_at", "ended_at", "updated_at",
+			"state", "end_reason", "recording_state", "recording_started_at", "recording_stopped_at", "transcription_state", "transcription_started_at", "transcription_stopped_at", "started_at", "answered_at", "ended_at", "updated_at",
 		}).AddRow(
-			"call-1", "conv-1", "acc-a", "acc-a", false, nil, nil, "sess-1", true, call.StateActive, "", now, nil, nil, now,
+			"call-1", "conv-1", "acc-a", "acc-a", false, nil, nil, "sess-1", true, call.StateActive, "", "inactive", nil, nil, "inactive", nil, nil, now, nil, nil, now,
 		))
 
 	row, err := store.CallByID(context.Background(), "call-1")
@@ -140,9 +143,9 @@ func TestCallInviteParticipantQueries(t *testing.T) {
 		WithArgs("conv-1").
 		WillReturnRows(sqlmock.NewRows([]string{
 			"call_id", "conversation_id", "initiator_account_id", "host_account_id", "stage_mode_enabled", "pinned_speaker_account_id", "pinned_speaker_device_id", "active_session_id", "requested_video",
-			"state", "end_reason", "started_at", "answered_at", "ended_at", "updated_at",
+			"state", "end_reason", "recording_state", "recording_started_at", "recording_stopped_at", "transcription_state", "transcription_started_at", "transcription_stopped_at", "started_at", "answered_at", "ended_at", "updated_at",
 		}).AddRow(
-			"call-1", "conv-1", "acc-a", "acc-a", false, nil, nil, "sess-1", true, call.StateActive, "", now, nil, nil, now,
+			"call-1", "conv-1", "acc-a", "acc-a", false, nil, nil, "sess-1", true, call.StateActive, "", "inactive", nil, nil, "inactive", nil, nil, now, nil, nil, now,
 		))
 
 	row, err = store.ActiveCallByConversation(context.Background(), "conv-1")
@@ -153,9 +156,9 @@ func TestCallInviteParticipantQueries(t *testing.T) {
 		WithArgs("conv-1").
 		WillReturnRows(sqlmock.NewRows([]string{
 			"call_id", "conversation_id", "initiator_account_id", "host_account_id", "stage_mode_enabled", "pinned_speaker_account_id", "pinned_speaker_device_id", "active_session_id", "requested_video",
-			"state", "end_reason", "started_at", "answered_at", "ended_at", "updated_at",
+			"state", "end_reason", "recording_state", "recording_started_at", "recording_stopped_at", "transcription_state", "transcription_started_at", "transcription_stopped_at", "started_at", "answered_at", "ended_at", "updated_at",
 		}).AddRow(
-			"call-1", "conv-1", "acc-a", "acc-a", false, nil, nil, "", true, call.StateActive, "", now, nil, nil, now,
+			"call-1", "conv-1", "acc-a", "acc-a", false, nil, nil, "", true, call.StateActive, "", "inactive", nil, nil, "inactive", nil, nil, now, nil, nil, now,
 		))
 
 	rows, err := store.CallsByConversation(context.Background(), "conv-1", false)

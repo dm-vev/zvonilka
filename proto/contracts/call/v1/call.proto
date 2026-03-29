@@ -21,6 +21,8 @@ service CallService {
   rpc PublishCallIceCandidate(PublishCallIceCandidateRequest) returns (PublishCallIceCandidateResponse);
   rpc LeaveCall(LeaveCallRequest) returns (LeaveCallResponse);
   rpc UpdateCallMediaState(UpdateCallMediaStateRequest) returns (UpdateCallMediaStateResponse);
+  rpc UpdateCallRecording(UpdateCallRecordingRequest) returns (UpdateCallRecordingResponse);
+  rpc UpdateCallTranscription(UpdateCallTranscriptionRequest) returns (UpdateCallTranscriptionResponse);
   rpc RaiseCallHand(RaiseCallHandRequest) returns (RaiseCallHandResponse);
   rpc ModerateCallParticipant(ModerateCallParticipantRequest) returns (ModerateCallParticipantResponse);
   rpc MuteAllCallParticipants(MuteAllCallParticipantsRequest) returns (MuteAllCallParticipantsResponse);

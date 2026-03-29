@@ -33,6 +33,8 @@ const (
 	CallService_PublishCallIceCandidate_FullMethodName   = "/zvonilka.call.v1.CallService/PublishCallIceCandidate"
 	CallService_LeaveCall_FullMethodName                 = "/zvonilka.call.v1.CallService/LeaveCall"
 	CallService_UpdateCallMediaState_FullMethodName      = "/zvonilka.call.v1.CallService/UpdateCallMediaState"
+	CallService_UpdateCallRecording_FullMethodName       = "/zvonilka.call.v1.CallService/UpdateCallRecording"
+	CallService_UpdateCallTranscription_FullMethodName   = "/zvonilka.call.v1.CallService/UpdateCallTranscription"
 	CallService_RaiseCallHand_FullMethodName             = "/zvonilka.call.v1.CallService/RaiseCallHand"
 	CallService_ModerateCallParticipant_FullMethodName   = "/zvonilka.call.v1.CallService/ModerateCallParticipant"
 	CallService_MuteAllCallParticipants_FullMethodName   = "/zvonilka.call.v1.CallService/MuteAllCallParticipants"
@@ -65,6 +67,8 @@ type CallServiceClient interface {
 	PublishCallIceCandidate(ctx context.Context, in *PublishCallIceCandidateRequest, opts ...grpc.CallOption) (*PublishCallIceCandidateResponse, error)
 	LeaveCall(ctx context.Context, in *LeaveCallRequest, opts ...grpc.CallOption) (*LeaveCallResponse, error)
 	UpdateCallMediaState(ctx context.Context, in *UpdateCallMediaStateRequest, opts ...grpc.CallOption) (*UpdateCallMediaStateResponse, error)
+	UpdateCallRecording(ctx context.Context, in *UpdateCallRecordingRequest, opts ...grpc.CallOption) (*UpdateCallRecordingResponse, error)
+	UpdateCallTranscription(ctx context.Context, in *UpdateCallTranscriptionRequest, opts ...grpc.CallOption) (*UpdateCallTranscriptionResponse, error)
 	RaiseCallHand(ctx context.Context, in *RaiseCallHandRequest, opts ...grpc.CallOption) (*RaiseCallHandResponse, error)
 	ModerateCallParticipant(ctx context.Context, in *ModerateCallParticipantRequest, opts ...grpc.CallOption) (*ModerateCallParticipantResponse, error)
 	MuteAllCallParticipants(ctx context.Context, in *MuteAllCallParticipantsRequest, opts ...grpc.CallOption) (*MuteAllCallParticipantsResponse, error)
@@ -207,6 +211,24 @@ func (c *callServiceClient) LeaveCall(ctx context.Context, in *LeaveCallRequest,
 func (c *callServiceClient) UpdateCallMediaState(ctx context.Context, in *UpdateCallMediaStateRequest, opts ...grpc.CallOption) (*UpdateCallMediaStateResponse, error) {
 	out := new(UpdateCallMediaStateResponse)
 	err := c.cc.Invoke(ctx, CallService_UpdateCallMediaState_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *callServiceClient) UpdateCallRecording(ctx context.Context, in *UpdateCallRecordingRequest, opts ...grpc.CallOption) (*UpdateCallRecordingResponse, error) {
+	out := new(UpdateCallRecordingResponse)
+	err := c.cc.Invoke(ctx, CallService_UpdateCallRecording_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *callServiceClient) UpdateCallTranscription(ctx context.Context, in *UpdateCallTranscriptionRequest, opts ...grpc.CallOption) (*UpdateCallTranscriptionResponse, error) {
+	out := new(UpdateCallTranscriptionResponse)
+	err := c.cc.Invoke(ctx, CallService_UpdateCallTranscription_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -385,6 +407,8 @@ type CallServiceServer interface {
 	PublishCallIceCandidate(context.Context, *PublishCallIceCandidateRequest) (*PublishCallIceCandidateResponse, error)
 	LeaveCall(context.Context, *LeaveCallRequest) (*LeaveCallResponse, error)
 	UpdateCallMediaState(context.Context, *UpdateCallMediaStateRequest) (*UpdateCallMediaStateResponse, error)
+	UpdateCallRecording(context.Context, *UpdateCallRecordingRequest) (*UpdateCallRecordingResponse, error)
+	UpdateCallTranscription(context.Context, *UpdateCallTranscriptionRequest) (*UpdateCallTranscriptionResponse, error)
 	RaiseCallHand(context.Context, *RaiseCallHandRequest) (*RaiseCallHandResponse, error)
 	ModerateCallParticipant(context.Context, *ModerateCallParticipantRequest) (*ModerateCallParticipantResponse, error)
 	MuteAllCallParticipants(context.Context, *MuteAllCallParticipantsRequest) (*MuteAllCallParticipantsResponse, error)
@@ -445,6 +469,12 @@ func (UnimplementedCallServiceServer) LeaveCall(context.Context, *LeaveCallReque
 }
 func (UnimplementedCallServiceServer) UpdateCallMediaState(context.Context, *UpdateCallMediaStateRequest) (*UpdateCallMediaStateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateCallMediaState not implemented")
+}
+func (UnimplementedCallServiceServer) UpdateCallRecording(context.Context, *UpdateCallRecordingRequest) (*UpdateCallRecordingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateCallRecording not implemented")
+}
+func (UnimplementedCallServiceServer) UpdateCallTranscription(context.Context, *UpdateCallTranscriptionRequest) (*UpdateCallTranscriptionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateCallTranscription not implemented")
 }
 func (UnimplementedCallServiceServer) RaiseCallHand(context.Context, *RaiseCallHandRequest) (*RaiseCallHandResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RaiseCallHand not implemented")
@@ -747,6 +777,42 @@ func _CallService_UpdateCallMediaState_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CallService_UpdateCallRecording_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateCallRecordingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).UpdateCallRecording(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_UpdateCallRecording_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).UpdateCallRecording(ctx, req.(*UpdateCallRecordingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CallService_UpdateCallTranscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateCallTranscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).UpdateCallTranscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_UpdateCallTranscription_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).UpdateCallTranscription(ctx, req.(*UpdateCallTranscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CallService_RaiseCallHand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RaiseCallHandRequest)
 	if err := dec(in); err != nil {
@@ -1031,6 +1097,14 @@ var CallService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateCallMediaState",
 			Handler:    _CallService_UpdateCallMediaState_Handler,
+		},
+		{
+			MethodName: "UpdateCallRecording",
+			Handler:    _CallService_UpdateCallRecording_Handler,
+		},
+		{
+			MethodName: "UpdateCallTranscription",
+			Handler:    _CallService_UpdateCallTranscription_Handler,
 		},
 		{
 			MethodName: "RaiseCallHand",

@@ -286,6 +286,73 @@ func TestGroupCallLifecycleWithScreenShare(t *testing.T) {
 	require.Len(t, events, 1)
 }
 
+func TestCallRecordingAndTranscriptionLifecycle(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 29, 14, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return now }
+
+	conversations := conversationtest.NewMemoryStore()
+	require.NoError(t, seedGroupConversation(conversations))
+
+	service, err := domaincall.NewService(
+		calltest.NewMemoryStore(),
+		conversations,
+		platformrtc.NewManager("webrtc://test/calls", 15*time.Minute),
+		domaincall.WithNow(clock),
+	)
+	require.NoError(t, err)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-group",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, domaincall.RecordingStateInactive, started.RecordingState)
+	require.Equal(t, domaincall.TranscriptionStateInactive, started.TranscriptionState)
+
+	updatedRecording, events, err := service.UpdateRecording(context.Background(), domaincall.UpdateRecordingParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		Enabled:   true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, domaincall.RecordingStateActive, updatedRecording.RecordingState)
+	require.False(t, updatedRecording.RecordingStartedAt.IsZero())
+	require.Len(t, events, 1)
+	require.Equal(t, domaincall.EventTypeRecordingUpdated, events[0].EventType)
+
+	updatedTranscription, events, err := service.UpdateTranscription(context.Background(), domaincall.UpdateTranscriptionParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		Enabled:   true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, domaincall.TranscriptionStateActive, updatedTranscription.TranscriptionState)
+	require.False(t, updatedTranscription.TranscriptionStartedAt.IsZero())
+	require.Len(t, events, 1)
+	require.Equal(t, domaincall.EventTypeTranscriptionUpdated, events[0].EventType)
+
+	stoppedRecording, events, err := service.UpdateRecording(context.Background(), domaincall.UpdateRecordingParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		Enabled:   false,
+	})
+	require.NoError(t, err)
+	require.Equal(t, domaincall.RecordingStateInactive, stoppedRecording.RecordingState)
+	require.Equal(t, domaincall.TranscriptionStateInactive, stoppedRecording.TranscriptionState)
+	require.False(t, stoppedRecording.RecordingStoppedAt.IsZero())
+	require.False(t, stoppedRecording.TranscriptionStoppedAt.IsZero())
+	require.Len(t, events, 2)
+	require.Equal(t, domaincall.EventTypeRecordingUpdated, events[0].EventType)
+	require.Equal(t, domaincall.EventTypeTranscriptionUpdated, events[1].EventType)
+}
+
 func TestGroupCallModerationLifecycle(t *testing.T) {
 	t.Parallel()
 

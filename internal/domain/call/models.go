@@ -90,6 +90,38 @@ const (
 	EventTypeSignalDescription EventType = "call.signal_description"
 	// EventTypeSignalCandidate indicates a published ICE candidate.
 	EventTypeSignalCandidate EventType = "call.signal_candidate"
+	// EventTypeRecordingUpdated indicates changed call recording state.
+	EventTypeRecordingUpdated EventType = "call.recording_updated"
+	// EventTypeTranscriptionUpdated indicates changed call transcription state.
+	EventTypeTranscriptionUpdated EventType = "call.transcription_updated"
+)
+
+// RecordingState identifies the lifecycle stage of one call recording.
+type RecordingState string
+
+const (
+	// RecordingStateUnspecified is the zero value.
+	RecordingStateUnspecified RecordingState = ""
+	// RecordingStateInactive indicates that recording is disabled.
+	RecordingStateInactive RecordingState = "inactive"
+	// RecordingStateActive indicates that recording is enabled.
+	RecordingStateActive RecordingState = "active"
+	// RecordingStateFailed indicates that recording failed.
+	RecordingStateFailed RecordingState = "failed"
+)
+
+// TranscriptionState identifies the lifecycle stage of one call transcription flow.
+type TranscriptionState string
+
+const (
+	// TranscriptionStateUnspecified is the zero value.
+	TranscriptionStateUnspecified TranscriptionState = ""
+	// TranscriptionStateInactive indicates that transcription is disabled.
+	TranscriptionStateInactive TranscriptionState = "inactive"
+	// TranscriptionStateActive indicates that transcription is enabled.
+	TranscriptionStateActive TranscriptionState = "active"
+	// TranscriptionStateFailed indicates that transcription failed.
+	TranscriptionStateFailed TranscriptionState = "failed"
 )
 
 // MediaState describes the participant media toggles visible to other clients.
@@ -245,6 +277,12 @@ type Call struct {
 	RequestedVideo         bool
 	State                  State
 	EndReason              EndReason
+	RecordingState         RecordingState
+	RecordingStartedAt     time.Time
+	RecordingStoppedAt     time.Time
+	TranscriptionState     TranscriptionState
+	TranscriptionStartedAt time.Time
+	TranscriptionStoppedAt time.Time
 	StartedAt              time.Time
 	AnsweredAt             time.Time
 	EndedAt                time.Time
