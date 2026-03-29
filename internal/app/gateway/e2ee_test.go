@@ -11,7 +11,9 @@ import (
 	conversationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1"
 	e2eev1 "github.com/dm-vev/zvonilka/gen/proto/contracts/e2ee/v1"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 func TestUploadAndFetchPreKeysRPC(t *testing.T) {
@@ -526,7 +528,7 @@ func TestSendMessageRequiresGroupSenderKeyReferenceRPC(t *testing.T) {
 	}
 
 	aliceCtx, aliceDeviceID := login(alice.Username, "alice-group-msg-phone", "alice-group-msg-device")
-	_, bobDeviceID := login(bob.Username, "bob-group-msg-phone", "bob-group-msg-device")
+	bobCtx, bobDeviceID := login(bob.Username, "bob-group-msg-phone", "bob-group-msg-device")
 
 	group, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
 		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
@@ -540,7 +542,7 @@ func TestSendMessageRequiresGroupSenderKeyReferenceRPC(t *testing.T) {
 		t.Fatalf("create group conversation: %v", err)
 	}
 
-	_, err = api.PublishGroupSenderKeys(aliceCtx, &e2eev1.PublishGroupSenderKeysRequest{
+	published, err := api.PublishGroupSenderKeys(aliceCtx, &e2eev1.PublishGroupSenderKeysRequest{
 		ConversationId: group.Conversation.ConversationId,
 		SenderKeyId:    "sender-key-group-1",
 		Recipients: []*e2eev1.RecipientSenderKey{
@@ -557,6 +559,15 @@ func TestSendMessageRequiresGroupSenderKeyReferenceRPC(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("publish group sender key: %v", err)
+	}
+	if len(published.Distributions) != 1 {
+		t.Fatalf("expected one published distribution, got %+v", published.Distributions)
+	}
+	_, err = api.AcknowledgeGroupSenderKey(bobCtx, &e2eev1.AcknowledgeGroupSenderKeyRequest{
+		DistributionId: published.Distributions[0].DistributionId,
+	})
+	if err != nil {
+		t.Fatalf("ack published group sender key: %v", err)
 	}
 
 	sent, err := api.SendMessage(aliceCtx, &conversationv1.SendMessageRequest{
@@ -581,6 +592,241 @@ func TestSendMessageRequiresGroupSenderKeyReferenceRPC(t *testing.T) {
 	}
 	if sent.Message == nil || sent.Message.MessageId == "" {
 		t.Fatalf("unexpected sent group message: %+v", sent.Message)
+	}
+}
+
+func TestSendEncryptedMessageRejectsCompromisedTrustRPC(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-direct-compromised",
+		DisplayName: "Alice Direct Compromised",
+		Email:       "alice-direct-compromised@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-direct-compromised",
+		DisplayName: "Bob Direct Compromised",
+		Email:       "bob-direct-compromised@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, _ := login(alice.Username, "alice-compromised-phone", "alice-compromised-device")
+	bobCtx, bobDeviceID := login(bob.Username, "bob-compromised-phone", "bob-compromised-device")
+
+	_, err = api.UploadDevicePreKeys(bobCtx, &e2eev1.UploadDevicePreKeysRequest{
+		SignedPrekey: &e2eev1.SignedPreKey{
+			Key:       &commonv1.PublicKeyBundle{KeyId: "spk-bob-direct-compromised", Algorithm: "x25519", PublicKey: []byte("spk")},
+			Signature: []byte("sig"),
+		},
+		OneTimePrekeys: []*e2eev1.PreKey{
+			{Key: &commonv1.PublicKeyBundle{KeyId: "otk-bob-direct-compromised", Algorithm: "x25519", PublicKey: []byte("otk")}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("upload bob prekeys: %v", err)
+	}
+
+	created, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{bob.ID},
+		Settings:      &conversationv1.ConversationSettings{RequireEncryptedMessages: true},
+	})
+	if err != nil {
+		t.Fatalf("create direct conversation: %v", err)
+	}
+	sessionResp, err := api.CreateDirectSessions(aliceCtx, &e2eev1.CreateDirectSessionsRequest{
+		UserId:                bob.ID,
+		InitiatorEphemeralKey: &commonv1.PublicKeyBundle{KeyId: "eph-direct-compromised", Algorithm: "x25519", PublicKey: []byte("eph")},
+		Bootstrap:             &e2eev1.SessionBootstrapPayload{Algorithm: "x3dh-v1", Ciphertext: []byte("cipher")},
+	})
+	if err != nil {
+		t.Fatalf("create direct session: %v", err)
+	}
+	_, err = api.AcknowledgeDirectSession(bobCtx, &e2eev1.AcknowledgeDirectSessionRequest{
+		SessionId: sessionResp.Sessions[0].SessionId,
+	})
+	if err != nil {
+		t.Fatalf("ack direct session: %v", err)
+	}
+	_, err = api.SetDeviceTrust(aliceCtx, &e2eev1.SetDeviceTrustRequest{
+		TargetUserId:   bob.ID,
+		TargetDeviceId: bobDeviceID,
+		State:          e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_COMPROMISED,
+	})
+	if err != nil {
+		t.Fatalf("set compromised trust: %v", err)
+	}
+
+	_, err = api.SendMessage(aliceCtx, &conversationv1.SendMessageRequest{
+		ConversationId: created.Conversation.ConversationId,
+		Draft: &commonv1.MessageDraft{
+			ClientMessageId: "msg-direct-compromised",
+			Kind:            commonv1.MessageKind_MESSAGE_KIND_TEXT,
+			Payload: &commonv1.EncryptedPayload{
+				KeyId:      sessionResp.Sessions[0].SessionId,
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+				Metadata:   map[string]string{"direct_session_id": sessionResp.Sessions[0].SessionId},
+			},
+		},
+	})
+	if status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("expected permission denied for compromised trust, got %v", err)
+	}
+}
+
+func TestSendEncryptedGroupMessageRejectsMissingCoverageRPC(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-group-missing-coverage",
+		DisplayName: "Alice Group Missing Coverage",
+		Email:       "alice-group-missing-coverage@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-group-missing-coverage",
+		DisplayName: "Bob Group Missing Coverage",
+		Email:       "bob-group-missing-coverage@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+	carol, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "carol-group-missing-coverage",
+		DisplayName: "Carol Group Missing Coverage",
+		Email:       "carol-group-missing-coverage@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create carol: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, aliceDeviceID := login(alice.Username, "alice-group-missing-phone", "alice-group-missing-device")
+	bobCtx, bobDeviceID := login(bob.Username, "bob-group-missing-phone", "bob-group-missing-device")
+	_, _ = login(carol.Username, "carol-group-missing-phone", "carol-group-missing-device")
+
+	group, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Encrypted Sender Key Group Missing",
+		MemberUserIds: []string{bob.ID, carol.ID},
+		Settings:      &conversationv1.ConversationSettings{RequireEncryptedMessages: true},
+	})
+	if err != nil {
+		t.Fatalf("create group conversation: %v", err)
+	}
+	published, err := api.PublishGroupSenderKeys(aliceCtx, &e2eev1.PublishGroupSenderKeysRequest{
+		ConversationId: group.Conversation.ConversationId,
+		SenderKeyId:    "sender-key-group-missing",
+		Recipients: []*e2eev1.RecipientSenderKey{
+			{
+				RecipientUserId:   bob.ID,
+				RecipientDeviceId: bobDeviceID,
+				Payload:           &e2eev1.SenderKeyPayload{Algorithm: "sender-key-v1", Ciphertext: []byte("ciphertext")},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("publish group sender key: %v", err)
+	}
+	if len(published.Distributions) != 1 {
+		t.Fatalf("expected one published distribution, got %+v", published.Distributions)
+	}
+	_, err = api.AcknowledgeGroupSenderKey(bobCtx, &e2eev1.AcknowledgeGroupSenderKeyRequest{
+		DistributionId: published.Distributions[0].DistributionId,
+	})
+	if err != nil {
+		t.Fatalf("ack published group sender key: %v", err)
+	}
+
+	_, err = api.SendMessage(aliceCtx, &conversationv1.SendMessageRequest{
+		ConversationId: group.Conversation.ConversationId,
+		Draft: &commonv1.MessageDraft{
+			ClientMessageId: "msg-group-missing-coverage",
+			Kind:            commonv1.MessageKind_MESSAGE_KIND_TEXT,
+			Payload: &commonv1.EncryptedPayload{
+				KeyId:      "sender-key-group-missing",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+				Metadata: map[string]string{
+					"sender_key_id": "sender-key-group-missing",
+					"sender_device": aliceDeviceID,
+				},
+			},
+		},
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected failed precondition for missing group coverage, got %v", err)
 	}
 }
 

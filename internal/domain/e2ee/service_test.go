@@ -693,6 +693,148 @@ func TestListVerificationRequiredDevices(t *testing.T) {
 	}
 }
 
+func TestValidateConversationPayloadRejectsCompromisedTrust(t *testing.T) {
+	ctx := context.Background()
+	directory := identitytest.NewMemoryStore()
+	chats := conversationtest.NewMemoryStore()
+	e2eeStore := teststore.NewMemoryStore()
+	service, err := domaine2ee.NewService(e2eeStore, directory, chats)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	now := time.Now().UTC()
+	seedIdentity(t, ctx, directory, "acc-a", "dev-a", "device-key-a")
+	seedIdentity(t, ctx, directory, "acc-b", "dev-b", "device-key-b")
+	if _, err = service.UploadDevicePreKeys(ctx, domaine2ee.UploadDevicePreKeysParams{
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		SignedPreKey: domaine2ee.SignedPreKey{
+			Key:       domaine2ee.PublicKey{KeyID: "spk-b", Algorithm: "x25519", PublicKey: []byte("spk-b"), CreatedAt: now},
+			Signature: []byte("sig-b"),
+		},
+		OneTimePreKeys: []domaine2ee.OneTimePreKey{
+			{Key: domaine2ee.PublicKey{KeyID: "otk-b", Algorithm: "x25519", PublicKey: []byte("otk-b"), CreatedAt: now}},
+		},
+	}); err != nil {
+		t.Fatalf("upload bob prekeys: %v", err)
+	}
+
+	conversationService, err := conversation.NewService(chats)
+	if err != nil {
+		t.Fatalf("new conversation service: %v", err)
+	}
+	direct, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-a",
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{"acc-b"},
+		CreatedAt:        now,
+		Settings: conversation.ConversationSettings{
+			RequireEncryptedMessages: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create direct: %v", err)
+	}
+
+	sessions, err := service.CreateDirectSessions(ctx, domaine2ee.CreateDirectSessionsParams{
+		InitiatorAccountID: "acc-a",
+		InitiatorDeviceID:  "dev-a",
+		TargetAccountID:    "acc-b",
+		InitiatorEphemeral: domaine2ee.PublicKey{KeyID: "eph", Algorithm: "x25519", PublicKey: []byte("eph"), CreatedAt: now},
+		Bootstrap:          domaine2ee.BootstrapPayload{Algorithm: "x3dh-v1", Ciphertext: []byte("cipher")},
+	})
+	if err != nil {
+		t.Fatalf("create direct sessions: %v", err)
+	}
+	if _, err = service.AcknowledgeDirectSession(ctx, domaine2ee.AcknowledgeDirectSessionParams{
+		SessionID:          sessions[0].ID,
+		RecipientAccountID: "acc-b",
+		RecipientDeviceID:  "dev-b",
+	}); err != nil {
+		t.Fatalf("ack direct session: %v", err)
+	}
+	if _, err = service.SetDeviceTrust(ctx, domaine2ee.SetDeviceTrustParams{
+		ObserverAccountID: "acc-a",
+		ObserverDeviceID:  "dev-a",
+		TargetAccountID:   "acc-b",
+		TargetDeviceID:    "dev-b",
+		State:             domaine2ee.DeviceTrustStateCompromised,
+	}); err != nil {
+		t.Fatalf("set trust: %v", err)
+	}
+
+	err = service.ValidateConversationPayload(ctx, domaine2ee.ValidateConversationPayloadParams{
+		ConversationID:  direct.ID,
+		SenderAccountID: "acc-a",
+		SenderDeviceID:  "dev-a",
+		PayloadKeyID:    sessions[0].ID,
+		PayloadMetadata: map[string]string{"direct_session_id": sessions[0].ID},
+	})
+	if err != domaine2ee.ErrForbidden {
+		t.Fatalf("expected forbidden for compromised trust, got %v", err)
+	}
+}
+
+func TestValidateConversationPayloadRejectsMissingGroupCoverage(t *testing.T) {
+	ctx := context.Background()
+	directory := identitytest.NewMemoryStore()
+	chats := conversationtest.NewMemoryStore()
+	e2eeStore := teststore.NewMemoryStore()
+	service, err := domaine2ee.NewService(e2eeStore, directory, chats)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	now := time.Now().UTC()
+	seedIdentity(t, ctx, directory, "acc-a", "dev-a", "device-key-a")
+	seedIdentity(t, ctx, directory, "acc-b", "dev-b", "device-key-b")
+	seedIdentity(t, ctx, directory, "acc-c", "dev-c", "device-key-c")
+
+	conversationService, err := conversation.NewService(chats)
+	if err != nil {
+		t.Fatalf("new conversation service: %v", err)
+	}
+	group, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-a",
+		Kind:             conversation.ConversationKindGroup,
+		MemberAccountIDs: []string{"acc-b", "acc-c"},
+		CreatedAt:        now,
+		Settings: conversation.ConversationSettings{
+			RequireEncryptedMessages: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if _, err = service.PublishGroupSenderKeys(ctx, domaine2ee.PublishGroupSenderKeysParams{
+		ConversationID:  group.ID,
+		SenderAccountID: "acc-a",
+		SenderDeviceID:  "dev-a",
+		SenderKeyID:     "sender-key-1",
+		Recipients: []domaine2ee.RecipientSenderKey{
+			{
+				RecipientAccountID: "acc-b",
+				RecipientDeviceID:  "dev-b",
+				Payload:            domaine2ee.SenderKeyPayload{Algorithm: "sender-key-v1", Ciphertext: []byte("cipher")},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("publish sender keys: %v", err)
+	}
+
+	err = service.ValidateConversationPayload(ctx, domaine2ee.ValidateConversationPayloadParams{
+		ConversationID:  group.ID,
+		SenderAccountID: "acc-a",
+		SenderDeviceID:  "dev-a",
+		PayloadKeyID:    "sender-key-1",
+		PayloadMetadata: map[string]string{"sender_key_id": "sender-key-1"},
+	})
+	if err != domaine2ee.ErrConflict {
+		t.Fatalf("expected conflict for missing group coverage, got %v", err)
+	}
+}
+
 func seedIdentity(t *testing.T, ctx context.Context, store identity.Store, accountID string, deviceID string, publicKey string) {
 	t.Helper()
 	if _, err := store.SaveAccount(ctx, identity.Account{

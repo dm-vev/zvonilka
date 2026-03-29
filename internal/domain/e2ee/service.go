@@ -987,9 +987,32 @@ func (s *Service) ValidateConversationPayload(ctx context.Context, params Valida
 
 	switch conversationRow.Kind {
 	case conversation.ConversationKindDirect:
-		return s.validateDirectConversationPayload(ctx, params)
+		if err := s.validateDirectConversationPayload(ctx, params); err != nil {
+			return err
+		}
+		coverage, err := s.GetConversationKeyCoverage(ctx, GetConversationKeyCoverageParams{
+			ConversationID:  params.ConversationID,
+			SenderAccountID: params.SenderAccountID,
+			SenderDeviceID:  params.SenderDeviceID,
+		})
+		if err != nil {
+			return err
+		}
+		return validateCoverageEntries(coverage)
 	case conversation.ConversationKindGroup:
-		return s.validateGroupConversationPayload(ctx, params)
+		if err := s.validateGroupConversationPayload(ctx, params); err != nil {
+			return err
+		}
+		coverage, err := s.GetConversationKeyCoverage(ctx, GetConversationKeyCoverageParams{
+			ConversationID:  params.ConversationID,
+			SenderAccountID: params.SenderAccountID,
+			SenderDeviceID:  params.SenderDeviceID,
+			SenderKeyID:     strings.TrimSpace(params.PayloadMetadata["sender_key_id"]),
+		})
+		if err != nil {
+			return err
+		}
+		return validateCoverageEntries(coverage)
 	default:
 		return nil
 	}
@@ -1464,6 +1487,18 @@ func containsString(values []string, expected string) bool {
 		}
 	}
 	return false
+}
+
+func validateCoverageEntries(entries []ConversationKeyCoverageEntry) error {
+	for _, entry := range entries {
+		if entry.TrustState == DeviceTrustStateCompromised {
+			return ErrForbidden
+		}
+		if entry.State != ConversationKeyCoverageStateReady {
+			return ErrConflict
+		}
+	}
+	return nil
 }
 
 func normalizeSignedPreKey(value SignedPreKey) SignedPreKey {
