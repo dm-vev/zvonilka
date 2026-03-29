@@ -73,5 +73,6 @@ func (a *api) subscribeE2EEUpdates() (<-chan e2eeSignal, func()) {
 func cloneE2EEUpdate(value domaine2ee.Update) domaine2ee.Update {
 	cloned := value
 	cloned.Metadata = cloneStringMap(value.Metadata)
+	cloned.ConversationIDs = append([]string(nil), value.ConversationIDs...)
 	return cloned
 }

@@ -111,6 +111,7 @@ message E2EEUpdate {
   DeviceTrustState current_trust_state = 13;
   string target_key_fingerprint = 14;
   bool verification_required = 15;
+  repeated string conversation_ids = 16;
 }
 
 enum DirectSessionState {

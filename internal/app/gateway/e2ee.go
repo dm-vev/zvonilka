@@ -182,6 +182,10 @@ func (a *api) VerifyDeviceSafetyNumber(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	conversationIDs, err := a.e2ee.SharedConversationIDs(ctx, authContext.Account.ID, trust.TargetAccountID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
 	a.publishE2EEUpdates(domaine2ee.Update{
 		ID:                   newGatewayEventID("e2ee"),
 		Type:                 domaine2ee.UpdateTypeDeviceVerified,
@@ -192,6 +196,7 @@ func (a *api) VerifyDeviceSafetyNumber(
 		CurrentTrustState:    trust.State,
 		TargetKeyFingerprint: trust.KeyFingerprint,
 		VerificationRequired: false,
+		ConversationIDs:      conversationIDs,
 		Metadata: map[string]string{
 			"state": string(trust.State),
 		},
@@ -220,6 +225,10 @@ func (a *api) SetDeviceTrust(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	conversationIDs, err := a.e2ee.SharedConversationIDs(ctx, authContext.Account.ID, trust.TargetAccountID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
 	a.publishE2EEUpdates(domaine2ee.Update{
 		ID:                   newGatewayEventID("e2ee"),
 		Type:                 domaine2ee.UpdateTypeDeviceTrustUpdated,
@@ -230,6 +239,7 @@ func (a *api) SetDeviceTrust(
 		CurrentTrustState:    trust.State,
 		TargetKeyFingerprint: trust.KeyFingerprint,
 		VerificationRequired: trust.State != domaine2ee.DeviceTrustStateTrusted,
+		ConversationIDs:      conversationIDs,
 		Metadata: map[string]string{
 			"state": string(trust.State),
 		},
@@ -606,6 +616,7 @@ func e2eeUpdateProto(value domaine2ee.Update) *e2eev1.E2EEUpdate {
 		CurrentTrustState:    deviceTrustStateProto(value.CurrentTrustState),
 		TargetKeyFingerprint: value.TargetKeyFingerprint,
 		VerificationRequired: value.VerificationRequired,
+		ConversationIds:      append([]string(nil), value.ConversationIDs...),
 	}
 }
 

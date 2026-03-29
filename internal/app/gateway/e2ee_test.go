@@ -1160,6 +1160,13 @@ func TestGetConversationKeyCoverageRPC(t *testing.T) {
 	if directCoverage.Entries[0].KeyFingerprint == "" || !directCoverage.Entries[0].VerificationRequired {
 		t.Fatalf("expected verification hints in direct coverage: %+v", directCoverage.Entries[0])
 	}
+	if _, err := api.SetDeviceTrust(aliceCtx, &e2eev1.SetDeviceTrustRequest{
+		TargetUserId:   bob.ID,
+		TargetDeviceId: bobDeviceID,
+		State:          e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_UNTRUSTED,
+	}); err != nil {
+		t.Fatalf("set direct untrusted trust: %v", err)
+	}
 
 	group, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
 		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
@@ -1300,6 +1307,9 @@ func TestSubscribeE2EEUpdatesStreamsTrustChanges(t *testing.T) {
 		if resp.Update.CurrentTrustState != e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_TRUSTED || resp.Update.TargetKeyFingerprint == "" || resp.Update.VerificationRequired {
 			t.Fatalf("unexpected trust update verification fields: %+v", resp.Update)
 		}
+		if len(resp.Update.ConversationIds) != 0 {
+			t.Fatalf("expected no shared conversation ids before chats, got %+v", resp.Update.ConversationIds)
+		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("timed out waiting for e2ee update")
 	}
@@ -1400,6 +1410,106 @@ func TestGetAndVerifyDeviceSafetyNumberRPC(t *testing.T) {
 	}
 	if codeResp.Verification == nil || codeResp.Verification.CurrentTrustState != e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_TRUSTED {
 		t.Fatalf("unexpected verification state after trust: %+v", codeResp.Verification)
+	}
+}
+
+func TestSubscribeE2EEUpdatesIncludesConversationIDsForTrustChanges(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-e2ee-stream-conversations",
+		DisplayName: "Alice E2EE Stream Conversations",
+		Email:       "alice-e2ee-stream-conversations@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-e2ee-stream-conversations",
+		DisplayName: "Bob E2EE Stream Conversations",
+		Email:       "bob-e2ee-stream-conversations@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, _ := login(alice.Username, "alice-e2ee-stream-conversations-phone", "alice-e2ee-stream-conversations-device")
+	_, bobDeviceID := login(bob.Username, "bob-e2ee-stream-conversations-phone", "bob-e2ee-stream-conversations-device")
+
+	direct, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{bob.ID},
+	})
+	if err != nil {
+		t.Fatalf("create direct conversation: %v", err)
+	}
+
+	stream := newTestSubscribeE2EEUpdatesStream(aliceCtx)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- api.SubscribeE2EEUpdates(&e2eev1.SubscribeE2EEUpdatesRequest{}, stream)
+	}()
+	time.Sleep(50 * time.Millisecond)
+
+	_, err = api.SetDeviceTrust(aliceCtx, &e2eev1.SetDeviceTrustRequest{
+		TargetUserId:   bob.ID,
+		TargetDeviceId: bobDeviceID,
+		State:          e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_UNTRUSTED,
+	})
+	if err != nil {
+		t.Fatalf("set device trust: %v", err)
+	}
+
+	select {
+	case resp := <-stream.responses:
+		if len(resp.Update.ConversationIds) != 1 || resp.Update.ConversationIds[0] != direct.Conversation.ConversationId {
+			t.Fatalf("unexpected conversation ids in update: %+v", resp.Update)
+		}
+		if !resp.Update.VerificationRequired {
+			t.Fatalf("expected verification required in trust update: %+v", resp.Update)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for trust update")
+	}
+
+	stream.cancel()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("subscribe e2ee updates returned error: %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for stream shutdown")
 	}
 }
 

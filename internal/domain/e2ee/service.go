@@ -490,6 +490,45 @@ func (s *Service) ListVerificationRequiredDevices(
 	return result, nil
 }
 
+func (s *Service) SharedConversationIDs(
+	ctx context.Context,
+	observerAccountID string,
+	targetAccountID string,
+) ([]string, error) {
+	if err := s.validateContext(ctx, "list shared conversations"); err != nil {
+		return nil, err
+	}
+	observerAccountID = strings.TrimSpace(observerAccountID)
+	targetAccountID = strings.TrimSpace(targetAccountID)
+	if observerAccountID == "" || targetAccountID == "" {
+		return nil, ErrInvalidInput
+	}
+
+	conversations, err := s.chats.ConversationsByAccountID(ctx, observerAccountID)
+	if err != nil {
+		return nil, fmt.Errorf("list conversations for %s: %w", observerAccountID, err)
+	}
+	result := make([]string, 0)
+	for _, convo := range conversations {
+		members, err := s.chats.ConversationMembersByConversationID(ctx, convo.ID)
+		if err != nil {
+			return nil, mapConversationError("list conversation members", convo.ID, err)
+		}
+		for _, member := range members {
+			if !isActiveConversationMember(member) {
+				continue
+			}
+			if member.AccountID != targetAccountID {
+				continue
+			}
+			result = append(result, convo.ID)
+			break
+		}
+	}
+	sort.Strings(result)
+	return result, nil
+}
+
 func (s *Service) GetConversationKeyCoverage(ctx context.Context, params GetConversationKeyCoverageParams) ([]ConversationKeyCoverageEntry, error) {
 	if err := s.validateContext(ctx, "get conversation key coverage"); err != nil {
 		return nil, err

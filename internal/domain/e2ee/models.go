@@ -124,6 +124,7 @@ type Update struct {
 	CurrentTrustState    DeviceTrustState
 	TargetKeyFingerprint string
 	VerificationRequired bool
+	ConversationIDs      []string
 }
 
 type BootstrapPayload struct {

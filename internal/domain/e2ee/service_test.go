@@ -693,6 +693,63 @@ func TestListVerificationRequiredDevices(t *testing.T) {
 	}
 }
 
+func TestSharedConversationIDs(t *testing.T) {
+	ctx := context.Background()
+	directory := identitytest.NewMemoryStore()
+	chats := conversationtest.NewMemoryStore()
+	e2eeStore := teststore.NewMemoryStore()
+	service, err := domaine2ee.NewService(e2eeStore, directory, chats)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	now := time.Now().UTC()
+	seedIdentity(t, ctx, directory, "acc-a", "dev-a", "device-key-a")
+	seedIdentity(t, ctx, directory, "acc-b", "dev-b", "device-key-b")
+	seedIdentity(t, ctx, directory, "acc-c", "dev-c", "device-key-c")
+
+	conversationService, err := conversation.NewService(chats)
+	if err != nil {
+		t.Fatalf("new conversation service: %v", err)
+	}
+	direct, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-a",
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{"acc-b"},
+		CreatedAt:        now,
+	})
+	if err != nil {
+		t.Fatalf("create direct: %v", err)
+	}
+	group, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-a",
+		Kind:             conversation.ConversationKindGroup,
+		MemberAccountIDs: []string{"acc-b", "acc-c"},
+		CreatedAt:        now,
+	})
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+
+	ids, err := service.SharedConversationIDs(ctx, "acc-a", "acc-b")
+	if err != nil {
+		t.Fatalf("shared conversation ids: %v", err)
+	}
+	hasDirect := false
+	hasGroup := false
+	for _, id := range ids {
+		if id == direct.ID {
+			hasDirect = true
+		}
+		if id == group.ID {
+			hasGroup = true
+		}
+	}
+	if len(ids) != 2 || !hasDirect || !hasGroup {
+		t.Fatalf("unexpected shared ids: %+v", ids)
+	}
+}
+
 func TestValidateConversationPayloadRejectsCompromisedTrust(t *testing.T) {
 	ctx := context.Background()
 	directory := identitytest.NewMemoryStore()
