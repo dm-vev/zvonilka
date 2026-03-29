@@ -139,6 +139,31 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Call.MaxVideoParticipants = uint32(value)
 	}
+	if value, ok, err := durationValue(serviceName, "CALL_WORKER_POLL_INTERVAL", cfg.Call.WorkerPollInterval); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.WorkerPollInterval = value
+	}
+	if value, ok, err := intValue(serviceName, "CALL_WORKER_BATCH_SIZE", cfg.Call.WorkerBatchSize); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.WorkerBatchSize = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "CALL_RECORDING_HOOK_URL", cfg.Call.RecordingHookURL); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.RecordingHookURL = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "CALL_TRANSCRIPTION_HOOK_URL", cfg.Call.TranscriptionHookURL); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.TranscriptionHookURL = value
+	}
+	if value, ok, err := durationValue(serviceName, "CALL_HOOK_TIMEOUT", cfg.Call.HookTimeout); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.HookTimeout = value
+	}
 	if value, ok, err := stringValueWithPresence(serviceName, "RTC_PUBLIC_ENDPOINT", cfg.RTC.PublicEndpoint); err != nil {
 		return err
 	} else if ok {

@@ -66,6 +66,18 @@ func (c Configuration) Validate() error {
 	if c.Call.MaxVideoParticipants > c.Call.MaxGroupParticipants {
 		errs = append(errs, errors.New("call max video participants must be less than or equal to max group participants"))
 	}
+	if c.Call.WorkerPollInterval <= 0 {
+		errs = append(errs, errors.New("call worker poll interval must be positive"))
+	}
+	if c.Call.WorkerBatchSize <= 0 {
+		errs = append(errs, errors.New("call worker batch size must be positive"))
+	}
+	if c.Call.HookTimeout <= 0 {
+		errs = append(errs, errors.New("call hook timeout must be positive"))
+	}
+	if c.Service.Name == "callworker" && strings.TrimSpace(c.Call.RecordingHookURL) == "" && strings.TrimSpace(c.Call.TranscriptionHookURL) == "" {
+		errs = append(errs, errors.New("call recording or transcription hook url is required"))
+	}
 	if c.RTC.CredentialTTL <= 0 {
 		errs = append(errs, errors.New("rtc credential ttl must be positive"))
 	}
@@ -285,7 +297,7 @@ func validateLogFormat(format string) error {
 func validateServiceName(serviceName string) error {
 	serviceName = strings.ToLower(strings.TrimSpace(serviceName))
 	switch serviceName {
-	case "controlplane", "gateway", "botapi", "notificationworker":
+	case "controlplane", "gateway", "botapi", "notificationworker", "callworker":
 		return nil
 	case "":
 		return errors.New("service name is required")

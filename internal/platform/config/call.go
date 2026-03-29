@@ -14,6 +14,11 @@ type CallConfig struct {
 	MaxDuration          time.Duration
 	MaxGroupParticipants uint32
 	MaxVideoParticipants uint32
+	WorkerPollInterval   time.Duration
+	WorkerBatchSize      int
+	RecordingHookURL     string
+	TranscriptionHookURL string
+	HookTimeout          time.Duration
 }
 
 // ToSettings converts config values into domain call settings.

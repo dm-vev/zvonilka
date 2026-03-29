@@ -186,6 +186,16 @@ func scanEvent(row rowScanner) (call.Event, error) {
 	return value, nil
 }
 
+func scanWorkerCursor(row rowScanner) (call.WorkerCursor, error) {
+	var cursor call.WorkerCursor
+	if err := row.Scan(&cursor.Name, &cursor.LastSequence, &cursor.UpdatedAt); err != nil {
+		return call.WorkerCursor{}, err
+	}
+
+	cursor.UpdatedAt = cursor.UpdatedAt.UTC()
+	return cursor, nil
+}
+
 func mapConstraintError(err error) error {
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) {

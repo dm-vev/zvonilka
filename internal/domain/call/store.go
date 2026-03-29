@@ -27,4 +27,7 @@ type Store interface {
 		conversationID string,
 		limit int,
 	) ([]Event, error)
+
+	SaveWorkerCursor(ctx context.Context, cursor WorkerCursor) (WorkerCursor, error)
+	WorkerCursorByName(ctx context.Context, name string) (WorkerCursor, error)
 }

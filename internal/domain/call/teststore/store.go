@@ -13,6 +13,7 @@ func NewMemoryStore() call.Store {
 		invitesByKey:      make(map[string]call.Invite),
 		participantsByKey: make(map[string]call.Participant),
 		eventsByID:        make(map[string]call.Event),
+		workerCursors:     make(map[string]call.WorkerCursor),
 	}
 }
 
@@ -23,6 +24,7 @@ type memoryStore struct {
 	invitesByKey      map[string]call.Invite
 	participantsByKey map[string]call.Participant
 	eventsByID        map[string]call.Event
+	workerCursors     map[string]call.WorkerCursor
 	eventOrder        []string
 	nextSequence      uint64
 }

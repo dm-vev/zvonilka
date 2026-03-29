@@ -230,6 +230,7 @@ type stubStore struct {
 	invites      map[string][]Invite
 	participants map[string][]Participant
 	events       []Event
+	cursors      map[string]WorkerCursor
 	nextSeq      uint64
 }
 
@@ -238,6 +239,7 @@ func newStubStore() *stubStore {
 		calls:        make(map[string]Call),
 		invites:      make(map[string][]Invite),
 		participants: make(map[string][]Participant),
+		cursors:      make(map[string]WorkerCursor),
 	}
 }
 
@@ -352,6 +354,24 @@ func (s *stubStore) EventsAfterSequence(_ context.Context, fromSequence uint64, 
 		}
 	}
 	return result, nil
+}
+func (s *stubStore) SaveWorkerCursor(_ context.Context, cursor WorkerCursor) (WorkerCursor, error) {
+	cursor, err := NormalizeWorkerCursor(cursor, time.Now().UTC())
+	if err != nil {
+		return WorkerCursor{}, err
+	}
+	if existing, ok := s.cursors[cursor.Name]; ok && cursor.LastSequence <= existing.LastSequence {
+		return existing, nil
+	}
+	s.cursors[cursor.Name] = cursor
+	return cursor, nil
+}
+func (s *stubStore) WorkerCursorByName(_ context.Context, name string) (WorkerCursor, error) {
+	cursor, ok := s.cursors[name]
+	if !ok {
+		return WorkerCursor{}, ErrNotFound
+	}
+	return cursor, nil
 }
 
 type stubConversations struct {

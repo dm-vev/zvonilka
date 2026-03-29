@@ -14,6 +14,7 @@ import (
 
 func TestFromEnvUsesDistinctServiceDefaults(t *testing.T) {
 	resetConfigEnv(t)
+	t.Setenv("ZVONILKA_CALL_RECORDING_HOOK_URL", "http://127.0.0.1/recording")
 
 	type expected struct {
 		http string
@@ -50,6 +51,13 @@ func TestFromEnvUsesDistinctServiceDefaults(t *testing.T) {
 			want: expected{
 				http: ":8083",
 				grpc: ":9093",
+			},
+		},
+		{
+			service: "callworker",
+			want: expected{
+				http: ":8084",
+				grpc: ":9094",
 			},
 		},
 	}

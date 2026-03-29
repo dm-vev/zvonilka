@@ -166,6 +166,32 @@ func TestCallInviteParticipantQueries(t *testing.T) {
 	require.Len(t, rows, 1)
 
 	mock.ExpectBegin()
+	mock.ExpectQuery(`(?s)INSERT INTO "call"\."call_worker_cursors" AS existing .*RETURNING name, last_sequence, updated_at`).
+		WithArgs("call_hooks", uint64(9), now.UTC()).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"name", "last_sequence", "updated_at",
+		}).AddRow("call_hooks", uint64(9), now.UTC()))
+	mock.ExpectCommit()
+
+	cursor, err := store.SaveWorkerCursor(context.Background(), call.WorkerCursor{
+		Name:         "call_hooks",
+		LastSequence: 9,
+		UpdatedAt:    now,
+	})
+	require.NoError(t, err)
+	require.EqualValues(t, 9, cursor.LastSequence)
+
+	mock.ExpectQuery(`SELECT name, last_sequence, updated_at FROM "call"\."call_worker_cursors" WHERE name = \$1`).
+		WithArgs("call_hooks").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"name", "last_sequence", "updated_at",
+		}).AddRow("call_hooks", uint64(9), now.UTC()))
+
+	cursor, err = store.WorkerCursorByName(context.Background(), "call_hooks")
+	require.NoError(t, err)
+	require.EqualValues(t, 9, cursor.LastSequence)
+
+	mock.ExpectBegin()
 	mock.ExpectQuery(`(?s)INSERT INTO "call"\."call_invites".*RETURNING`).
 		WithArgs("call-1", "acc-b", call.InviteStatePending, now, nil, now).
 		WillReturnRows(sqlmock.NewRows([]string{

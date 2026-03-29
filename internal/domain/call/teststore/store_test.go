@@ -143,6 +143,34 @@ func TestMemoryStoreWithinTxRollbackAndCommitSemantics(t *testing.T) {
 	require.Equal(t, "call-commit", committed.ID)
 }
 
+func TestMemoryStoreWorkerCursorRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	store := NewMemoryStore()
+	ctx := context.Background()
+	now := time.Date(2026, time.March, 29, 17, 0, 0, 0, time.UTC)
+
+	saved, err := store.SaveWorkerCursor(ctx, call.WorkerCursor{
+		Name:         "call_hooks",
+		LastSequence: 7,
+		UpdatedAt:    now,
+	})
+	require.NoError(t, err)
+	require.EqualValues(t, 7, saved.LastSequence)
+
+	loaded, err := store.WorkerCursorByName(ctx, "call_hooks")
+	require.NoError(t, err)
+	require.EqualValues(t, 7, loaded.LastSequence)
+
+	ignored, err := store.SaveWorkerCursor(ctx, call.WorkerCursor{
+		Name:         "call_hooks",
+		LastSequence: 3,
+		UpdatedAt:    now.Add(time.Second),
+	})
+	require.NoError(t, err)
+	require.EqualValues(t, 7, ignored.LastSequence)
+}
+
 func TestMemoryStoreRejectsInvalidInputs(t *testing.T) {
 	t.Parallel()
 

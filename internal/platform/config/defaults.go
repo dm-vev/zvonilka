@@ -34,6 +34,10 @@ var serviceListenDefaults = map[string]listenDefaults{
 		http: ":8083",
 		grpc: ":9093",
 	},
+	"callworker": {
+		http: ":8084",
+		grpc: ":9094",
+	},
 }
 
 const (
@@ -93,6 +97,9 @@ func defaultConfiguration(serviceName string) Configuration {
 			MaxDuration:          callDefaults.MaxDuration,
 			MaxGroupParticipants: callDefaults.MaxGroupParticipants,
 			MaxVideoParticipants: callDefaults.MaxVideoParticipants,
+			WorkerPollInterval:   2 * time.Second,
+			WorkerBatchSize:      100,
+			HookTimeout:          10 * time.Second,
 		},
 		RTC: RTCConfig{
 			PublicEndpoint: "webrtc://gateway/calls",
