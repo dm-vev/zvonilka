@@ -438,6 +438,21 @@ func (s *Service) JoinCall(ctx context.Context, params JoinParams) (Call, JoinDe
 			WithVideo: params.WithVideo,
 			Media:     defaultJoinMediaState(params.WithVideo),
 		})
+		if runtimeErr != nil && runtimeUnavailable(runtimeErr) {
+			migratedCall, _, migratedEvent, migrateErr := s.failoverActiveSession(ctx, store, callRow, now, "join")
+			if migrateErr != nil {
+				return fmt.Errorf("fail over runtime session %s: %w", callRow.ActiveSessionID, migrateErr)
+			}
+			callRow = migratedCall
+			events = append(events, migratedEvent)
+			runtimeJoin, runtimeErr = s.runtime.JoinSession(ctx, callRow.ActiveSessionID, RuntimeParticipant{
+				CallID:    callRow.ID,
+				AccountID: params.AccountID,
+				DeviceID:  params.DeviceID,
+				WithVideo: params.WithVideo,
+				Media:     defaultJoinMediaState(params.WithVideo),
+			})
+		}
 		if runtimeErr != nil {
 			return fmt.Errorf("join runtime session %s: %w", callRow.ActiveSessionID, runtimeErr)
 		}
@@ -567,6 +582,21 @@ func (s *Service) HandoffCall(
 			WithVideo: source.MediaState.CameraEnabled,
 			Media:     source.MediaState,
 		})
+		if runtimeErr != nil && runtimeUnavailable(runtimeErr) {
+			migratedCall, _, migratedEvent, migrateErr := s.failoverActiveSession(ctx, store, callRow, now, "handoff")
+			if migrateErr != nil {
+				return fmt.Errorf("fail over runtime session %s for handoff: %w", callRow.ActiveSessionID, migrateErr)
+			}
+			callRow = migratedCall
+			events = append(events, migratedEvent)
+			runtimeJoin, runtimeErr = s.runtime.JoinSession(ctx, callRow.ActiveSessionID, RuntimeParticipant{
+				CallID:    callRow.ID,
+				AccountID: params.AccountID,
+				DeviceID:  params.ToDeviceID,
+				WithVideo: source.MediaState.CameraEnabled,
+				Media:     source.MediaState,
+			})
+		}
 		if runtimeErr != nil {
 			return fmt.Errorf("join runtime session %s for handoff: %w", callRow.ActiveSessionID, runtimeErr)
 		}

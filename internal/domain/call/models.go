@@ -84,6 +84,8 @@ const (
 	EventTypeLeft EventType = "call.left"
 	// EventTypeMediaUpdated indicates changed participant media state.
 	EventTypeMediaUpdated EventType = "call.media_updated"
+	// EventTypeSessionMigrated indicates one server-initiated session failover.
+	EventTypeSessionMigrated EventType = "call.session_migrated"
 	// EventTypeEnded indicates a finished call.
 	EventTypeEnded EventType = "call.ended"
 	// EventTypeSignalDescription indicates a published SDP description.

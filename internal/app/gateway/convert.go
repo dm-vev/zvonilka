@@ -131,6 +131,8 @@ func callEventTypeToProto(eventType domaincall.EventType) callv1.CallEventType {
 		return callv1.CallEventType_CALL_EVENT_TYPE_LEFT
 	case domaincall.EventTypeMediaUpdated:
 		return callv1.CallEventType_CALL_EVENT_TYPE_MEDIA_UPDATED
+	case domaincall.EventTypeSessionMigrated:
+		return callv1.CallEventType_CALL_EVENT_TYPE_SESSION_MIGRATED
 	case domaincall.EventTypeEnded:
 		return callv1.CallEventType_CALL_EVENT_TYPE_ENDED
 	case domaincall.EventTypeSignalDescription:

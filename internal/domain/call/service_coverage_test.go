@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 	calltest "github.com/dm-vev/zvonilka/internal/domain/call/teststore"
@@ -25,6 +27,7 @@ type fakeRuntime struct {
 	signals   []domaincall.RuntimeSignal
 	joinError error
 	ackError  error
+	ensureN   int
 }
 
 type ackCall struct {
@@ -62,6 +65,20 @@ func newFakeRuntime(now time.Time) *fakeRuntime {
 }
 
 func (f *fakeRuntime) EnsureSession(context.Context, domaincall.Call) (domaincall.RuntimeSession, error) {
+	f.ensureN++
+	if f.ensureN > 1 {
+		next := f.session
+		next.SessionID = "sess-2"
+		next.RuntimeEndpoint = "webrtc://runtime-2"
+		next.CandidatePort = 42000
+		f.session = next
+
+		join := f.join
+		join.SessionID = next.SessionID
+		join.RuntimeEndpoint = next.RuntimeEndpoint
+		join.CandidatePort = next.CandidatePort
+		f.join = join
+	}
 	return f.session, nil
 }
 
@@ -70,7 +87,7 @@ func (f *fakeRuntime) JoinSession(
 	sessionID string,
 	participant domaincall.RuntimeParticipant,
 ) (domaincall.RuntimeJoin, error) {
-	if f.joinError != nil {
+	if f.joinError != nil && sessionID == "sess-1" {
 		return domaincall.RuntimeJoin{}, f.joinError
 	}
 
@@ -895,4 +912,44 @@ func TestStartCallRejectsSecondActiveCallAndPublishAfterEnd(t *testing.T) {
 		},
 	})
 	require.ErrorIs(t, err, domaincall.ErrConflict)
+}
+
+func TestJoinCallMigratesSessionOnRuntimeUnavailable(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 28, 0, 0, 0, 0, time.UTC)
+	runtime := newFakeRuntime(now)
+	service := newTestService(t, now, runtime)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-direct",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+
+	_, _, err = service.AcceptCall(context.Background(), domaincall.AcceptParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.NoError(t, err)
+
+	runtime.joinError = status.Error(codes.Unavailable, "rtc unavailable")
+	callRow, details, events, err := service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "sess-2", callRow.ActiveSessionID)
+	require.Equal(t, "sess-2", details.SessionID)
+	require.Len(t, events, 2)
+	require.Equal(t, domaincall.EventTypeSessionMigrated, events[0].EventType)
+	require.Equal(t, "sess-1", events[0].Metadata["previous_session_id"])
+	require.Equal(t, "sess-2", events[0].Metadata["session_id"])
+	require.Equal(t, "join", events[0].Metadata["failover_reason"])
+	require.Equal(t, domaincall.EventTypeJoined, events[1].EventType)
 }
