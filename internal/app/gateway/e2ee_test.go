@@ -775,6 +775,26 @@ func TestSendEncryptedMessageRejectsCompromisedTrustRPC(t *testing.T) {
 	if status.Code(err) != codes.PermissionDenied {
 		t.Fatalf("expected permission denied for compromised trust, got %v", err)
 	}
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected grpc status, got %v", err)
+	}
+	if len(st.Details()) != 1 {
+		t.Fatalf("expected one error detail, got %+v", st.Details())
+	}
+	detail, ok := st.Details()[0].(*conversationv1.EncryptedSendBlockedDetail)
+	if !ok {
+		t.Fatalf("expected encrypted send blocked detail, got %+v", st.Details()[0])
+	}
+	if detail.BlockReason != conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_COMPROMISED_DEVICE_PRESENT {
+		t.Fatalf("expected compromised-device block reason, got %s", detail.BlockReason)
+	}
+	if detail.PrimaryRemediationHint != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_REMOVE_COMPROMISED_DEVICE {
+		t.Fatalf("expected remove-compromised remediation hint, got %s", detail.PrimaryRemediationHint)
+	}
+	if len(detail.BlockedDevices) != 1 || detail.BlockedDevices[0].TrustState != e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_COMPROMISED {
+		t.Fatalf("unexpected blocked device details: %+v", detail.BlockedDevices)
+	}
 }
 
 func TestSendEncryptedGroupMessageRejectsMissingCoverageRPC(t *testing.T) {
@@ -893,6 +913,23 @@ func TestSendEncryptedGroupMessageRejectsMissingCoverageRPC(t *testing.T) {
 	})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("expected failed precondition for missing group coverage, got %v", err)
+	}
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected grpc status, got %v", err)
+	}
+	if len(st.Details()) != 1 {
+		t.Fatalf("expected one error detail, got %+v", st.Details())
+	}
+	detail, ok := st.Details()[0].(*conversationv1.EncryptedSendBlockedDetail)
+	if !ok {
+		t.Fatalf("expected encrypted send blocked detail, got %+v", st.Details()[0])
+	}
+	if detail.BlockReason != conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_MISSING_KEY_COVERAGE {
+		t.Fatalf("expected missing-key-coverage block reason, got %s", detail.BlockReason)
+	}
+	if detail.CanSendEncryptedNow {
+		t.Fatal("expected encrypted send detail to stay blocked")
 	}
 }
 

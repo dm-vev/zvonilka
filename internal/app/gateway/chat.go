@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"slices"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
 	domainconversation "github.com/dm-vev/zvonilka/internal/domain/conversation"
 	domaine2ee "github.com/dm-vev/zvonilka/internal/domain/e2ee"
+	"google.golang.org/grpc/status"
 )
 
 // CreateConversation creates a direct chat, group, channel, or saved-messages conversation.
@@ -547,7 +549,7 @@ func (a *api) SendMessage(
 			PayloadKeyID:    draft.Payload.KeyID,
 			PayloadMetadata: draft.Payload.Metadata,
 		}); err != nil {
-			return nil, grpcError(err)
+			return nil, a.encryptedSendError(ctx, authContext.Account.ID, authContext.Device.ID, conversationRow, err)
 		}
 	}
 
@@ -1106,6 +1108,45 @@ func cloneBlockedDevices(values []*conversationv1.ConversationBlockedDevice) []*
 		})
 	}
 	return cloned
+}
+
+func (a *api) encryptedSendError(
+	ctx context.Context,
+	accountID string,
+	deviceID string,
+	conversationRow domainconversation.Conversation,
+	err error,
+) error {
+	base := grpcError(err)
+	if a == nil || a.e2ee == nil || (!errors.Is(err, domaine2ee.ErrConflict) && !errors.Is(err, domaine2ee.ErrForbidden)) {
+		return base
+	}
+
+	overlays, overlayErr := a.conversationE2EEOverlays(ctx, accountID, deviceID)
+	if overlayErr != nil {
+		return base
+	}
+	overlay := overlays[conversationRow.ID]
+	detail := &conversationv1.EncryptedSendBlockedDetail{
+		ConversationId:              conversationRow.ID,
+		CanSendEncryptedNow:         overlay.CanSendEncryptedNow,
+		BlockReason:                 overlay.EncryptedSendBlockReason,
+		PrimaryRemediationHint:      overlay.PrimaryRemediationHint,
+		VerificationRequiredDevices: overlay.VerificationRequiredDevices,
+		UntrustedDevices:            overlay.UntrustedDevices,
+		CompromisedDevices:          overlay.CompromisedDevices,
+		BlockedDevices:              cloneBlockedDevices(overlay.BlockedDevices),
+	}
+
+	st, statusErr := status.FromError(base)
+	if !statusErr {
+		return base
+	}
+	withDetails, detailErr := st.WithDetails(detail)
+	if detailErr != nil {
+		return base
+	}
+	return withDetails.Err()
 }
 
 func e2eeDeviceTrustStateForConversationPreview(value domaine2ee.DeviceTrustState) e2eev1.DeviceTrustState {
