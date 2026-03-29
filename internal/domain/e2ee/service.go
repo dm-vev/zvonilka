@@ -543,6 +543,33 @@ func (s *Service) AcknowledgeGroupSenderKey(ctx context.Context, params Acknowle
 	return updated, nil
 }
 
+func (s *Service) ValidateConversationPayload(ctx context.Context, params ValidateConversationPayloadParams) error {
+	if err := s.validateContext(ctx, "validate conversation payload"); err != nil {
+		return err
+	}
+	params.ConversationID = strings.TrimSpace(params.ConversationID)
+	params.SenderAccountID = strings.TrimSpace(params.SenderAccountID)
+	params.SenderDeviceID = strings.TrimSpace(params.SenderDeviceID)
+	params.PayloadKeyID = strings.TrimSpace(params.PayloadKeyID)
+	if params.ConversationID == "" || params.SenderAccountID == "" || params.SenderDeviceID == "" || params.PayloadKeyID == "" {
+		return ErrInvalidInput
+	}
+
+	conversationRow, err := s.chats.ConversationByID(ctx, params.ConversationID)
+	if err != nil {
+		return mapConversationError("load conversation", params.ConversationID, err)
+	}
+
+	switch conversationRow.Kind {
+	case conversation.ConversationKindDirect:
+		return s.validateDirectConversationPayload(ctx, params)
+	case conversation.ConversationKindGroup:
+		return s.validateGroupConversationPayload(ctx, params)
+	default:
+		return nil
+	}
+}
+
 func (s *Service) fetchAccountBundles(ctx context.Context, store Store, params FetchAccountBundlesParams) ([]DeviceBundle, error) {
 	account, err := s.directory.AccountByID(ctx, strings.TrimSpace(params.TargetAccountID))
 	if err != nil {
@@ -718,6 +745,63 @@ func mapConversationError(action string, conversationID string, err error) error
 	default:
 		return fmt.Errorf("%s %s: %w", action, conversationID, err)
 	}
+}
+
+func (s *Service) validateDirectConversationPayload(ctx context.Context, params ValidateConversationPayloadParams) error {
+	sessionID := strings.TrimSpace(params.PayloadMetadata["direct_session_id"])
+	if sessionID == "" {
+		return ErrInvalidInput
+	}
+	session, err := s.store.DirectSessionByID(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	if session.State != DirectSessionStateAcknowledged {
+		return ErrConflict
+	}
+	if session.ExpiresAt.IsZero() || !s.now().Before(session.ExpiresAt) {
+		return ErrConflict
+	}
+	if params.PayloadKeyID != session.SignedPreKey.Key.KeyID && params.PayloadKeyID != session.OneTimePreKey.Key.KeyID && params.PayloadKeyID != session.ID {
+		return ErrConflict
+	}
+	if session.InitiatorAccountID == params.SenderAccountID && session.InitiatorDeviceID == params.SenderDeviceID {
+		return nil
+	}
+	if session.RecipientAccountID == params.SenderAccountID && session.RecipientDeviceID == params.SenderDeviceID {
+		return nil
+	}
+	return ErrForbidden
+}
+
+func (s *Service) validateGroupConversationPayload(ctx context.Context, params ValidateConversationPayloadParams) error {
+	senderKeyID := strings.TrimSpace(params.PayloadMetadata["sender_key_id"])
+	if senderKeyID == "" {
+		return ErrInvalidInput
+	}
+	if params.PayloadKeyID != senderKeyID {
+		return ErrConflict
+	}
+	distributions, err := s.store.GroupSenderKeyDistributionsBySenderKey(
+		ctx,
+		params.ConversationID,
+		params.SenderAccountID,
+		params.SenderDeviceID,
+		senderKeyID,
+	)
+	if err != nil {
+		return err
+	}
+	if len(distributions) == 0 {
+		return ErrNotFound
+	}
+	now := s.now()
+	for _, item := range distributions {
+		if item.ExpiresAt.IsZero() || now.Before(item.ExpiresAt) {
+			return nil
+		}
+	}
+	return ErrConflict
 }
 
 func normalizeSignedPreKey(value SignedPreKey) SignedPreKey {

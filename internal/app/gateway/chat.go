@@ -10,6 +10,7 @@ import (
 	conversationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1"
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
 	domainconversation "github.com/dm-vev/zvonilka/internal/domain/conversation"
+	domaine2ee "github.com/dm-vev/zvonilka/internal/domain/e2ee"
 )
 
 // CreateConversation creates a direct chat, group, channel, or saved-messages conversation.
@@ -512,12 +513,31 @@ func (a *api) SendMessage(
 	if err != nil {
 		return nil, err
 	}
+	draft := draftFromProto(req.GetDraft())
+	conversationRow, _, err := a.conversation.GetConversation(ctx, domainconversation.GetConversationParams{
+		ConversationID: req.GetConversationId(),
+		AccountID:      authContext.Account.ID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	if conversationRow.Settings.RequireEncryptedMessages {
+		if err := a.e2ee.ValidateConversationPayload(ctx, domaine2ee.ValidateConversationPayloadParams{
+			ConversationID:  req.GetConversationId(),
+			SenderAccountID: authContext.Account.ID,
+			SenderDeviceID:  authContext.Device.ID,
+			PayloadKeyID:    draft.Payload.KeyID,
+			PayloadMetadata: draft.Payload.Metadata,
+		}); err != nil {
+			return nil, grpcError(err)
+		}
+	}
 
 	message, event, err := a.conversation.SendMessage(ctx, domainconversation.SendMessageParams{
 		ConversationID:  req.GetConversationId(),
 		SenderAccountID: authContext.Account.ID,
 		SenderDeviceID:  authContext.Device.ID,
-		Draft:           draftFromProto(req.GetDraft()),
+		Draft:           draft,
 		CausationID:     req.GetIdempotencyKey(),
 		CorrelationID:   req.GetDraft().GetClientMessageId(),
 	})

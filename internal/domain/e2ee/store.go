@@ -27,6 +27,7 @@ type Store interface {
 	SaveGroupSenderKeyDistribution(ctx context.Context, value GroupSenderKeyDistribution) (GroupSenderKeyDistribution, error)
 	GroupSenderKeyDistributionByID(ctx context.Context, distributionID string) (GroupSenderKeyDistribution, error)
 	GroupSenderKeyDistributionsByRecipientDevice(ctx context.Context, conversationID string, accountID string, deviceID string) ([]GroupSenderKeyDistribution, error)
+	GroupSenderKeyDistributionsBySenderKey(ctx context.Context, conversationID string, senderAccountID string, senderDeviceID string, senderKeyID string) ([]GroupSenderKeyDistribution, error)
 }
 
 type Directory interface {

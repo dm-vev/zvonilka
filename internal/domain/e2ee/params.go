@@ -28,16 +28,16 @@ type CreateDirectSessionsParams struct {
 }
 
 type ListDeviceSessionsParams struct {
-	AccountID            string
-	DeviceID             string
-	IncludeAcknowledged  bool
-	PeerAccountID        string
+	AccountID           string
+	DeviceID            string
+	IncludeAcknowledged bool
+	PeerAccountID       string
 }
 
 type AcknowledgeDirectSessionParams struct {
-	SessionID           string
-	RecipientAccountID  string
-	RecipientDeviceID   string
+	SessionID          string
+	RecipientAccountID string
+	RecipientDeviceID  string
 }
 
 type RecipientSenderKey struct {
@@ -47,23 +47,31 @@ type RecipientSenderKey struct {
 }
 
 type PublishGroupSenderKeysParams struct {
-	ConversationID   string
-	SenderAccountID  string
-	SenderDeviceID   string
-	SenderKeyID      string
-	Recipients       []RecipientSenderKey
-	ExpiresAt        time.Time
+	ConversationID  string
+	SenderAccountID string
+	SenderDeviceID  string
+	SenderKeyID     string
+	Recipients      []RecipientSenderKey
+	ExpiresAt       time.Time
 }
 
 type ListGroupSenderKeysParams struct {
-	ConversationID        string
-	RecipientAccountID    string
-	RecipientDeviceID     string
-	IncludeAcknowledged   bool
+	ConversationID      string
+	RecipientAccountID  string
+	RecipientDeviceID   string
+	IncludeAcknowledged bool
 }
 
 type AcknowledgeGroupSenderKeyParams struct {
-	DistributionID      string
-	RecipientAccountID  string
-	RecipientDeviceID   string
+	DistributionID     string
+	RecipientAccountID string
+	RecipientDeviceID  string
+}
+
+type ValidateConversationPayloadParams struct {
+	ConversationID  string
+	SenderAccountID string
+	SenderDeviceID  string
+	PayloadKeyID    string
+	PayloadMetadata map[string]string
 }

@@ -294,8 +294,8 @@ func TestPublishListAndAcknowledgeGroupSenderKeysRPC(t *testing.T) {
 	bobCtx, bobDeviceID := login(bob.Username, "bob-group-phone", "bob-group-device")
 
 	group, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
-		Kind:        commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
-		Title:       "Encrypted Group",
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Encrypted Group",
 		MemberUserIds: []string{bob.ID},
 	})
 	if err != nil {
@@ -343,5 +343,241 @@ func TestPublishListAndAcknowledgeGroupSenderKeysRPC(t *testing.T) {
 	}
 	if acked.Distribution == nil || acked.Distribution.State != e2eev1.GroupSenderKeyState_GROUP_SENDER_KEY_STATE_ACKNOWLEDGED {
 		t.Fatalf("unexpected acknowledged distribution: %+v", acked.Distribution)
+	}
+}
+
+func TestSendMessageRequiresDirectSessionReferenceRPC(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-direct-msg",
+		DisplayName: "Alice Direct Msg",
+		Email:       "alice-direct-msg@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-direct-msg",
+		DisplayName: "Bob Direct Msg",
+		Email:       "bob-direct-msg@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, _ := login(alice.Username, "alice-direct-phone", "alice-direct-device")
+	bobCtx, _ := login(bob.Username, "bob-direct-phone", "bob-direct-device")
+
+	_, err = api.UploadDevicePreKeys(bobCtx, &e2eev1.UploadDevicePreKeysRequest{
+		SignedPrekey: &e2eev1.SignedPreKey{
+			Key:       &commonv1.PublicKeyBundle{KeyId: "spk-bob-direct", Algorithm: "x25519", PublicKey: []byte("spk")},
+			Signature: []byte("sig"),
+		},
+		OneTimePrekeys: []*e2eev1.PreKey{
+			{Key: &commonv1.PublicKeyBundle{KeyId: "otk-bob-direct", Algorithm: "x25519", PublicKey: []byte("otk")}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("upload bob direct prekeys: %v", err)
+	}
+
+	created, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{bob.ID},
+		Settings: &conversationv1.ConversationSettings{
+			RequireEncryptedMessages: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create direct conversation: %v", err)
+	}
+
+	sessionResp, err := api.CreateDirectSessions(aliceCtx, &e2eev1.CreateDirectSessionsRequest{
+		UserId: bob.ID,
+		InitiatorEphemeralKey: &commonv1.PublicKeyBundle{
+			KeyId:     "eph-direct",
+			Algorithm: "x25519",
+			PublicKey: []byte("eph"),
+		},
+		Bootstrap: &e2eev1.SessionBootstrapPayload{
+			Algorithm:  "x3dh-v1",
+			Nonce:      []byte("nonce"),
+			Ciphertext: []byte("cipher"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("create direct session: %v", err)
+	}
+	if len(sessionResp.Sessions) != 1 {
+		t.Fatalf("expected one direct session, got %d", len(sessionResp.Sessions))
+	}
+	_, err = api.AcknowledgeDirectSession(bobCtx, &e2eev1.AcknowledgeDirectSessionRequest{
+		SessionId: sessionResp.Sessions[0].SessionId,
+	})
+	if err != nil {
+		t.Fatalf("ack direct session: %v", err)
+	}
+
+	sent, err := api.SendMessage(aliceCtx, &conversationv1.SendMessageRequest{
+		ConversationId: created.Conversation.ConversationId,
+		Draft: &commonv1.MessageDraft{
+			ClientMessageId: "msg-direct-1",
+			Kind:            commonv1.MessageKind_MESSAGE_KIND_TEXT,
+			Payload: &commonv1.EncryptedPayload{
+				KeyId:      sessionResp.Sessions[0].SessionId,
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+				Metadata: map[string]string{
+					"direct_session_id": sessionResp.Sessions[0].SessionId,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("send direct encrypted message: %v", err)
+	}
+	if sent.Message == nil || sent.Message.MessageId == "" {
+		t.Fatalf("unexpected sent message: %+v", sent.Message)
+	}
+}
+
+func TestSendMessageRequiresGroupSenderKeyReferenceRPC(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-group-msg",
+		DisplayName: "Alice Group Msg",
+		Email:       "alice-group-msg@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-group-msg",
+		DisplayName: "Bob Group Msg",
+		Email:       "bob-group-msg@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, aliceDeviceID := login(alice.Username, "alice-group-msg-phone", "alice-group-msg-device")
+	_, bobDeviceID := login(bob.Username, "bob-group-msg-phone", "bob-group-msg-device")
+
+	group, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Encrypted Sender Key Group",
+		MemberUserIds: []string{bob.ID},
+		Settings: &conversationv1.ConversationSettings{
+			RequireEncryptedMessages: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create group conversation: %v", err)
+	}
+
+	_, err = api.PublishGroupSenderKeys(aliceCtx, &e2eev1.PublishGroupSenderKeysRequest{
+		ConversationId: group.Conversation.ConversationId,
+		SenderKeyId:    "sender-key-group-1",
+		Recipients: []*e2eev1.RecipientSenderKey{
+			{
+				RecipientUserId:   bob.ID,
+				RecipientDeviceId: bobDeviceID,
+				Payload: &e2eev1.SenderKeyPayload{
+					Algorithm:  "sender-key-v1",
+					Nonce:      []byte("nonce"),
+					Ciphertext: []byte("ciphertext"),
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("publish group sender key: %v", err)
+	}
+
+	sent, err := api.SendMessage(aliceCtx, &conversationv1.SendMessageRequest{
+		ConversationId: group.Conversation.ConversationId,
+		Draft: &commonv1.MessageDraft{
+			ClientMessageId: "msg-group-1",
+			Kind:            commonv1.MessageKind_MESSAGE_KIND_TEXT,
+			Payload: &commonv1.EncryptedPayload{
+				KeyId:      "sender-key-group-1",
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+				Metadata: map[string]string{
+					"sender_key_id": "sender-key-group-1",
+					"sender_device": aliceDeviceID,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("send group encrypted message: %v", err)
+	}
+	if sent.Message == nil || sent.Message.MessageId == "" {
+		t.Fatalf("unexpected sent group message: %+v", sent.Message)
 	}
 }

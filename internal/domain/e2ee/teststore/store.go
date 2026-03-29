@@ -9,10 +9,10 @@ import (
 
 func NewMemoryStore() e2ee.Store {
 	return &memoryStore{
-		signed:        make(map[string]e2ee.SignedPreKey),
-		oneTime:       make(map[string][]e2ee.OneTimePreKey),
-		sessions:      make(map[string]e2ee.DirectSession),
-		groupSender:   make(map[string]e2ee.GroupSenderKeyDistribution),
+		signed:      make(map[string]e2ee.SignedPreKey),
+		oneTime:     make(map[string][]e2ee.OneTimePreKey),
+		sessions:    make(map[string]e2ee.DirectSession),
+		groupSender: make(map[string]e2ee.GroupSenderKeyDistribution),
 	}
 }
 
@@ -155,6 +155,19 @@ func (s *memoryStore) GroupSenderKeyDistributionsByRecipientDevice(_ context.Con
 	result := make([]e2ee.GroupSenderKeyDistribution, 0)
 	for _, value := range s.groupSender {
 		if value.ConversationID != conversationID || value.RecipientAccountID != accountID || value.RecipientDeviceID != deviceID {
+			continue
+		}
+		result = append(result, cloneGroupSenderKeyDistribution(value))
+	}
+	return result, nil
+}
+
+func (s *memoryStore) GroupSenderKeyDistributionsBySenderKey(_ context.Context, conversationID string, senderAccountID string, senderDeviceID string, senderKeyID string) ([]e2ee.GroupSenderKeyDistribution, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]e2ee.GroupSenderKeyDistribution, 0)
+	for _, value := range s.groupSender {
+		if value.ConversationID != conversationID || value.SenderAccountID != senderAccountID || value.SenderDeviceID != senderDeviceID || value.SenderKeyID != senderKeyID {
 			continue
 		}
 		result = append(result, cloneGroupSenderKeyDistribution(value))

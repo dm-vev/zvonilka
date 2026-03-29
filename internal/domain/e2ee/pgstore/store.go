@@ -452,6 +452,36 @@ ORDER BY created_at DESC, id DESC
 	return result, nil
 }
 
+func (s *Store) GroupSenderKeyDistributionsBySenderKey(ctx context.Context, conversationID string, senderAccountID string, senderDeviceID string, senderKeyID string) ([]e2ee.GroupSenderKeyDistribution, error) {
+	query := fmt.Sprintf(`
+SELECT
+	id, conversation_id, sender_account_id, sender_device_id, recipient_account_id, recipient_device_id,
+	sender_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_metadata,
+	state, created_at, acknowledged_at, expires_at
+FROM %s
+WHERE conversation_id = $1 AND sender_account_id = $2 AND sender_device_id = $3 AND sender_key_id = $4
+ORDER BY created_at DESC, id DESC
+`, s.table("e2ee_group_sender_keys"))
+	rows, err := s.conn().QueryContext(ctx, query, conversationID, senderAccountID, senderDeviceID, senderKeyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]e2ee.GroupSenderKeyDistribution, 0)
+	for rows.Next() {
+		value, scanErr := scanGroupSenderKeyDistribution(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		result = append(result, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (s *Store) conn() sqlConn {
 	if s.tx != nil {
 		return s.tx
