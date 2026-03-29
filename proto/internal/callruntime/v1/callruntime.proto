@@ -1,0 +1,137 @@
+syntax = "proto3";
+
+package zvonilka.internal.callruntime.v1;
+
+import "contracts/call/v1/models.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/internal/genproto/callruntime/v1;callruntimev1";
+
+message RuntimeCall {
+  string call_id = 1;
+  string conversation_id = 2;
+  string active_session_id = 3;
+}
+
+message RuntimeParticipant {
+  string call_id = 1;
+  string account_id = 2;
+  string device_id = 3;
+  bool with_video = 4;
+  zvonilka.call.v1.CallMediaState media_state = 5;
+}
+
+message RuntimeSignal {
+  string target_account_id = 1;
+  string target_device_id = 2;
+  string session_id = 3;
+  zvonilka.call.v1.SessionDescription description = 4;
+  zvonilka.call.v1.IceCandidate ice_candidate = 5;
+  map<string, string> metadata = 6;
+}
+
+message RuntimeStat {
+  string account_id = 1;
+  string device_id = 2;
+  zvonilka.call.v1.CallTransportStats transport_stats = 3;
+}
+
+message EnsureSessionRequest {
+  RuntimeCall call = 1;
+}
+
+message EnsureSessionResponse {
+  string session_id = 1;
+  string runtime_endpoint = 2;
+  string ice_ufrag = 3;
+  string ice_pwd = 4;
+  string dtls_fingerprint = 5;
+  string candidate_host = 6;
+  int32 candidate_port = 7;
+}
+
+message JoinSessionRequest {
+  string session_id = 1;
+  RuntimeParticipant participant = 2;
+}
+
+message JoinSessionResponse {
+  string session_id = 1;
+  string session_token = 2;
+  string runtime_endpoint = 3;
+  int64 expires_at_unix = 4;
+  string ice_ufrag = 5;
+  string ice_pwd = 6;
+  string dtls_fingerprint = 7;
+  string candidate_host = 8;
+  int32 candidate_port = 9;
+}
+
+message PublishDescriptionRequest {
+  string session_id = 1;
+  RuntimeParticipant participant = 2;
+  zvonilka.call.v1.SessionDescription description = 3;
+}
+
+message PublishDescriptionResponse {
+  repeated RuntimeSignal signals = 1;
+}
+
+message PublishCandidateRequest {
+  string session_id = 1;
+  RuntimeParticipant participant = 2;
+  zvonilka.call.v1.IceCandidate candidate = 3;
+}
+
+message PublishCandidateResponse {
+  repeated RuntimeSignal signals = 1;
+}
+
+message UpdateParticipantRequest {
+  string session_id = 1;
+  RuntimeParticipant participant = 2;
+}
+
+message UpdateParticipantResponse {}
+
+message AcknowledgeAdaptationRequest {
+  string session_id = 1;
+  RuntimeParticipant participant = 2;
+  uint64 adaptation_revision = 3;
+  string applied_profile = 4;
+}
+
+message AcknowledgeAdaptationResponse {}
+
+message SessionStatsRequest {
+  string session_id = 1;
+}
+
+message SessionStatsResponse {
+  repeated RuntimeStat stats = 1;
+}
+
+message LeaveSessionRequest {
+  string session_id = 1;
+  string account_id = 2;
+  string device_id = 3;
+}
+
+message LeaveSessionResponse {}
+
+message CloseSessionRequest {
+  string session_id = 1;
+}
+
+message CloseSessionResponse {}
+
+service CallRuntimeService {
+  rpc EnsureSession(EnsureSessionRequest) returns (EnsureSessionResponse);
+  rpc JoinSession(JoinSessionRequest) returns (JoinSessionResponse);
+  rpc PublishDescription(PublishDescriptionRequest) returns (PublishDescriptionResponse);
+  rpc PublishCandidate(PublishCandidateRequest) returns (PublishCandidateResponse);
+  rpc UpdateParticipant(UpdateParticipantRequest) returns (UpdateParticipantResponse);
+  rpc AcknowledgeAdaptation(AcknowledgeAdaptationRequest) returns (AcknowledgeAdaptationResponse);
+  rpc SessionStats(SessionStatsRequest) returns (SessionStatsResponse);
+  rpc LeaveSession(LeaveSessionRequest) returns (LeaveSessionResponse);
+  rpc CloseSession(CloseSessionRequest) returns (CloseSessionResponse);
+}

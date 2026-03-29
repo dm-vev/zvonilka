@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -20,8 +21,10 @@ import (
 	"github.com/dm-vev/zvonilka/internal/domain/search"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
+	callruntimev1 "github.com/dm-vev/zvonilka/internal/genproto/callruntime/v1"
 	"github.com/dm-vev/zvonilka/internal/platform/buildinfo"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
+	platformrtc "github.com/dm-vev/zvonilka/internal/platform/rtc"
 	"github.com/dm-vev/zvonilka/internal/platform/runtime"
 	"google.golang.org/grpc"
 )
@@ -30,7 +33,9 @@ type app struct {
 	health         *runtime.Health
 	handler        http.Handler
 	catalog        *domainstorage.Catalog
+	rtcCluster     *platformrtc.Cluster
 	api            *api
+	callRuntime    *callRuntimeAPI
 	cleanupTimeout time.Duration
 }
 
@@ -62,30 +67,40 @@ func (a *app) registerGRPC(server *grpc.Server) {
 	mediav1.RegisterMediaServiceServer(server, a.api)
 	searchv1.RegisterSearchServiceServer(server, a.api)
 	syncv1.RegisterSyncServiceServer(server, a.api)
+	callruntimev1.RegisterCallRuntimeServiceServer(server, a.callRuntime)
 }
 
 func (a *app) close(ctx context.Context) error {
 	if a == nil || a.catalog == nil {
-		return nil
+		if a == nil || a.rtcCluster == nil {
+			return nil
+		}
+		return a.rtcCluster.Close(ctx)
 	}
 
 	cleanupCtx, cancel := cleanupContext(ctx, a.cleanupTimeout)
 	defer cancel()
 
-	return a.catalog.Close(cleanupCtx)
+	clusterErr := error(nil)
+	if a.rtcCluster != nil {
+		clusterErr = a.rtcCluster.Close(cleanupCtx)
+	}
+
+	return errors.Join(clusterErr, a.catalog.Close(cleanupCtx))
 }
 
 func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 	health := runtime.NewHealth(cfg.Service.Name, buildinfo.Version, buildinfo.Commit, buildinfo.Date)
-	catalog, callService, identityService, conversationService, mediaService, presenceService, searchService, userService, err := buildAppStorage(ctx, cfg)
+	catalog, rtcCluster, localRTC, callService, identityService, conversationService, mediaService, presenceService, searchService, userService, err := buildAppStorage(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	return &app{
-		health:  health,
-		handler: http.NotFoundHandler(),
-		catalog: catalog,
+		health:     health,
+		handler:    http.NotFoundHandler(),
+		catalog:    catalog,
+		rtcCluster: rtcCluster,
 		api: &api{
 			call:         callService,
 			identity:     identityService,
@@ -97,6 +112,7 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 			callNotifier: newCallNotifier(),
 			syncNotifier: newSyncNotifier(),
 		},
+		callRuntime:    newCallRuntimeAPI(localRTC),
 		cleanupTimeout: cfg.Runtime.ShutdownTimeout,
 	}, nil
 }

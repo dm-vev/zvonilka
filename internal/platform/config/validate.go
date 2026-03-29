@@ -291,8 +291,12 @@ func validateRTCNodes(cfg RTCConfig) error {
 	for _, node := range cfg.Nodes {
 		id := strings.TrimSpace(node.ID)
 		endpoint := strings.TrimSpace(node.Endpoint)
+		controlEndpoint := strings.TrimSpace(node.ControlEndpoint)
 		if id == "" || endpoint == "" {
 			return errors.New("rtc cluster nodes must define id and endpoint")
+		}
+		if strings.Contains(endpoint, "|") || strings.Contains(controlEndpoint, "|") {
+			return errors.New("rtc cluster nodes cannot contain unparsed separators")
 		}
 		if _, ok := seen[id]; ok {
 			return fmt.Errorf("rtc cluster nodes must be unique: %s", id)

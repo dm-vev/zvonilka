@@ -13,7 +13,7 @@ import (
 func TestClusterPlacesCallsOnDeterministicNodes(t *testing.T) {
 	t.Parallel()
 
-	cluster := NewCluster(domaincall.RTCConfig{
+	cluster, err := NewCluster(domaincall.RTCConfig{
 		PublicEndpoint: "webrtc://gateway/calls",
 		CredentialTTL:  15 * time.Minute,
 		NodeID:         "node-a",
@@ -24,7 +24,8 @@ func TestClusterPlacesCallsOnDeterministicNodes(t *testing.T) {
 			{ID: "node-a", Endpoint: "webrtc://node-a/calls"},
 			{ID: "node-b", Endpoint: "webrtc://node-b/calls"},
 		},
-	})
+	}, NewManager("webrtc://node-a/calls", 15*time.Minute, WithCandidateHost("127.0.0.1"), WithUDPPortRange(41000, 41099)))
+	require.NoError(t, err)
 
 	first, err := cluster.EnsureSession(context.Background(), domaincall.Call{
 		ID:             "call-1",
@@ -46,7 +47,7 @@ func TestClusterPlacesCallsOnDeterministicNodes(t *testing.T) {
 func TestClusterRoutesSessionOperationsByNodePrefix(t *testing.T) {
 	t.Parallel()
 
-	cluster := NewCluster(domaincall.RTCConfig{
+	cluster, err := NewCluster(domaincall.RTCConfig{
 		PublicEndpoint: "webrtc://gateway/calls",
 		CredentialTTL:  15 * time.Minute,
 		NodeID:         "node-a",
@@ -57,7 +58,8 @@ func TestClusterRoutesSessionOperationsByNodePrefix(t *testing.T) {
 			{ID: "node-a", Endpoint: "webrtc://node-a/calls"},
 			{ID: "node-b", Endpoint: "webrtc://node-b/calls"},
 		},
-	})
+	}, NewManager("webrtc://node-a/calls", 15*time.Minute, WithCandidateHost("127.0.0.1"), WithUDPPortRange(42000, 42099)))
+	require.NoError(t, err)
 
 	sessionID := "node-b:rtc_call-2"
 	session, err := cluster.EnsureSession(context.Background(), domaincall.Call{

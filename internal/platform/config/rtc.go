@@ -23,8 +23,9 @@ type RTCConfig struct {
 
 // RTCNodeConfig defines one logical media-plane node.
 type RTCNodeConfig struct {
-	ID       string
-	Endpoint string
+	ID              string
+	Endpoint        string
+	ControlEndpoint string
 }
 
 // ToDomain converts configuration into the call-domain RTC shape.
@@ -51,8 +52,9 @@ func toDomainRTCNodes(values []RTCNodeConfig) []domaincall.RTCNode {
 	result := make([]domaincall.RTCNode, 0, len(values))
 	for _, value := range values {
 		result = append(result, domaincall.RTCNode{
-			ID:       strings.TrimSpace(value.ID),
-			Endpoint: strings.TrimSpace(value.Endpoint),
+			ID:              strings.TrimSpace(value.ID),
+			Endpoint:        strings.TrimSpace(value.Endpoint),
+			ControlEndpoint: strings.TrimSpace(value.ControlEndpoint),
 		})
 	}
 

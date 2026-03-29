@@ -22,8 +22,9 @@ type RTCConfig struct {
 
 // RTCNode describes one logical media-plane node.
 type RTCNode struct {
-	ID       string
-	Endpoint string
+	ID              string
+	Endpoint        string
+	ControlEndpoint string
 }
 
 // RuntimeSession describes one active media room.
@@ -164,6 +165,7 @@ func normalizeRTCNodes(values []RTCNode) []RTCNode {
 	for _, value := range values {
 		value.ID = strings.TrimSpace(value.ID)
 		value.Endpoint = strings.TrimSpace(value.Endpoint)
+		value.ControlEndpoint = strings.TrimSpace(value.ControlEndpoint)
 		if value.ID == "" || value.Endpoint == "" {
 			continue
 		}

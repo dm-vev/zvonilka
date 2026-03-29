@@ -730,10 +730,21 @@ func rtcNodeSliceValue(serviceName string, key string, fallback []RTCNodeConfig)
 		}
 		id = strings.TrimSpace(id)
 		endpoint = strings.TrimSpace(endpoint)
-		if id == "" || endpoint == "" {
+		publicEndpoint := endpoint
+		controlEndpoint := ""
+		if strings.Contains(endpoint, "|") {
+			publicEndpoint, controlEndpoint, _ = strings.Cut(endpoint, "|")
+			publicEndpoint = strings.TrimSpace(publicEndpoint)
+			controlEndpoint = strings.TrimSpace(controlEndpoint)
+		}
+		if id == "" || publicEndpoint == "" {
 			return nil, false, fmt.Errorf("%s must use id=endpoint entries", serviceEnvKey(serviceName, key))
 		}
-		result = append(result, RTCNodeConfig{ID: id, Endpoint: endpoint})
+		result = append(result, RTCNodeConfig{
+			ID:              id,
+			Endpoint:        publicEndpoint,
+			ControlEndpoint: controlEndpoint,
+		})
 	}
 
 	return result, true, nil

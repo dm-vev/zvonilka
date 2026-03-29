@@ -2,6 +2,7 @@ package rtc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"sort"
@@ -18,16 +19,23 @@ type Cluster struct {
 }
 
 type clusterNode struct {
-	id       string
-	endpoint string
-	manager  *Manager
+	id      string
+	runtime nodeRuntime
+}
+
+type nodeRuntime interface {
+	domaincall.Runtime
+	Close(context.Context) error
 }
 
 // NewCluster constructs a node-aware RTC runtime from the current RTC config.
-func NewCluster(cfg domaincall.RTCConfig) *Cluster {
+func NewCluster(cfg domaincall.RTCConfig, local *Manager) (*Cluster, error) {
 	cfg = cfg.NormalizeForPlatform()
 
-	nodes := buildClusterNodes(cfg)
+	nodes, err := buildClusterNodes(cfg, local)
+	if err != nil {
+		return nil, err
+	}
 	byID := make(map[string]*clusterNode, len(nodes))
 	for _, node := range nodes {
 		byID[node.id] = node
@@ -36,7 +44,7 @@ func NewCluster(cfg domaincall.RTCConfig) *Cluster {
 	return &Cluster{
 		nodes: nodes,
 		byID:  byID,
-	}
+	}, nil
 }
 
 // EnsureSession creates or resolves the active media session for a call on its assigned node.
@@ -50,7 +58,7 @@ func (c *Cluster) EnsureSession(ctx context.Context, callRow domaincall.Call) (d
 		callRow.ActiveSessionID = prefixedSessionID(node.id, callRow.ID)
 	}
 
-	return node.manager.EnsureSession(ctx, callRow)
+	return node.runtime.EnsureSession(ctx, callRow)
 }
 
 func (c *Cluster) JoinSession(ctx context.Context, sessionID string, participant domaincall.RuntimeParticipant) (domaincall.RuntimeJoin, error) {
@@ -59,7 +67,7 @@ func (c *Cluster) JoinSession(ctx context.Context, sessionID string, participant
 		return domaincall.RuntimeJoin{}, err
 	}
 
-	return node.manager.JoinSession(ctx, sessionID, participant)
+	return node.runtime.JoinSession(ctx, sessionID, participant)
 }
 
 func (c *Cluster) PublishDescription(
@@ -73,7 +81,7 @@ func (c *Cluster) PublishDescription(
 		return nil, err
 	}
 
-	return node.manager.PublishDescription(ctx, sessionID, participant, description)
+	return node.runtime.PublishDescription(ctx, sessionID, participant, description)
 }
 
 func (c *Cluster) PublishCandidate(
@@ -87,7 +95,7 @@ func (c *Cluster) PublishCandidate(
 		return nil, err
 	}
 
-	return node.manager.PublishCandidate(ctx, sessionID, participant, candidate)
+	return node.runtime.PublishCandidate(ctx, sessionID, participant, candidate)
 }
 
 func (c *Cluster) UpdateParticipant(ctx context.Context, sessionID string, participant domaincall.RuntimeParticipant) error {
@@ -96,7 +104,7 @@ func (c *Cluster) UpdateParticipant(ctx context.Context, sessionID string, parti
 		return err
 	}
 
-	return node.manager.UpdateParticipant(ctx, sessionID, participant)
+	return node.runtime.UpdateParticipant(ctx, sessionID, participant)
 }
 
 func (c *Cluster) AcknowledgeAdaptation(
@@ -111,7 +119,7 @@ func (c *Cluster) AcknowledgeAdaptation(
 		return err
 	}
 
-	return node.manager.AcknowledgeAdaptation(ctx, sessionID, participant, adaptationRevision, appliedProfile)
+	return node.runtime.AcknowledgeAdaptation(ctx, sessionID, participant, adaptationRevision, appliedProfile)
 }
 
 func (c *Cluster) SessionStats(ctx context.Context, sessionID string) ([]domaincall.RuntimeStats, error) {
@@ -120,7 +128,7 @@ func (c *Cluster) SessionStats(ctx context.Context, sessionID string) ([]domainc
 		return nil, err
 	}
 
-	return node.manager.SessionStats(ctx, sessionID)
+	return node.runtime.SessionStats(ctx, sessionID)
 }
 
 func (c *Cluster) LeaveSession(ctx context.Context, sessionID string, accountID string, deviceID string) error {
@@ -129,7 +137,7 @@ func (c *Cluster) LeaveSession(ctx context.Context, sessionID string, accountID 
 		return err
 	}
 
-	return node.manager.LeaveSession(ctx, sessionID, accountID, deviceID)
+	return node.runtime.LeaveSession(ctx, sessionID, accountID, deviceID)
 }
 
 func (c *Cluster) CloseSession(ctx context.Context, sessionID string) error {
@@ -138,7 +146,7 @@ func (c *Cluster) CloseSession(ctx context.Context, sessionID string) error {
 		return err
 	}
 
-	return node.manager.CloseSession(ctx, sessionID)
+	return node.runtime.CloseSession(ctx, sessionID)
 }
 
 func (c *Cluster) nodeForCall(callRow domaincall.Call) (*clusterNode, error) {
@@ -178,19 +186,40 @@ func (c *Cluster) nodeForSession(sessionID string) (*clusterNode, error) {
 	return node, nil
 }
 
-func buildClusterNodes(cfg domaincall.RTCConfig) []*clusterNode {
+func (c *Cluster) Close(ctx context.Context) error {
+	if c == nil {
+		return nil
+	}
+
+	var closeErr error
+	for _, node := range c.nodes {
+		if node == nil || node.runtime == nil {
+			continue
+		}
+		if err := node.runtime.Close(ctx); err != nil {
+			closeErr = errors.Join(closeErr, err)
+		}
+	}
+
+	return closeErr
+}
+
+func buildClusterNodes(cfg domaincall.RTCConfig, local *Manager) ([]*clusterNode, error) {
+	localID := strings.TrimSpace(cfg.NodeID)
 	if len(cfg.Nodes) == 0 {
-		id := strings.TrimSpace(cfg.NodeID)
+		id := localID
 		if id == "" {
 			id = "node-local"
 		}
+		if local == nil {
+			return nil, domaincall.ErrInvalidInput
+		}
 		return []*clusterNode{
 			{
-				id:       id,
-				endpoint: cfg.PublicEndpoint,
-				manager:  newConfiguredManager(cfg.PublicEndpoint, cfg.CredentialTTL, cfg.CandidateHost, cfg.UDPPortMin, cfg.UDPPortMax),
+				id:      id,
+				runtime: local,
 			},
-		}
+		}, nil
 	}
 
 	nodes := append([]domaincall.RTCNode(nil), cfg.Nodes...)
@@ -199,14 +228,29 @@ func buildClusterNodes(cfg domaincall.RTCConfig) []*clusterNode {
 	ranges := splitPortRange(cfg.UDPPortMin, cfg.UDPPortMax, len(nodes))
 	result := make([]*clusterNode, 0, len(nodes))
 	for i, node := range nodes {
+		var runtime nodeRuntime
+		switch {
+		case node.ID == localID:
+			if local == nil {
+				return nil, domaincall.ErrInvalidInput
+			}
+			runtime = local
+		case strings.TrimSpace(node.ControlEndpoint) != "":
+			client, err := newGRPCRuntimeClient(node.ControlEndpoint)
+			if err != nil {
+				return nil, fmt.Errorf("dial rtc node %s: %w", node.ID, err)
+			}
+			runtime = client
+		default:
+			runtime = newConfiguredManager(node.Endpoint, cfg.CredentialTTL, cfg.CandidateHost, ranges[i][0], ranges[i][1])
+		}
 		result = append(result, &clusterNode{
-			id:       node.ID,
-			endpoint: node.Endpoint,
-			manager:  newConfiguredManager(node.Endpoint, cfg.CredentialTTL, cfg.CandidateHost, ranges[i][0], ranges[i][1]),
+			id:      node.ID,
+			runtime: runtime,
 		})
 	}
 
-	return result
+	return result, nil
 }
 
 func newConfiguredManager(endpoint string, ttl time.Duration, host string, portMin int, portMax int) *Manager {
@@ -216,6 +260,10 @@ func newConfiguredManager(endpoint string, ttl time.Duration, host string, portM
 		WithCandidateHost(host),
 		WithUDPPortRange(portMin, portMax),
 	)
+}
+
+func (m *Manager) Close(context.Context) error {
+	return nil
 }
 
 func splitPortRange(min int, max int, count int) [][2]int {
