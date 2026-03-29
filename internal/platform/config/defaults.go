@@ -103,6 +103,8 @@ func defaultConfiguration(serviceName string) Configuration {
 			MaxVideoParticipants: callDefaults.MaxVideoParticipants,
 			WorkerPollInterval:   2 * time.Second,
 			WorkerBatchSize:      100,
+			RehomePollInterval:   3 * time.Second,
+			RehomeBatchSize:      64,
 			HookTimeout:          10 * time.Second,
 		},
 		RTC: RTCConfig{

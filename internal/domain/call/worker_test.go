@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 	calltest "github.com/dm-vev/zvonilka/internal/domain/call/teststore"
@@ -16,6 +18,15 @@ type recordingHookRecorder struct {
 	recording     []domaincall.HookPayload
 	transcription []domaincall.HookPayload
 	failEventID   string
+}
+
+type rehomeEventRecorder struct {
+	events []domaincall.Event
+}
+
+func (r *rehomeEventRecorder) HandleCallEvents(_ context.Context, events []domaincall.Event) error {
+	r.events = append(r.events, events...)
+	return nil
 }
 
 func (r *recordingHookRecorder) HandleRecording(_ context.Context, payload domaincall.HookPayload) error {
@@ -131,4 +142,54 @@ func TestCallWorkerDoesNotAdvanceCursorOnHandlerFailure(t *testing.T) {
 	require.Error(t, err)
 	_, err = store.WorkerCursorByName(context.Background(), "call_hooks")
 	require.ErrorIs(t, err, domaincall.ErrNotFound)
+}
+
+func TestRehomeWorkerMigratesUnavailableActiveCalls(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 29, 17, 0, 0, 0, time.UTC)
+	runtime := newFakeRuntime(now)
+	service := newTestService(t, now, runtime)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-direct",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+
+	_, _, err = service.AcceptCall(context.Background(), domaincall.AcceptParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.NoError(t, err)
+
+	_, _, _, err = service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	runtime.statsErr["sess-1"] = status.Error(codes.Unavailable, "rtc unavailable")
+
+	recorder := &rehomeEventRecorder{}
+	worker, err := domaincall.NewRehomeWorker(service, recorder, domaincall.RehomeWorkerSettings{
+		PollInterval: time.Hour,
+		BatchSize:    10,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, worker.ProcessOnceForTests(context.Background()))
+	require.NotEmpty(t, recorder.events)
+
+	callRow, err := service.GetCall(context.Background(), domaincall.GetParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "sess-2", callRow.ActiveSessionID)
 }

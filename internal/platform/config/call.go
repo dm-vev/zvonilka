@@ -16,6 +16,8 @@ type CallConfig struct {
 	MaxVideoParticipants uint32
 	WorkerPollInterval   time.Duration
 	WorkerBatchSize      int
+	RehomePollInterval   time.Duration
+	RehomeBatchSize      int
 	RecordingHookURL     string
 	TranscriptionHookURL string
 	HookTimeout          time.Duration

@@ -149,6 +149,16 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Call.WorkerBatchSize = value
 	}
+	if value, ok, err := durationValue(serviceName, "CALL_REHOME_POLL_INTERVAL", cfg.Call.RehomePollInterval); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.RehomePollInterval = value
+	}
+	if value, ok, err := intValue(serviceName, "CALL_REHOME_BATCH_SIZE", cfg.Call.RehomeBatchSize); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.RehomeBatchSize = value
+	}
 	if value, ok, err := stringValueWithPresence(serviceName, "CALL_RECORDING_HOOK_URL", cfg.Call.RecordingHookURL); err != nil {
 		return err
 	} else if ok {

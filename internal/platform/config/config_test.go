@@ -286,6 +286,24 @@ func TestLoadAppliesCallReconnectGraceOverride(t *testing.T) {
 	}
 }
 
+func TestLoadAppliesCallRehomeOverrides(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_CALL_REHOME_POLL_INTERVAL", "1500ms")
+	t.Setenv("ZVONILKA_CALL_REHOME_BATCH_SIZE", "17")
+
+	cfg, err := Load("gateway")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.Call.RehomePollInterval != 1500*time.Millisecond {
+		t.Fatalf("call rehome poll interval: got %s, want 1500ms", cfg.Call.RehomePollInterval)
+	}
+	if cfg.Call.RehomeBatchSize != 17 {
+		t.Fatalf("call rehome batch size: got %d, want 17", cfg.Call.RehomeBatchSize)
+	}
+}
+
 func TestLoadSearchDefaultsMatchDomainSettings(t *testing.T) {
 	resetConfigEnv(t)
 

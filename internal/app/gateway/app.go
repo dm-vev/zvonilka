@@ -3,7 +3,9 @@ package gateway
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	authv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/auth/v1"
@@ -37,6 +39,7 @@ type app struct {
 	api            *api
 	callRuntime    callruntimev1.CallRuntimeServiceServer
 	cleanupTimeout time.Duration
+	backgroundWG   sync.WaitGroup
 }
 
 type api struct {
@@ -85,6 +88,7 @@ func (a *app) close(ctx context.Context) error {
 	if a.rtcCluster != nil {
 		clusterErr = a.rtcCluster.Close(cleanupCtx)
 	}
+	a.backgroundWG.Wait()
 
 	return errors.Join(clusterErr, a.catalog.Close(cleanupCtx))
 }
@@ -115,6 +119,28 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 		callRuntime:    platformrtc.NewGRPCRuntimeServer(localRTC),
 		cleanupTimeout: cfg.Runtime.ShutdownTimeout,
 	}, nil
+}
+
+func (a *app) startBackground(ctx context.Context, logger *slog.Logger, cfg config.Configuration) error {
+	if a == nil || a.api == nil || a.api.call == nil || logger == nil {
+		return nil
+	}
+
+	worker, err := domaincall.NewRehomeWorker(a.api.call, a.api, domaincall.RehomeWorkerSettings{
+		PollInterval: cfg.Call.RehomePollInterval,
+		BatchSize:    cfg.Call.RehomeBatchSize,
+	})
+	if err != nil {
+		return err
+	}
+
+	a.backgroundWG.Add(1)
+	go func() {
+		defer a.backgroundWG.Done()
+		_ = worker.Run(ctx, logger)
+	}()
+
+	return nil
 }
 
 // cleanupContext returns a shutdown context detached from runtime cancellation.

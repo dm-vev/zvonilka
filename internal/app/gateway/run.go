@@ -26,6 +26,9 @@ func Run(ctx context.Context) error {
 	defer func() {
 		_ = app.close(context.Background())
 	}()
+	if err := app.startBackground(ctx, logger, cfg); err != nil {
+		return err
+	}
 
 	logger.InfoContext(
 		ctx,

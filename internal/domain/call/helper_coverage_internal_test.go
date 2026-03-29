@@ -3,6 +3,7 @@ package call
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -262,6 +263,22 @@ func (s *stubStore) ActiveCallByConversation(_ context.Context, conversationID s
 		}
 	}
 	return Call{}, ErrNotFound
+}
+func (s *stubStore) ActiveCalls(_ context.Context, limit int) ([]Call, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	var result []Call
+	for _, callRow := range s.calls {
+		if callRow.State != StateActive || strings.TrimSpace(callRow.ActiveSessionID) == "" {
+			continue
+		}
+		result = append(result, cloneCall(callRow))
+	}
+	if len(result) > limit {
+		result = result[:limit]
+	}
+	return result, nil
 }
 func (s *stubStore) CallsByConversation(_ context.Context, conversationID string, includeEnded bool) ([]Call, error) {
 	var result []Call

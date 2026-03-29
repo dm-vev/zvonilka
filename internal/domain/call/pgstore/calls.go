@@ -179,6 +179,46 @@ LIMIT 1
 	return value, nil
 }
 
+func (s *Store) ActiveCalls(ctx context.Context, limit int) ([]call.Call, error) {
+	if err := s.requireStore(); err != nil {
+		return nil, err
+	}
+	if err := s.requireContext(ctx); err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+
+	query := fmt.Sprintf(`
+SELECT %s
+FROM %s
+WHERE state = 'active' AND active_session_id IS NOT NULL
+ORDER BY updated_at DESC, call_id ASC
+LIMIT $1
+`, callColumnList, s.table("call_calls"))
+
+	rows, err := s.conn().QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list active calls: %w", err)
+	}
+	defer rows.Close()
+
+	result := make([]call.Call, 0)
+	for rows.Next() {
+		value, scanErr := scanCall(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan active call: %w", scanErr)
+		}
+		result = append(result, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate active calls: %w", err)
+	}
+
+	return result, nil
+}
+
 func (s *Store) CallsByConversation(ctx context.Context, conversationID string, includeEnded bool) ([]call.Call, error) {
 	if err := s.requireStore(); err != nil {
 		return nil, err

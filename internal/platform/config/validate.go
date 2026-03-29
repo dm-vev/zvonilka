@@ -72,6 +72,12 @@ func (c Configuration) Validate() error {
 	if c.Call.WorkerBatchSize <= 0 {
 		errs = append(errs, errors.New("call worker batch size must be positive"))
 	}
+	if c.Call.RehomePollInterval <= 0 {
+		errs = append(errs, errors.New("call rehome poll interval must be positive"))
+	}
+	if c.Call.RehomeBatchSize <= 0 {
+		errs = append(errs, errors.New("call rehome batch size must be positive"))
+	}
 	if c.Call.HookTimeout <= 0 {
 		errs = append(errs, errors.New("call hook timeout must be positive"))
 	}

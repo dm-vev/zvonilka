@@ -9,6 +9,7 @@ type Store interface {
 	SaveCall(ctx context.Context, call Call) (Call, error)
 	CallByID(ctx context.Context, callID string) (Call, error)
 	ActiveCallByConversation(ctx context.Context, conversationID string) (Call, error)
+	ActiveCalls(ctx context.Context, limit int) ([]Call, error)
 	CallsByConversation(ctx context.Context, conversationID string, includeEnded bool) ([]Call, error)
 
 	SaveInvite(ctx context.Context, invite Invite) (Invite, error)

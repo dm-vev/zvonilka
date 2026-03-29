@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"sync"
 
 	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
@@ -61,6 +62,11 @@ func (a *api) publishCallEvents(events ...domaincall.Event) {
 		return
 	}
 	a.callNotifier.publish(events...)
+}
+
+func (a *api) HandleCallEvents(_ context.Context, events []domaincall.Event) error {
+	a.publishCallEvents(events...)
+	return nil
 }
 
 func (a *api) subscribeCallEvents() (<-chan callSignal, func()) {

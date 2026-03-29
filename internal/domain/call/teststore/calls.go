@@ -57,6 +57,45 @@ func (s *memoryStore) ActiveCallByConversation(_ context.Context, conversationID
 	return call.Call{}, call.ErrNotFound
 }
 
+func (s *memoryStore) ActiveCalls(_ context.Context, limit int) ([]call.Call, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]call.Call, 0, len(s.callsByID))
+	for _, value := range s.callsByID {
+		if value.State != call.StateActive || strings.TrimSpace(value.ActiveSessionID) == "" {
+			continue
+		}
+		result = append(result, callClone(value))
+	}
+
+	slices.SortFunc(result, func(left call.Call, right call.Call) int {
+		if left.UpdatedAt.After(right.UpdatedAt) {
+			return -1
+		}
+		if left.UpdatedAt.Before(right.UpdatedAt) {
+			return 1
+		}
+		if left.ID < right.ID {
+			return -1
+		}
+		if left.ID > right.ID {
+			return 1
+		}
+		return 0
+	})
+
+	if len(result) > limit {
+		result = result[:limit]
+	}
+
+	return result, nil
+}
+
 func (s *memoryStore) CallsByConversation(_ context.Context, conversationID string, includeEnded bool) ([]call.Call, error) {
 	conversationID = strings.TrimSpace(conversationID)
 	if conversationID == "" {
