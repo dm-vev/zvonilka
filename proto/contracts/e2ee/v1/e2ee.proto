@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package zvonilka.e2ee.v1;
+
+import "contracts/e2ee/v1/requests.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/e2ee/v1;e2eev1";
+
+service E2EEService {
+  rpc UploadDevicePreKeys(UploadDevicePreKeysRequest) returns (UploadDevicePreKeysResponse);
+  rpc GetAccountPreKeyBundles(GetAccountPreKeyBundlesRequest) returns (GetAccountPreKeyBundlesResponse);
+}

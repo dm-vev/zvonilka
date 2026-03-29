@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package zvonilka.e2ee.v1;
+
+import "google/protobuf/timestamp.proto";
+import "contracts/common/v1/messages.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/e2ee/v1;e2eev1";
+
+message PreKey {
+  zvonilka.common.v1.PublicKeyBundle key = 1;
+}
+
+message SignedPreKey {
+  zvonilka.common.v1.PublicKeyBundle key = 1;
+  bytes signature = 2;
+}
+
+message DevicePreKeyBundle {
+  string user_id = 1;
+  string device_id = 2;
+  zvonilka.common.v1.PublicKeyBundle identity_key = 3;
+  SignedPreKey signed_prekey = 4;
+  PreKey one_time_prekey = 5;
+  uint32 one_time_prekeys_available = 6;
+  google.protobuf.Timestamp device_last_seen_at = 7;
+}

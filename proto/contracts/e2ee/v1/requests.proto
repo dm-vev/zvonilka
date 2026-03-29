@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package zvonilka.e2ee.v1;
+
+import "contracts/e2ee/v1/models.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/e2ee/v1;e2eev1";
+
+message UploadDevicePreKeysRequest {
+  string device_id = 1;
+  SignedPreKey signed_prekey = 2;
+  repeated PreKey one_time_prekeys = 3;
+  bool replace_one_time_prekeys = 4;
+}
+
+message UploadDevicePreKeysResponse {
+  DevicePreKeyBundle bundle = 1;
+}
+
+message GetAccountPreKeyBundlesRequest {
+  string user_id = 1;
+  bool consume_one_time_prekeys = 2;
+}
+
+message GetAccountPreKeyBundlesResponse {
+  repeated DevicePreKeyBundle bundles = 1;
+}

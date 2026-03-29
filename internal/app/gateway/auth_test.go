@@ -11,6 +11,8 @@ import (
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 	conversationtest "github.com/dm-vev/zvonilka/internal/domain/conversation/teststore"
+	domaine2ee "github.com/dm-vev/zvonilka/internal/domain/e2ee"
+	e2eetest "github.com/dm-vev/zvonilka/internal/domain/e2ee/teststore"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	identitytest "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
 	"github.com/dm-vev/zvonilka/internal/domain/presence"
@@ -78,8 +80,13 @@ func newTestAPI(t *testing.T) (*api, *recordingSender) {
 	if err != nil {
 		t.Fatalf("new user service: %v", err)
 	}
+	e2eeService, err := domaine2ee.NewService(e2eetest.NewMemoryStore(), identityStore)
+	if err != nil {
+		t.Fatalf("new e2ee service: %v", err)
+	}
 
 	return &api{
+		e2ee:         e2eeService,
 		identity:     identityService,
 		conversation: conversationService,
 		presence:     presenceService,
