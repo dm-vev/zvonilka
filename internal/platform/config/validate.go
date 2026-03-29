@@ -81,6 +81,9 @@ func (c Configuration) Validate() error {
 	if c.RTC.CredentialTTL <= 0 {
 		errs = append(errs, errors.New("rtc credential ttl must be positive"))
 	}
+	if strings.TrimSpace(c.RTC.NodeID) == "" {
+		errs = append(errs, errors.New("rtc node id is required"))
+	}
 	if c.RTC.UDPPortMin <= 0 {
 		errs = append(errs, errors.New("rtc udp port min must be positive"))
 	}
@@ -92,6 +95,9 @@ func (c Configuration) Validate() error {
 	}
 	if len(c.RTC.TURNURLs) > 0 && c.RTC.TURNSecret == "" {
 		errs = append(errs, errors.New("rtc turn secret is required when turn urls are configured"))
+	}
+	if err := validateRTCNodes(c.RTC); err != nil {
+		errs = append(errs, err)
 	}
 	if c.Bot.FanoutPollInterval <= 0 {
 		errs = append(errs, errors.New("bot fanout poll interval must be positive"))
@@ -274,6 +280,31 @@ func (c Configuration) Validate() error {
 	}
 
 	return errors.Join(errs...)
+}
+
+func validateRTCNodes(cfg RTCConfig) error {
+	if len(cfg.Nodes) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(cfg.Nodes))
+	for _, node := range cfg.Nodes {
+		id := strings.TrimSpace(node.ID)
+		endpoint := strings.TrimSpace(node.Endpoint)
+		if id == "" || endpoint == "" {
+			return errors.New("rtc cluster nodes must define id and endpoint")
+		}
+		if _, ok := seen[id]; ok {
+			return fmt.Errorf("rtc cluster nodes must be unique: %s", id)
+		}
+		seen[id] = struct{}{}
+	}
+
+	if _, ok := seen[strings.TrimSpace(cfg.NodeID)]; !ok {
+		return fmt.Errorf("rtc node id %q must be present in rtc cluster nodes", strings.TrimSpace(cfg.NodeID))
+	}
+
+	return nil
 }
 
 func validateLogLevel(level string) error {

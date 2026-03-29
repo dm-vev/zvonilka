@@ -108,6 +108,7 @@ func defaultConfiguration(serviceName string) Configuration {
 		RTC: RTCConfig{
 			PublicEndpoint: "webrtc://gateway/calls",
 			CredentialTTL:  15 * time.Minute,
+			NodeID:         "node-local",
 			CandidateHost:  "127.0.0.1",
 			UDPPortMin:     40000,
 			UDPPortMax:     40100,

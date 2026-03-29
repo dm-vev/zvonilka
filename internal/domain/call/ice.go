@@ -31,7 +31,7 @@ func (s *Service) GetIceConfig(ctx context.Context, params IceParams) ([]IceServ
 		return nil, time.Time{}, "", err
 	}
 
-	return servers, expiresAt, s.resolveRuntimeEndpoint(""), nil
+	return servers, expiresAt, s.resolveRuntimeEndpoint(s.rtc.endpointForSession(callRow.ActiveSessionID)), nil
 }
 
 func (s *Service) iceServersForAccount(

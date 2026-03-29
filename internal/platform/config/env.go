@@ -174,6 +174,11 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.RTC.CredentialTTL = value
 	}
+	if value, ok, err := stringValueWithPresence(serviceName, "RTC_NODE_ID", cfg.RTC.NodeID); err != nil {
+		return err
+	} else if ok {
+		cfg.RTC.NodeID = value
+	}
 	if value, ok, err := stringValueWithPresence(serviceName, "RTC_CANDIDATE_HOST", cfg.RTC.CandidateHost); err != nil {
 		return err
 	} else if ok {
@@ -198,6 +203,11 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 		return err
 	} else if ok {
 		cfg.RTC.TURNURLs = value
+	}
+	if value, ok, err := rtcNodeSliceValue(serviceName, "RTC_CLUSTER_NODES", cfg.RTC.Nodes); err != nil {
+		return err
+	} else if ok {
+		cfg.RTC.Nodes = value
 	}
 	if value, ok, err := stringValueWithPresence(serviceName, "RTC_TURN_SECRET", cfg.RTC.TURNSecret); err != nil {
 		return err
@@ -696,4 +706,35 @@ func stringSliceValue(serviceName string, key string, fallback []string) ([]stri
 	}
 
 	return values, true, nil
+}
+
+func rtcNodeSliceValue(serviceName string, key string, fallback []RTCNodeConfig) ([]RTCNodeConfig, bool, error) {
+	raw, ok, err := stringValueWithPresence(serviceName, key, "")
+	if err != nil {
+		return nil, false, err
+	}
+	if !ok {
+		return append([]RTCNodeConfig(nil), fallback...), false, nil
+	}
+
+	items := strings.Split(raw, ",")
+	result := make([]RTCNodeConfig, 0, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		id, endpoint, found := strings.Cut(item, "=")
+		if !found {
+			return nil, false, fmt.Errorf("%s must use id=endpoint entries", serviceEnvKey(serviceName, key))
+		}
+		id = strings.TrimSpace(id)
+		endpoint = strings.TrimSpace(endpoint)
+		if id == "" || endpoint == "" {
+			return nil, false, fmt.Errorf("%s must use id=endpoint entries", serviceEnvKey(serviceName, key))
+		}
+		result = append(result, RTCNodeConfig{ID: id, Endpoint: endpoint})
+	}
+
+	return result, true, nil
 }

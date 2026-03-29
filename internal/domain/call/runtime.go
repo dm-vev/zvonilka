@@ -10,12 +10,20 @@ import (
 type RTCConfig struct {
 	PublicEndpoint string
 	CredentialTTL  time.Duration
+	NodeID         string
 	CandidateHost  string
 	UDPPortMin     int
 	UDPPortMax     int
 	STUNURLs       []string
 	TURNURLs       []string
 	TURNSecret     string
+	Nodes          []RTCNode
+}
+
+// RTCNode describes one logical media-plane node.
+type RTCNode struct {
+	ID       string
+	Endpoint string
 }
 
 // RuntimeSession describes one active media room.
@@ -115,12 +123,19 @@ func (c RTCConfig) normalize() RTCConfig {
 		c.UDPPortMax = c.UDPPortMin
 	}
 	c.PublicEndpoint = strings.TrimSpace(c.PublicEndpoint)
+	c.NodeID = strings.TrimSpace(c.NodeID)
 	c.CandidateHost = strings.TrimSpace(c.CandidateHost)
 	c.TURNSecret = strings.TrimSpace(c.TURNSecret)
 	c.STUNURLs = trimList(c.STUNURLs)
 	c.TURNURLs = trimList(c.TURNURLs)
+	c.Nodes = normalizeRTCNodes(c.Nodes)
 
 	return c
+}
+
+// NormalizeForPlatform returns a normalized RTC config for runtime integration layers.
+func (c RTCConfig) NormalizeForPlatform() RTCConfig {
+	return c.normalize()
 }
 
 func trimList(values []string) []string {
@@ -138,4 +153,51 @@ func trimList(values []string) []string {
 	}
 
 	return result
+}
+
+func normalizeRTCNodes(values []RTCNode) []RTCNode {
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]RTCNode, 0, len(values))
+	for _, value := range values {
+		value.ID = strings.TrimSpace(value.ID)
+		value.Endpoint = strings.TrimSpace(value.Endpoint)
+		if value.ID == "" || value.Endpoint == "" {
+			continue
+		}
+		result = append(result, value)
+	}
+
+	return result
+}
+
+func (c RTCConfig) endpointForSession(sessionID string) string {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID != "" {
+		nodeID := NodeIDFromSessionID(sessionID)
+		for _, node := range c.Nodes {
+			if node.ID == nodeID && node.Endpoint != "" {
+				return node.Endpoint
+			}
+		}
+	}
+
+	return c.PublicEndpoint
+}
+
+// NodeIDFromSessionID extracts the owning media-node identifier from a session id.
+func NodeIDFromSessionID(sessionID string) string {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return ""
+	}
+
+	nodeID, _, found := strings.Cut(sessionID, ":")
+	if !found {
+		return ""
+	}
+
+	return strings.TrimSpace(nodeID)
 }
