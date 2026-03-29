@@ -15,6 +15,8 @@ const (
 	callMetadataRuntimeEndpoint   = "runtime_endpoint"
 	callMetadataFailoverReason    = "failover_reason"
 	callMetadataReconnectRequired = "reconnect_required"
+	callMetadataMigrationMode     = "migration_mode"
+	callMetadataCutoverDeadline   = "cutover_deadline_unix"
 	callMetadataSessionToken      = "session_token"
 	callMetadataExpiresAtUnix     = "expires_at_unix"
 	callMetadataIceUfrag          = "ice_ufrag"
@@ -27,6 +29,10 @@ const (
 func runtimeUnavailable(err error) bool {
 	code := status.Code(err)
 	return code == codes.Unavailable || code == codes.DeadlineExceeded
+}
+
+type sessionMigrator interface {
+	MigrateSession(ctx context.Context, callRow Call) (RuntimeSession, error)
 }
 
 func (s *Service) failoverActiveSession(
@@ -44,7 +50,7 @@ func (s *Service) failoverActiveSession(
 	replacement := callRow
 	replacement.ActiveSessionID = ""
 
-	runtimeSession, err := s.runtime.EnsureSession(ctx, replacement)
+	runtimeSession, migrationMode, err := s.replacementRuntimeSession(ctx, callRow, replacement)
 	if err != nil {
 		return Call{}, RuntimeSession{}, nil, err
 	}
@@ -65,6 +71,7 @@ func (s *Service) failoverActiveSession(
 		callMetadataSessionID:         runtimeSession.SessionID,
 		callMetadataRuntimeEndpoint:   runtimeSession.RuntimeEndpoint,
 		callMetadataFailoverReason:    reason,
+		callMetadataMigrationMode:     migrationMode,
 	}, now)
 	if err != nil {
 		return Call{}, RuntimeSession{}, nil, err
@@ -84,6 +91,7 @@ func (s *Service) failoverActiveSession(
 		if joinErr != nil {
 			return Call{}, RuntimeSession{}, nil, joinErr
 		}
+		cutoverDeadline := now.Add(s.settings.ReconnectGrace).UTC()
 
 		targetEvent, appendErr := s.appendEvent(ctx, store, savedCall, EventTypeSessionMigrated, "", "", map[string]string{
 			callMetadataTargetAccountID:   participant.AccountID,
@@ -92,6 +100,8 @@ func (s *Service) failoverActiveSession(
 			callMetadataSessionID:         runtimeJoin.SessionID,
 			callMetadataRuntimeEndpoint:   s.resolveRuntimeEndpoint(runtimeJoin.RuntimeEndpoint),
 			callMetadataFailoverReason:    reason,
+			callMetadataMigrationMode:     migrationMode,
+			callMetadataCutoverDeadline:   strconv.FormatInt(cutoverDeadline.Unix(), 10),
 			callMetadataReconnectRequired: "true",
 			callMetadataSessionToken:      runtimeJoin.SessionToken,
 			callMetadataExpiresAtUnix:     strconv.FormatInt(runtimeJoin.ExpiresAt.UTC().Unix(), 10),
@@ -108,6 +118,29 @@ func (s *Service) failoverActiveSession(
 	}
 
 	return savedCall, runtimeSession, events, nil
+}
+
+func (s *Service) replacementRuntimeSession(
+	ctx context.Context,
+	current Call,
+	replacement Call,
+) (RuntimeSession, string, error) {
+	if migrator, ok := s.runtime.(sessionMigrator); ok {
+		runtimeSession, err := migrator.MigrateSession(ctx, current)
+		if err == nil {
+			return runtimeSession, "graceful", nil
+		}
+		if !runtimeUnavailable(err) {
+			return RuntimeSession{}, "", err
+		}
+	}
+
+	runtimeSession, err := s.runtime.EnsureSession(ctx, replacement)
+	if err != nil {
+		return RuntimeSession{}, "", err
+	}
+
+	return runtimeSession, "reconnect", nil
 }
 
 func runtimeParticipantFromParticipant(callID string, participant Participant) RuntimeParticipant {

@@ -296,3 +296,72 @@ func TestClusterReplicatesRemoteSessionStateToStandbyNode(t *testing.T) {
 	require.Equal(t, "acc-standby", restored.Participants[0].AccountID)
 	require.True(t, restored.Participants[0].Media.ScreenShareEnabled)
 }
+
+func TestClusterMigrateSessionCutsOverToDifferentNode(t *testing.T) {
+	t.Parallel()
+
+	localManager := NewManager("webrtc://node-a/calls", 15*time.Minute, WithCandidateHost("127.0.0.1"), WithUDPPortRange(43800, 43899))
+	remoteManager := NewManager("webrtc://node-b/calls", 15*time.Minute, WithCandidateHost("127.0.0.1"), WithUDPPortRange(43900, 43999))
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer listener.Close()
+
+	server := grpc.NewServer()
+	callruntimev1.RegisterCallRuntimeServiceServer(server, NewGRPCRuntimeServer(remoteManager))
+	defer server.Stop()
+
+	go func() {
+		_ = server.Serve(listener)
+	}()
+
+	cluster, err := NewCluster(domaincall.RTCConfig{
+		PublicEndpoint: "webrtc://gateway/calls",
+		CredentialTTL:  15 * time.Minute,
+		NodeID:         "node-a",
+		CandidateHost:  "127.0.0.1",
+		UDPPortMin:     43800,
+		UDPPortMax:     43999,
+		Nodes: []domaincall.RTCNode{
+			{ID: "node-a", Endpoint: "webrtc://node-a/calls"},
+			{ID: "node-b", Endpoint: "webrtc://node-b/calls", ControlEndpoint: listener.Addr().String()},
+		},
+	}, localManager)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, cluster.Close(context.Background()))
+	}()
+
+	sourceSessionID := "node-b:rtc_call-cutover"
+	_, err = cluster.EnsureSession(context.Background(), domaincall.Call{
+		ID:              "call-cutover",
+		ConversationID:  "conv-cutover",
+		ActiveSessionID: sourceSessionID,
+	})
+	require.NoError(t, err)
+
+	_, err = cluster.JoinSession(context.Background(), sourceSessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-cutover",
+		AccountID: "acc-cutover",
+		DeviceID:  "dev-cutover",
+		WithVideo: true,
+		Media: domaincall.MediaState{
+			CameraEnabled: true,
+		},
+	})
+	require.NoError(t, err)
+
+	migrated, err := cluster.MigrateSession(context.Background(), domaincall.Call{
+		ID:              "call-cutover",
+		ConversationID:  "conv-cutover",
+		ActiveSessionID: sourceSessionID,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "node-a", domaincall.NodeIDFromSessionID(migrated.SessionID))
+
+	restored, err := localManager.ExportSessionSnapshot(context.Background(), migrated.SessionID)
+	require.NoError(t, err)
+	require.Equal(t, "call-cutover", restored.CallID)
+	require.Len(t, restored.Participants, 1)
+	require.Equal(t, "acc-cutover", restored.Participants[0].AccountID)
+}

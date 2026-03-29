@@ -94,6 +94,53 @@ func (c *Cluster) EnsureSession(ctx context.Context, callRow domaincall.Call) (d
 	return session, nil
 }
 
+// MigrateSession performs a controlled session cutover onto a different healthy node when possible.
+func (c *Cluster) MigrateSession(ctx context.Context, callRow domaincall.Call) (domaincall.RuntimeSession, error) {
+	if c == nil {
+		return domaincall.RuntimeSession{}, domaincall.ErrInvalidInput
+	}
+	callID := strings.TrimSpace(callRow.ID)
+	currentSessionID := strings.TrimSpace(callRow.ActiveSessionID)
+	if callID == "" || currentSessionID == "" {
+		return domaincall.RuntimeSession{}, domaincall.ErrInvalidInput
+	}
+
+	sourceNode, err := c.nodeForSession(currentSessionID)
+	if err != nil {
+		return domaincall.RuntimeSession{}, err
+	}
+	targetNode, err := c.migrationTargetNode(ctx, sourceNode.id, callID)
+	if err != nil {
+		return domaincall.RuntimeSession{}, err
+	}
+	if targetNode.id == sourceNode.id {
+		return c.EnsureSession(ctx, callRow)
+	}
+
+	var snapshot sessionSnapshot
+	snapshot, err = sourceNode.runtime.ExportSessionSnapshot(ctx, currentSessionID)
+	if err != nil {
+		if saveErr := c.restoreReplicatedSnapshot(ctx, targetNode, callID); saveErr != nil {
+			return domaincall.RuntimeSession{}, err
+		}
+	} else if saveErr := targetNode.runtime.SaveReplica(ctx, snapshot); saveErr != nil {
+		return domaincall.RuntimeSession{}, saveErr
+	}
+
+	replacement := callRow
+	replacement.ActiveSessionID = prefixedSessionID(targetNode.id, callID)
+	session, err := targetNode.runtime.EnsureSession(ctx, replacement)
+	if err != nil {
+		return domaincall.RuntimeSession{}, err
+	}
+	if restoreErr := targetNode.runtime.RestoreReplica(ctx, callID, session.SessionID); restoreErr != nil && !errors.Is(restoreErr, domaincall.ErrNotFound) {
+		return domaincall.RuntimeSession{}, restoreErr
+	}
+	_ = c.replicateSession(ctx, session.SessionID)
+
+	return session, nil
+}
+
 func (c *Cluster) JoinSession(ctx context.Context, sessionID string, participant domaincall.RuntimeParticipant) (domaincall.RuntimeJoin, error) {
 	node, err := c.nodeForSession(sessionID)
 	if err != nil {
@@ -296,6 +343,50 @@ func (c *Cluster) healthyNodes(ctx context.Context) ([]*clusterNode, error) {
 	}
 
 	return result, nil
+}
+
+func (c *Cluster) migrationTargetNode(ctx context.Context, sourceNodeID string, callID string) (*clusterNode, error) {
+	healthyNodes, err := c.healthyNodes(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	filtered := make([]*clusterNode, 0, len(healthyNodes))
+	for _, node := range healthyNodes {
+		if node == nil || node.id == strings.TrimSpace(sourceNodeID) {
+			continue
+		}
+		filtered = append(filtered, node)
+	}
+	if len(filtered) == 0 {
+		return c.byID[strings.TrimSpace(sourceNodeID)], nil
+	}
+
+	index := rendezvousIndex(callID, len(filtered))
+	return filtered[index], nil
+}
+
+func (c *Cluster) restoreReplicatedSnapshot(ctx context.Context, target *clusterNode, callID string) error {
+	if c == nil || target == nil || target.runtime == nil {
+		return domaincall.ErrInvalidInput
+	}
+	callID = strings.TrimSpace(callID)
+	if callID == "" {
+		return domaincall.ErrInvalidInput
+	}
+
+	for _, node := range c.nodes {
+		if node == nil || node.runtime == nil || node.id == target.id {
+			continue
+		}
+		snapshot, err := node.runtime.ExportSessionSnapshot(ctx, prefixedSessionID(node.id, callID))
+		if err != nil {
+			continue
+		}
+		return target.runtime.SaveReplica(ctx, snapshot)
+	}
+
+	return domaincall.ErrNotFound
 }
 
 func (c *Cluster) nodeHealthy(ctx context.Context, node *clusterNode) (bool, error) {
