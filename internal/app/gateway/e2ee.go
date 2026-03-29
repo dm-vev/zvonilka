@@ -183,12 +183,15 @@ func (a *api) VerifyDeviceSafetyNumber(
 		return nil, grpcError(err)
 	}
 	a.publishE2EEUpdates(domaine2ee.Update{
-		ID:              newGatewayEventID("e2ee"),
-		Type:            domaine2ee.UpdateTypeDeviceVerified,
-		ActorAccountID:  authContext.Account.ID,
-		ActorDeviceID:   authContext.Session.DeviceID,
-		TargetAccountID: trust.TargetAccountID,
-		TargetDeviceID:  trust.TargetDeviceID,
+		ID:                   newGatewayEventID("e2ee"),
+		Type:                 domaine2ee.UpdateTypeDeviceVerified,
+		ActorAccountID:       authContext.Account.ID,
+		ActorDeviceID:        authContext.Session.DeviceID,
+		TargetAccountID:      trust.TargetAccountID,
+		TargetDeviceID:       trust.TargetDeviceID,
+		CurrentTrustState:    trust.State,
+		TargetKeyFingerprint: trust.KeyFingerprint,
+		VerificationRequired: false,
 		Metadata: map[string]string{
 			"state": string(trust.State),
 		},
@@ -218,12 +221,15 @@ func (a *api) SetDeviceTrust(
 		return nil, grpcError(err)
 	}
 	a.publishE2EEUpdates(domaine2ee.Update{
-		ID:              newGatewayEventID("e2ee"),
-		Type:            domaine2ee.UpdateTypeDeviceTrustUpdated,
-		ActorAccountID:  authContext.Account.ID,
-		ActorDeviceID:   authContext.Session.DeviceID,
-		TargetAccountID: trust.TargetAccountID,
-		TargetDeviceID:  trust.TargetDeviceID,
+		ID:                   newGatewayEventID("e2ee"),
+		Type:                 domaine2ee.UpdateTypeDeviceTrustUpdated,
+		ActorAccountID:       authContext.Account.ID,
+		ActorDeviceID:        authContext.Session.DeviceID,
+		TargetAccountID:      trust.TargetAccountID,
+		TargetDeviceID:       trust.TargetDeviceID,
+		CurrentTrustState:    trust.State,
+		TargetKeyFingerprint: trust.KeyFingerprint,
+		VerificationRequired: trust.State != domaine2ee.DeviceTrustStateTrusted,
 		Metadata: map[string]string{
 			"state": string(trust.State),
 		},
@@ -550,28 +556,34 @@ func deviceVerificationCodeProto(value domaine2ee.DeviceVerificationCode) *e2eev
 
 func e2eeUpdateProto(value domaine2ee.Update) *e2eev1.E2EEUpdate {
 	return &e2eev1.E2EEUpdate{
-		UpdateId:       value.ID,
-		UpdateType:     e2eeUpdateTypeProto(value.Type),
-		ActorUserId:    value.ActorAccountID,
-		ActorDeviceId:  value.ActorDeviceID,
-		TargetUserId:   value.TargetAccountID,
-		TargetDeviceId: value.TargetDeviceID,
-		ConversationId: value.ConversationID,
-		SessionId:      value.SessionID,
-		DistributionId: value.DistributionID,
-		SenderKeyId:    value.SenderKeyID,
-		Metadata:       cloneStringMap(value.Metadata),
-		CreatedAt:      protoTime(value.CreatedAt),
+		UpdateId:             value.ID,
+		UpdateType:           e2eeUpdateTypeProto(value.Type),
+		ActorUserId:          value.ActorAccountID,
+		ActorDeviceId:        value.ActorDeviceID,
+		TargetUserId:         value.TargetAccountID,
+		TargetDeviceId:       value.TargetDeviceID,
+		ConversationId:       value.ConversationID,
+		SessionId:            value.SessionID,
+		DistributionId:       value.DistributionID,
+		SenderKeyId:          value.SenderKeyID,
+		Metadata:             cloneStringMap(value.Metadata),
+		CreatedAt:            protoTime(value.CreatedAt),
+		CurrentTrustState:    deviceTrustStateProto(value.CurrentTrustState),
+		TargetKeyFingerprint: value.TargetKeyFingerprint,
+		VerificationRequired: value.VerificationRequired,
 	}
 }
 
 func conversationKeyCoverageEntryProto(value domaine2ee.ConversationKeyCoverageEntry) *e2eev1.ConversationKeyCoverageEntry {
 	return &e2eev1.ConversationKeyCoverageEntry{
-		UserId:      value.AccountID,
-		DeviceId:    value.DeviceID,
-		State:       conversationKeyCoverageStateProto(value.State),
-		ReferenceId: value.ReferenceID,
-		ExpiresAt:   protoTime(value.ExpiresAt),
+		UserId:               value.AccountID,
+		DeviceId:             value.DeviceID,
+		State:                conversationKeyCoverageStateProto(value.State),
+		ReferenceId:          value.ReferenceID,
+		ExpiresAt:            protoTime(value.ExpiresAt),
+		TrustState:           deviceTrustStateProto(value.TrustState),
+		KeyFingerprint:       value.KeyFingerprint,
+		VerificationRequired: value.VerificationRequired,
 	}
 }
 

@@ -911,6 +911,9 @@ func TestGetConversationKeyCoverageRPC(t *testing.T) {
 	if len(directCoverage.Entries) != 1 || directCoverage.Entries[0].State != e2eev1.ConversationKeyCoverageState_CONVERSATION_KEY_COVERAGE_STATE_READY {
 		t.Fatalf("unexpected direct coverage: %+v", directCoverage.Entries)
 	}
+	if directCoverage.Entries[0].KeyFingerprint == "" || !directCoverage.Entries[0].VerificationRequired {
+		t.Fatalf("expected verification hints in direct coverage: %+v", directCoverage.Entries[0])
+	}
 
 	group, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
 		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
@@ -960,6 +963,11 @@ func TestGetConversationKeyCoverageRPC(t *testing.T) {
 	}
 	if !seenReady || !seenMissing {
 		t.Fatalf("unexpected group coverage states: %+v", groupCoverage.Entries)
+	}
+	for _, entry := range groupCoverage.Entries {
+		if entry.KeyFingerprint == "" {
+			t.Fatalf("expected key fingerprint in group coverage: %+v", entry)
+		}
 	}
 }
 
@@ -1042,6 +1050,9 @@ func TestSubscribeE2EEUpdatesStreamsTrustChanges(t *testing.T) {
 		}
 		if resp.Update.TargetUserId != bob.ID || resp.Update.TargetDeviceId != bobDeviceID {
 			t.Fatalf("unexpected update target: %+v", resp.Update)
+		}
+		if resp.Update.CurrentTrustState != e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_TRUSTED || resp.Update.TargetKeyFingerprint == "" || resp.Update.VerificationRequired {
+			t.Fatalf("unexpected trust update verification fields: %+v", resp.Update)
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("timed out waiting for e2ee update")
@@ -1133,6 +1144,16 @@ func TestGetAndVerifyDeviceSafetyNumberRPC(t *testing.T) {
 	}
 	if verifyResp.Trust == nil || verifyResp.Trust.State != e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_TRUSTED {
 		t.Fatalf("unexpected verification trust: %+v", verifyResp.Trust)
+	}
+	codeResp, err = api.GetDeviceVerificationCode(aliceCtx, &e2eev1.GetDeviceVerificationCodeRequest{
+		TargetUserId:   bob.ID,
+		TargetDeviceId: bobDeviceID,
+	})
+	if err != nil {
+		t.Fatalf("get verification code after verify: %v", err)
+	}
+	if codeResp.Verification == nil || codeResp.Verification.CurrentTrustState != e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_TRUSTED {
+		t.Fatalf("unexpected verification state after trust: %+v", codeResp.Verification)
 	}
 }
 

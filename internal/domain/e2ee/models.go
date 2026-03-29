@@ -75,11 +75,14 @@ const (
 )
 
 type ConversationKeyCoverageEntry struct {
-	AccountID   string
-	DeviceID    string
-	State       ConversationKeyCoverageState
-	ReferenceID string
-	ExpiresAt   time.Time
+	AccountID            string
+	DeviceID             string
+	State                ConversationKeyCoverageState
+	ReferenceID          string
+	ExpiresAt            time.Time
+	TrustState           DeviceTrustState
+	KeyFingerprint       string
+	VerificationRequired bool
 }
 
 type UpdateType string
@@ -97,18 +100,21 @@ const (
 )
 
 type Update struct {
-	ID              string
-	Type            UpdateType
-	ActorAccountID  string
-	ActorDeviceID   string
-	TargetAccountID string
-	TargetDeviceID  string
-	ConversationID  string
-	SessionID       string
-	DistributionID  string
-	SenderKeyID     string
-	Metadata        map[string]string
-	CreatedAt       time.Time
+	ID                   string
+	Type                 UpdateType
+	ActorAccountID       string
+	ActorDeviceID        string
+	TargetAccountID      string
+	TargetDeviceID       string
+	ConversationID       string
+	SessionID            string
+	DistributionID       string
+	SenderKeyID          string
+	Metadata             map[string]string
+	CreatedAt            time.Time
+	CurrentTrustState    DeviceTrustState
+	TargetKeyFingerprint string
+	VerificationRequired bool
 }
 
 type BootstrapPayload struct {

@@ -415,11 +415,24 @@ func (s *Service) GetConversationKeyCoverage(ctx context.Context, params GetConv
 		return nil, ErrForbidden
 	}
 
+	trusts, err := s.store.DeviceTrustsByObserverDevice(ctx, params.SenderAccountID, params.SenderDeviceID, "")
+	if err != nil {
+		return nil, fmt.Errorf("load trust map for %s/%s: %w", params.SenderAccountID, params.SenderDeviceID, err)
+	}
+	trustByDevice := make(map[string]DeviceTrust, len(trusts))
+	for _, item := range trusts {
+		key := trustMapKey(item.TargetAccountID, item.TargetDeviceID)
+		if _, exists := trustByDevice[key]; exists {
+			continue
+		}
+		trustByDevice[key] = item
+	}
+
 	switch conversationRow.Kind {
 	case conversation.ConversationKindDirect:
-		return s.directConversationKeyCoverage(ctx, params)
+		return s.directConversationKeyCoverage(ctx, params, trustByDevice)
 	case conversation.ConversationKindGroup:
-		return s.groupConversationKeyCoverage(ctx, params)
+		return s.groupConversationKeyCoverage(ctx, params, trustByDevice)
 	default:
 		return nil, ErrForbidden
 	}
@@ -1157,7 +1170,11 @@ func (s *Service) validateGroupConversationPayload(ctx context.Context, params V
 	return ErrConflict
 }
 
-func (s *Service) directConversationKeyCoverage(ctx context.Context, params GetConversationKeyCoverageParams) ([]ConversationKeyCoverageEntry, error) {
+func (s *Service) directConversationKeyCoverage(
+	ctx context.Context,
+	params GetConversationKeyCoverageParams,
+	trustByDevice map[string]DeviceTrust,
+) ([]ConversationKeyCoverageEntry, error) {
 	members, err := s.chats.ConversationMembersByConversationID(ctx, params.ConversationID)
 	if err != nil {
 		return nil, mapConversationError("list conversation members", params.ConversationID, err)
@@ -1182,9 +1199,11 @@ func (s *Service) directConversationKeyCoverage(ctx context.Context, params GetC
 				continue
 			}
 			entry := ConversationKeyCoverageEntry{
-				AccountID: member.AccountID,
-				DeviceID:  device.ID,
-				State:     ConversationKeyCoverageStateMissing,
+				AccountID:      member.AccountID,
+				DeviceID:       device.ID,
+				State:          ConversationKeyCoverageStateMissing,
+				TrustState:     trustByDevice[trustMapKey(member.AccountID, device.ID)].State,
+				KeyFingerprint: deviceKeyFingerprint(device),
 			}
 			for _, session := range sessions {
 				if session.InitiatorAccountID == params.SenderAccountID && session.InitiatorDeviceID == params.SenderDeviceID {
@@ -1198,18 +1217,23 @@ func (s *Service) directConversationKeyCoverage(ctx context.Context, params GetC
 				} else {
 					continue
 				}
-				entry = coverageEntryFromDirectSession(session, now)
+				entry = coverageEntryFromDirectSession(session, now, device, trustByDevice[trustMapKey(member.AccountID, device.ID)])
 				entry.AccountID = member.AccountID
 				entry.DeviceID = device.ID
 				break
 			}
+			entry.VerificationRequired = trustRequiresVerification(entry.TrustState)
 			result = append(result, entry)
 		}
 	}
 	return result, nil
 }
 
-func (s *Service) groupConversationKeyCoverage(ctx context.Context, params GetConversationKeyCoverageParams) ([]ConversationKeyCoverageEntry, error) {
+func (s *Service) groupConversationKeyCoverage(
+	ctx context.Context,
+	params GetConversationKeyCoverageParams,
+	trustByDevice map[string]DeviceTrust,
+) ([]ConversationKeyCoverageEntry, error) {
 	members, err := s.chats.ConversationMembersByConversationID(ctx, params.ConversationID)
 	if err != nil {
 		return nil, mapConversationError("list conversation members", params.ConversationID, err)
@@ -1234,9 +1258,11 @@ func (s *Service) groupConversationKeyCoverage(ctx context.Context, params GetCo
 				continue
 			}
 			entry := ConversationKeyCoverageEntry{
-				AccountID: member.AccountID,
-				DeviceID:  device.ID,
-				State:     ConversationKeyCoverageStateMissing,
+				AccountID:      member.AccountID,
+				DeviceID:       device.ID,
+				State:          ConversationKeyCoverageStateMissing,
+				TrustState:     trustByDevice[trustMapKey(member.AccountID, device.ID)].State,
+				KeyFingerprint: deviceKeyFingerprint(device),
 			}
 			for _, item := range distributions {
 				if item.RecipientAccountID != member.AccountID || item.RecipientDeviceID != device.ID {
@@ -1245,21 +1271,30 @@ func (s *Service) groupConversationKeyCoverage(ctx context.Context, params GetCo
 				if params.SenderKeyID != "" && item.SenderKeyID != params.SenderKeyID {
 					continue
 				}
-				entry = coverageEntryFromSenderKeyDistribution(item, now)
+				entry = coverageEntryFromSenderKeyDistribution(item, now, device, trustByDevice[trustMapKey(member.AccountID, device.ID)])
 				entry.AccountID = member.AccountID
 				entry.DeviceID = device.ID
 				break
 			}
+			entry.VerificationRequired = trustRequiresVerification(entry.TrustState)
 			result = append(result, entry)
 		}
 	}
 	return result, nil
 }
 
-func coverageEntryFromDirectSession(value DirectSession, now time.Time) ConversationKeyCoverageEntry {
+func coverageEntryFromDirectSession(
+	value DirectSession,
+	now time.Time,
+	target identity.Device,
+	trust DeviceTrust,
+) ConversationKeyCoverageEntry {
 	entry := ConversationKeyCoverageEntry{
-		ReferenceID: value.ID,
-		ExpiresAt:   value.ExpiresAt,
+		ReferenceID:          value.ID,
+		ExpiresAt:            value.ExpiresAt,
+		TrustState:           trust.State,
+		KeyFingerprint:       deviceKeyFingerprint(target),
+		VerificationRequired: trustRequiresVerification(trust.State),
 	}
 	if !value.ExpiresAt.IsZero() && !now.Before(value.ExpiresAt) {
 		entry.State = ConversationKeyCoverageStateExpired
@@ -1276,10 +1311,18 @@ func coverageEntryFromDirectSession(value DirectSession, now time.Time) Conversa
 	return entry
 }
 
-func coverageEntryFromSenderKeyDistribution(value GroupSenderKeyDistribution, now time.Time) ConversationKeyCoverageEntry {
+func coverageEntryFromSenderKeyDistribution(
+	value GroupSenderKeyDistribution,
+	now time.Time,
+	target identity.Device,
+	trust DeviceTrust,
+) ConversationKeyCoverageEntry {
 	entry := ConversationKeyCoverageEntry{
-		ReferenceID: value.SenderKeyID,
-		ExpiresAt:   value.ExpiresAt,
+		ReferenceID:          value.SenderKeyID,
+		ExpiresAt:            value.ExpiresAt,
+		TrustState:           trust.State,
+		KeyFingerprint:       deviceKeyFingerprint(target),
+		VerificationRequired: trustRequiresVerification(trust.State),
 	}
 	if !value.ExpiresAt.IsZero() && !now.Before(value.ExpiresAt) {
 		entry.State = ConversationKeyCoverageStateExpired
@@ -1294,6 +1337,14 @@ func coverageEntryFromSenderKeyDistribution(value GroupSenderKeyDistribution, no
 		entry.State = ConversationKeyCoverageStateMissing
 	}
 	return entry
+}
+
+func trustMapKey(accountID string, deviceID string) string {
+	return accountID + "|" + deviceID
+}
+
+func trustRequiresVerification(state DeviceTrustState) bool {
+	return state != DeviceTrustStateTrusted
 }
 
 func normalizeSignedPreKey(value SignedPreKey) SignedPreKey {

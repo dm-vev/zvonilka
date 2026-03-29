@@ -530,6 +530,32 @@ func TestGetConversationKeyCoverage(t *testing.T) {
 	if len(directCoverage) != 1 || directCoverage[0].State != domaine2ee.ConversationKeyCoverageStateReady {
 		t.Fatalf("unexpected direct coverage: %+v", directCoverage)
 	}
+	if directCoverage[0].TrustState != domaine2ee.DeviceTrustStateUnspecified || !directCoverage[0].VerificationRequired || directCoverage[0].KeyFingerprint == "" {
+		t.Fatalf("unexpected direct verification hints: %+v", directCoverage[0])
+	}
+
+	_, err = service.SetDeviceTrust(ctx, domaine2ee.SetDeviceTrustParams{
+		ObserverAccountID: "acc-a",
+		ObserverDeviceID:  "dev-a",
+		TargetAccountID:   "acc-b",
+		TargetDeviceID:    "dev-b",
+		State:             domaine2ee.DeviceTrustStateTrusted,
+	})
+	if err != nil {
+		t.Fatalf("set direct trust: %v", err)
+	}
+
+	directCoverage, err = service.GetConversationKeyCoverage(ctx, domaine2ee.GetConversationKeyCoverageParams{
+		ConversationID:  direct.ID,
+		SenderAccountID: "acc-a",
+		SenderDeviceID:  "dev-a",
+	})
+	if err != nil {
+		t.Fatalf("direct coverage after trust: %v", err)
+	}
+	if directCoverage[0].TrustState != domaine2ee.DeviceTrustStateTrusted || directCoverage[0].VerificationRequired {
+		t.Fatalf("unexpected direct trust coverage after trust: %+v", directCoverage[0])
+	}
 
 	groupCoverage, err := service.GetConversationKeyCoverage(ctx, domaine2ee.GetConversationKeyCoverageParams{
 		ConversationID:  group.ID,
@@ -545,6 +571,18 @@ func TestGetConversationKeyCoverage(t *testing.T) {
 	}
 	if groupCoverage[0].State == domaine2ee.ConversationKeyCoverageStateMissing && groupCoverage[1].State == domaine2ee.ConversationKeyCoverageStateMissing {
 		t.Fatalf("expected at least one non-missing group coverage entry: %+v", groupCoverage)
+	}
+	seenUntrusted := false
+	for _, entry := range groupCoverage {
+		if entry.KeyFingerprint == "" {
+			t.Fatalf("expected key fingerprint in coverage entry: %+v", entry)
+		}
+		if entry.VerificationRequired {
+			seenUntrusted = true
+		}
+	}
+	if !seenUntrusted {
+		t.Fatalf("expected verification-required group coverage: %+v", groupCoverage)
 	}
 }
 
