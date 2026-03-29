@@ -619,12 +619,10 @@ func (a *api) publishConversationE2EERequiredActionEvents(
 
 	for _, conversationID := range conversationIDs {
 		overlay := overlays[conversationID]
-		a.publishSyntheticSyncEvent(domainconversation.EventEnvelope{
-			EventID:        newGatewayEventID("sync"),
-			EventType:      domainconversation.EventTypeConversationUpdated,
+		_, event, err := a.conversation.PublishConversationUpdate(ctx, domainconversation.PublishConversationUpdateParams{
 			ConversationID: conversationID,
-			ActorAccountID: accountID,
-			ActorDeviceID:  deviceID,
+			AccountID:      accountID,
+			DeviceID:       deviceID,
 			PayloadType:    "e2ee_required_action",
 			Metadata: map[string]string{
 				"verification_required_devices": strconv.FormatUint(uint64(overlay.VerificationRequiredDevices), 10),
@@ -632,6 +630,10 @@ func (a *api) publishConversationE2EERequiredActionEvents(
 			},
 			CreatedAt: timeNowUTC(),
 		})
+		if err != nil {
+			continue
+		}
+		a.publishSyncEvent(event)
 	}
 }
 

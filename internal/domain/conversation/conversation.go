@@ -146,6 +146,53 @@ func (s *Service) appendConversationEvent(
 	return savedConversation, event, nil
 }
 
+// PublishConversationUpdate appends a sync-visible conversation.updated event without mutating settings or members.
+func (s *Service) PublishConversationUpdate(
+	ctx context.Context,
+	params PublishConversationUpdateParams,
+) (Conversation, EventEnvelope, error) {
+	if err := s.validateContext(ctx, "publish conversation update"); err != nil {
+		return Conversation{}, EventEnvelope{}, err
+	}
+
+	params.ConversationID = strings.TrimSpace(params.ConversationID)
+	params.AccountID = strings.TrimSpace(params.AccountID)
+	params.DeviceID = strings.TrimSpace(params.DeviceID)
+	params.PayloadType = strings.TrimSpace(params.PayloadType)
+	if params.ConversationID == "" || params.AccountID == "" || params.PayloadType == "" {
+		return Conversation{}, EventEnvelope{}, ErrInvalidInput
+	}
+
+	var (
+		saved Conversation
+		event EventEnvelope
+	)
+	err := s.store.WithinTx(ctx, func(tx Store) error {
+		conversationRow, _, err := s.loadConversationActor(ctx, tx, params.ConversationID, params.AccountID)
+		if err != nil {
+			return err
+		}
+
+		saved, event, err = s.appendConversationEvent(
+			ctx,
+			tx,
+			conversationRow,
+			params.AccountID,
+			params.DeviceID,
+			EventTypeConversationUpdated,
+			params.PayloadType,
+			params.Metadata,
+			params.CreatedAt,
+		)
+		return err
+	})
+	if err != nil {
+		return Conversation{}, EventEnvelope{}, err
+	}
+
+	return saved, event, nil
+}
+
 func canManageConversation(member ConversationMember, actorAccountID string, kind ConversationKind) bool {
 	if member.AccountID != actorAccountID || !isActiveMember(member) {
 		return false

@@ -234,6 +234,16 @@ type PublishUserUpdateParams struct {
 	CreatedAt   time.Time
 }
 
+// PublishConversationUpdateParams describes one synthetic conversation update event.
+type PublishConversationUpdateParams struct {
+	ConversationID string
+	AccountID      string
+	DeviceID       string
+	PayloadType    string
+	Metadata       map[string]string
+	CreatedAt      time.Time
+}
+
 // CreateTopicParams describes a new topic to persist.
 type CreateTopicParams struct {
 	ConversationID   string

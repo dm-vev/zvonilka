@@ -1512,6 +1512,96 @@ func TestSubscribeEventsStreamsConversationE2EERequiredActionOverlay(t *testing.
 	}
 }
 
+func TestPullEventsIncludesConversationE2EERequiredActionOverlay(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-pull-e2ee-overlay",
+		DisplayName: "Alice Pull E2EE Overlay",
+		Email:       "alice-pull-e2ee-overlay@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-pull-e2ee-overlay",
+		DisplayName: "Bob Pull E2EE Overlay",
+		Email:       "bob-pull-e2ee-overlay@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, _ := login(alice.Username, "alice-pull-overlay-phone", "alice-pull-overlay-device-key")
+	_, bobDeviceID := login(bob.Username, "bob-pull-overlay-phone", "bob-pull-overlay-device-key")
+
+	created, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{bob.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	if _, err := api.SetDeviceTrust(aliceCtx, &e2eev1.SetDeviceTrustRequest{
+		TargetUserId:   bob.ID,
+		TargetDeviceId: bobDeviceID,
+		State:          e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_UNTRUSTED,
+	}); err != nil {
+		t.Fatalf("set device trust: %v", err)
+	}
+
+	pulled, err := api.PullEvents(aliceCtx, &syncv1.PullEventsRequest{
+		FromSequence:    created.Conversation.LastSequence,
+		ConversationIds: []string{created.Conversation.ConversationId},
+	})
+	if err != nil {
+		t.Fatalf("pull events: %v", err)
+	}
+	if len(pulled.Events) != 1 {
+		t.Fatalf("expected one e2ee overlay event, got %+v", pulled.Events)
+	}
+	if pulled.Events[0].EventType != commonv1.EventType_EVENT_TYPE_CONVERSATION_UPDATED {
+		t.Fatalf("expected conversation updated, got %s", pulled.Events[0].EventType)
+	}
+	if pulled.Events[0].PayloadType != "e2ee_required_action" {
+		t.Fatalf("expected e2ee_required_action payload, got %s", pulled.Events[0].PayloadType)
+	}
+	if pulled.Events[0].Metadata["verification_required_devices"] != "1" {
+		t.Fatalf("expected one verification-required device, got %+v", pulled.Events[0].Metadata)
+	}
+}
+
 func TestSubscribeE2EEUpdatesStreamsTrustChanges(t *testing.T) {
 	t.Parallel()
 
