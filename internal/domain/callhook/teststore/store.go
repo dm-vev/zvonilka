@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 	"github.com/dm-vev/zvonilka/internal/domain/callhook"
 	"github.com/dm-vev/zvonilka/internal/domain/storage"
 )
@@ -76,6 +77,28 @@ func (s *memoryStore) RecordingJobByCallID(_ context.Context, callID string) (ca
 	return job, nil
 }
 
+func (s *memoryStore) PendingRecordingJobs(_ context.Context, limit int) ([]callhook.RecordingJob, error) {
+	if limit <= 0 {
+		return nil, callhook.ErrInvalidInput
+	}
+
+	jobs := make([]callhook.RecordingJob, 0, limit)
+	for _, job := range s.recordingByCallID {
+		if strings.TrimSpace(job.OwnerAccountID) == "" || strings.TrimSpace(job.ConversationID) == "" {
+			continue
+		}
+		if job.State != domaincall.RecordingStateInactive || job.StoppedAt.IsZero() || strings.TrimSpace(job.OutputMediaID) != "" {
+			continue
+		}
+		jobs = append(jobs, job)
+		if len(jobs) == limit {
+			break
+		}
+	}
+
+	return jobs, nil
+}
+
 func (s *memoryStore) SaveTranscriptionJob(_ context.Context, job callhook.TranscriptionJob) (callhook.TranscriptionJob, error) {
 	job.CallID = strings.TrimSpace(job.CallID)
 	job.LastEventID = strings.TrimSpace(job.LastEventID)
@@ -96,6 +119,28 @@ func (s *memoryStore) TranscriptionJobByCallID(_ context.Context, callID string)
 		return callhook.TranscriptionJob{}, callhook.ErrNotFound
 	}
 	return job, nil
+}
+
+func (s *memoryStore) PendingTranscriptionJobs(_ context.Context, limit int) ([]callhook.TranscriptionJob, error) {
+	if limit <= 0 {
+		return nil, callhook.ErrInvalidInput
+	}
+
+	jobs := make([]callhook.TranscriptionJob, 0, limit)
+	for _, job := range s.transcriptionByCallID {
+		if strings.TrimSpace(job.OwnerAccountID) == "" || strings.TrimSpace(job.ConversationID) == "" {
+			continue
+		}
+		if job.State != domaincall.TranscriptionStateInactive || job.StoppedAt.IsZero() || strings.TrimSpace(job.TranscriptMediaID) != "" {
+			continue
+		}
+		jobs = append(jobs, job)
+		if len(jobs) == limit {
+			break
+		}
+	}
+
+	return jobs, nil
 }
 
 func cloneRecordingJobs(src map[string]callhook.RecordingJob) map[string]callhook.RecordingJob {

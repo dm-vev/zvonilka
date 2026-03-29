@@ -34,12 +34,14 @@ func (s *Service) ApplyRecordingHook(ctx context.Context, payload domaincall.Hoo
 	}
 
 	job := RecordingJob{
-		CallID:      payload.Call.ID,
-		LastEventID: payload.Event.EventID,
-		State:       payload.Call.RecordingState,
-		StartedAt:   payload.Call.RecordingStartedAt,
-		StoppedAt:   payload.Call.RecordingStoppedAt,
-		UpdatedAt:   s.currentTime(),
+		OwnerAccountID: ownerAccountID(payload.Call),
+		ConversationID: strings.TrimSpace(payload.Call.ConversationID),
+		CallID:         payload.Call.ID,
+		LastEventID:    payload.Event.EventID,
+		State:          payload.Call.RecordingState,
+		StartedAt:      payload.Call.RecordingStartedAt,
+		StoppedAt:      payload.Call.RecordingStoppedAt,
+		UpdatedAt:      s.currentTime(),
 	}
 
 	saved, err := s.store.SaveRecordingJob(ctx, job)
@@ -57,12 +59,14 @@ func (s *Service) ApplyTranscriptionHook(ctx context.Context, payload domaincall
 	}
 
 	job := TranscriptionJob{
-		CallID:      payload.Call.ID,
-		LastEventID: payload.Event.EventID,
-		State:       payload.Call.TranscriptionState,
-		StartedAt:   payload.Call.TranscriptionStartedAt,
-		StoppedAt:   payload.Call.TranscriptionStoppedAt,
-		UpdatedAt:   s.currentTime(),
+		OwnerAccountID: ownerAccountID(payload.Call),
+		ConversationID: strings.TrimSpace(payload.Call.ConversationID),
+		CallID:         payload.Call.ID,
+		LastEventID:    payload.Event.EventID,
+		State:          payload.Call.TranscriptionState,
+		StartedAt:      payload.Call.TranscriptionStartedAt,
+		StoppedAt:      payload.Call.TranscriptionStoppedAt,
+		UpdatedAt:      s.currentTime(),
 	}
 
 	saved, err := s.store.SaveTranscriptionJob(ctx, job)
@@ -99,4 +103,13 @@ func (s *Service) validatePayload(ctx context.Context, payload domaincall.HookPa
 	}
 
 	return nil
+}
+
+func ownerAccountID(callRow domaincall.Call) string {
+	hostAccountID := strings.TrimSpace(callRow.HostAccountID)
+	if hostAccountID != "" {
+		return hostAccountID
+	}
+
+	return strings.TrimSpace(callRow.InitiatorAccountID)
 }

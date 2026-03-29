@@ -8,7 +8,9 @@ type Store interface {
 
 	SaveRecordingJob(ctx context.Context, job RecordingJob) (RecordingJob, error)
 	RecordingJobByCallID(ctx context.Context, callID string) (RecordingJob, error)
+	PendingRecordingJobs(ctx context.Context, limit int) ([]RecordingJob, error)
 
 	SaveTranscriptionJob(ctx context.Context, job TranscriptionJob) (TranscriptionJob, error)
 	TranscriptionJobByCallID(ctx context.Context, callID string) (TranscriptionJob, error)
+	PendingTranscriptionJobs(ctx context.Context, limit int) ([]TranscriptionJob, error)
 }

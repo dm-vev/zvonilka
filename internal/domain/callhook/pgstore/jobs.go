@@ -35,6 +35,8 @@ func (s *Store) SaveRecordingJob(ctx context.Context, job callhook.RecordingJob)
 }
 
 func (s *Store) saveRecordingJob(ctx context.Context, job callhook.RecordingJob) (callhook.RecordingJob, error) {
+	job.OwnerAccountID = strings.TrimSpace(job.OwnerAccountID)
+	job.ConversationID = strings.TrimSpace(job.ConversationID)
 	job.CallID = strings.TrimSpace(job.CallID)
 	job.LastEventID = strings.TrimSpace(job.LastEventID)
 	job.OutputMediaID = strings.TrimSpace(job.OutputMediaID)
@@ -44,23 +46,27 @@ func (s *Store) saveRecordingJob(ctx context.Context, job callhook.RecordingJob)
 
 	query := fmt.Sprintf(`
 INSERT INTO %s (
-	call_id, last_event_id, state, output_media_id, started_at, stopped_at, updated_at
+	owner_account_id, conversation_id, call_id, last_event_id, state, output_media_id, started_at, stopped_at, updated_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7
+	$1, $2, $3, $4, $5, $6, $7, $8, $9
 )
 ON CONFLICT (call_id) DO UPDATE SET
+	owner_account_id = COALESCE(NULLIF(EXCLUDED.owner_account_id, ''), %s.owner_account_id),
+	conversation_id = COALESCE(NULLIF(EXCLUDED.conversation_id, ''), %s.conversation_id),
 	last_event_id = EXCLUDED.last_event_id,
 	state = EXCLUDED.state,
 	output_media_id = EXCLUDED.output_media_id,
 	started_at = EXCLUDED.started_at,
 	stopped_at = EXCLUDED.stopped_at,
 	updated_at = EXCLUDED.updated_at
-RETURNING call_id, last_event_id, state, output_media_id, started_at, stopped_at, updated_at
-`, s.table("call_recording_jobs"))
+RETURNING owner_account_id, conversation_id, call_id, last_event_id, state, output_media_id, started_at, stopped_at, updated_at
+`, s.table("call_recording_jobs"), s.table("call_recording_jobs"), s.table("call_recording_jobs"))
 
 	row := s.conn().QueryRowContext(
 		ctx,
 		query,
+		nullString(job.OwnerAccountID),
+		nullString(job.ConversationID),
 		job.CallID,
 		job.LastEventID,
 		nullString(string(job.State)),
@@ -85,7 +91,7 @@ func (s *Store) RecordingJobByCallID(ctx context.Context, callID string) (callho
 	}
 
 	query := fmt.Sprintf(`
-SELECT call_id, last_event_id, state, output_media_id, started_at, stopped_at, updated_at
+SELECT owner_account_id, conversation_id, call_id, last_event_id, state, output_media_id, started_at, stopped_at, updated_at
 FROM %s
 WHERE call_id = $1
 `, s.table("call_recording_jobs"))
@@ -98,6 +104,49 @@ WHERE call_id = $1
 		return callhook.RecordingJob{}, fmt.Errorf("load recording job %s: %w", callID, err)
 	}
 	return job, nil
+}
+
+func (s *Store) PendingRecordingJobs(ctx context.Context, limit int) ([]callhook.RecordingJob, error) {
+	if err := s.requireStore(); err != nil {
+		return nil, err
+	}
+	if err := s.requireContext(ctx); err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		return nil, callhook.ErrInvalidInput
+	}
+
+	query := fmt.Sprintf(`
+SELECT owner_account_id, conversation_id, call_id, last_event_id, state, output_media_id, started_at, stopped_at, updated_at
+FROM %s
+WHERE state = 'inactive'
+  AND stopped_at IS NOT NULL
+  AND COALESCE(output_media_id, '') = ''
+  AND COALESCE(owner_account_id, '') <> ''
+  AND COALESCE(conversation_id, '') <> ''
+ORDER BY updated_at ASC, call_id ASC
+LIMIT $1
+`, s.table("call_recording_jobs"))
+	rows, err := s.conn().QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("load pending recording jobs: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []callhook.RecordingJob
+	for rows.Next() {
+		job, scanErr := scanRecordingJobRows(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan pending recording job: %w", scanErr)
+		}
+		jobs = append(jobs, job)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate pending recording jobs: %w", err)
+	}
+
+	return jobs, nil
 }
 
 func (s *Store) SaveTranscriptionJob(ctx context.Context, job callhook.TranscriptionJob) (callhook.TranscriptionJob, error) {
@@ -124,6 +173,8 @@ func (s *Store) SaveTranscriptionJob(ctx context.Context, job callhook.Transcrip
 }
 
 func (s *Store) saveTranscriptionJob(ctx context.Context, job callhook.TranscriptionJob) (callhook.TranscriptionJob, error) {
+	job.OwnerAccountID = strings.TrimSpace(job.OwnerAccountID)
+	job.ConversationID = strings.TrimSpace(job.ConversationID)
 	job.CallID = strings.TrimSpace(job.CallID)
 	job.LastEventID = strings.TrimSpace(job.LastEventID)
 	job.TranscriptMediaID = strings.TrimSpace(job.TranscriptMediaID)
@@ -133,23 +184,27 @@ func (s *Store) saveTranscriptionJob(ctx context.Context, job callhook.Transcrip
 
 	query := fmt.Sprintf(`
 INSERT INTO %s (
-	call_id, last_event_id, state, transcript_media_id, started_at, stopped_at, updated_at
+	owner_account_id, conversation_id, call_id, last_event_id, state, transcript_media_id, started_at, stopped_at, updated_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7
+	$1, $2, $3, $4, $5, $6, $7, $8, $9
 )
 ON CONFLICT (call_id) DO UPDATE SET
+	owner_account_id = COALESCE(NULLIF(EXCLUDED.owner_account_id, ''), %s.owner_account_id),
+	conversation_id = COALESCE(NULLIF(EXCLUDED.conversation_id, ''), %s.conversation_id),
 	last_event_id = EXCLUDED.last_event_id,
 	state = EXCLUDED.state,
 	transcript_media_id = EXCLUDED.transcript_media_id,
 	started_at = EXCLUDED.started_at,
 	stopped_at = EXCLUDED.stopped_at,
 	updated_at = EXCLUDED.updated_at
-RETURNING call_id, last_event_id, state, transcript_media_id, started_at, stopped_at, updated_at
-`, s.table("call_transcription_jobs"))
+RETURNING owner_account_id, conversation_id, call_id, last_event_id, state, transcript_media_id, started_at, stopped_at, updated_at
+`, s.table("call_transcription_jobs"), s.table("call_transcription_jobs"), s.table("call_transcription_jobs"))
 
 	row := s.conn().QueryRowContext(
 		ctx,
 		query,
+		nullString(job.OwnerAccountID),
+		nullString(job.ConversationID),
 		job.CallID,
 		job.LastEventID,
 		nullString(string(job.State)),
@@ -174,7 +229,7 @@ func (s *Store) TranscriptionJobByCallID(ctx context.Context, callID string) (ca
 	}
 
 	query := fmt.Sprintf(`
-SELECT call_id, last_event_id, state, transcript_media_id, started_at, stopped_at, updated_at
+SELECT owner_account_id, conversation_id, call_id, last_event_id, state, transcript_media_id, started_at, stopped_at, updated_at
 FROM %s
 WHERE call_id = $1
 `, s.table("call_transcription_jobs"))
@@ -187,6 +242,49 @@ WHERE call_id = $1
 		return callhook.TranscriptionJob{}, fmt.Errorf("load transcription job %s: %w", callID, err)
 	}
 	return job, nil
+}
+
+func (s *Store) PendingTranscriptionJobs(ctx context.Context, limit int) ([]callhook.TranscriptionJob, error) {
+	if err := s.requireStore(); err != nil {
+		return nil, err
+	}
+	if err := s.requireContext(ctx); err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		return nil, callhook.ErrInvalidInput
+	}
+
+	query := fmt.Sprintf(`
+SELECT owner_account_id, conversation_id, call_id, last_event_id, state, transcript_media_id, started_at, stopped_at, updated_at
+FROM %s
+WHERE state = 'inactive'
+  AND stopped_at IS NOT NULL
+  AND COALESCE(transcript_media_id, '') = ''
+  AND COALESCE(owner_account_id, '') <> ''
+  AND COALESCE(conversation_id, '') <> ''
+ORDER BY updated_at ASC, call_id ASC
+LIMIT $1
+`, s.table("call_transcription_jobs"))
+	rows, err := s.conn().QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("load pending transcription jobs: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []callhook.TranscriptionJob
+	for rows.Next() {
+		job, scanErr := scanTranscriptionJobRows(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan pending transcription job: %w", scanErr)
+		}
+		jobs = append(jobs, job)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate pending transcription jobs: %w", err)
+	}
+
+	return jobs, nil
 }
 
 func nullTime(value time.Time) sql.NullTime {
@@ -213,15 +311,42 @@ func nullString(value string) any {
 
 func scanRecordingJob(row *sql.Row) (callhook.RecordingJob, error) {
 	var (
-		job       callhook.RecordingJob
-		state     sql.NullString
-		outputID  sql.NullString
-		startedAt sql.NullTime
-		stoppedAt sql.NullTime
+		job            callhook.RecordingJob
+		ownerAccountID sql.NullString
+		conversationID sql.NullString
+		state          sql.NullString
+		outputID       sql.NullString
+		startedAt      sql.NullTime
+		stoppedAt      sql.NullTime
 	)
-	if err := row.Scan(&job.CallID, &job.LastEventID, &state, &outputID, &startedAt, &stoppedAt, &job.UpdatedAt); err != nil {
+	if err := row.Scan(&ownerAccountID, &conversationID, &job.CallID, &job.LastEventID, &state, &outputID, &startedAt, &stoppedAt, &job.UpdatedAt); err != nil {
 		return callhook.RecordingJob{}, err
 	}
+	job.OwnerAccountID = ownerAccountID.String
+	job.ConversationID = conversationID.String
+	job.State = domaincall.RecordingState(state.String)
+	job.OutputMediaID = outputID.String
+	job.StartedAt = decodeTime(startedAt)
+	job.StoppedAt = decodeTime(stoppedAt)
+	job.UpdatedAt = job.UpdatedAt.UTC()
+	return job, nil
+}
+
+func scanRecordingJobRows(rows *sql.Rows) (callhook.RecordingJob, error) {
+	var (
+		job            callhook.RecordingJob
+		ownerAccountID sql.NullString
+		conversationID sql.NullString
+		state          sql.NullString
+		outputID       sql.NullString
+		startedAt      sql.NullTime
+		stoppedAt      sql.NullTime
+	)
+	if err := rows.Scan(&ownerAccountID, &conversationID, &job.CallID, &job.LastEventID, &state, &outputID, &startedAt, &stoppedAt, &job.UpdatedAt); err != nil {
+		return callhook.RecordingJob{}, err
+	}
+	job.OwnerAccountID = ownerAccountID.String
+	job.ConversationID = conversationID.String
 	job.State = domaincall.RecordingState(state.String)
 	job.OutputMediaID = outputID.String
 	job.StartedAt = decodeTime(startedAt)
@@ -232,15 +357,42 @@ func scanRecordingJob(row *sql.Row) (callhook.RecordingJob, error) {
 
 func scanTranscriptionJob(row *sql.Row) (callhook.TranscriptionJob, error) {
 	var (
-		job       callhook.TranscriptionJob
-		state     sql.NullString
-		mediaID   sql.NullString
-		startedAt sql.NullTime
-		stoppedAt sql.NullTime
+		job            callhook.TranscriptionJob
+		ownerAccountID sql.NullString
+		conversationID sql.NullString
+		state          sql.NullString
+		mediaID        sql.NullString
+		startedAt      sql.NullTime
+		stoppedAt      sql.NullTime
 	)
-	if err := row.Scan(&job.CallID, &job.LastEventID, &state, &mediaID, &startedAt, &stoppedAt, &job.UpdatedAt); err != nil {
+	if err := row.Scan(&ownerAccountID, &conversationID, &job.CallID, &job.LastEventID, &state, &mediaID, &startedAt, &stoppedAt, &job.UpdatedAt); err != nil {
 		return callhook.TranscriptionJob{}, err
 	}
+	job.OwnerAccountID = ownerAccountID.String
+	job.ConversationID = conversationID.String
+	job.State = domaincall.TranscriptionState(state.String)
+	job.TranscriptMediaID = mediaID.String
+	job.StartedAt = decodeTime(startedAt)
+	job.StoppedAt = decodeTime(stoppedAt)
+	job.UpdatedAt = job.UpdatedAt.UTC()
+	return job, nil
+}
+
+func scanTranscriptionJobRows(rows *sql.Rows) (callhook.TranscriptionJob, error) {
+	var (
+		job            callhook.TranscriptionJob
+		ownerAccountID sql.NullString
+		conversationID sql.NullString
+		state          sql.NullString
+		mediaID        sql.NullString
+		startedAt      sql.NullTime
+		stoppedAt      sql.NullTime
+	)
+	if err := rows.Scan(&ownerAccountID, &conversationID, &job.CallID, &job.LastEventID, &state, &mediaID, &startedAt, &stoppedAt, &job.UpdatedAt); err != nil {
+		return callhook.TranscriptionJob{}, err
+	}
+	job.OwnerAccountID = ownerAccountID.String
+	job.ConversationID = conversationID.String
 	job.State = domaincall.TranscriptionState(state.String)
 	job.TranscriptMediaID = mediaID.String
 	job.StartedAt = decodeTime(startedAt)

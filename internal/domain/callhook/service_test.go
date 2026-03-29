@@ -27,6 +27,9 @@ func TestApplyRecordingAndTranscriptionHooks(t *testing.T) {
 			EventType: domaincall.EventTypeRecordingUpdated,
 		},
 		Call: domaincall.Call{
+			ConversationID:     "conv-1",
+			HostAccountID:      "acc-host",
+			InitiatorAccountID: "acc-init",
 			ID:                 "call-1",
 			RecordingState:     domaincall.RecordingStateActive,
 			RecordingStartedAt: now,
@@ -36,6 +39,8 @@ func TestApplyRecordingAndTranscriptionHooks(t *testing.T) {
 	recording, err := service.ApplyRecordingHook(context.Background(), payload)
 	require.NoError(t, err)
 	require.Equal(t, domaincall.RecordingStateActive, recording.State)
+	require.Equal(t, "acc-host", recording.OwnerAccountID)
+	require.Equal(t, "conv-1", recording.ConversationID)
 
 	transcription, err := service.ApplyTranscriptionHook(context.Background(), domaincall.HookPayload{
 		Event: domaincall.Event{
@@ -44,6 +49,8 @@ func TestApplyRecordingAndTranscriptionHooks(t *testing.T) {
 			EventType: domaincall.EventTypeTranscriptionUpdated,
 		},
 		Call: domaincall.Call{
+			ConversationID:         "conv-1",
+			InitiatorAccountID:     "acc-init",
 			ID:                     "call-1",
 			TranscriptionState:     domaincall.TranscriptionStateActive,
 			TranscriptionStartedAt: now,
@@ -51,6 +58,8 @@ func TestApplyRecordingAndTranscriptionHooks(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, domaincall.TranscriptionStateActive, transcription.State)
+	require.Equal(t, "acc-init", transcription.OwnerAccountID)
+	require.Equal(t, "conv-1", transcription.ConversationID)
 }
 
 func TestApplyHookRejectsMismatchedCallIDs(t *testing.T) {

@@ -27,6 +27,18 @@ func Run(ctx context.Context) (err error) {
 		err = finalizeRun(ctx, app, err)
 	}()
 
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	executorErrCh := make(chan error, 1)
+	go func() {
+		executorErr := app.executor.Run(runCtx, logger)
+		executorErrCh <- executorErr
+		if executorErr != nil && !errors.Is(executorErr, context.Canceled) {
+			cancel()
+		}
+	}()
+
 	logger.InfoContext(
 		ctx,
 		"service initialized",
@@ -42,14 +54,28 @@ func Run(ctx context.Context) (err error) {
 		cfg.Runtime.GRPC.Address,
 	)
 
-	return runtime.Run(
-		ctx,
+	runErr := runtime.Run(
+		runCtx,
 		cfg.Runtime.ToRuntime(cfg.Service),
 		logger,
 		app.health,
 		app.handler,
 		nil,
 	)
+	cancel()
+
+	executorErr := <-executorErrCh
+	if runErr != nil {
+		if executorErr != nil && !errors.Is(executorErr, context.Canceled) {
+			return errors.Join(runErr, executorErr)
+		}
+		return runErr
+	}
+	if executorErr != nil && !errors.Is(executorErr, context.Canceled) {
+		return executorErr
+	}
+
+	return nil
 }
 
 func finalizeRun(ctx context.Context, app *app, runErr error) error {
