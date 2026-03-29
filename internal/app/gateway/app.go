@@ -35,7 +35,7 @@ type app struct {
 	catalog        *domainstorage.Catalog
 	rtcCluster     *platformrtc.Cluster
 	api            *api
-	callRuntime    *callRuntimeAPI
+	callRuntime    callruntimev1.CallRuntimeServiceServer
 	cleanupTimeout time.Duration
 }
 
@@ -112,7 +112,7 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 			callNotifier: newCallNotifier(),
 			syncNotifier: newSyncNotifier(),
 		},
-		callRuntime:    newCallRuntimeAPI(localRTC),
+		callRuntime:    platformrtc.NewGRPCRuntimeServer(localRTC),
 		cleanupTimeout: cfg.Runtime.ShutdownTimeout,
 	}, nil
 }
