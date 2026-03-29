@@ -270,6 +270,7 @@ func sessionSnapshotProto(value sessionSnapshot) *callruntimev1.SessionSnapshot 
 				CameraEnabled:      participant.Media.CameraEnabled,
 				ScreenShareEnabled: participant.Media.ScreenShareEnabled,
 			},
+			TransportStats: runtimeTransportStatsProto(participant.Transport),
 		})
 	}
 	return result
@@ -296,6 +297,7 @@ func sessionSnapshotFromProto(value *callruntimev1.SessionSnapshot) sessionSnaps
 				CameraEnabled:      participant.GetMediaState().GetCameraEnabled(),
 				ScreenShareEnabled: participant.GetMediaState().GetScreenShareEnabled(),
 			},
+			Transport: runtimeTransportStatsFromProto(participant.GetTransportStats()),
 		})
 	}
 

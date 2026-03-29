@@ -18,6 +18,7 @@ type snapshotParticipant struct {
 	DeviceID  string
 	WithVideo bool
 	Media     domaincall.MediaState
+	Transport domaincall.TransportStats
 }
 
 func cloneSessionSnapshot(value sessionSnapshot) sessionSnapshot {
@@ -29,9 +30,42 @@ func cloneSessionSnapshot(value sessionSnapshot) sessionSnapshot {
 	}
 
 	cloned := make([]snapshotParticipant, len(value.Participants))
-	copy(cloned, value.Participants)
+	for i := range value.Participants {
+		cloned[i] = cloneSnapshotParticipant(value.Participants[i])
+	}
 	value.Participants = cloned
 	return value
+}
+
+func cloneSnapshotParticipant(value snapshotParticipant) snapshotParticipant {
+	value.Transport = cloneTransportStats(value.Transport)
+	return value
+}
+
+func cloneTransportStats(value domaincall.TransportStats) domaincall.TransportStats {
+	value.RecentSamples = cloneTransportQualitySamples(value.RecentSamples)
+	value.RecentQoSSamples = cloneTransportQoSSamples(value.RecentQoSSamples)
+	return value
+}
+
+func cloneTransportQualitySamples(values []domaincall.TransportQualitySample) []domaincall.TransportQualitySample {
+	if len(values) == 0 {
+		return nil
+	}
+
+	cloned := make([]domaincall.TransportQualitySample, len(values))
+	copy(cloned, values)
+	return cloned
+}
+
+func cloneTransportQoSSamples(values []domaincall.TransportQoSSample) []domaincall.TransportQoSSample {
+	if len(values) == 0 {
+		return nil
+	}
+
+	cloned := make([]domaincall.TransportQoSSample, len(values))
+	copy(cloned, values)
+	return cloned
 }
 
 func (m *Manager) ExportSessionSnapshot(_ context.Context, sessionID string) (sessionSnapshot, error) {
@@ -53,12 +87,17 @@ func (m *Manager) ExportSessionSnapshot(_ context.Context, sessionID string) (se
 		Conversation: active.conversation,
 		Participants: make([]snapshotParticipant, 0, len(active.participants)),
 	}
-	for _, participant := range active.participants {
+	for key, participant := range active.participants {
+		transport := cloneTransportStats(active.standbyStats[key])
+		if value := active.peers[key]; value != nil {
+			transport = cloneTransportStats(value.snapshotStats())
+		}
 		snapshot.Participants = append(snapshot.Participants, snapshotParticipant{
 			AccountID: participant.accountID,
 			DeviceID:  participant.deviceID,
 			WithVideo: participant.withVideo,
 			Media:     participant.media,
+			Transport: transport,
 		})
 	}
 
@@ -105,14 +144,38 @@ func (m *Manager) RestoreReplica(_ context.Context, callID string, sessionID str
 	if active.participants == nil {
 		active.participants = make(map[string]participant)
 	}
+	if active.standbyStats == nil {
+		active.standbyStats = make(map[string]domaincall.TransportStats)
+	}
 	for _, item := range snapshot.Participants {
-		active.participants[participantKey(item.AccountID, item.DeviceID)] = participant{
+		key := participantKey(item.AccountID, item.DeviceID)
+		active.participants[key] = participant{
 			accountID: item.AccountID,
 			deviceID:  item.DeviceID,
 			withVideo: item.WithVideo,
 			media:     item.Media,
 		}
+		if hasTransportStats(item.Transport) {
+			active.standbyStats[key] = cloneTransportStats(item.Transport)
+			continue
+		}
+		delete(active.standbyStats, key)
 	}
 
 	return nil
+}
+
+func hasTransportStats(value domaincall.TransportStats) bool {
+	return !value.LastUpdatedAt.IsZero() ||
+		value.PeerConnectionState != "" ||
+		value.IceConnectionState != "" ||
+		value.SignalingState != "" ||
+		value.Quality != "" ||
+		value.AdaptationRevision != 0 ||
+		value.ReconnectAttempt != 0 ||
+		value.RelayPackets != 0 ||
+		value.RelayBytes != 0 ||
+		value.RelayWriteErrors != 0 ||
+		len(value.RecentSamples) > 0 ||
+		len(value.RecentQoSSamples) > 0
 }

@@ -40,6 +40,7 @@ message SnapshotParticipant {
   string device_id = 2;
   bool with_video = 3;
   zvonilka.call.v1.CallMediaState media_state = 4;
+  zvonilka.call.v1.CallTransportStats transport_stats = 5;
 }
 
 message SessionSnapshot {

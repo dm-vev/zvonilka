@@ -47,6 +47,7 @@ type session struct {
 	host         string
 	port         int
 	participants map[string]participant
+	standbyStats map[string]domaincall.TransportStats
 	peers        map[string]*peer
 }
 
@@ -233,6 +234,7 @@ func (m *Manager) EnsureSession(_ context.Context, callRow domaincall.Call) (dom
 		host:         m.host,
 		port:         port,
 		participants: make(map[string]participant),
+		standbyStats: make(map[string]domaincall.TransportStats),
 		peers:        make(map[string]*peer),
 	}
 
@@ -474,14 +476,39 @@ func (m *Manager) SessionStats(_ context.Context, sessionID string) ([]domaincal
 			peers = append(peers, value)
 		}
 	}
+	standby := make(map[string]domaincall.TransportStats, len(active.standbyStats))
+	for key, value := range active.standbyStats {
+		standby[key] = cloneTransportStats(value)
+	}
+	participants := make(map[string]participant, len(active.participants))
+	for key, value := range active.participants {
+		participants[key] = value
+	}
 	m.mu.Unlock()
 
-	stats := make([]domaincall.RuntimeStats, 0, len(peers))
+	stats := make([]domaincall.RuntimeStats, 0, len(peers)+len(standby))
+	liveKeys := make(map[string]struct{}, len(peers))
 	for _, value := range peers {
+		key := participantKey(value.accountID, value.deviceID)
+		liveKeys[key] = struct{}{}
 		stats = append(stats, domaincall.RuntimeStats{
 			AccountID: value.accountID,
 			DeviceID:  value.deviceID,
 			Transport: value.snapshotStats(),
+		})
+	}
+	for key, value := range standby {
+		if _, ok := liveKeys[key]; ok {
+			continue
+		}
+		participantRow, ok := participants[key]
+		if !ok {
+			continue
+		}
+		stats = append(stats, domaincall.RuntimeStats{
+			AccountID: participantRow.accountID,
+			DeviceID:  participantRow.deviceID,
+			Transport: value,
 		})
 	}
 	markActiveAndDominantSpeakers(stats, m.now())
@@ -548,6 +575,7 @@ func (m *Manager) LeaveSession(_ context.Context, sessionID string, accountID st
 		return domaincall.ErrNotFound
 	}
 	delete(active.participants, participantKey(accountID, deviceID))
+	delete(active.standbyStats, participantKey(accountID, deviceID))
 	peerConn = active.peers[participantKey(accountID, deviceID)]
 	delete(active.peers, participantKey(accountID, deviceID))
 	affected = m.removeSourceRelayTracksLocked(active, participantKey(accountID, deviceID))
@@ -635,6 +663,10 @@ func (m *Manager) ensurePeer(sessionID string, participantRow domaincall.Runtime
 	if existing := active.peers[key]; existing != nil {
 		_ = created.pc.Close()
 		return active, existing, nil
+	}
+	if standby, ok := active.standbyStats[key]; ok {
+		created.restoreTransportStats(standby)
+		delete(active.standbyStats, key)
 	}
 	active.peers[key] = created
 
@@ -1534,11 +1566,26 @@ func (p *peer) snapshotStats() domaincall.TransportStats {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	stats := p.stats
+	stats := cloneTransportStats(p.stats)
 	stats.RelayTracks = uint32(len(p.tracks))
 	stats.ScreenShareRelayTracks = uint32(countScreenShareRelayTracks(p.tracks))
 
 	return stats
+}
+
+func (p *peer) restoreTransportStats(stats domaincall.TransportStats) {
+	if p == nil {
+		return
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.stats = cloneTransportStats(stats)
+	p.lastPC = p.stats.PeerConnectionState
+	p.lastICE = p.stats.IceConnectionState
+	p.lastSIG = p.stats.SignalingState
+	p.reconnectAttempts = p.stats.ReconnectAttempt
 }
 
 func markActiveAndDominantSpeakers(stats []domaincall.RuntimeStats, now time.Time) {

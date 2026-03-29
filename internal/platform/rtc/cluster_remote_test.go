@@ -351,6 +351,19 @@ func TestClusterMigrateSessionCutsOverToDifferentNode(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	_, peerConn, err := remoteManager.ensurePeer(sourceSessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-cutover",
+		AccountID: "acc-cutover",
+		DeviceID:  "dev-cutover",
+		WithVideo: true,
+		Media: domaincall.MediaState{
+			CameraEnabled: true,
+		},
+	})
+	require.NoError(t, err)
+	peerConn.updateTelemetry(telemetryICEStateKey, webrtc.ICEConnectionStateConnected.String())
+	peerConn.updateTelemetry(telemetryPCStateKey, webrtc.PeerConnectionStateConnected.String())
+
 	migrated, err := cluster.MigrateSession(context.Background(), domaincall.Call{
 		ID:              "call-cutover",
 		ConversationID:  "conv-cutover",
@@ -364,4 +377,29 @@ func TestClusterMigrateSessionCutsOverToDifferentNode(t *testing.T) {
 	require.Equal(t, "call-cutover", restored.CallID)
 	require.Len(t, restored.Participants, 1)
 	require.Equal(t, "acc-cutover", restored.Participants[0].AccountID)
+	require.Equal(t, "connected", restored.Participants[0].Transport.Quality)
+	require.Equal(t, webrtc.ICEConnectionStateConnected.String(), restored.Participants[0].Transport.IceConnectionState)
+
+	stats, err := cluster.SessionStats(context.Background(), migrated.SessionID)
+	require.NoError(t, err)
+	require.Len(t, stats, 1)
+	require.Equal(t, "acc-cutover", stats[0].AccountID)
+	require.Equal(t, "connected", stats[0].Transport.Quality)
+	require.Equal(t, webrtc.PeerConnectionStateConnected.String(), stats[0].Transport.PeerConnectionState)
+
+	_, _, err = localManager.ensurePeer(migrated.SessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-cutover",
+		AccountID: "acc-cutover",
+		DeviceID:  "dev-cutover",
+		WithVideo: true,
+		Media: domaincall.MediaState{
+			CameraEnabled: true,
+		},
+	})
+	require.NoError(t, err)
+
+	stats, err = localManager.SessionStats(context.Background(), migrated.SessionID)
+	require.NoError(t, err)
+	require.Len(t, stats, 1)
+	require.Equal(t, "connected", stats[0].Transport.Quality)
 }
