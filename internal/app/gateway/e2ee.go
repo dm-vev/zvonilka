@@ -43,6 +43,42 @@ func (a *api) UploadDevicePreKeys(
 	}, nil
 }
 
+func (a *api) RotateE2EEKeys(
+	ctx context.Context,
+	req *e2eev1.RotateE2EEKeysRequest,
+) (*e2eev1.RotateE2EEKeysResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	deviceID := strings.TrimSpace(req.GetDeviceId())
+	if deviceID == "" {
+		deviceID = authContext.Session.DeviceID
+	}
+	if deviceID != authContext.Session.DeviceID {
+		return nil, grpcError(domaine2ee.ErrForbidden)
+	}
+
+	bundle, expiredDirect, expiredGroup, err := a.e2ee.RotateDeviceKeys(ctx, domaine2ee.RotateDeviceKeysParams{
+		AccountID:                    authContext.Account.ID,
+		DeviceID:                     deviceID,
+		SignedPreKey:                 signedPreKeyFromProto(req.GetSignedPrekey()),
+		OneTimePreKeys:               oneTimePreKeysFromProto(req.GetOneTimePrekeys()),
+		ReplaceOneTimePreKey:         req.GetReplaceOneTimePrekeys(),
+		ExpirePendingDirectSessions:  req.GetExpirePendingDirectSessions(),
+		ExpirePendingGroupSenderKeys: req.GetExpirePendingGroupSenderKeys(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &e2eev1.RotateE2EEKeysResponse{
+		Bundle:                        deviceBundleProto(bundle),
+		ExpiredPendingDirectSessions:  expiredDirect,
+		ExpiredPendingGroupSenderKeys: expiredGroup,
+	}, nil
+}
+
 func (a *api) GetAccountPreKeyBundles(
 	ctx context.Context,
 	req *e2eev1.GetAccountPreKeyBundlesRequest,
@@ -67,6 +103,53 @@ func (a *api) GetAccountPreKeyBundles(
 		result = append(result, deviceBundleProto(bundle))
 	}
 	return &e2eev1.GetAccountPreKeyBundlesResponse{Bundles: result}, nil
+}
+
+func (a *api) SetDeviceTrust(
+	ctx context.Context,
+	req *e2eev1.SetDeviceTrustRequest,
+) (*e2eev1.SetDeviceTrustResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	trust, err := a.e2ee.SetDeviceTrust(ctx, domaine2ee.SetDeviceTrustParams{
+		ObserverAccountID: authContext.Account.ID,
+		ObserverDeviceID:  authContext.Session.DeviceID,
+		TargetAccountID:   req.GetTargetUserId(),
+		TargetDeviceID:    req.GetTargetDeviceId(),
+		State:             deviceTrustStateFromProto(req.GetState()),
+		Note:              req.GetNote(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &e2eev1.SetDeviceTrustResponse{Trust: deviceTrustProto(trust)}, nil
+}
+
+func (a *api) ListDeviceTrusts(
+	ctx context.Context,
+	req *e2eev1.ListDeviceTrustsRequest,
+) (*e2eev1.ListDeviceTrustsResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	trusts, err := a.e2ee.ListDeviceTrusts(ctx, domaine2ee.ListDeviceTrustsParams{
+		ObserverAccountID: authContext.Account.ID,
+		ObserverDeviceID:  authContext.Session.DeviceID,
+		TargetAccountID:   req.GetTargetUserId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	result := make([]*e2eev1.DeviceTrust, 0, len(trusts))
+	for _, item := range trusts {
+		result = append(result, deviceTrustProto(item))
+	}
+	return &e2eev1.ListDeviceTrustsResponse{Trusts: result}, nil
 }
 
 func (a *api) CreateDirectSessions(
@@ -229,6 +312,20 @@ func deviceBundleProto(value domaine2ee.DeviceBundle) *e2eev1.DevicePreKeyBundle
 	}
 }
 
+func deviceTrustProto(value domaine2ee.DeviceTrust) *e2eev1.DeviceTrust {
+	return &e2eev1.DeviceTrust{
+		ObserverUserId:   value.ObserverAccountID,
+		ObserverDeviceId: value.ObserverDeviceID,
+		TargetUserId:     value.TargetAccountID,
+		TargetDeviceId:   value.TargetDeviceID,
+		State:            deviceTrustStateProto(value.State),
+		KeyFingerprint:   value.KeyFingerprint,
+		Note:             value.Note,
+		CreatedAt:        protoTime(value.CreatedAt),
+		UpdatedAt:        protoTime(value.UpdatedAt),
+	}
+}
+
 func signedPreKeyProto(value domaine2ee.SignedPreKey) *e2eev1.SignedPreKey {
 	if value.Key.KeyID == "" && len(value.Key.PublicKey) == 0 && len(value.Signature) == 0 {
 		return nil
@@ -262,20 +359,20 @@ func publicKeyBundleProto(value domaine2ee.PublicKey) *commonv1.PublicKeyBundle 
 
 func directSessionProto(value domaine2ee.DirectSession) *e2eev1.DirectSession {
 	return &e2eev1.DirectSession{
-		SessionId:            value.ID,
-		InitiatorUserId:      value.InitiatorAccountID,
-		InitiatorDeviceId:    value.InitiatorDeviceID,
-		RecipientUserId:      value.RecipientAccountID,
-		RecipientDeviceId:    value.RecipientDeviceID,
+		SessionId:             value.ID,
+		InitiatorUserId:       value.InitiatorAccountID,
+		InitiatorDeviceId:     value.InitiatorDeviceID,
+		RecipientUserId:       value.RecipientAccountID,
+		RecipientDeviceId:     value.RecipientDeviceID,
 		InitiatorEphemeralKey: publicKeyBundleProto(value.InitiatorEphemeral),
-		IdentityKey:          publicKeyBundleProto(value.IdentityKey),
-		SignedPrekey:         signedPreKeyProto(value.SignedPreKey),
-		OneTimePrekey:        oneTimePreKeyProto(value.OneTimePreKey),
-		Bootstrap:            bootstrapPayloadProto(value.Bootstrap),
-		State:                directSessionStateProto(value.State),
-		CreatedAt:            protoTime(value.CreatedAt),
-		AcknowledgedAt:       protoTime(value.AcknowledgedAt),
-		ExpiresAt:            protoTime(value.ExpiresAt),
+		IdentityKey:           publicKeyBundleProto(value.IdentityKey),
+		SignedPrekey:          signedPreKeyProto(value.SignedPreKey),
+		OneTimePrekey:         oneTimePreKeyProto(value.OneTimePreKey),
+		Bootstrap:             bootstrapPayloadProto(value.Bootstrap),
+		State:                 directSessionStateProto(value.State),
+		CreatedAt:             protoTime(value.CreatedAt),
+		AcknowledgedAt:        protoTime(value.AcknowledgedAt),
+		ExpiresAt:             protoTime(value.ExpiresAt),
 	}
 }
 
@@ -299,18 +396,18 @@ func bootstrapPayloadProto(value domaine2ee.BootstrapPayload) *e2eev1.SessionBoo
 
 func groupSenderKeyDistributionProto(value domaine2ee.GroupSenderKeyDistribution) *e2eev1.GroupSenderKeyDistribution {
 	return &e2eev1.GroupSenderKeyDistribution{
-		DistributionId:   value.ID,
-		ConversationId:   value.ConversationID,
-		SenderUserId:     value.SenderAccountID,
-		SenderDeviceId:   value.SenderDeviceID,
-		RecipientUserId:  value.RecipientAccountID,
-		RecipientDeviceId:value.RecipientDeviceID,
-		SenderKeyId:      value.SenderKeyID,
-		Payload:          senderKeyPayloadProto(value.Payload),
-		State:            groupSenderKeyStateProto(value.State),
-		CreatedAt:        protoTime(value.CreatedAt),
-		AcknowledgedAt:   protoTime(value.AcknowledgedAt),
-		ExpiresAt:        protoTime(value.ExpiresAt),
+		DistributionId:    value.ID,
+		ConversationId:    value.ConversationID,
+		SenderUserId:      value.SenderAccountID,
+		SenderDeviceId:    value.SenderDeviceID,
+		RecipientUserId:   value.RecipientAccountID,
+		RecipientDeviceId: value.RecipientDeviceID,
+		SenderKeyId:       value.SenderKeyID,
+		Payload:           senderKeyPayloadProto(value.Payload),
+		State:             groupSenderKeyStateProto(value.State),
+		CreatedAt:         protoTime(value.CreatedAt),
+		AcknowledgedAt:    protoTime(value.AcknowledgedAt),
+		ExpiresAt:         protoTime(value.ExpiresAt),
 	}
 }
 
@@ -452,5 +549,31 @@ func groupSenderKeyStateProto(value domaine2ee.GroupSenderKeyState) e2eev1.Group
 		return e2eev1.GroupSenderKeyState_GROUP_SENDER_KEY_STATE_ACKNOWLEDGED
 	default:
 		return e2eev1.GroupSenderKeyState_GROUP_SENDER_KEY_STATE_UNSPECIFIED
+	}
+}
+
+func deviceTrustStateProto(value domaine2ee.DeviceTrustState) e2eev1.DeviceTrustState {
+	switch value {
+	case domaine2ee.DeviceTrustStateTrusted:
+		return e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_TRUSTED
+	case domaine2ee.DeviceTrustStateUntrusted:
+		return e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_UNTRUSTED
+	case domaine2ee.DeviceTrustStateCompromised:
+		return e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_COMPROMISED
+	default:
+		return e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_UNSPECIFIED
+	}
+}
+
+func deviceTrustStateFromProto(value e2eev1.DeviceTrustState) domaine2ee.DeviceTrustState {
+	switch value {
+	case e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_TRUSTED:
+		return domaine2ee.DeviceTrustStateTrusted
+	case e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_UNTRUSTED:
+		return domaine2ee.DeviceTrustStateUntrusted
+	case e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_COMPROMISED:
+		return domaine2ee.DeviceTrustStateCompromised
+	default:
+		return domaine2ee.DeviceTrustStateUnspecified
 	}
 }

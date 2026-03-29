@@ -250,6 +250,187 @@ func TestPublishListAndAcknowledgeGroupSenderKeys(t *testing.T) {
 	}
 }
 
+func TestRotateDeviceKeysExpiresPendingArtifacts(t *testing.T) {
+	ctx := context.Background()
+	directory := identitytest.NewMemoryStore()
+	chats := conversationtest.NewMemoryStore()
+	e2eeStore := teststore.NewMemoryStore()
+	service, err := domaine2ee.NewService(e2eeStore, directory, chats)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	seedIdentity(t, ctx, directory, "acc-a", "dev-a", "device-key-a")
+	seedIdentity(t, ctx, directory, "acc-b", "dev-b", "device-key-b")
+
+	now := time.Now().UTC()
+	_, err = service.UploadDevicePreKeys(ctx, domaine2ee.UploadDevicePreKeysParams{
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		SignedPreKey: domaine2ee.SignedPreKey{
+			Key:       domaine2ee.PublicKey{KeyID: "spk-a1", Algorithm: "x25519", PublicKey: []byte("spk-a1"), CreatedAt: now},
+			Signature: []byte("sig-a1"),
+		},
+		OneTimePreKeys: []domaine2ee.OneTimePreKey{
+			{Key: domaine2ee.PublicKey{KeyID: "otk-a1", Algorithm: "x25519", PublicKey: []byte("otk-a1"), CreatedAt: now}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("upload alice prekeys: %v", err)
+	}
+	_, err = service.UploadDevicePreKeys(ctx, domaine2ee.UploadDevicePreKeysParams{
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		SignedPreKey: domaine2ee.SignedPreKey{
+			Key:       domaine2ee.PublicKey{KeyID: "spk-b1", Algorithm: "x25519", PublicKey: []byte("spk-b1"), CreatedAt: now},
+			Signature: []byte("sig-b1"),
+		},
+		OneTimePreKeys: []domaine2ee.OneTimePreKey{
+			{Key: domaine2ee.PublicKey{KeyID: "otk-b1", Algorithm: "x25519", PublicKey: []byte("otk-b1"), CreatedAt: now}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("upload bob prekeys: %v", err)
+	}
+
+	groupService, err := conversation.NewService(chats)
+	if err != nil {
+		t.Fatalf("new conversation service: %v", err)
+	}
+	group, _, err := groupService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-a",
+		Kind:             conversation.ConversationKindGroup,
+		Title:            "Rotate group",
+		MemberAccountIDs: []string{"acc-b"},
+		CreatedAt:        now,
+	})
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+
+	created, err := service.CreateDirectSessions(ctx, domaine2ee.CreateDirectSessionsParams{
+		InitiatorAccountID: "acc-a",
+		InitiatorDeviceID:  "dev-a",
+		TargetAccountID:    "acc-b",
+		InitiatorEphemeral: domaine2ee.PublicKey{KeyID: "eph-a1", Algorithm: "x25519", PublicKey: []byte("eph-a1"), CreatedAt: now},
+		Bootstrap:          domaine2ee.BootstrapPayload{Algorithm: "x3dh-v1", Ciphertext: []byte("cipher")},
+	})
+	if err != nil {
+		t.Fatalf("create direct session: %v", err)
+	}
+	if len(created) != 1 {
+		t.Fatalf("expected one direct session, got %d", len(created))
+	}
+
+	published, err := service.PublishGroupSenderKeys(ctx, domaine2ee.PublishGroupSenderKeysParams{
+		ConversationID:  group.ID,
+		SenderAccountID: "acc-a",
+		SenderDeviceID:  "dev-a",
+		SenderKeyID:     "sender-key-a1",
+		Recipients: []domaine2ee.RecipientSenderKey{
+			{
+				RecipientAccountID: "acc-b",
+				RecipientDeviceID:  "dev-b",
+				Payload:            domaine2ee.SenderKeyPayload{Algorithm: "sender-key-v1", Ciphertext: []byte("payload")},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("publish sender key: %v", err)
+	}
+	if len(published) != 1 {
+		t.Fatalf("expected one sender-key distribution, got %d", len(published))
+	}
+
+	_, expiredDirect, expiredGroup, err := service.RotateDeviceKeys(ctx, domaine2ee.RotateDeviceKeysParams{
+		AccountID:                    "acc-a",
+		DeviceID:                     "dev-a",
+		SignedPreKey:                 domaine2ee.SignedPreKey{Key: domaine2ee.PublicKey{KeyID: "spk-a2", Algorithm: "x25519", PublicKey: []byte("spk-a2"), CreatedAt: now.Add(time.Minute)}, Signature: []byte("sig-a2")},
+		OneTimePreKeys:               []domaine2ee.OneTimePreKey{{Key: domaine2ee.PublicKey{KeyID: "otk-a2", Algorithm: "x25519", PublicKey: []byte("otk-a2"), CreatedAt: now.Add(time.Minute)}}},
+		ReplaceOneTimePreKey:         true,
+		ExpirePendingDirectSessions:  true,
+		ExpirePendingGroupSenderKeys: true,
+	})
+	if err != nil {
+		t.Fatalf("rotate device keys: %v", err)
+	}
+	if expiredDirect != 1 {
+		t.Fatalf("expected one expired direct session, got %d", expiredDirect)
+	}
+	if expiredGroup != 1 {
+		t.Fatalf("expected one expired group sender key, got %d", expiredGroup)
+	}
+
+	listed, err := service.ListDeviceSessions(ctx, domaine2ee.ListDeviceSessionsParams{
+		AccountID:           "acc-b",
+		DeviceID:            "dev-b",
+		IncludeAcknowledged: true,
+	})
+	if err != nil {
+		t.Fatalf("list direct sessions: %v", err)
+	}
+	if len(listed) != 0 {
+		t.Fatalf("expected expired direct sessions to disappear, got %+v", listed)
+	}
+
+	distributions, err := service.ListGroupSenderKeys(ctx, domaine2ee.ListGroupSenderKeysParams{
+		ConversationID:      group.ID,
+		RecipientAccountID:  "acc-b",
+		RecipientDeviceID:   "dev-b",
+		IncludeAcknowledged: true,
+	})
+	if err != nil {
+		t.Fatalf("list group sender keys: %v", err)
+	}
+	if len(distributions) != 0 {
+		t.Fatalf("expected expired sender-key distributions to disappear, got %+v", distributions)
+	}
+}
+
+func TestSetAndListDeviceTrust(t *testing.T) {
+	ctx := context.Background()
+	directory := identitytest.NewMemoryStore()
+	chats := conversationtest.NewMemoryStore()
+	e2eeStore := teststore.NewMemoryStore()
+	service, err := domaine2ee.NewService(e2eeStore, directory, chats)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	seedIdentity(t, ctx, directory, "acc-a", "dev-a", "device-key-a")
+	seedIdentity(t, ctx, directory, "acc-b", "dev-b", "device-key-b")
+
+	trust, err := service.SetDeviceTrust(ctx, domaine2ee.SetDeviceTrustParams{
+		ObserverAccountID: "acc-a",
+		ObserverDeviceID:  "dev-a",
+		TargetAccountID:   "acc-b",
+		TargetDeviceID:    "dev-b",
+		State:             domaine2ee.DeviceTrustStateTrusted,
+		Note:              "verified out of band",
+	})
+	if err != nil {
+		t.Fatalf("set device trust: %v", err)
+	}
+	if trust.State != domaine2ee.DeviceTrustStateTrusted {
+		t.Fatalf("unexpected trust state: %+v", trust)
+	}
+	if trust.KeyFingerprint == "" {
+		t.Fatal("expected key fingerprint")
+	}
+
+	listed, err := service.ListDeviceTrusts(ctx, domaine2ee.ListDeviceTrustsParams{
+		ObserverAccountID: "acc-a",
+		ObserverDeviceID:  "dev-a",
+		TargetAccountID:   "acc-b",
+	})
+	if err != nil {
+		t.Fatalf("list device trusts: %v", err)
+	}
+	if len(listed) != 1 || listed[0].TargetDeviceID != "dev-b" {
+		t.Fatalf("unexpected trust list: %+v", listed)
+	}
+}
+
 func seedIdentity(t *testing.T, ctx context.Context, store identity.Store, accountID string, deviceID string, publicKey string) {
 	t.Helper()
 	if _, err := store.SaveAccount(ctx, identity.Account{

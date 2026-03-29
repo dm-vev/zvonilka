@@ -10,11 +10,36 @@ type UploadDevicePreKeysParams struct {
 	ReplaceOneTimePreKey bool
 }
 
+type RotateDeviceKeysParams struct {
+	AccountID                    string
+	DeviceID                     string
+	SignedPreKey                 SignedPreKey
+	OneTimePreKeys               []OneTimePreKey
+	ReplaceOneTimePreKey         bool
+	ExpirePendingDirectSessions  bool
+	ExpirePendingGroupSenderKeys bool
+}
+
 type FetchAccountBundlesParams struct {
 	RequesterAccountID   string
 	RequesterDeviceID    string
 	TargetAccountID      string
 	ConsumeOneTimePreKey bool
+}
+
+type SetDeviceTrustParams struct {
+	ObserverAccountID string
+	ObserverDeviceID  string
+	TargetAccountID   string
+	TargetDeviceID    string
+	State             DeviceTrustState
+	Note              string
+}
+
+type ListDeviceTrustsParams struct {
+	ObserverAccountID string
+	ObserverDeviceID  string
+	TargetAccountID   string
 }
 
 type CreateDirectSessionsParams struct {

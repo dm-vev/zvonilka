@@ -20,7 +20,10 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	E2EEService_UploadDevicePreKeys_FullMethodName       = "/zvonilka.e2ee.v1.E2EEService/UploadDevicePreKeys"
+	E2EEService_RotateE2EEKeys_FullMethodName            = "/zvonilka.e2ee.v1.E2EEService/RotateE2EEKeys"
 	E2EEService_GetAccountPreKeyBundles_FullMethodName   = "/zvonilka.e2ee.v1.E2EEService/GetAccountPreKeyBundles"
+	E2EEService_SetDeviceTrust_FullMethodName            = "/zvonilka.e2ee.v1.E2EEService/SetDeviceTrust"
+	E2EEService_ListDeviceTrusts_FullMethodName          = "/zvonilka.e2ee.v1.E2EEService/ListDeviceTrusts"
 	E2EEService_CreateDirectSessions_FullMethodName      = "/zvonilka.e2ee.v1.E2EEService/CreateDirectSessions"
 	E2EEService_ListDeviceSessions_FullMethodName        = "/zvonilka.e2ee.v1.E2EEService/ListDeviceSessions"
 	E2EEService_AcknowledgeDirectSession_FullMethodName  = "/zvonilka.e2ee.v1.E2EEService/AcknowledgeDirectSession"
@@ -34,7 +37,10 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type E2EEServiceClient interface {
 	UploadDevicePreKeys(ctx context.Context, in *UploadDevicePreKeysRequest, opts ...grpc.CallOption) (*UploadDevicePreKeysResponse, error)
+	RotateE2EEKeys(ctx context.Context, in *RotateE2EEKeysRequest, opts ...grpc.CallOption) (*RotateE2EEKeysResponse, error)
 	GetAccountPreKeyBundles(ctx context.Context, in *GetAccountPreKeyBundlesRequest, opts ...grpc.CallOption) (*GetAccountPreKeyBundlesResponse, error)
+	SetDeviceTrust(ctx context.Context, in *SetDeviceTrustRequest, opts ...grpc.CallOption) (*SetDeviceTrustResponse, error)
+	ListDeviceTrusts(ctx context.Context, in *ListDeviceTrustsRequest, opts ...grpc.CallOption) (*ListDeviceTrustsResponse, error)
 	CreateDirectSessions(ctx context.Context, in *CreateDirectSessionsRequest, opts ...grpc.CallOption) (*CreateDirectSessionsResponse, error)
 	ListDeviceSessions(ctx context.Context, in *ListDeviceSessionsRequest, opts ...grpc.CallOption) (*ListDeviceSessionsResponse, error)
 	AcknowledgeDirectSession(ctx context.Context, in *AcknowledgeDirectSessionRequest, opts ...grpc.CallOption) (*AcknowledgeDirectSessionResponse, error)
@@ -60,9 +66,36 @@ func (c *e2EEServiceClient) UploadDevicePreKeys(ctx context.Context, in *UploadD
 	return out, nil
 }
 
+func (c *e2EEServiceClient) RotateE2EEKeys(ctx context.Context, in *RotateE2EEKeysRequest, opts ...grpc.CallOption) (*RotateE2EEKeysResponse, error) {
+	out := new(RotateE2EEKeysResponse)
+	err := c.cc.Invoke(ctx, E2EEService_RotateE2EEKeys_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *e2EEServiceClient) GetAccountPreKeyBundles(ctx context.Context, in *GetAccountPreKeyBundlesRequest, opts ...grpc.CallOption) (*GetAccountPreKeyBundlesResponse, error) {
 	out := new(GetAccountPreKeyBundlesResponse)
 	err := c.cc.Invoke(ctx, E2EEService_GetAccountPreKeyBundles_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *e2EEServiceClient) SetDeviceTrust(ctx context.Context, in *SetDeviceTrustRequest, opts ...grpc.CallOption) (*SetDeviceTrustResponse, error) {
+	out := new(SetDeviceTrustResponse)
+	err := c.cc.Invoke(ctx, E2EEService_SetDeviceTrust_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *e2EEServiceClient) ListDeviceTrusts(ctx context.Context, in *ListDeviceTrustsRequest, opts ...grpc.CallOption) (*ListDeviceTrustsResponse, error) {
+	out := new(ListDeviceTrustsResponse)
+	err := c.cc.Invoke(ctx, E2EEService_ListDeviceTrusts_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +161,10 @@ func (c *e2EEServiceClient) AcknowledgeGroupSenderKey(ctx context.Context, in *A
 // for forward compatibility
 type E2EEServiceServer interface {
 	UploadDevicePreKeys(context.Context, *UploadDevicePreKeysRequest) (*UploadDevicePreKeysResponse, error)
+	RotateE2EEKeys(context.Context, *RotateE2EEKeysRequest) (*RotateE2EEKeysResponse, error)
 	GetAccountPreKeyBundles(context.Context, *GetAccountPreKeyBundlesRequest) (*GetAccountPreKeyBundlesResponse, error)
+	SetDeviceTrust(context.Context, *SetDeviceTrustRequest) (*SetDeviceTrustResponse, error)
+	ListDeviceTrusts(context.Context, *ListDeviceTrustsRequest) (*ListDeviceTrustsResponse, error)
 	CreateDirectSessions(context.Context, *CreateDirectSessionsRequest) (*CreateDirectSessionsResponse, error)
 	ListDeviceSessions(context.Context, *ListDeviceSessionsRequest) (*ListDeviceSessionsResponse, error)
 	AcknowledgeDirectSession(context.Context, *AcknowledgeDirectSessionRequest) (*AcknowledgeDirectSessionResponse, error)
@@ -145,8 +181,17 @@ type UnimplementedE2EEServiceServer struct {
 func (UnimplementedE2EEServiceServer) UploadDevicePreKeys(context.Context, *UploadDevicePreKeysRequest) (*UploadDevicePreKeysResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UploadDevicePreKeys not implemented")
 }
+func (UnimplementedE2EEServiceServer) RotateE2EEKeys(context.Context, *RotateE2EEKeysRequest) (*RotateE2EEKeysResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RotateE2EEKeys not implemented")
+}
 func (UnimplementedE2EEServiceServer) GetAccountPreKeyBundles(context.Context, *GetAccountPreKeyBundlesRequest) (*GetAccountPreKeyBundlesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAccountPreKeyBundles not implemented")
+}
+func (UnimplementedE2EEServiceServer) SetDeviceTrust(context.Context, *SetDeviceTrustRequest) (*SetDeviceTrustResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetDeviceTrust not implemented")
+}
+func (UnimplementedE2EEServiceServer) ListDeviceTrusts(context.Context, *ListDeviceTrustsRequest) (*ListDeviceTrustsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListDeviceTrusts not implemented")
 }
 func (UnimplementedE2EEServiceServer) CreateDirectSessions(context.Context, *CreateDirectSessionsRequest) (*CreateDirectSessionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateDirectSessions not implemented")
@@ -197,6 +242,24 @@ func _E2EEService_UploadDevicePreKeys_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _E2EEService_RotateE2EEKeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RotateE2EEKeysRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(E2EEServiceServer).RotateE2EEKeys(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: E2EEService_RotateE2EEKeys_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(E2EEServiceServer).RotateE2EEKeys(ctx, req.(*RotateE2EEKeysRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _E2EEService_GetAccountPreKeyBundles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetAccountPreKeyBundlesRequest)
 	if err := dec(in); err != nil {
@@ -211,6 +274,42 @@ func _E2EEService_GetAccountPreKeyBundles_Handler(srv interface{}, ctx context.C
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(E2EEServiceServer).GetAccountPreKeyBundles(ctx, req.(*GetAccountPreKeyBundlesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _E2EEService_SetDeviceTrust_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetDeviceTrustRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(E2EEServiceServer).SetDeviceTrust(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: E2EEService_SetDeviceTrust_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(E2EEServiceServer).SetDeviceTrust(ctx, req.(*SetDeviceTrustRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _E2EEService_ListDeviceTrusts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListDeviceTrustsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(E2EEServiceServer).ListDeviceTrusts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: E2EEService_ListDeviceTrusts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(E2EEServiceServer).ListDeviceTrusts(ctx, req.(*ListDeviceTrustsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -335,8 +434,20 @@ var E2EEService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _E2EEService_UploadDevicePreKeys_Handler,
 		},
 		{
+			MethodName: "RotateE2EEKeys",
+			Handler:    _E2EEService_RotateE2EEKeys_Handler,
+		},
+		{
 			MethodName: "GetAccountPreKeyBundles",
 			Handler:    _E2EEService_GetAccountPreKeyBundles_Handler,
+		},
+		{
+			MethodName: "SetDeviceTrust",
+			Handler:    _E2EEService_SetDeviceTrust_Handler,
+		},
+		{
+			MethodName: "ListDeviceTrusts",
+			Handler:    _E2EEService_ListDeviceTrusts_Handler,
 		},
 		{
 			MethodName: "CreateDirectSessions",

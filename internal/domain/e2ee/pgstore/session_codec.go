@@ -23,13 +23,13 @@ func (s *Store) scanDirectSession(ctx context.Context, query string, args ...any
 
 func scanDirectSession(row rowScanner) (e2ee.DirectSession, error) {
 	var (
-		value                 e2ee.DirectSession
-		metadata              []byte
-		oneTimeKeyID          sql.NullString
-		oneTimeAlgorithm      sql.NullString
-		oneTimePublicKey      []byte
-		acknowledgedAt        sql.NullTime
-		expiresAt             sql.NullTime
+		value            e2ee.DirectSession
+		metadata         []byte
+		oneTimeKeyID     sql.NullString
+		oneTimeAlgorithm sql.NullString
+		oneTimePublicKey []byte
+		acknowledgedAt   sql.NullTime
+		expiresAt        sql.NullTime
 	)
 	err := row.Scan(
 		&value.ID,
@@ -134,5 +134,24 @@ func scanGroupSenderKeyDistribution(row rowScanner) (e2ee.GroupSenderKeyDistribu
 	value.Payload.Metadata = unmarshalMetadata(metadata)
 	value.AcknowledgedAt = acknowledgedAt.Time
 	value.ExpiresAt = expiresAt.Time
+	return value, nil
+}
+
+func scanDeviceTrust(row rowScanner) (e2ee.DeviceTrust, error) {
+	var value e2ee.DeviceTrust
+	err := row.Scan(
+		&value.ObserverAccountID,
+		&value.ObserverDeviceID,
+		&value.TargetAccountID,
+		&value.TargetDeviceID,
+		&value.State,
+		&value.KeyFingerprint,
+		&value.Note,
+		&value.CreatedAt,
+		&value.UpdatedAt,
+	)
+	if err != nil {
+		return e2ee.DeviceTrust{}, err
+	}
 	return value, nil
 }

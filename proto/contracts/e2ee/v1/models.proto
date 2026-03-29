@@ -26,6 +26,25 @@ message DevicePreKeyBundle {
   google.protobuf.Timestamp device_last_seen_at = 7;
 }
 
+enum DeviceTrustState {
+  DEVICE_TRUST_STATE_UNSPECIFIED = 0;
+  DEVICE_TRUST_STATE_TRUSTED = 1;
+  DEVICE_TRUST_STATE_UNTRUSTED = 2;
+  DEVICE_TRUST_STATE_COMPROMISED = 3;
+}
+
+message DeviceTrust {
+  string observer_user_id = 1;
+  string observer_device_id = 2;
+  string target_user_id = 3;
+  string target_device_id = 4;
+  DeviceTrustState state = 5;
+  string key_fingerprint = 6;
+  string note = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
 enum DirectSessionState {
   DIRECT_SESSION_STATE_UNSPECIFIED = 0;
   DIRECT_SESSION_STATE_PENDING = 1;

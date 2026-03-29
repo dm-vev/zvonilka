@@ -2,6 +2,7 @@ package e2ee
 
 import (
 	"context"
+	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
@@ -21,13 +22,17 @@ type Store interface {
 		claimedByDeviceID string,
 	) (OneTimePreKey, error)
 	CountAvailableOneTimePreKeys(ctx context.Context, accountID string, deviceID string) (uint32, error)
+	ExpirePendingDirectSessionsByDevice(ctx context.Context, accountID string, deviceID string, expiresAt time.Time) (uint32, error)
 	SaveDirectSession(ctx context.Context, value DirectSession) (DirectSession, error)
 	DirectSessionByID(ctx context.Context, sessionID string) (DirectSession, error)
 	DirectSessionsByRecipientDevice(ctx context.Context, accountID string, deviceID string) ([]DirectSession, error)
+	ExpirePendingGroupSenderKeysBySenderDevice(ctx context.Context, accountID string, deviceID string, expiresAt time.Time) (uint32, error)
 	SaveGroupSenderKeyDistribution(ctx context.Context, value GroupSenderKeyDistribution) (GroupSenderKeyDistribution, error)
 	GroupSenderKeyDistributionByID(ctx context.Context, distributionID string) (GroupSenderKeyDistribution, error)
 	GroupSenderKeyDistributionsByRecipientDevice(ctx context.Context, conversationID string, accountID string, deviceID string) ([]GroupSenderKeyDistribution, error)
 	GroupSenderKeyDistributionsBySenderKey(ctx context.Context, conversationID string, senderAccountID string, senderDeviceID string, senderKeyID string) ([]GroupSenderKeyDistribution, error)
+	SaveDeviceTrust(ctx context.Context, value DeviceTrust) (DeviceTrust, error)
+	DeviceTrustsByObserverDevice(ctx context.Context, observerAccountID string, observerDeviceID string, targetAccountID string) ([]DeviceTrust, error)
 }
 
 type Directory interface {

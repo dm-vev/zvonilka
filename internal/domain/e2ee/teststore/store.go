@@ -3,6 +3,7 @@ package teststore
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/e2ee"
 )
@@ -13,6 +14,7 @@ func NewMemoryStore() e2ee.Store {
 		oneTime:     make(map[string][]e2ee.OneTimePreKey),
 		sessions:    make(map[string]e2ee.DirectSession),
 		groupSender: make(map[string]e2ee.GroupSenderKeyDistribution),
+		trusts:      make(map[string]e2ee.DeviceTrust),
 	}
 }
 
@@ -22,6 +24,7 @@ type memoryStore struct {
 	oneTime     map[string][]e2ee.OneTimePreKey
 	sessions    map[string]e2ee.DirectSession
 	groupSender map[string]e2ee.GroupSenderKeyDistribution
+	trusts      map[string]e2ee.DeviceTrust
 }
 
 func (s *memoryStore) WithinTx(_ context.Context, fn func(e2ee.Store) error) error {
@@ -102,6 +105,31 @@ func (s *memoryStore) CountAvailableOneTimePreKeys(_ context.Context, accountID 
 	return total, nil
 }
 
+func (s *memoryStore) ExpirePendingDirectSessionsByDevice(_ context.Context, accountID string, deviceID string, expiresAt time.Time) (uint32, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var total uint32
+	for id, value := range s.sessions {
+		if value.State != e2ee.DirectSessionStatePending {
+			continue
+		}
+		if value.InitiatorAccountID != accountID && value.RecipientAccountID != accountID {
+			continue
+		}
+		if value.InitiatorDeviceID != deviceID && value.RecipientDeviceID != deviceID {
+			continue
+		}
+		if !value.ExpiresAt.IsZero() && !expiresAt.Before(value.ExpiresAt) {
+			continue
+		}
+		value.ExpiresAt = expiresAt
+		s.sessions[id] = cloneDirectSession(value)
+		total++
+	}
+	return total, nil
+}
+
 func (s *memoryStore) SaveDirectSession(_ context.Context, value e2ee.DirectSession) (e2ee.DirectSession, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -130,6 +158,28 @@ func (s *memoryStore) DirectSessionsByRecipientDevice(_ context.Context, account
 		result = append(result, cloneDirectSession(value))
 	}
 	return result, nil
+}
+
+func (s *memoryStore) ExpirePendingGroupSenderKeysBySenderDevice(_ context.Context, accountID string, deviceID string, expiresAt time.Time) (uint32, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var total uint32
+	for id, value := range s.groupSender {
+		if value.State != e2ee.GroupSenderKeyStatePending {
+			continue
+		}
+		if value.SenderAccountID != accountID || value.SenderDeviceID != deviceID {
+			continue
+		}
+		if !value.ExpiresAt.IsZero() && !expiresAt.Before(value.ExpiresAt) {
+			continue
+		}
+		value.ExpiresAt = expiresAt
+		s.groupSender[id] = cloneGroupSenderKeyDistribution(value)
+		total++
+	}
+	return total, nil
 }
 
 func (s *memoryStore) SaveGroupSenderKeyDistribution(_ context.Context, value e2ee.GroupSenderKeyDistribution) (e2ee.GroupSenderKeyDistribution, error) {
@@ -175,8 +225,43 @@ func (s *memoryStore) GroupSenderKeyDistributionsBySenderKey(_ context.Context, 
 	return result, nil
 }
 
+func (s *memoryStore) SaveDeviceTrust(_ context.Context, value e2ee.DeviceTrust) (e2ee.DeviceTrust, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := trustKey(value.ObserverAccountID, value.ObserverDeviceID, value.TargetAccountID, value.TargetDeviceID)
+	if existing, ok := s.trusts[key]; ok {
+		value.CreatedAt = existing.CreatedAt
+	} else if value.CreatedAt.IsZero() {
+		value.CreatedAt = value.UpdatedAt
+	}
+	s.trusts[key] = cloneDeviceTrust(value)
+	return cloneDeviceTrust(value), nil
+}
+
+func (s *memoryStore) DeviceTrustsByObserverDevice(_ context.Context, observerAccountID string, observerDeviceID string, targetAccountID string) ([]e2ee.DeviceTrust, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]e2ee.DeviceTrust, 0)
+	for _, value := range s.trusts {
+		if value.ObserverAccountID != observerAccountID || value.ObserverDeviceID != observerDeviceID {
+			continue
+		}
+		if targetAccountID != "" && value.TargetAccountID != targetAccountID {
+			continue
+		}
+		result = append(result, cloneDeviceTrust(value))
+	}
+	return result, nil
+}
+
 func key(accountID string, deviceID string) string {
 	return accountID + "|" + deviceID
+}
+
+func trustKey(observerAccountID string, observerDeviceID string, targetAccountID string, targetDeviceID string) string {
+	return observerAccountID + "|" + observerDeviceID + "|" + targetAccountID + "|" + targetDeviceID
 }
 
 func cloneDirectSession(value e2ee.DirectSession) e2ee.DirectSession {
@@ -223,6 +308,10 @@ func cloneGroupSenderKeyDistribution(value e2ee.GroupSenderKeyDistribution) e2ee
 			value.Payload.Metadata[key] = item
 		}
 	}
+	return value
+}
+
+func cloneDeviceTrust(value e2ee.DeviceTrust) e2ee.DeviceTrust {
 	return value
 }
 

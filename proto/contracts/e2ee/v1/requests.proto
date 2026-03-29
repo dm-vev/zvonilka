@@ -19,6 +19,21 @@ message UploadDevicePreKeysResponse {
   DevicePreKeyBundle bundle = 1;
 }
 
+message RotateE2EEKeysRequest {
+  string device_id = 1;
+  SignedPreKey signed_prekey = 2;
+  repeated PreKey one_time_prekeys = 3;
+  bool replace_one_time_prekeys = 4;
+  bool expire_pending_direct_sessions = 5;
+  bool expire_pending_group_sender_keys = 6;
+}
+
+message RotateE2EEKeysResponse {
+  DevicePreKeyBundle bundle = 1;
+  uint32 expired_pending_direct_sessions = 2;
+  uint32 expired_pending_group_sender_keys = 3;
+}
+
 message GetAccountPreKeyBundlesRequest {
   string user_id = 1;
   bool consume_one_time_prekeys = 2;
@@ -26,6 +41,25 @@ message GetAccountPreKeyBundlesRequest {
 
 message GetAccountPreKeyBundlesResponse {
   repeated DevicePreKeyBundle bundles = 1;
+}
+
+message SetDeviceTrustRequest {
+  string target_user_id = 1;
+  string target_device_id = 2;
+  DeviceTrustState state = 3;
+  string note = 4;
+}
+
+message SetDeviceTrustResponse {
+  DeviceTrust trust = 1;
+}
+
+message ListDeviceTrustsRequest {
+  string target_user_id = 1;
+}
+
+message ListDeviceTrustsResponse {
+  repeated DeviceTrust trusts = 1;
 }
 
 message CreateDirectSessionsRequest {

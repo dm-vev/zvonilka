@@ -229,6 +229,25 @@ func (s *Store) CountAvailableOneTimePreKeys(ctx context.Context, accountID stri
 	return count, nil
 }
 
+func (s *Store) ExpirePendingDirectSessionsByDevice(ctx context.Context, accountID string, deviceID string, expiresAt time.Time) (uint32, error) {
+	query := fmt.Sprintf(`
+UPDATE %s
+SET expires_at = $3, updated_at = NOW()
+WHERE state = 'pending'
+  AND ((initiator_account_id = $1 AND initiator_device_id = $2) OR (recipient_account_id = $1 AND recipient_device_id = $2))
+  AND (expires_at IS NULL OR expires_at > $3)
+`, s.table("e2ee_direct_sessions"))
+	result, err := s.conn().ExecContext(ctx, query, accountID, deviceID, expiresAt.UTC())
+	if err != nil {
+		return 0, mapConstraintError(err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return uint32(affected), nil
+}
+
 func (s *Store) SaveDirectSession(ctx context.Context, value e2ee.DirectSession) (e2ee.DirectSession, error) {
 	if err := s.requireContext(ctx); err != nil {
 		return e2ee.DirectSession{}, err
@@ -356,6 +375,26 @@ ORDER BY created_at DESC, id DESC
 	return result, nil
 }
 
+func (s *Store) ExpirePendingGroupSenderKeysBySenderDevice(ctx context.Context, accountID string, deviceID string, expiresAt time.Time) (uint32, error) {
+	query := fmt.Sprintf(`
+UPDATE %s
+SET expires_at = $3, updated_at = NOW()
+WHERE state = 'pending'
+  AND sender_account_id = $1
+  AND sender_device_id = $2
+  AND (expires_at IS NULL OR expires_at > $3)
+`, s.table("e2ee_group_sender_keys"))
+	result, err := s.conn().ExecContext(ctx, query, accountID, deviceID, expiresAt.UTC())
+	if err != nil {
+		return 0, mapConstraintError(err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return uint32(affected), nil
+}
+
 func (s *Store) SaveGroupSenderKeyDistribution(ctx context.Context, value e2ee.GroupSenderKeyDistribution) (e2ee.GroupSenderKeyDistribution, error) {
 	if err := s.requireContext(ctx); err != nil {
 		return e2ee.GroupSenderKeyDistribution{}, err
@@ -471,6 +510,73 @@ ORDER BY created_at DESC, id DESC
 	result := make([]e2ee.GroupSenderKeyDistribution, 0)
 	for rows.Next() {
 		value, scanErr := scanGroupSenderKeyDistribution(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		result = append(result, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *Store) SaveDeviceTrust(ctx context.Context, value e2ee.DeviceTrust) (e2ee.DeviceTrust, error) {
+	if err := s.requireContext(ctx); err != nil {
+		return e2ee.DeviceTrust{}, err
+	}
+	query := fmt.Sprintf(`
+INSERT INTO %s (
+	observer_account_id, observer_device_id, target_account_id, target_device_id, state, key_fingerprint, note, created_at, updated_at
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+ON CONFLICT (observer_account_id, observer_device_id, target_account_id, target_device_id)
+DO UPDATE SET
+	state = EXCLUDED.state,
+	key_fingerprint = EXCLUDED.key_fingerprint,
+	note = EXCLUDED.note,
+	updated_at = EXCLUDED.updated_at
+RETURNING observer_account_id, observer_device_id, target_account_id, target_device_id, state, key_fingerprint, note, created_at, updated_at
+`, s.table("e2ee_device_trust"))
+	saved, err := scanDeviceTrust(s.conn().QueryRowContext(
+		ctx,
+		query,
+		value.ObserverAccountID,
+		value.ObserverDeviceID,
+		value.TargetAccountID,
+		value.TargetDeviceID,
+		value.State,
+		value.KeyFingerprint,
+		value.Note,
+		nullTime(value.CreatedAt),
+		nullTime(value.UpdatedAt),
+	))
+	if err != nil {
+		return e2ee.DeviceTrust{}, mapConstraintError(err)
+	}
+	return saved, nil
+}
+
+func (s *Store) DeviceTrustsByObserverDevice(ctx context.Context, observerAccountID string, observerDeviceID string, targetAccountID string) ([]e2ee.DeviceTrust, error) {
+	query := fmt.Sprintf(`
+SELECT observer_account_id, observer_device_id, target_account_id, target_device_id, state, key_fingerprint, note, created_at, updated_at
+FROM %s
+WHERE observer_account_id = $1 AND observer_device_id = $2
+`, s.table("e2ee_device_trust"))
+	args := []any{observerAccountID, observerDeviceID}
+	if strings.TrimSpace(targetAccountID) != "" {
+		query += " AND target_account_id = $3"
+		args = append(args, targetAccountID)
+	}
+	query += " ORDER BY updated_at DESC, target_account_id, target_device_id"
+	rows, err := s.conn().QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]e2ee.DeviceTrust, 0)
+	for rows.Next() {
+		value, scanErr := scanDeviceTrust(rows)
 		if scanErr != nil {
 			return nil, scanErr
 		}

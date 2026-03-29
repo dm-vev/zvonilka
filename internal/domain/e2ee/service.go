@@ -2,7 +2,9 @@ package e2ee
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -29,6 +31,92 @@ func NewService(store Store, directory Directory, chats Conversations) (*Service
 		chats:     chats,
 		now:       func() time.Time { return time.Now().UTC() },
 	}, nil
+}
+
+func (s *Service) RotateDeviceKeys(ctx context.Context, params RotateDeviceKeysParams) (DeviceBundle, uint32, uint32, error) {
+	if err := s.validateContext(ctx, "rotate device e2ee keys"); err != nil {
+		return DeviceBundle{}, 0, 0, err
+	}
+	params.AccountID = strings.TrimSpace(params.AccountID)
+	params.DeviceID = strings.TrimSpace(params.DeviceID)
+	if params.AccountID == "" || params.DeviceID == "" {
+		return DeviceBundle{}, 0, 0, ErrInvalidInput
+	}
+	if err := validateSignedPreKey(params.SignedPreKey); err != nil {
+		return DeviceBundle{}, 0, 0, err
+	}
+	for _, value := range params.OneTimePreKeys {
+		if err := validateOneTimePreKey(value); err != nil {
+			return DeviceBundle{}, 0, 0, err
+		}
+	}
+
+	device, err := s.directory.DeviceByID(ctx, params.DeviceID)
+	if err != nil {
+		if err == identity.ErrNotFound {
+			return DeviceBundle{}, 0, 0, ErrNotFound
+		}
+		return DeviceBundle{}, 0, 0, fmt.Errorf("load device %s: %w", params.DeviceID, err)
+	}
+	if device.AccountID != params.AccountID || device.Status != identity.DeviceStatusActive {
+		return DeviceBundle{}, 0, 0, ErrForbidden
+	}
+
+	var (
+		savedSigned            SignedPreKey
+		expiredDirectSessions  uint32
+		expiredGroupSenderKeys uint32
+		expiresAt              = s.now()
+	)
+	if err := s.store.WithinTx(ctx, func(tx Store) error {
+		var saveErr error
+		savedSigned, saveErr = tx.SaveSignedPreKey(ctx, params.AccountID, params.DeviceID, normalizeSignedPreKey(params.SignedPreKey))
+		if saveErr != nil {
+			return saveErr
+		}
+		if params.ReplaceOneTimePreKey {
+			if deleteErr := tx.DeleteOneTimePreKeysByDevice(ctx, params.AccountID, params.DeviceID); deleteErr != nil {
+				return deleteErr
+			}
+		}
+		if len(params.OneTimePreKeys) > 0 {
+			if saveErr := tx.SaveOneTimePreKeys(ctx, params.AccountID, params.DeviceID, normalizeOneTimePreKeys(params.OneTimePreKeys)); saveErr != nil {
+				return saveErr
+			}
+		}
+		if params.ExpirePendingDirectSessions {
+			expiredDirectSessions, saveErr = tx.ExpirePendingDirectSessionsByDevice(ctx, params.AccountID, params.DeviceID, expiresAt)
+			if saveErr != nil {
+				return saveErr
+			}
+		}
+		if params.ExpirePendingGroupSenderKeys {
+			expiredGroupSenderKeys, saveErr = tx.ExpirePendingGroupSenderKeysBySenderDevice(ctx, params.AccountID, params.DeviceID, expiresAt)
+			if saveErr != nil {
+				return saveErr
+			}
+		}
+		return nil
+	}); err != nil {
+		return DeviceBundle{}, 0, 0, err
+	}
+
+	bundles, err := s.fetchAccountBundles(ctx, s.store, FetchAccountBundlesParams{
+		RequesterAccountID:   params.AccountID,
+		RequesterDeviceID:    params.DeviceID,
+		TargetAccountID:      params.AccountID,
+		ConsumeOneTimePreKey: false,
+	})
+	if err != nil {
+		return DeviceBundle{}, 0, 0, err
+	}
+	for _, bundle := range bundles {
+		if bundle.DeviceID == params.DeviceID {
+			bundle.SignedPreKey = savedSigned
+			return bundle, expiredDirectSessions, expiredGroupSenderKeys, nil
+		}
+	}
+	return DeviceBundle{}, 0, 0, ErrNotFound
 }
 
 func (s *Service) UploadDevicePreKeys(ctx context.Context, params UploadDevicePreKeysParams) (DeviceBundle, error) {
@@ -121,6 +209,91 @@ func (s *Service) GetAccountBundles(ctx context.Context, params FetchAccountBund
 		return bundles, err
 	}
 	return s.fetchAccountBundles(ctx, s.store, params)
+}
+
+func (s *Service) SetDeviceTrust(ctx context.Context, params SetDeviceTrustParams) (DeviceTrust, error) {
+	if err := s.validateContext(ctx, "set device trust"); err != nil {
+		return DeviceTrust{}, err
+	}
+	params.ObserverAccountID = strings.TrimSpace(params.ObserverAccountID)
+	params.ObserverDeviceID = strings.TrimSpace(params.ObserverDeviceID)
+	params.TargetAccountID = strings.TrimSpace(params.TargetAccountID)
+	params.TargetDeviceID = strings.TrimSpace(params.TargetDeviceID)
+	params.Note = strings.TrimSpace(params.Note)
+	if params.ObserverAccountID == "" || params.ObserverDeviceID == "" || params.TargetAccountID == "" || params.TargetDeviceID == "" {
+		return DeviceTrust{}, ErrInvalidInput
+	}
+	if !isValidDeviceTrustState(params.State) {
+		return DeviceTrust{}, ErrInvalidInput
+	}
+
+	observer, err := s.directory.DeviceByID(ctx, params.ObserverDeviceID)
+	if err != nil {
+		if err == identity.ErrNotFound {
+			return DeviceTrust{}, ErrNotFound
+		}
+		return DeviceTrust{}, fmt.Errorf("load observer device %s: %w", params.ObserverDeviceID, err)
+	}
+	if observer.AccountID != params.ObserverAccountID || observer.Status != identity.DeviceStatusActive {
+		return DeviceTrust{}, ErrForbidden
+	}
+
+	target, err := s.directory.DeviceByID(ctx, params.TargetDeviceID)
+	if err != nil {
+		if err == identity.ErrNotFound {
+			return DeviceTrust{}, ErrNotFound
+		}
+		return DeviceTrust{}, fmt.Errorf("load target device %s: %w", params.TargetDeviceID, err)
+	}
+	if target.AccountID != params.TargetAccountID {
+		return DeviceTrust{}, ErrForbidden
+	}
+
+	now := s.now()
+	row := DeviceTrust{
+		ObserverAccountID: params.ObserverAccountID,
+		ObserverDeviceID:  params.ObserverDeviceID,
+		TargetAccountID:   params.TargetAccountID,
+		TargetDeviceID:    params.TargetDeviceID,
+		State:             params.State,
+		KeyFingerprint:    deviceKeyFingerprint(target),
+		Note:              params.Note,
+		UpdatedAt:         now,
+	}
+	saved, err := s.store.SaveDeviceTrust(ctx, row)
+	if err != nil {
+		return DeviceTrust{}, err
+	}
+	return saved, nil
+}
+
+func (s *Service) ListDeviceTrusts(ctx context.Context, params ListDeviceTrustsParams) ([]DeviceTrust, error) {
+	if err := s.validateContext(ctx, "list device trusts"); err != nil {
+		return nil, err
+	}
+	params.ObserverAccountID = strings.TrimSpace(params.ObserverAccountID)
+	params.ObserverDeviceID = strings.TrimSpace(params.ObserverDeviceID)
+	params.TargetAccountID = strings.TrimSpace(params.TargetAccountID)
+	if params.ObserverAccountID == "" || params.ObserverDeviceID == "" {
+		return nil, ErrInvalidInput
+	}
+
+	observer, err := s.directory.DeviceByID(ctx, params.ObserverDeviceID)
+	if err != nil {
+		if err == identity.ErrNotFound {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("load observer device %s: %w", params.ObserverDeviceID, err)
+	}
+	if observer.AccountID != params.ObserverAccountID || observer.Status != identity.DeviceStatusActive {
+		return nil, ErrForbidden
+	}
+
+	rows, err := s.store.DeviceTrustsByObserverDevice(ctx, params.ObserverAccountID, params.ObserverDeviceID, params.TargetAccountID)
+	if err != nil {
+		return nil, err
+	}
+	return rows, nil
 }
 
 func (s *Service) CreateDirectSessions(ctx context.Context, params CreateDirectSessionsParams) ([]DirectSession, error) {
@@ -728,6 +901,20 @@ func normalizeSenderKeyPayload(value SenderKeyPayload) SenderKeyPayload {
 	value.Ciphertext = append([]byte(nil), value.Ciphertext...)
 	value.Metadata = trimMetadata(value.Metadata)
 	return value
+}
+
+func isValidDeviceTrustState(value DeviceTrustState) bool {
+	switch value {
+	case DeviceTrustStateTrusted, DeviceTrustStateUntrusted, DeviceTrustStateCompromised:
+		return true
+	default:
+		return false
+	}
+}
+
+func deviceKeyFingerprint(device identity.Device) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(device.PublicKey)))
+	return hex.EncodeToString(sum[:])
 }
 
 func isActiveConversationMember(member conversation.ConversationMember) bool {

@@ -24,13 +24,34 @@ type OneTimePreKey struct {
 }
 
 type DeviceBundle struct {
-	AccountID             string
-	DeviceID              string
-	IdentityKey           PublicKey
-	SignedPreKey          SignedPreKey
-	OneTimePreKey         OneTimePreKey
-	OneTimePreKeysAvail   uint32
-	DeviceLastSeenAt      time.Time
+	AccountID           string
+	DeviceID            string
+	IdentityKey         PublicKey
+	SignedPreKey        SignedPreKey
+	OneTimePreKey       OneTimePreKey
+	OneTimePreKeysAvail uint32
+	DeviceLastSeenAt    time.Time
+}
+
+type DeviceTrustState string
+
+const (
+	DeviceTrustStateUnspecified DeviceTrustState = ""
+	DeviceTrustStateTrusted     DeviceTrustState = "trusted"
+	DeviceTrustStateUntrusted   DeviceTrustState = "untrusted"
+	DeviceTrustStateCompromised DeviceTrustState = "compromised"
+)
+
+type DeviceTrust struct {
+	ObserverAccountID string
+	ObserverDeviceID  string
+	TargetAccountID   string
+	TargetDeviceID    string
+	State             DeviceTrustState
+	KeyFingerprint    string
+	Note              string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type BootstrapPayload struct {

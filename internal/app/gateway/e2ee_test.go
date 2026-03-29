@@ -581,3 +581,218 @@ func TestSendMessageRequiresGroupSenderKeyReferenceRPC(t *testing.T) {
 		t.Fatalf("unexpected sent group message: %+v", sent.Message)
 	}
 }
+
+func TestRotateE2EEKeysRPC(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-rotate-e2ee",
+		DisplayName: "Alice Rotate E2EE",
+		Email:       "alice-rotate-e2ee@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-rotate-e2ee",
+		DisplayName: "Bob Rotate E2EE",
+		Email:       "bob-rotate-e2ee@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, _ := login(alice.Username, "alice-rotate-phone", "alice-rotate-device")
+	bobCtx, bobDeviceID := login(bob.Username, "bob-rotate-phone", "bob-rotate-device")
+
+	_, err = api.UploadDevicePreKeys(bobCtx, &e2eev1.UploadDevicePreKeysRequest{
+		SignedPrekey: &e2eev1.SignedPreKey{
+			Key:       &commonv1.PublicKeyBundle{KeyId: "spk-bob-rotate", Algorithm: "x25519", PublicKey: []byte("spk-bob-rotate")},
+			Signature: []byte("sig-bob-rotate"),
+		},
+		OneTimePrekeys: []*e2eev1.PreKey{
+			{Key: &commonv1.PublicKeyBundle{KeyId: "otk-bob-rotate", Algorithm: "x25519", PublicKey: []byte("otk-bob-rotate")}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("upload bob prekeys: %v", err)
+	}
+
+	group, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Rotate E2EE Group",
+		MemberUserIds: []string{bob.ID},
+	})
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+
+	_, err = api.CreateDirectSessions(aliceCtx, &e2eev1.CreateDirectSessionsRequest{
+		UserId: bob.ID,
+		InitiatorEphemeralKey: &commonv1.PublicKeyBundle{
+			KeyId:     "eph-rotate",
+			Algorithm: "x25519",
+			PublicKey: []byte("eph-rotate"),
+		},
+		Bootstrap: &e2eev1.SessionBootstrapPayload{
+			Algorithm:  "x3dh-v1",
+			Ciphertext: []byte("cipher"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("create direct session: %v", err)
+	}
+
+	_, err = api.PublishGroupSenderKeys(aliceCtx, &e2eev1.PublishGroupSenderKeysRequest{
+		ConversationId: group.Conversation.ConversationId,
+		SenderKeyId:    "sender-key-rotate-1",
+		Recipients: []*e2eev1.RecipientSenderKey{
+			{
+				RecipientUserId:   bob.ID,
+				RecipientDeviceId: bobDeviceID,
+				Payload: &e2eev1.SenderKeyPayload{
+					Algorithm:  "sender-key-v1",
+					Ciphertext: []byte("ciphertext"),
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("publish group sender key: %v", err)
+	}
+
+	rotated, err := api.RotateE2EEKeys(aliceCtx, &e2eev1.RotateE2EEKeysRequest{
+		SignedPrekey: &e2eev1.SignedPreKey{
+			Key:       &commonv1.PublicKeyBundle{KeyId: "spk-alice-rotate-2", Algorithm: "x25519", PublicKey: []byte("spk-alice-rotate-2")},
+			Signature: []byte("sig-alice-rotate-2"),
+		},
+		OneTimePrekeys: []*e2eev1.PreKey{
+			{Key: &commonv1.PublicKeyBundle{KeyId: "otk-alice-rotate-2", Algorithm: "x25519", PublicKey: []byte("otk-alice-rotate-2")}},
+		},
+		ReplaceOneTimePrekeys:        true,
+		ExpirePendingDirectSessions:  true,
+		ExpirePendingGroupSenderKeys: true,
+	})
+	if err != nil {
+		t.Fatalf("rotate e2ee keys: %v", err)
+	}
+	if rotated.Bundle == nil || rotated.Bundle.SignedPrekey == nil || rotated.Bundle.SignedPrekey.Key.KeyId != "spk-alice-rotate-2" {
+		t.Fatalf("unexpected rotated bundle: %+v", rotated.Bundle)
+	}
+	if rotated.ExpiredPendingDirectSessions == 0 {
+		t.Fatalf("expected expired direct sessions, got %+v", rotated)
+	}
+	if rotated.ExpiredPendingGroupSenderKeys == 0 {
+		t.Fatalf("expected expired group sender keys, got %+v", rotated)
+	}
+}
+
+func TestSetAndListDeviceTrustRPC(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-device-trust",
+		DisplayName: "Alice Device Trust",
+		Email:       "alice-device-trust@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-device-trust",
+		DisplayName: "Bob Device Trust",
+		Email:       "bob-device-trust@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, _ := login(alice.Username, "alice-trust-phone", "alice-trust-device")
+	_, bobDeviceID := login(bob.Username, "bob-trust-phone", "bob-trust-device")
+
+	setResp, err := api.SetDeviceTrust(aliceCtx, &e2eev1.SetDeviceTrustRequest{
+		TargetUserId:   bob.ID,
+		TargetDeviceId: bobDeviceID,
+		State:          e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_TRUSTED,
+		Note:           "verified by safety number",
+	})
+	if err != nil {
+		t.Fatalf("set device trust: %v", err)
+	}
+	if setResp.Trust == nil || setResp.Trust.State != e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_TRUSTED {
+		t.Fatalf("unexpected trust row: %+v", setResp.Trust)
+	}
+	if setResp.Trust.KeyFingerprint == "" {
+		t.Fatal("expected key fingerprint")
+	}
+
+	listResp, err := api.ListDeviceTrusts(aliceCtx, &e2eev1.ListDeviceTrustsRequest{
+		TargetUserId: bob.ID,
+	})
+	if err != nil {
+		t.Fatalf("list device trusts: %v", err)
+	}
+	if len(listResp.Trusts) != 1 || listResp.Trusts[0].TargetDeviceId != bobDeviceID {
+		t.Fatalf("unexpected trust list: %+v", listResp.Trusts)
+	}
+}

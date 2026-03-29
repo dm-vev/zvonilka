@@ -8,7 +8,10 @@ option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/e2ee/v1;e2ee
 
 service E2EEService {
   rpc UploadDevicePreKeys(UploadDevicePreKeysRequest) returns (UploadDevicePreKeysResponse);
+  rpc RotateE2EEKeys(RotateE2EEKeysRequest) returns (RotateE2EEKeysResponse);
   rpc GetAccountPreKeyBundles(GetAccountPreKeyBundlesRequest) returns (GetAccountPreKeyBundlesResponse);
+  rpc SetDeviceTrust(SetDeviceTrustRequest) returns (SetDeviceTrustResponse);
+  rpc ListDeviceTrusts(ListDeviceTrustsRequest) returns (ListDeviceTrustsResponse);
   rpc CreateDirectSessions(CreateDirectSessionsRequest) returns (CreateDirectSessionsResponse);
   rpc ListDeviceSessions(ListDeviceSessionsRequest) returns (ListDeviceSessionsResponse);
   rpc AcknowledgeDirectSession(AcknowledgeDirectSessionRequest) returns (AcknowledgeDirectSessionResponse);
