@@ -35,6 +35,7 @@ type Manager struct {
 	dtlsFP   string
 	now      func() time.Time
 	sessions map[string]*session
+	replicas map[string]sessionSnapshot
 }
 
 type session struct {
@@ -137,6 +138,7 @@ func NewManager(endpoint string, tokenTTL time.Duration, opts ...Option) *Manage
 		dtlsFP:   mustDTLSFingerprint(),
 		now:      func() time.Time { return time.Now().UTC() },
 		sessions: make(map[string]*session),
+		replicas: make(map[string]sessionSnapshot),
 	}
 	for _, opt := range opts {
 		if opt != nil {

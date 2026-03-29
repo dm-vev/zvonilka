@@ -31,6 +31,9 @@ type clusterNode struct {
 
 type nodeRuntime interface {
 	domaincall.Runtime
+	ExportSessionSnapshot(context.Context, string) (sessionSnapshot, error)
+	SaveReplica(context.Context, sessionSnapshot) error
+	RestoreReplica(context.Context, string, string) error
 	Close(context.Context) error
 }
 
@@ -72,11 +75,23 @@ func (c *Cluster) EnsureSession(ctx context.Context, callRow domaincall.Call) (d
 		return domaincall.RuntimeSession{}, err
 	}
 
+	creating := strings.TrimSpace(callRow.ActiveSessionID) == ""
 	if strings.TrimSpace(callRow.ActiveSessionID) == "" {
 		callRow.ActiveSessionID = prefixedSessionID(node.id, callRow.ID)
 	}
 
-	return node.runtime.EnsureSession(ctx, callRow)
+	session, err := node.runtime.EnsureSession(ctx, callRow)
+	if err != nil {
+		return domaincall.RuntimeSession{}, err
+	}
+	if creating && strings.TrimSpace(callRow.ID) != "" {
+		if restoreErr := node.runtime.RestoreReplica(ctx, callRow.ID, session.SessionID); restoreErr != nil && !errors.Is(restoreErr, domaincall.ErrNotFound) {
+			return domaincall.RuntimeSession{}, restoreErr
+		}
+	}
+	_ = c.replicateSession(ctx, session.SessionID)
+
+	return session, nil
 }
 
 func (c *Cluster) JoinSession(ctx context.Context, sessionID string, participant domaincall.RuntimeParticipant) (domaincall.RuntimeJoin, error) {
@@ -85,7 +100,12 @@ func (c *Cluster) JoinSession(ctx context.Context, sessionID string, participant
 		return domaincall.RuntimeJoin{}, err
 	}
 
-	return node.runtime.JoinSession(ctx, sessionID, participant)
+	join, err := node.runtime.JoinSession(ctx, sessionID, participant)
+	if err != nil {
+		return domaincall.RuntimeJoin{}, err
+	}
+	_ = c.replicateSession(ctx, sessionID)
+	return join, nil
 }
 
 func (c *Cluster) PublishDescription(
@@ -122,7 +142,11 @@ func (c *Cluster) UpdateParticipant(ctx context.Context, sessionID string, parti
 		return err
 	}
 
-	return node.runtime.UpdateParticipant(ctx, sessionID, participant)
+	if err := node.runtime.UpdateParticipant(ctx, sessionID, participant); err != nil {
+		return err
+	}
+	_ = c.replicateSession(ctx, sessionID)
+	return nil
 }
 
 func (c *Cluster) AcknowledgeAdaptation(
@@ -155,7 +179,11 @@ func (c *Cluster) LeaveSession(ctx context.Context, sessionID string, accountID 
 		return err
 	}
 
-	return node.runtime.LeaveSession(ctx, sessionID, accountID, deviceID)
+	if err := node.runtime.LeaveSession(ctx, sessionID, accountID, deviceID); err != nil {
+		return err
+	}
+	_ = c.replicateSession(ctx, sessionID)
+	return nil
 }
 
 func (c *Cluster) CloseSession(ctx context.Context, sessionID string) error {
@@ -224,6 +252,28 @@ func (c *Cluster) Close(ctx context.Context) error {
 	}
 
 	return closeErr
+}
+
+func (c *Cluster) replicateSession(ctx context.Context, sessionID string) error {
+	node, err := c.nodeForSession(sessionID)
+	if err != nil {
+		return err
+	}
+	snapshot, err := node.runtime.ExportSessionSnapshot(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+
+	for _, target := range c.nodes {
+		if target == nil || target.runtime == nil || target.id == node.id {
+			continue
+		}
+		if saveErr := target.runtime.SaveReplica(ctx, snapshot); saveErr != nil {
+			continue
+		}
+	}
+
+	return nil
 }
 
 func (c *Cluster) healthyNodes(ctx context.Context) ([]*clusterNode, error) {

@@ -26,6 +26,9 @@ const (
 	CallRuntimeService_UpdateParticipant_FullMethodName     = "/zvonilka.internal.callruntime.v1.CallRuntimeService/UpdateParticipant"
 	CallRuntimeService_AcknowledgeAdaptation_FullMethodName = "/zvonilka.internal.callruntime.v1.CallRuntimeService/AcknowledgeAdaptation"
 	CallRuntimeService_SessionStats_FullMethodName          = "/zvonilka.internal.callruntime.v1.CallRuntimeService/SessionStats"
+	CallRuntimeService_ExportSessionSnapshot_FullMethodName = "/zvonilka.internal.callruntime.v1.CallRuntimeService/ExportSessionSnapshot"
+	CallRuntimeService_SaveReplica_FullMethodName           = "/zvonilka.internal.callruntime.v1.CallRuntimeService/SaveReplica"
+	CallRuntimeService_RestoreReplica_FullMethodName        = "/zvonilka.internal.callruntime.v1.CallRuntimeService/RestoreReplica"
 	CallRuntimeService_LeaveSession_FullMethodName          = "/zvonilka.internal.callruntime.v1.CallRuntimeService/LeaveSession"
 	CallRuntimeService_CloseSession_FullMethodName          = "/zvonilka.internal.callruntime.v1.CallRuntimeService/CloseSession"
 	CallRuntimeService_Health_FullMethodName                = "/zvonilka.internal.callruntime.v1.CallRuntimeService/Health"
@@ -42,6 +45,9 @@ type CallRuntimeServiceClient interface {
 	UpdateParticipant(ctx context.Context, in *UpdateParticipantRequest, opts ...grpc.CallOption) (*UpdateParticipantResponse, error)
 	AcknowledgeAdaptation(ctx context.Context, in *AcknowledgeAdaptationRequest, opts ...grpc.CallOption) (*AcknowledgeAdaptationResponse, error)
 	SessionStats(ctx context.Context, in *SessionStatsRequest, opts ...grpc.CallOption) (*SessionStatsResponse, error)
+	ExportSessionSnapshot(ctx context.Context, in *ExportSessionSnapshotRequest, opts ...grpc.CallOption) (*ExportSessionSnapshotResponse, error)
+	SaveReplica(ctx context.Context, in *SaveReplicaRequest, opts ...grpc.CallOption) (*SaveReplicaResponse, error)
+	RestoreReplica(ctx context.Context, in *RestoreReplicaRequest, opts ...grpc.CallOption) (*RestoreReplicaResponse, error)
 	LeaveSession(ctx context.Context, in *LeaveSessionRequest, opts ...grpc.CallOption) (*LeaveSessionResponse, error)
 	CloseSession(ctx context.Context, in *CloseSessionRequest, opts ...grpc.CallOption) (*CloseSessionResponse, error)
 	Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
@@ -118,6 +124,33 @@ func (c *callRuntimeServiceClient) SessionStats(ctx context.Context, in *Session
 	return out, nil
 }
 
+func (c *callRuntimeServiceClient) ExportSessionSnapshot(ctx context.Context, in *ExportSessionSnapshotRequest, opts ...grpc.CallOption) (*ExportSessionSnapshotResponse, error) {
+	out := new(ExportSessionSnapshotResponse)
+	err := c.cc.Invoke(ctx, CallRuntimeService_ExportSessionSnapshot_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *callRuntimeServiceClient) SaveReplica(ctx context.Context, in *SaveReplicaRequest, opts ...grpc.CallOption) (*SaveReplicaResponse, error) {
+	out := new(SaveReplicaResponse)
+	err := c.cc.Invoke(ctx, CallRuntimeService_SaveReplica_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *callRuntimeServiceClient) RestoreReplica(ctx context.Context, in *RestoreReplicaRequest, opts ...grpc.CallOption) (*RestoreReplicaResponse, error) {
+	out := new(RestoreReplicaResponse)
+	err := c.cc.Invoke(ctx, CallRuntimeService_RestoreReplica_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *callRuntimeServiceClient) LeaveSession(ctx context.Context, in *LeaveSessionRequest, opts ...grpc.CallOption) (*LeaveSessionResponse, error) {
 	out := new(LeaveSessionResponse)
 	err := c.cc.Invoke(ctx, CallRuntimeService_LeaveSession_FullMethodName, in, out, opts...)
@@ -156,6 +189,9 @@ type CallRuntimeServiceServer interface {
 	UpdateParticipant(context.Context, *UpdateParticipantRequest) (*UpdateParticipantResponse, error)
 	AcknowledgeAdaptation(context.Context, *AcknowledgeAdaptationRequest) (*AcknowledgeAdaptationResponse, error)
 	SessionStats(context.Context, *SessionStatsRequest) (*SessionStatsResponse, error)
+	ExportSessionSnapshot(context.Context, *ExportSessionSnapshotRequest) (*ExportSessionSnapshotResponse, error)
+	SaveReplica(context.Context, *SaveReplicaRequest) (*SaveReplicaResponse, error)
+	RestoreReplica(context.Context, *RestoreReplicaRequest) (*RestoreReplicaResponse, error)
 	LeaveSession(context.Context, *LeaveSessionRequest) (*LeaveSessionResponse, error)
 	CloseSession(context.Context, *CloseSessionRequest) (*CloseSessionResponse, error)
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
@@ -186,6 +222,15 @@ func (UnimplementedCallRuntimeServiceServer) AcknowledgeAdaptation(context.Conte
 }
 func (UnimplementedCallRuntimeServiceServer) SessionStats(context.Context, *SessionStatsRequest) (*SessionStatsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SessionStats not implemented")
+}
+func (UnimplementedCallRuntimeServiceServer) ExportSessionSnapshot(context.Context, *ExportSessionSnapshotRequest) (*ExportSessionSnapshotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ExportSessionSnapshot not implemented")
+}
+func (UnimplementedCallRuntimeServiceServer) SaveReplica(context.Context, *SaveReplicaRequest) (*SaveReplicaResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SaveReplica not implemented")
+}
+func (UnimplementedCallRuntimeServiceServer) RestoreReplica(context.Context, *RestoreReplicaRequest) (*RestoreReplicaResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RestoreReplica not implemented")
 }
 func (UnimplementedCallRuntimeServiceServer) LeaveSession(context.Context, *LeaveSessionRequest) (*LeaveSessionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LeaveSession not implemented")
@@ -335,6 +380,60 @@ func _CallRuntimeService_SessionStats_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CallRuntimeService_ExportSessionSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExportSessionSnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallRuntimeServiceServer).ExportSessionSnapshot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallRuntimeService_ExportSessionSnapshot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallRuntimeServiceServer).ExportSessionSnapshot(ctx, req.(*ExportSessionSnapshotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CallRuntimeService_SaveReplica_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveReplicaRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallRuntimeServiceServer).SaveReplica(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallRuntimeService_SaveReplica_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallRuntimeServiceServer).SaveReplica(ctx, req.(*SaveReplicaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CallRuntimeService_RestoreReplica_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RestoreReplicaRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallRuntimeServiceServer).RestoreReplica(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallRuntimeService_RestoreReplica_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallRuntimeServiceServer).RestoreReplica(ctx, req.(*RestoreReplicaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CallRuntimeService_LeaveSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(LeaveSessionRequest)
 	if err := dec(in); err != nil {
@@ -423,6 +522,18 @@ var CallRuntimeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SessionStats",
 			Handler:    _CallRuntimeService_SessionStats_Handler,
+		},
+		{
+			MethodName: "ExportSessionSnapshot",
+			Handler:    _CallRuntimeService_ExportSessionSnapshot_Handler,
+		},
+		{
+			MethodName: "SaveReplica",
+			Handler:    _CallRuntimeService_SaveReplica_Handler,
+		},
+		{
+			MethodName: "RestoreReplica",
+			Handler:    _CallRuntimeService_RestoreReplica_Handler,
 		},
 		{
 			MethodName: "LeaveSession",

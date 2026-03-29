@@ -157,6 +157,30 @@ func (c *grpcRuntimeClient) SessionStats(ctx context.Context, sessionID string) 
 	return result, nil
 }
 
+func (c *grpcRuntimeClient) ExportSessionSnapshot(ctx context.Context, sessionID string) (sessionSnapshot, error) {
+	resp, err := c.client.ExportSessionSnapshot(ctx, &callruntimev1.ExportSessionSnapshotRequest{SessionId: sessionID})
+	if err != nil {
+		return sessionSnapshot{}, err
+	}
+
+	return sessionSnapshotFromProto(resp.GetSnapshot()), nil
+}
+
+func (c *grpcRuntimeClient) SaveReplica(ctx context.Context, snapshot sessionSnapshot) error {
+	_, err := c.client.SaveReplica(ctx, &callruntimev1.SaveReplicaRequest{
+		Snapshot: sessionSnapshotProto(snapshot),
+	})
+	return err
+}
+
+func (c *grpcRuntimeClient) RestoreReplica(ctx context.Context, callID string, sessionID string) error {
+	_, err := c.client.RestoreReplica(ctx, &callruntimev1.RestoreReplicaRequest{
+		CallId:    callID,
+		SessionId: sessionID,
+	})
+	return err
+}
+
 func (c *grpcRuntimeClient) LeaveSession(ctx context.Context, sessionID string, accountID string, deviceID string) error {
 	_, err := c.client.LeaveSession(ctx, &callruntimev1.LeaveSessionRequest{
 		SessionId: sessionID,
@@ -226,6 +250,55 @@ func runtimeSignalsFromProto(values []*callruntimev1.RuntimeSignal) []domaincall
 		}
 		result = append(result, signal)
 	}
+	return result
+}
+
+func sessionSnapshotProto(value sessionSnapshot) *callruntimev1.SessionSnapshot {
+	result := &callruntimev1.SessionSnapshot{
+		CallId:         value.CallID,
+		ConversationId: value.Conversation,
+		Participants:   make([]*callruntimev1.SnapshotParticipant, 0, len(value.Participants)),
+	}
+	for _, participant := range value.Participants {
+		result.Participants = append(result.Participants, &callruntimev1.SnapshotParticipant{
+			AccountId: participant.AccountID,
+			DeviceId:  participant.DeviceID,
+			WithVideo: participant.WithVideo,
+			MediaState: &callv1.CallMediaState{
+				AudioMuted:         participant.Media.AudioMuted,
+				VideoMuted:         participant.Media.VideoMuted,
+				CameraEnabled:      participant.Media.CameraEnabled,
+				ScreenShareEnabled: participant.Media.ScreenShareEnabled,
+			},
+		})
+	}
+	return result
+}
+
+func sessionSnapshotFromProto(value *callruntimev1.SessionSnapshot) sessionSnapshot {
+	if value == nil {
+		return sessionSnapshot{}
+	}
+
+	result := sessionSnapshot{
+		CallID:       value.GetCallId(),
+		Conversation: value.GetConversationId(),
+		Participants: make([]snapshotParticipant, 0, len(value.GetParticipants())),
+	}
+	for _, participant := range value.GetParticipants() {
+		result.Participants = append(result.Participants, snapshotParticipant{
+			AccountID: participant.GetAccountId(),
+			DeviceID:  participant.GetDeviceId(),
+			WithVideo: participant.GetWithVideo(),
+			Media: domaincall.MediaState{
+				AudioMuted:         participant.GetMediaState().GetAudioMuted(),
+				VideoMuted:         participant.GetMediaState().GetVideoMuted(),
+				CameraEnabled:      participant.GetMediaState().GetCameraEnabled(),
+				ScreenShareEnabled: participant.GetMediaState().GetScreenShareEnabled(),
+			},
+		})
+	}
+
 	return result
 }
 

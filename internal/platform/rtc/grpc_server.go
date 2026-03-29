@@ -187,6 +187,54 @@ func (s *grpcRuntimeServer) SessionStats(
 	return &callruntimev1.SessionStatsResponse{Stats: result}, nil
 }
 
+func (s *grpcRuntimeServer) ExportSessionSnapshot(
+	ctx context.Context,
+	req *callruntimev1.ExportSessionSnapshotRequest,
+) (*callruntimev1.ExportSessionSnapshotResponse, error) {
+	if s == nil || s.local == nil {
+		return nil, domaincall.ErrInvalidInput
+	}
+
+	snapshot, err := s.local.ExportSessionSnapshot(ctx, req.GetSessionId())
+	if err != nil {
+		return nil, err
+	}
+
+	return &callruntimev1.ExportSessionSnapshotResponse{
+		Snapshot: sessionSnapshotProto(snapshot),
+	}, nil
+}
+
+func (s *grpcRuntimeServer) SaveReplica(
+	ctx context.Context,
+	req *callruntimev1.SaveReplicaRequest,
+) (*callruntimev1.SaveReplicaResponse, error) {
+	if s == nil || s.local == nil {
+		return nil, domaincall.ErrInvalidInput
+	}
+
+	if err := s.local.SaveReplica(ctx, sessionSnapshotFromProto(req.GetSnapshot())); err != nil {
+		return nil, err
+	}
+
+	return &callruntimev1.SaveReplicaResponse{}, nil
+}
+
+func (s *grpcRuntimeServer) RestoreReplica(
+	ctx context.Context,
+	req *callruntimev1.RestoreReplicaRequest,
+) (*callruntimev1.RestoreReplicaResponse, error) {
+	if s == nil || s.local == nil {
+		return nil, domaincall.ErrInvalidInput
+	}
+
+	if err := s.local.RestoreReplica(ctx, req.GetCallId(), req.GetSessionId()); err != nil {
+		return nil, err
+	}
+
+	return &callruntimev1.RestoreReplicaResponse{}, nil
+}
+
 func (s *grpcRuntimeServer) LeaveSession(
 	ctx context.Context,
 	req *callruntimev1.LeaveSessionRequest,

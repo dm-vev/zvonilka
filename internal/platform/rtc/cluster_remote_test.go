@@ -221,3 +221,78 @@ func TestClusterSkipsUnhealthyRemoteNodesForNewCalls(t *testing.T) {
 	require.Equal(t, "webrtc://node-a/calls", session.RuntimeEndpoint)
 	require.Equal(t, "node-a", domaincall.NodeIDFromSessionID(session.SessionID))
 }
+
+func TestClusterReplicatesRemoteSessionStateToStandbyNode(t *testing.T) {
+	t.Parallel()
+
+	localManager := NewManager("webrtc://node-a/calls", 15*time.Minute, WithCandidateHost("127.0.0.1"), WithUDPPortRange(43600, 43699))
+	remoteManager := NewManager("webrtc://node-b/calls", 15*time.Minute, WithCandidateHost("127.0.0.1"), WithUDPPortRange(43700, 43799))
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer listener.Close()
+
+	server := grpc.NewServer()
+	callruntimev1.RegisterCallRuntimeServiceServer(server, NewGRPCRuntimeServer(remoteManager))
+	defer server.Stop()
+
+	go func() {
+		_ = server.Serve(listener)
+	}()
+
+	cluster, err := NewCluster(domaincall.RTCConfig{
+		PublicEndpoint: "webrtc://gateway/calls",
+		CredentialTTL:  15 * time.Minute,
+		NodeID:         "node-a",
+		CandidateHost:  "127.0.0.1",
+		UDPPortMin:     43600,
+		UDPPortMax:     43799,
+		Nodes: []domaincall.RTCNode{
+			{ID: "node-a", Endpoint: "webrtc://node-a/calls"},
+			{ID: "node-b", Endpoint: "webrtc://node-b/calls", ControlEndpoint: listener.Addr().String()},
+		},
+	}, localManager)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, cluster.Close(context.Background()))
+	}()
+
+	sessionID := "node-b:rtc_call-standby"
+	_, err = cluster.EnsureSession(context.Background(), domaincall.Call{
+		ID:              "call-standby",
+		ConversationID:  "conv-standby",
+		ActiveSessionID: sessionID,
+	})
+	require.NoError(t, err)
+
+	_, err = cluster.JoinSession(context.Background(), sessionID, domaincall.RuntimeParticipant{
+		CallID:    "call-standby",
+		AccountID: "acc-standby",
+		DeviceID:  "dev-standby",
+		WithVideo: true,
+		Media: domaincall.MediaState{
+			CameraEnabled:      true,
+			ScreenShareEnabled: true,
+		},
+	})
+	require.NoError(t, err)
+
+	snapshot, err := localManager.ExportSessionSnapshot(context.Background(), "node-a:rtc_call-restored")
+	require.ErrorIs(t, err, domaincall.ErrNotFound)
+	require.Empty(t, snapshot.CallID)
+
+	_, err = localManager.EnsureSession(context.Background(), domaincall.Call{
+		ID:              "call-standby",
+		ConversationID:  "conv-standby",
+		ActiveSessionID: "node-a:rtc_call-restored",
+	})
+	require.NoError(t, err)
+	require.NoError(t, localManager.RestoreReplica(context.Background(), "call-standby", "node-a:rtc_call-restored"))
+
+	restored, err := localManager.ExportSessionSnapshot(context.Background(), "node-a:rtc_call-restored")
+	require.NoError(t, err)
+	require.Equal(t, "call-standby", restored.CallID)
+	require.Len(t, restored.Participants, 1)
+	require.Equal(t, "acc-standby", restored.Participants[0].AccountID)
+	require.True(t, restored.Participants[0].Media.ScreenShareEnabled)
+}
