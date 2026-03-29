@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"time"
 
@@ -1066,12 +1067,20 @@ func zeroTime(value interface{ AsTime() time.Time }) time.Time {
 	if value == nil {
 		return time.Time{}
 	}
+	raw := reflect.ValueOf(value)
+	if raw.Kind() == reflect.Pointer && raw.IsNil() {
+		return time.Time{}
+	}
 
 	return value.AsTime()
 }
 
 func timeDuration(value interface{ AsDuration() time.Duration }) time.Duration {
 	if value == nil {
+		return 0
+	}
+	raw := reflect.ValueOf(value)
+	if raw.Kind() == reflect.Pointer && raw.IsNil() {
 		return 0
 	}
 

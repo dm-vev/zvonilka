@@ -25,3 +25,33 @@ message DevicePreKeyBundle {
   uint32 one_time_prekeys_available = 6;
   google.protobuf.Timestamp device_last_seen_at = 7;
 }
+
+enum DirectSessionState {
+  DIRECT_SESSION_STATE_UNSPECIFIED = 0;
+  DIRECT_SESSION_STATE_PENDING = 1;
+  DIRECT_SESSION_STATE_ACKNOWLEDGED = 2;
+}
+
+message SessionBootstrapPayload {
+  string algorithm = 1;
+  bytes nonce = 2;
+  bytes ciphertext = 3;
+  map<string, string> metadata = 4;
+}
+
+message DirectSession {
+  string session_id = 1;
+  string initiator_user_id = 2;
+  string initiator_device_id = 3;
+  string recipient_user_id = 4;
+  string recipient_device_id = 5;
+  zvonilka.common.v1.PublicKeyBundle initiator_ephemeral_key = 6;
+  zvonilka.common.v1.PublicKeyBundle identity_key = 7;
+  SignedPreKey signed_prekey = 8;
+  PreKey one_time_prekey = 9;
+  SessionBootstrapPayload bootstrap = 10;
+  DirectSessionState state = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp acknowledged_at = 13;
+  google.protobuf.Timestamp expires_at = 14;
+}

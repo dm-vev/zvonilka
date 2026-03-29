@@ -19,8 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	E2EEService_UploadDevicePreKeys_FullMethodName     = "/zvonilka.e2ee.v1.E2EEService/UploadDevicePreKeys"
-	E2EEService_GetAccountPreKeyBundles_FullMethodName = "/zvonilka.e2ee.v1.E2EEService/GetAccountPreKeyBundles"
+	E2EEService_UploadDevicePreKeys_FullMethodName      = "/zvonilka.e2ee.v1.E2EEService/UploadDevicePreKeys"
+	E2EEService_GetAccountPreKeyBundles_FullMethodName  = "/zvonilka.e2ee.v1.E2EEService/GetAccountPreKeyBundles"
+	E2EEService_CreateDirectSessions_FullMethodName     = "/zvonilka.e2ee.v1.E2EEService/CreateDirectSessions"
+	E2EEService_ListDeviceSessions_FullMethodName       = "/zvonilka.e2ee.v1.E2EEService/ListDeviceSessions"
+	E2EEService_AcknowledgeDirectSession_FullMethodName = "/zvonilka.e2ee.v1.E2EEService/AcknowledgeDirectSession"
 )
 
 // E2EEServiceClient is the client API for E2EEService service.
@@ -29,6 +32,9 @@ const (
 type E2EEServiceClient interface {
 	UploadDevicePreKeys(ctx context.Context, in *UploadDevicePreKeysRequest, opts ...grpc.CallOption) (*UploadDevicePreKeysResponse, error)
 	GetAccountPreKeyBundles(ctx context.Context, in *GetAccountPreKeyBundlesRequest, opts ...grpc.CallOption) (*GetAccountPreKeyBundlesResponse, error)
+	CreateDirectSessions(ctx context.Context, in *CreateDirectSessionsRequest, opts ...grpc.CallOption) (*CreateDirectSessionsResponse, error)
+	ListDeviceSessions(ctx context.Context, in *ListDeviceSessionsRequest, opts ...grpc.CallOption) (*ListDeviceSessionsResponse, error)
+	AcknowledgeDirectSession(ctx context.Context, in *AcknowledgeDirectSessionRequest, opts ...grpc.CallOption) (*AcknowledgeDirectSessionResponse, error)
 }
 
 type e2EEServiceClient struct {
@@ -57,12 +63,42 @@ func (c *e2EEServiceClient) GetAccountPreKeyBundles(ctx context.Context, in *Get
 	return out, nil
 }
 
+func (c *e2EEServiceClient) CreateDirectSessions(ctx context.Context, in *CreateDirectSessionsRequest, opts ...grpc.CallOption) (*CreateDirectSessionsResponse, error) {
+	out := new(CreateDirectSessionsResponse)
+	err := c.cc.Invoke(ctx, E2EEService_CreateDirectSessions_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *e2EEServiceClient) ListDeviceSessions(ctx context.Context, in *ListDeviceSessionsRequest, opts ...grpc.CallOption) (*ListDeviceSessionsResponse, error) {
+	out := new(ListDeviceSessionsResponse)
+	err := c.cc.Invoke(ctx, E2EEService_ListDeviceSessions_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *e2EEServiceClient) AcknowledgeDirectSession(ctx context.Context, in *AcknowledgeDirectSessionRequest, opts ...grpc.CallOption) (*AcknowledgeDirectSessionResponse, error) {
+	out := new(AcknowledgeDirectSessionResponse)
+	err := c.cc.Invoke(ctx, E2EEService_AcknowledgeDirectSession_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // E2EEServiceServer is the server API for E2EEService service.
 // All implementations must embed UnimplementedE2EEServiceServer
 // for forward compatibility
 type E2EEServiceServer interface {
 	UploadDevicePreKeys(context.Context, *UploadDevicePreKeysRequest) (*UploadDevicePreKeysResponse, error)
 	GetAccountPreKeyBundles(context.Context, *GetAccountPreKeyBundlesRequest) (*GetAccountPreKeyBundlesResponse, error)
+	CreateDirectSessions(context.Context, *CreateDirectSessionsRequest) (*CreateDirectSessionsResponse, error)
+	ListDeviceSessions(context.Context, *ListDeviceSessionsRequest) (*ListDeviceSessionsResponse, error)
+	AcknowledgeDirectSession(context.Context, *AcknowledgeDirectSessionRequest) (*AcknowledgeDirectSessionResponse, error)
 	mustEmbedUnimplementedE2EEServiceServer()
 }
 
@@ -75,6 +111,15 @@ func (UnimplementedE2EEServiceServer) UploadDevicePreKeys(context.Context, *Uplo
 }
 func (UnimplementedE2EEServiceServer) GetAccountPreKeyBundles(context.Context, *GetAccountPreKeyBundlesRequest) (*GetAccountPreKeyBundlesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAccountPreKeyBundles not implemented")
+}
+func (UnimplementedE2EEServiceServer) CreateDirectSessions(context.Context, *CreateDirectSessionsRequest) (*CreateDirectSessionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateDirectSessions not implemented")
+}
+func (UnimplementedE2EEServiceServer) ListDeviceSessions(context.Context, *ListDeviceSessionsRequest) (*ListDeviceSessionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListDeviceSessions not implemented")
+}
+func (UnimplementedE2EEServiceServer) AcknowledgeDirectSession(context.Context, *AcknowledgeDirectSessionRequest) (*AcknowledgeDirectSessionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AcknowledgeDirectSession not implemented")
 }
 func (UnimplementedE2EEServiceServer) mustEmbedUnimplementedE2EEServiceServer() {}
 
@@ -125,6 +170,60 @@ func _E2EEService_GetAccountPreKeyBundles_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _E2EEService_CreateDirectSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateDirectSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(E2EEServiceServer).CreateDirectSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: E2EEService_CreateDirectSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(E2EEServiceServer).CreateDirectSessions(ctx, req.(*CreateDirectSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _E2EEService_ListDeviceSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListDeviceSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(E2EEServiceServer).ListDeviceSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: E2EEService_ListDeviceSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(E2EEServiceServer).ListDeviceSessions(ctx, req.(*ListDeviceSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _E2EEService_AcknowledgeDirectSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AcknowledgeDirectSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(E2EEServiceServer).AcknowledgeDirectSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: E2EEService_AcknowledgeDirectSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(E2EEServiceServer).AcknowledgeDirectSession(ctx, req.(*AcknowledgeDirectSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // E2EEService_ServiceDesc is the grpc.ServiceDesc for E2EEService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -139,6 +238,18 @@ var E2EEService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAccountPreKeyBundles",
 			Handler:    _E2EEService_GetAccountPreKeyBundles_Handler,
+		},
+		{
+			MethodName: "CreateDirectSessions",
+			Handler:    _E2EEService_CreateDirectSessions_Handler,
+		},
+		{
+			MethodName: "ListDeviceSessions",
+			Handler:    _E2EEService_ListDeviceSessions_Handler,
+		},
+		{
+			MethodName: "AcknowledgeDirectSession",
+			Handler:    _E2EEService_AcknowledgeDirectSession_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

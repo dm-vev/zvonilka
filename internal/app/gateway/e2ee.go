@@ -69,6 +69,82 @@ func (a *api) GetAccountPreKeyBundles(
 	return &e2eev1.GetAccountPreKeyBundlesResponse{Bundles: result}, nil
 }
 
+func (a *api) CreateDirectSessions(
+	ctx context.Context,
+	req *e2eev1.CreateDirectSessionsRequest,
+) (*e2eev1.CreateDirectSessionsResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	sessions, err := a.e2ee.CreateDirectSessions(ctx, domaine2ee.CreateDirectSessionsParams{
+		InitiatorAccountID: authContext.Account.ID,
+		InitiatorDeviceID:  authContext.Session.DeviceID,
+		TargetAccountID:    req.GetUserId(),
+		TargetDeviceID:     req.GetDeviceId(),
+		InitiatorEphemeral: publicKeyBundleFromProto(req.GetInitiatorEphemeralKey()),
+		Bootstrap:          bootstrapPayloadFromProto(req.GetBootstrap()),
+		ExpiresAt:          zeroTime(req.GetExpiresAt()),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	result := make([]*e2eev1.DirectSession, 0, len(sessions))
+	for _, session := range sessions {
+		result = append(result, directSessionProto(session))
+	}
+	return &e2eev1.CreateDirectSessionsResponse{Sessions: result}, nil
+}
+
+func (a *api) ListDeviceSessions(
+	ctx context.Context,
+	req *e2eev1.ListDeviceSessionsRequest,
+) (*e2eev1.ListDeviceSessionsResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	sessions, err := a.e2ee.ListDeviceSessions(ctx, domaine2ee.ListDeviceSessionsParams{
+		AccountID:           authContext.Account.ID,
+		DeviceID:            authContext.Session.DeviceID,
+		IncludeAcknowledged: req.GetIncludeAcknowledged(),
+		PeerAccountID:       req.GetPeerUserId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	result := make([]*e2eev1.DirectSession, 0, len(sessions))
+	for _, session := range sessions {
+		result = append(result, directSessionProto(session))
+	}
+	return &e2eev1.ListDeviceSessionsResponse{Sessions: result}, nil
+}
+
+func (a *api) AcknowledgeDirectSession(
+	ctx context.Context,
+	req *e2eev1.AcknowledgeDirectSessionRequest,
+) (*e2eev1.AcknowledgeDirectSessionResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	session, err := a.e2ee.AcknowledgeDirectSession(ctx, domaine2ee.AcknowledgeDirectSessionParams{
+		SessionID:          req.GetSessionId(),
+		RecipientAccountID: authContext.Account.ID,
+		RecipientDeviceID:  authContext.Session.DeviceID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &e2eev1.AcknowledgeDirectSessionResponse{Session: directSessionProto(session)}, nil
+}
+
 func deviceBundleProto(value domaine2ee.DeviceBundle) *e2eev1.DevicePreKeyBundle {
 	return &e2eev1.DevicePreKeyBundle{
 		UserId:                  value.AccountID,
@@ -110,6 +186,43 @@ func publicKeyBundleProto(value domaine2ee.PublicKey) *commonv1.PublicKeyBundle 
 		RotatedAt: protoTime(value.RotatedAt),
 		ExpiresAt: protoTime(value.ExpiresAt),
 	}
+}
+
+func directSessionProto(value domaine2ee.DirectSession) *e2eev1.DirectSession {
+	return &e2eev1.DirectSession{
+		SessionId:            value.ID,
+		InitiatorUserId:      value.InitiatorAccountID,
+		InitiatorDeviceId:    value.InitiatorDeviceID,
+		RecipientUserId:      value.RecipientAccountID,
+		RecipientDeviceId:    value.RecipientDeviceID,
+		InitiatorEphemeralKey: publicKeyBundleProto(value.InitiatorEphemeral),
+		IdentityKey:          publicKeyBundleProto(value.IdentityKey),
+		SignedPrekey:         signedPreKeyProto(value.SignedPreKey),
+		OneTimePrekey:        oneTimePreKeyProto(value.OneTimePreKey),
+		Bootstrap:            bootstrapPayloadProto(value.Bootstrap),
+		State:                directSessionStateProto(value.State),
+		CreatedAt:            protoTime(value.CreatedAt),
+		AcknowledgedAt:       protoTime(value.AcknowledgedAt),
+		ExpiresAt:            protoTime(value.ExpiresAt),
+	}
+}
+
+func bootstrapPayloadProto(value domaine2ee.BootstrapPayload) *e2eev1.SessionBootstrapPayload {
+	if strings.TrimSpace(value.Algorithm) == "" && len(value.Ciphertext) == 0 {
+		return nil
+	}
+	result := &e2eev1.SessionBootstrapPayload{
+		Algorithm:  value.Algorithm,
+		Nonce:      append([]byte(nil), value.Nonce...),
+		Ciphertext: append([]byte(nil), value.Ciphertext...),
+	}
+	if len(value.Metadata) > 0 {
+		result.Metadata = make(map[string]string, len(value.Metadata))
+		for key, item := range value.Metadata {
+			result.Metadata[key] = item
+		}
+	}
+	return result
 }
 
 func signedPreKeyFromProto(value *e2eev1.SignedPreKey) domaine2ee.SignedPreKey {
@@ -156,5 +269,34 @@ func publicKeyBundleFromProto(value *commonv1.PublicKeyBundle) domaine2ee.Public
 		CreatedAt: zeroTime(value.GetCreatedAt()),
 		RotatedAt: zeroTime(value.GetRotatedAt()),
 		ExpiresAt: zeroTime(value.GetExpiresAt()),
+	}
+}
+
+func bootstrapPayloadFromProto(value *e2eev1.SessionBootstrapPayload) domaine2ee.BootstrapPayload {
+	if value == nil {
+		return domaine2ee.BootstrapPayload{}
+	}
+	result := domaine2ee.BootstrapPayload{
+		Algorithm:  strings.TrimSpace(value.GetAlgorithm()),
+		Nonce:      append([]byte(nil), value.GetNonce()...),
+		Ciphertext: append([]byte(nil), value.GetCiphertext()...),
+	}
+	if len(value.GetMetadata()) > 0 {
+		result.Metadata = make(map[string]string, len(value.GetMetadata()))
+		for key, item := range value.GetMetadata() {
+			result.Metadata[key] = item
+		}
+	}
+	return result
+}
+
+func directSessionStateProto(value domaine2ee.DirectSessionState) e2eev1.DirectSessionState {
+	switch value {
+	case domaine2ee.DirectSessionStatePending:
+		return e2eev1.DirectSessionState_DIRECT_SESSION_STATE_PENDING
+	case domaine2ee.DirectSessionStateAcknowledged:
+		return e2eev1.DirectSessionState_DIRECT_SESSION_STATE_ACKNOWLEDGED
+	default:
+		return e2eev1.DirectSessionState_DIRECT_SESSION_STATE_UNSPECIFIED
 	}
 }

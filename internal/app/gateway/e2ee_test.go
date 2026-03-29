@@ -125,3 +125,116 @@ func TestUploadAndFetchPreKeysRPC(t *testing.T) {
 		t.Fatalf("expected one remaining one-time prekey, got %d", fetched.Bundles[0].OneTimePrekeysAvailable)
 	}
 }
+
+func TestCreateListAndAcknowledgeDirectSessionsRPC(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-session",
+		DisplayName: "Alice Session",
+		Email:       "alice-session@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-session",
+		DisplayName: "Bob Session",
+		Email:       "bob-session@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) context.Context {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken))
+	}
+
+	aliceCtx := login(alice.Username, "alice-phone", "alice-device-key")
+	bobCtx := login(bob.Username, "bob-phone", "bob-device-key")
+
+	_, err = api.UploadDevicePreKeys(bobCtx, &e2eev1.UploadDevicePreKeysRequest{
+		SignedPrekey: &e2eev1.SignedPreKey{
+			Key: &commonv1.PublicKeyBundle{
+				KeyId:     "spk-bob",
+				Algorithm: "x25519",
+				PublicKey: []byte("signed-prekey-bob"),
+			},
+			Signature: []byte("sig-bob"),
+		},
+		OneTimePrekeys: []*e2eev1.PreKey{
+			{Key: &commonv1.PublicKeyBundle{KeyId: "otk-bob", Algorithm: "x25519", PublicKey: []byte("otk-bob")}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("upload bob prekeys: %v", err)
+	}
+
+	created, err := api.CreateDirectSessions(aliceCtx, &e2eev1.CreateDirectSessionsRequest{
+		UserId: bob.ID,
+		InitiatorEphemeralKey: &commonv1.PublicKeyBundle{
+			KeyId:     "eph-a1",
+			Algorithm: "x25519",
+			PublicKey: []byte("alice-ephemeral"),
+		},
+		Bootstrap: &e2eev1.SessionBootstrapPayload{
+			Algorithm:  "x3dh-v1",
+			Nonce:      []byte("nonce"),
+			Ciphertext: []byte("ciphertext"),
+			Metadata:   map[string]string{"conversation_id": "conv-direct"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create direct sessions rpc: %v", err)
+	}
+	if len(created.Sessions) != 1 {
+		t.Fatalf("expected one created session, got %d", len(created.Sessions))
+	}
+
+	listed, err := api.ListDeviceSessions(bobCtx, &e2eev1.ListDeviceSessionsRequest{})
+	if err != nil {
+		t.Fatalf("list device sessions rpc: %v", err)
+	}
+	if len(listed.Sessions) != 1 {
+		t.Fatalf("expected one listed session, got %d", len(listed.Sessions))
+	}
+	if listed.Sessions[0].Bootstrap == nil || listed.Sessions[0].Bootstrap.Algorithm != "x3dh-v1" {
+		t.Fatalf("unexpected listed bootstrap: %+v", listed.Sessions[0].Bootstrap)
+	}
+
+	acked, err := api.AcknowledgeDirectSession(bobCtx, &e2eev1.AcknowledgeDirectSessionRequest{
+		SessionId: listed.Sessions[0].SessionId,
+	})
+	if err != nil {
+		t.Fatalf("ack direct session rpc: %v", err)
+	}
+	if acked.Session == nil || acked.Session.State != e2eev1.DirectSessionState_DIRECT_SESSION_STATE_ACKNOWLEDGED {
+		t.Fatalf("unexpected acknowledged session: %+v", acked.Session)
+	}
+}

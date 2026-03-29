@@ -3,6 +3,8 @@ syntax = "proto3";
 package zvonilka.e2ee.v1;
 
 import "contracts/e2ee/v1/models.proto";
+import "contracts/common/v1/messages.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/e2ee/v1;e2eev1";
 
@@ -24,4 +26,33 @@ message GetAccountPreKeyBundlesRequest {
 
 message GetAccountPreKeyBundlesResponse {
   repeated DevicePreKeyBundle bundles = 1;
+}
+
+message CreateDirectSessionsRequest {
+  string user_id = 1;
+  string device_id = 2;
+  zvonilka.common.v1.PublicKeyBundle initiator_ephemeral_key = 3;
+  SessionBootstrapPayload bootstrap = 4;
+  google.protobuf.Timestamp expires_at = 5;
+}
+
+message CreateDirectSessionsResponse {
+  repeated DirectSession sessions = 1;
+}
+
+message ListDeviceSessionsRequest {
+  bool include_acknowledged = 1;
+  string peer_user_id = 2;
+}
+
+message ListDeviceSessionsResponse {
+  repeated DirectSession sessions = 1;
+}
+
+message AcknowledgeDirectSessionRequest {
+  string session_id = 1;
+}
+
+message AcknowledgeDirectSessionResponse {
+  DirectSession session = 1;
 }

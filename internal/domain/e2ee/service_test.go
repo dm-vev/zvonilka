@@ -67,6 +67,107 @@ func TestUploadAndClaimBundles(t *testing.T) {
 	}
 }
 
+func TestCreateListAndAcknowledgeDirectSessions(t *testing.T) {
+	ctx := context.Background()
+	directory := identitytest.NewMemoryStore()
+	e2eeStore := teststore.NewMemoryStore()
+	service, err := domaine2ee.NewService(e2eeStore, directory)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	seedIdentity(t, ctx, directory, "acc-a", "dev-a", "device-key-a")
+	seedIdentity(t, ctx, directory, "acc-b", "dev-b1", "device-key-b1")
+	seedIdentity(t, ctx, directory, "acc-b", "dev-b2", "device-key-b2")
+
+	for _, deviceID := range []string{"dev-b1", "dev-b2"} {
+		_, err = service.UploadDevicePreKeys(ctx, domaine2ee.UploadDevicePreKeysParams{
+			AccountID: "acc-b",
+			DeviceID:  deviceID,
+			SignedPreKey: domaine2ee.SignedPreKey{
+				Key: domaine2ee.PublicKey{
+					KeyID:     "spk-" + deviceID,
+					Algorithm: "x25519",
+					PublicKey: []byte("signed-" + deviceID),
+					CreatedAt: time.Now().UTC(),
+				},
+				Signature: []byte("sig-" + deviceID),
+			},
+			OneTimePreKeys: []domaine2ee.OneTimePreKey{
+				{Key: domaine2ee.PublicKey{KeyID: "otk-" + deviceID, Algorithm: "x25519", PublicKey: []byte("otk-" + deviceID), CreatedAt: time.Now().UTC()}},
+			},
+		})
+		if err != nil {
+			t.Fatalf("upload prekeys for %s: %v", deviceID, err)
+		}
+	}
+
+	created, err := service.CreateDirectSessions(ctx, domaine2ee.CreateDirectSessionsParams{
+		InitiatorAccountID: "acc-a",
+		InitiatorDeviceID:  "dev-a",
+		TargetAccountID:    "acc-b",
+		InitiatorEphemeral: domaine2ee.PublicKey{
+			KeyID:     "eph-1",
+			Algorithm: "x25519",
+			PublicKey: []byte("ephemeral"),
+			CreatedAt: time.Now().UTC(),
+		},
+		Bootstrap: domaine2ee.BootstrapPayload{
+			Algorithm:  "x3dh-v1",
+			Nonce:      []byte("nonce"),
+			Ciphertext: []byte("ciphertext"),
+			Metadata:   map[string]string{"conversation_id": "conv-1"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create direct sessions: %v", err)
+	}
+	if len(created) != 2 {
+		t.Fatalf("expected two created sessions, got %d", len(created))
+	}
+	if created[0].OneTimePreKey.Key.KeyID == "" && created[1].OneTimePreKey.Key.KeyID == "" {
+		t.Fatal("expected at least one claimed one-time prekey")
+	}
+
+	listed, err := service.ListDeviceSessions(ctx, domaine2ee.ListDeviceSessionsParams{
+		AccountID: "acc-b",
+		DeviceID:  "dev-b1",
+	})
+	if err != nil {
+		t.Fatalf("list device sessions: %v", err)
+	}
+	if len(listed) != 1 {
+		t.Fatalf("expected one listed session, got %d", len(listed))
+	}
+	if listed[0].Bootstrap.Algorithm != "x3dh-v1" {
+		t.Fatalf("unexpected bootstrap payload: %+v", listed[0].Bootstrap)
+	}
+
+	acknowledged, err := service.AcknowledgeDirectSession(ctx, domaine2ee.AcknowledgeDirectSessionParams{
+		SessionID:          listed[0].ID,
+		RecipientAccountID: "acc-b",
+		RecipientDeviceID:  "dev-b1",
+	})
+	if err != nil {
+		t.Fatalf("acknowledge direct session: %v", err)
+	}
+	if acknowledged.State != domaine2ee.DirectSessionStateAcknowledged {
+		t.Fatalf("expected acknowledged state, got %s", acknowledged.State)
+	}
+
+	listed, err = service.ListDeviceSessions(ctx, domaine2ee.ListDeviceSessionsParams{
+		AccountID:           "acc-b",
+		DeviceID:            "dev-b1",
+		IncludeAcknowledged: true,
+	})
+	if err != nil {
+		t.Fatalf("list acknowledged session: %v", err)
+	}
+	if len(listed) != 1 || listed[0].State != domaine2ee.DirectSessionStateAcknowledged {
+		t.Fatalf("unexpected acknowledged sessions: %+v", listed)
+	}
+}
+
 func seedIdentity(t *testing.T, ctx context.Context, store identity.Store, accountID string, deviceID string, publicKey string) {
 	t.Helper()
 	if _, err := store.SaveAccount(ctx, identity.Account{

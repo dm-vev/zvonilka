@@ -20,6 +20,9 @@ type Store interface {
 		claimedByDeviceID string,
 	) (OneTimePreKey, error)
 	CountAvailableOneTimePreKeys(ctx context.Context, accountID string, deviceID string) (uint32, error)
+	SaveDirectSession(ctx context.Context, value DirectSession) (DirectSession, error)
+	DirectSessionByID(ctx context.Context, sessionID string) (DirectSession, error)
+	DirectSessionsByRecipientDevice(ctx context.Context, accountID string, deviceID string) ([]DirectSession, error)
 }
 
 type Directory interface {

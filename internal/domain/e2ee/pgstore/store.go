@@ -15,6 +15,7 @@ import (
 
 type sqlConn interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }
 
@@ -228,6 +229,133 @@ func (s *Store) CountAvailableOneTimePreKeys(ctx context.Context, accountID stri
 	return count, nil
 }
 
+func (s *Store) SaveDirectSession(ctx context.Context, value e2ee.DirectSession) (e2ee.DirectSession, error) {
+	if err := s.requireContext(ctx); err != nil {
+		return e2ee.DirectSession{}, err
+	}
+	query := fmt.Sprintf(`
+INSERT INTO %s (
+	id, initiator_account_id, initiator_device_id, recipient_account_id, recipient_device_id,
+	initiator_ephemeral_key_id, initiator_ephemeral_algorithm, initiator_ephemeral_public_key,
+	identity_key_id, identity_key_algorithm, identity_key_public_key,
+	signed_prekey_id, signed_prekey_algorithm, signed_prekey_public_key, signed_prekey_signature,
+	one_time_prekey_id, one_time_prekey_algorithm, one_time_prekey_public_key,
+	bootstrap_algorithm, bootstrap_nonce, bootstrap_ciphertext, bootstrap_metadata,
+	state, created_at, acknowledged_at, expires_at, updated_at
+) VALUES (
+	$1,$2,$3,$4,$5,
+	$6,$7,$8,
+	$9,$10,$11,
+	$12,$13,$14,$15,
+	$16,$17,$18,
+	$19,$20,$21,$22,
+	$23,$24,$25,$26,NOW()
+)
+ON CONFLICT (id)
+DO UPDATE SET
+	state = EXCLUDED.state,
+	acknowledged_at = EXCLUDED.acknowledged_at,
+	expires_at = EXCLUDED.expires_at,
+	bootstrap_algorithm = EXCLUDED.bootstrap_algorithm,
+	bootstrap_nonce = EXCLUDED.bootstrap_nonce,
+	bootstrap_ciphertext = EXCLUDED.bootstrap_ciphertext,
+	bootstrap_metadata = EXCLUDED.bootstrap_metadata,
+	updated_at = NOW()
+RETURNING
+	id, initiator_account_id, initiator_device_id, recipient_account_id, recipient_device_id,
+	initiator_ephemeral_key_id, initiator_ephemeral_algorithm, initiator_ephemeral_public_key,
+	identity_key_id, identity_key_algorithm, identity_key_public_key,
+	signed_prekey_id, signed_prekey_algorithm, signed_prekey_public_key, signed_prekey_signature,
+	one_time_prekey_id, one_time_prekey_algorithm, one_time_prekey_public_key,
+	bootstrap_algorithm, bootstrap_nonce, bootstrap_ciphertext, bootstrap_metadata,
+	state, created_at, acknowledged_at, expires_at
+`, s.table("e2ee_direct_sessions"))
+	saved, err := scanDirectSession(s.conn().QueryRowContext(
+		ctx,
+		query,
+		value.ID,
+		value.InitiatorAccountID,
+		value.InitiatorDeviceID,
+		value.RecipientAccountID,
+		value.RecipientDeviceID,
+		value.InitiatorEphemeral.KeyID,
+		value.InitiatorEphemeral.Algorithm,
+		value.InitiatorEphemeral.PublicKey,
+		value.IdentityKey.KeyID,
+		value.IdentityKey.Algorithm,
+		value.IdentityKey.PublicKey,
+		value.SignedPreKey.Key.KeyID,
+		value.SignedPreKey.Key.Algorithm,
+		value.SignedPreKey.Key.PublicKey,
+		value.SignedPreKey.Signature,
+		nullString(value.OneTimePreKey.Key.KeyID),
+		nullString(value.OneTimePreKey.Key.Algorithm),
+		nullBytes(value.OneTimePreKey.Key.PublicKey),
+		value.Bootstrap.Algorithm,
+		value.Bootstrap.Nonce,
+		value.Bootstrap.Ciphertext,
+		marshalMetadata(value.Bootstrap.Metadata),
+		value.State,
+		value.CreatedAt.UTC(),
+		nullTime(value.AcknowledgedAt),
+		nullTime(value.ExpiresAt),
+	))
+	if err != nil {
+		return e2ee.DirectSession{}, mapConstraintError(err)
+	}
+	return saved, nil
+}
+
+func (s *Store) DirectSessionByID(ctx context.Context, sessionID string) (e2ee.DirectSession, error) {
+	query := fmt.Sprintf(`
+SELECT
+	id, initiator_account_id, initiator_device_id, recipient_account_id, recipient_device_id,
+	initiator_ephemeral_key_id, initiator_ephemeral_algorithm, initiator_ephemeral_public_key,
+	identity_key_id, identity_key_algorithm, identity_key_public_key,
+	signed_prekey_id, signed_prekey_algorithm, signed_prekey_public_key, signed_prekey_signature,
+	one_time_prekey_id, one_time_prekey_algorithm, one_time_prekey_public_key,
+	bootstrap_algorithm, bootstrap_nonce, bootstrap_ciphertext, bootstrap_metadata,
+	state, created_at, acknowledged_at, expires_at
+FROM %s
+WHERE id = $1
+`, s.table("e2ee_direct_sessions"))
+	return s.scanDirectSession(ctx, query, sessionID)
+}
+
+func (s *Store) DirectSessionsByRecipientDevice(ctx context.Context, accountID string, deviceID string) ([]e2ee.DirectSession, error) {
+	query := fmt.Sprintf(`
+SELECT
+	id, initiator_account_id, initiator_device_id, recipient_account_id, recipient_device_id,
+	initiator_ephemeral_key_id, initiator_ephemeral_algorithm, initiator_ephemeral_public_key,
+	identity_key_id, identity_key_algorithm, identity_key_public_key,
+	signed_prekey_id, signed_prekey_algorithm, signed_prekey_public_key, signed_prekey_signature,
+	one_time_prekey_id, one_time_prekey_algorithm, one_time_prekey_public_key,
+	bootstrap_algorithm, bootstrap_nonce, bootstrap_ciphertext, bootstrap_metadata,
+	state, created_at, acknowledged_at, expires_at
+FROM %s
+WHERE recipient_account_id = $1 AND recipient_device_id = $2
+ORDER BY created_at DESC, id DESC
+`, s.table("e2ee_direct_sessions"))
+	queryRows, err := s.conn().QueryContext(ctx, query, accountID, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer queryRows.Close()
+
+	result := make([]e2ee.DirectSession, 0)
+	for queryRows.Next() {
+		value, scanErr := scanDirectSession(queryRows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		result = append(result, value)
+	}
+	if err := queryRows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (s *Store) conn() sqlConn {
 	if s.tx != nil {
 		return s.tx
@@ -287,6 +415,21 @@ func nullTime(value time.Time) any {
 		return nil
 	}
 	return value.UTC()
+}
+
+func nullString(value string) any {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return value
+}
+
+func nullBytes(value []byte) any {
+	if len(value) == 0 {
+		return nil
+	}
+	return value
 }
 
 var _ e2ee.Store = (*Store)(nil)
