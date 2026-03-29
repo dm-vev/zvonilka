@@ -2,7 +2,7 @@ package pgstore
 
 import "strings"
 
-const conversationColumnList = `id, kind, title, description, avatar_media_id, owner_account_id, only_admins_can_write, only_admins_can_add_members, allow_reactions, allow_forwards, allow_threads, require_encrypted_messages, require_join_approval, pinned_messages_only_admins, slow_mode_interval_nanos, archived, muted, pinned, hidden, last_sequence, created_at, updated_at, last_message_at`
+const conversationColumnList = `id, kind, title, description, avatar_media_id, owner_account_id, only_admins_can_write, only_admins_can_add_members, allow_reactions, allow_forwards, allow_threads, require_encrypted_messages, require_trusted_devices, require_join_approval, pinned_messages_only_admins, slow_mode_interval_nanos, archived, muted, pinned, hidden, last_sequence, created_at, updated_at, last_message_at`
 
 const topicColumnList = `conversation_id, id, root_message_id, title, created_by_account_id, is_general, archived, pinned, closed, last_sequence, message_count, created_at, updated_at, last_message_at, archived_at, closed_at`
 
@@ -22,7 +22,7 @@ const syncStateColumnList = `device_id, account_id, last_applied_sequence, last_
 
 const eventColumnList = `sequence, event_id, event_type, conversation_id, actor_account_id, actor_device_id, causation_id, correlation_id, message_id, payload_type, payload_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_aad, payload_metadata, read_through_sequence, metadata, created_at`
 
-const moderationPolicyColumnList = `target_kind, target_id, only_admins_can_write, only_admins_can_add_members, allow_reactions, allow_forwards, allow_threads, require_encrypted_messages, require_join_approval, pinned_messages_only_admins, slow_mode_interval_nanos, anti_spam_window_nanos, anti_spam_burst_limit, shadow_mode, created_at, updated_at`
+const moderationPolicyColumnList = `target_kind, target_id, only_admins_can_write, only_admins_can_add_members, allow_reactions, allow_forwards, allow_threads, require_encrypted_messages, require_trusted_devices, require_join_approval, pinned_messages_only_admins, slow_mode_interval_nanos, anti_spam_window_nanos, anti_spam_burst_limit, shadow_mode, created_at, updated_at`
 
 const moderationReportColumnList = `id, target_kind, target_id, reporter_account_id, target_account_id, reason, details, status, reviewed_by_account_id, reviewed_at, resolution, created_at, updated_at`
 

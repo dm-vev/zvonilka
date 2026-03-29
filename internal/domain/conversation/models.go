@@ -108,6 +108,7 @@ type ConversationSettings struct {
 	AllowForwards            bool
 	AllowThreads             bool
 	RequireEncryptedMessages bool
+	RequireTrustedDevices    bool
 	RequireJoinApproval      bool
 	PinnedMessagesOnlyAdmins bool
 	SlowModeInterval         time.Duration

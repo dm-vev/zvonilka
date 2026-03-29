@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS {{schema}}.e2ee_group_sender_keys (
     id TEXT PRIMARY KEY,
-    conversation_id TEXT NOT NULL REFERENCES {{schema}}.conversations(id) ON DELETE CASCADE,
+    conversation_id TEXT NOT NULL REFERENCES {{schema}}.conversation_conversations(id) ON DELETE CASCADE,
     sender_account_id TEXT NOT NULL REFERENCES {{schema}}.identity_accounts(id) ON DELETE CASCADE,
     sender_device_id TEXT NOT NULL REFERENCES {{schema}}.identity_devices(id) ON DELETE CASCADE,
     recipient_account_id TEXT NOT NULL REFERENCES {{schema}}.identity_accounts(id) ON DELETE CASCADE,

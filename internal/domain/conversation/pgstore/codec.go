@@ -133,6 +133,7 @@ func scanConversation(row rowScanner) (conversation.Conversation, error) {
 		&conversationRow.Settings.AllowForwards,
 		&conversationRow.Settings.AllowThreads,
 		&conversationRow.Settings.RequireEncryptedMessages,
+		&conversationRow.Settings.RequireTrustedDevices,
 		&conversationRow.Settings.RequireJoinApproval,
 		&conversationRow.Settings.PinnedMessagesOnlyAdmins,
 		&conversationRow.Settings.SlowModeInterval,

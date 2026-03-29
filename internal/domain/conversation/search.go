@@ -124,6 +124,7 @@ func conversationSearchMetadata(conversation Conversation, members []Conversatio
 		"allow_threads":         fmt.Sprintf("%t", conversation.Settings.AllowThreads),
 		"allow_reactions":       fmt.Sprintf("%t", conversation.Settings.AllowReactions),
 		"require_encrypted":     fmt.Sprintf("%t", conversation.Settings.RequireEncryptedMessages),
+		"require_trusted":       fmt.Sprintf("%t", conversation.Settings.RequireTrustedDevices),
 		"only_admins_can_write": fmt.Sprintf("%t", conversation.Settings.OnlyAdminsCanWrite),
 		"pinned_only_admins":    fmt.Sprintf("%t", conversation.Settings.PinnedMessagesOnlyAdmins),
 		"only_admins_can_add":   fmt.Sprintf("%t", conversation.Settings.OnlyAdminsCanAddMembers),

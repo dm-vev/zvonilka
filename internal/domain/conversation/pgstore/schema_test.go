@@ -151,6 +151,9 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 	if loadedConversation.Settings.RequireEncryptedMessages {
 		t.Fatal("expected encrypted message policy to remain opt-in by default")
 	}
+	if loadedConversation.Settings.RequireTrustedDevices {
+		t.Fatal("expected trusted device policy to remain opt-in by default")
+	}
 
 	loadedMessage, err := store.MessageByID(context.Background(), created.ID, message.ID)
 	if err != nil {

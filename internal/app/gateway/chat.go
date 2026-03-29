@@ -886,6 +886,7 @@ func conversationSettingsFromProto(settings *conversationv1.ConversationSettings
 		PinnedMessagesOnlyAdmins: settings.GetPinnedMessagesOnlyAdmins(),
 		SlowModeInterval:         slowMode,
 		RequireEncryptedMessages: settings.GetRequireEncryptedMessages(),
+		RequireTrustedDevices:    settings.GetRequireTrustedDevices(),
 	}
 }
 
@@ -922,6 +923,7 @@ func conversationSettingsProto(settings domainconversation.ConversationSettings)
 		PinnedMessagesOnlyAdmins: settings.PinnedMessagesOnlyAdmins,
 		SlowModeInterval:         protoDuration(settings.SlowModeInterval),
 		RequireEncryptedMessages: settings.RequireEncryptedMessages,
+		RequireTrustedDevices:    settings.RequireTrustedDevices,
 	}
 }
 
@@ -1202,6 +1204,12 @@ func conversationUpdateParamsFromRequest(
 				return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
 			}
 			currentSettings.RequireEncryptedMessages = row.GetSettings().GetRequireEncryptedMessages()
+			settingsChanged = true
+		case "settings.require_trusted_devices":
+			if row.GetSettings() == nil {
+				return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput
+			}
+			currentSettings.RequireTrustedDevices = row.GetSettings().GetRequireTrustedDevices()
 			settingsChanged = true
 		default:
 			return domainconversation.UpdateConversationParams{}, domainconversation.ErrInvalidInput

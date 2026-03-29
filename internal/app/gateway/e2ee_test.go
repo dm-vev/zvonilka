@@ -421,6 +421,7 @@ func TestSendMessageRequiresDirectSessionReferenceRPC(t *testing.T) {
 		MemberUserIds: []string{bob.ID},
 		Settings: &conversationv1.ConversationSettings{
 			RequireEncryptedMessages: true,
+			RequireTrustedDevices:    true,
 		},
 	})
 	if err != nil {
@@ -451,6 +452,34 @@ func TestSendMessageRequiresDirectSessionReferenceRPC(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("ack direct session: %v", err)
+	}
+
+	_, err = api.SendMessage(aliceCtx, &conversationv1.SendMessageRequest{
+		ConversationId: created.Conversation.ConversationId,
+		Draft: &commonv1.MessageDraft{
+			ClientMessageId: "msg-direct-untrusted",
+			Kind:            commonv1.MessageKind_MESSAGE_KIND_TEXT,
+			Payload: &commonv1.EncryptedPayload{
+				KeyId:      sessionResp.Sessions[0].SessionId,
+				Algorithm:  "xchacha20poly1305",
+				Nonce:      []byte("nonce"),
+				Ciphertext: []byte("ciphertext"),
+				Metadata: map[string]string{
+					"direct_session_id": sessionResp.Sessions[0].SessionId,
+				},
+			},
+		},
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected failed precondition for untrusted device policy, got %v", err)
+	}
+	_, err = api.SetDeviceTrust(aliceCtx, &e2eev1.SetDeviceTrustRequest{
+		TargetUserId:   bob.ID,
+		TargetDeviceId: sessionResp.Sessions[0].RecipientDeviceId,
+		State:          e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_TRUSTED,
+	})
+	if err != nil {
+		t.Fatalf("set trusted device: %v", err)
 	}
 
 	sent, err := api.SendMessage(aliceCtx, &conversationv1.SendMessageRequest{

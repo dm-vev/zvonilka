@@ -1,6 +1,6 @@
-CREATE TABLE IF NOT EXISTS "{{schema}}"."e2ee_signed_prekeys" (
-  account_id TEXT NOT NULL REFERENCES "{{schema}}"."identity_accounts"(id) ON DELETE CASCADE,
-  device_id TEXT NOT NULL REFERENCES "{{schema}}"."identity_devices"(id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS {{schema}}.e2ee_signed_prekeys (
+  account_id TEXT NOT NULL REFERENCES {{schema}}.identity_accounts(id) ON DELETE CASCADE,
+  device_id TEXT NOT NULL REFERENCES {{schema}}.identity_devices(id) ON DELETE CASCADE,
   key_id TEXT NOT NULL,
   algorithm TEXT NOT NULL,
   public_key BYTEA NOT NULL,
@@ -13,11 +13,11 @@ CREATE TABLE IF NOT EXISTS "{{schema}}"."e2ee_signed_prekeys" (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS e2ee_signed_prekeys_key_id_idx
-  ON "{{schema}}"."e2ee_signed_prekeys"(account_id, device_id, key_id);
+  ON {{schema}}.e2ee_signed_prekeys(account_id, device_id, key_id);
 
-CREATE TABLE IF NOT EXISTS "{{schema}}"."e2ee_one_time_prekeys" (
-  account_id TEXT NOT NULL REFERENCES "{{schema}}"."identity_accounts"(id) ON DELETE CASCADE,
-  device_id TEXT NOT NULL REFERENCES "{{schema}}"."identity_devices"(id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS {{schema}}.e2ee_one_time_prekeys (
+  account_id TEXT NOT NULL REFERENCES {{schema}}.identity_accounts(id) ON DELETE CASCADE,
+  device_id TEXT NOT NULL REFERENCES {{schema}}.identity_devices(id) ON DELETE CASCADE,
   key_id TEXT NOT NULL,
   algorithm TEXT NOT NULL,
   public_key BYTEA NOT NULL,
@@ -31,4 +31,4 @@ CREATE TABLE IF NOT EXISTS "{{schema}}"."e2ee_one_time_prekeys" (
 );
 
 CREATE INDEX IF NOT EXISTS e2ee_one_time_prekeys_available_idx
-  ON "{{schema}}"."e2ee_one_time_prekeys"(account_id, device_id, claimed_at, created_at);
+  ON {{schema}}.e2ee_one_time_prekeys(account_id, device_id, claimed_at, created_at);

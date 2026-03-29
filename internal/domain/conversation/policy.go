@@ -59,6 +59,7 @@ func baseModerationPolicy(conversation Conversation, targetKind ModerationTarget
 		AllowForwards:            conversation.Settings.AllowForwards,
 		AllowThreads:             conversation.Settings.AllowThreads,
 		RequireEncryptedMessages: conversation.Settings.RequireEncryptedMessages,
+		RequireTrustedDevices:    conversation.Settings.RequireTrustedDevices,
 		RequireJoinApproval:      conversation.Settings.RequireJoinApproval,
 		PinnedMessagesOnlyAdmins: conversation.Settings.PinnedMessagesOnlyAdmins,
 		SlowModeInterval:         conversation.Settings.SlowModeInterval,

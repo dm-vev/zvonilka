@@ -155,6 +155,31 @@ func TestEncryptedPayloadCanBeRequiredPerConversation(t *testing.T) {
 	}
 }
 
+func TestTrustedDevicePolicyImpliesEncryptedMessages(t *testing.T) {
+	t.Parallel()
+
+	store := teststore.NewMemoryStore()
+	svc, err := conversation.NewService(store)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	created, _, err := svc.CreateConversation(context.Background(), conversation.CreateConversationParams{
+		OwnerAccountID: "acc-owner",
+		Kind:           conversation.ConversationKindGroup,
+		Title:          "Trusted Group",
+		Settings: conversation.ConversationSettings{
+			RequireTrustedDevices: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+	if !created.Settings.RequireTrustedDevices || !created.Settings.RequireEncryptedMessages {
+		t.Fatalf("expected trusted device policy to imply encrypted messages, got %+v", created.Settings)
+	}
+}
+
 func TestEncryptedHintsAreStrippedFromMessages(t *testing.T) {
 	t.Parallel()
 

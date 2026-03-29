@@ -56,7 +56,7 @@ func (s *Store) saveModerationPolicy(ctx context.Context, policy conversation.Mo
 	query := fmt.Sprintf(`
 INSERT INTO %s (
 	target_kind, target_id, only_admins_can_write, only_admins_can_add_members, allow_reactions,
-	allow_forwards, allow_threads, require_encrypted_messages, require_join_approval, pinned_messages_only_admins,
+	allow_forwards, allow_threads, require_encrypted_messages, require_trusted_devices, require_join_approval, pinned_messages_only_admins,
 	slow_mode_interval_nanos, anti_spam_window_nanos, anti_spam_burst_limit, shadow_mode, created_at, updated_at
 ) VALUES (
 	$1, $2, $3, $4, $5,
@@ -70,6 +70,7 @@ ON CONFLICT (target_kind, target_id) DO UPDATE SET
 	allow_forwards = EXCLUDED.allow_forwards,
 	allow_threads = EXCLUDED.allow_threads,
 	require_encrypted_messages = EXCLUDED.require_encrypted_messages,
+	require_trusted_devices = EXCLUDED.require_trusted_devices,
 	require_join_approval = EXCLUDED.require_join_approval,
 	pinned_messages_only_admins = EXCLUDED.pinned_messages_only_admins,
 	slow_mode_interval_nanos = EXCLUDED.slow_mode_interval_nanos,
@@ -89,6 +90,7 @@ RETURNING %s
 		policy.AllowForwards,
 		policy.AllowThreads,
 		policy.RequireEncryptedMessages,
+		policy.RequireTrustedDevices,
 		policy.RequireJoinApproval,
 		policy.PinnedMessagesOnlyAdmins,
 		int64(policy.SlowModeInterval),
@@ -738,6 +740,7 @@ func scanModerationPolicy(row rowScanner) (conversation.ModerationPolicy, error)
 		&policy.AllowForwards,
 		&policy.AllowThreads,
 		&policy.RequireEncryptedMessages,
+		&policy.RequireTrustedDevices,
 		&policy.RequireJoinApproval,
 		&policy.PinnedMessagesOnlyAdmins,
 		&slowModeIntervalNanos,

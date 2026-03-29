@@ -9,6 +9,7 @@ func DefaultConversationSettings() ConversationSettings {
 		AllowForwards:            true,
 		AllowThreads:             true,
 		RequireEncryptedMessages: false,
+		RequireTrustedDevices:    false,
 		SlowModeInterval:         0,
 	}
 }
@@ -25,6 +26,9 @@ func normalizeConversationSettings(settings ConversationSettings) ConversationSe
 
 	if settings.SlowModeInterval < 0 {
 		settings.SlowModeInterval = 0
+	}
+	if settings.RequireTrustedDevices {
+		settings.RequireEncryptedMessages = true
 	}
 
 	return settings

@@ -1037,7 +1037,7 @@ func (s *Service) ValidateConversationPayload(ctx context.Context, params Valida
 		if err != nil {
 			return err
 		}
-		return validateCoverageEntries(coverage)
+		return validateCoverageEntries(coverage, conversationRow.Settings.RequireTrustedDevices)
 	case conversation.ConversationKindGroup:
 		if err := s.validateGroupConversationPayload(ctx, params); err != nil {
 			return err
@@ -1051,7 +1051,7 @@ func (s *Service) ValidateConversationPayload(ctx context.Context, params Valida
 		if err != nil {
 			return err
 		}
-		return validateCoverageEntries(coverage)
+		return validateCoverageEntries(coverage, conversationRow.Settings.RequireTrustedDevices)
 	default:
 		return nil
 	}
@@ -1528,12 +1528,15 @@ func containsString(values []string, expected string) bool {
 	return false
 }
 
-func validateCoverageEntries(entries []ConversationKeyCoverageEntry) error {
+func validateCoverageEntries(entries []ConversationKeyCoverageEntry, requireTrusted bool) error {
 	for _, entry := range entries {
 		if entry.TrustState == DeviceTrustStateCompromised {
 			return ErrForbidden
 		}
 		if entry.State != ConversationKeyCoverageStateReady {
+			return ErrConflict
+		}
+		if requireTrusted && entry.TrustState != DeviceTrustStateTrusted {
 			return ErrConflict
 		}
 	}

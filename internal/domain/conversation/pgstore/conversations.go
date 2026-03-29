@@ -56,14 +56,14 @@ func (s *Store) saveConversation(ctx context.Context, conversationRow conversati
 INSERT INTO %s (
 	id, kind, title, description, avatar_media_id, owner_account_id,
 	only_admins_can_write, only_admins_can_add_members, allow_reactions, allow_forwards,
-	allow_threads, require_encrypted_messages, require_join_approval, pinned_messages_only_admins,
+	allow_threads, require_encrypted_messages, require_trusted_devices, require_join_approval, pinned_messages_only_admins,
 	slow_mode_interval_nanos, archived, muted, pinned, hidden, last_sequence, created_at, updated_at,
 	last_message_at
 ) VALUES (
 	$1, $2, $3, $4, $5, $6,
 	$7, $8, $9, $10,
-	$11, $12, $13, $14,
-	$15, $16, $17, $18, $19, $20, $21, $22, $23
+	$11, $12, $13, $14, $15,
+	$16, $17, $18, $19, $20, $21, $22, $23, $24
 )
 ON CONFLICT (id) DO UPDATE SET
 	kind = EXCLUDED.kind,
@@ -77,6 +77,7 @@ ON CONFLICT (id) DO UPDATE SET
 	allow_forwards = EXCLUDED.allow_forwards,
 	allow_threads = EXCLUDED.allow_threads,
 	require_encrypted_messages = EXCLUDED.require_encrypted_messages,
+	require_trusted_devices = EXCLUDED.require_trusted_devices,
 	require_join_approval = EXCLUDED.require_join_approval,
 	pinned_messages_only_admins = EXCLUDED.pinned_messages_only_admins,
 	slow_mode_interval_nanos = EXCLUDED.slow_mode_interval_nanos,
@@ -103,6 +104,7 @@ RETURNING %s
 		settings.AllowForwards,
 		settings.AllowThreads,
 		settings.RequireEncryptedMessages,
+		settings.RequireTrustedDevices,
 		settings.RequireJoinApproval,
 		settings.PinnedMessagesOnlyAdmins,
 		int64(settings.SlowModeInterval),
