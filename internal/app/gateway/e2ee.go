@@ -626,6 +626,8 @@ func (a *api) publishConversationE2EERequiredActionEvents(
 			PayloadType:    "e2ee_required_action",
 			Metadata: map[string]string{
 				"verification_required_devices": strconv.FormatUint(uint64(overlay.VerificationRequiredDevices), 10),
+				"untrusted_devices":             strconv.FormatUint(uint64(overlay.UntrustedDevices), 10),
+				"compromised_devices":           strconv.FormatUint(uint64(overlay.CompromisedDevices), 10),
 				"e2ee_required_action":          overlay.RequiredAction.String(),
 			},
 			CreatedAt: timeNowUTC(),

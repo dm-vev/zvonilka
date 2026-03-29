@@ -1325,6 +1325,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 	if flaggedConversation.Conversation.VerificationRequiredDevices != 1 {
 		t.Fatalf("expected create response to expose one verification-required device, got %d", flaggedConversation.Conversation.VerificationRequiredDevices)
 	}
+	if flaggedConversation.Conversation.UntrustedDevices != 1 || flaggedConversation.Conversation.CompromisedDevices != 0 {
+		t.Fatalf("expected untrusted=1 compromised=0, got untrusted=%d compromised=%d", flaggedConversation.Conversation.UntrustedDevices, flaggedConversation.Conversation.CompromisedDevices)
+	}
 	if flaggedConversation.Conversation.E2EeRequiredAction != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES {
 		t.Fatalf("expected verify-devices action, got %s", flaggedConversation.Conversation.E2EeRequiredAction)
 	}
@@ -1344,6 +1347,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 	if getConversation.Conversation.VerificationRequiredDevices != 1 {
 		t.Fatalf("expected get conversation to expose one verification-required device, got %d", getConversation.Conversation.VerificationRequiredDevices)
 	}
+	if getConversation.Conversation.UntrustedDevices != 1 || getConversation.Conversation.CompromisedDevices != 0 {
+		t.Fatalf("expected get conversation counts to stay untrusted=1 compromised=0, got untrusted=%d compromised=%d", getConversation.Conversation.UntrustedDevices, getConversation.Conversation.CompromisedDevices)
+	}
 
 	listed, err := api.ListConversations(aliceCtx, &conversationv1.ListConversationsRequest{})
 	if err != nil {
@@ -1358,6 +1364,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 			if item.VerificationRequiredDevices != 1 {
 				t.Fatalf("expected flagged conversation to require one verification, got %d", item.VerificationRequiredDevices)
 			}
+			if item.UntrustedDevices != 1 || item.CompromisedDevices != 0 {
+				t.Fatalf("expected list counts untrusted=1 compromised=0, got untrusted=%d compromised=%d", item.UntrustedDevices, item.CompromisedDevices)
+			}
 			if item.E2EeRequiredAction != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES {
 				t.Fatalf("expected verify-devices action in list, got %s", item.E2EeRequiredAction)
 			}
@@ -1365,6 +1374,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 			seenPlain = true
 			if item.VerificationRequiredDevices != 0 {
 				t.Fatalf("expected plain conversation to stay clear in list, got %d", item.VerificationRequiredDevices)
+			}
+			if item.UntrustedDevices != 0 || item.CompromisedDevices != 0 {
+				t.Fatalf("expected plain conversation counts to stay zero, got untrusted=%d compromised=%d", item.UntrustedDevices, item.CompromisedDevices)
 			}
 			if item.E2EeRequiredAction != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_NONE {
 				t.Fatalf("expected no action for plain conversation, got %s", item.E2EeRequiredAction)
@@ -1391,6 +1403,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 	}
 	if cleared.Conversation.VerificationRequiredDevices != 0 {
 		t.Fatalf("expected overlay to clear after trust update, got %d", cleared.Conversation.VerificationRequiredDevices)
+	}
+	if cleared.Conversation.UntrustedDevices != 0 || cleared.Conversation.CompromisedDevices != 0 {
+		t.Fatalf("expected counts to clear after trust update, got untrusted=%d compromised=%d", cleared.Conversation.UntrustedDevices, cleared.Conversation.CompromisedDevices)
 	}
 	if cleared.Conversation.E2EeRequiredAction != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_NONE {
 		t.Fatalf("expected required action to clear after trust update, got %s", cleared.Conversation.E2EeRequiredAction)
@@ -1493,6 +1508,9 @@ func TestSubscribeEventsStreamsConversationE2EERequiredActionOverlay(t *testing.
 		}
 		if response.Event.Metadata["verification_required_devices"] != "1" {
 			t.Fatalf("expected one verification-required device, got %+v", response.Event.Metadata)
+		}
+		if response.Event.Metadata["untrusted_devices"] != "1" || response.Event.Metadata["compromised_devices"] != "0" {
+			t.Fatalf("expected untrusted=1 compromised=0 metadata, got %+v", response.Event.Metadata)
 		}
 		if response.Event.Metadata["e2ee_required_action"] != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES.String() {
 			t.Fatalf("unexpected required action metadata: %+v", response.Event.Metadata)
@@ -1599,6 +1617,92 @@ func TestPullEventsIncludesConversationE2EERequiredActionOverlay(t *testing.T) {
 	}
 	if pulled.Events[0].Metadata["verification_required_devices"] != "1" {
 		t.Fatalf("expected one verification-required device, got %+v", pulled.Events[0].Metadata)
+	}
+	if pulled.Events[0].Metadata["untrusted_devices"] != "1" || pulled.Events[0].Metadata["compromised_devices"] != "0" {
+		t.Fatalf("expected untrusted=1 compromised=0 metadata, got %+v", pulled.Events[0].Metadata)
+	}
+}
+
+func TestConversationResponsesTrackCompromisedDeviceCounts(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-compromised-overlay",
+		DisplayName: "Alice Compromised Overlay",
+		Email:       "alice-compromised-overlay@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-compromised-overlay",
+		DisplayName: "Bob Compromised Overlay",
+		Email:       "bob-compromised-overlay@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, _ := login(alice.Username, "alice-compromised-phone", "alice-compromised-device-key")
+	_, bobDeviceID := login(bob.Username, "bob-compromised-phone", "bob-compromised-device-key")
+
+	created, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{bob.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	if _, err := api.SetDeviceTrust(aliceCtx, &e2eev1.SetDeviceTrustRequest{
+		TargetUserId:   bob.ID,
+		TargetDeviceId: bobDeviceID,
+		State:          e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_COMPROMISED,
+	}); err != nil {
+		t.Fatalf("set compromised trust: %v", err)
+	}
+
+	loaded, err := api.GetConversation(aliceCtx, &conversationv1.GetConversationRequest{
+		ConversationId: created.Conversation.ConversationId,
+	})
+	if err != nil {
+		t.Fatalf("get conversation: %v", err)
+	}
+	if loaded.Conversation.VerificationRequiredDevices != 1 {
+		t.Fatalf("expected one blocked device, got %d", loaded.Conversation.VerificationRequiredDevices)
+	}
+	if loaded.Conversation.UntrustedDevices != 0 || loaded.Conversation.CompromisedDevices != 1 {
+		t.Fatalf("expected untrusted=0 compromised=1, got untrusted=%d compromised=%d", loaded.Conversation.UntrustedDevices, loaded.Conversation.CompromisedDevices)
 	}
 }
 

@@ -908,6 +908,8 @@ func conversationSettingsFromProto(settings *conversationv1.ConversationSettings
 
 type conversationE2EEOverlay struct {
 	VerificationRequiredDevices uint32
+	UntrustedDevices            uint32
+	CompromisedDevices          uint32
 	RequiredAction              conversationv1.ConversationE2EERequiredAction
 }
 
@@ -939,6 +941,8 @@ func conversationProto(
 		UnreadCount:                 conversationRow.UnreadCount,
 		UnreadMentionCount:          conversationRow.UnreadMentionCount,
 		VerificationRequiredDevices: overlay.VerificationRequiredDevices,
+		UntrustedDevices:            overlay.UntrustedDevices,
+		CompromisedDevices:          overlay.CompromisedDevices,
 		E2EeRequiredAction:          requiredAction,
 	}
 }
@@ -960,25 +964,34 @@ func (a *api) conversationE2EEOverlays(
 		return nil, err
 	}
 
-	byConversation := make(map[string]map[string]struct{})
+	byConversation := make(map[string]map[string]domaine2ee.DeviceTrustState)
 	for _, item := range devices {
 		deviceKey := item.AccountID + ":" + item.DeviceID
 		for _, conversationID := range item.ConversationIDs {
 			deviceSet := byConversation[conversationID]
 			if deviceSet == nil {
-				deviceSet = make(map[string]struct{})
+				deviceSet = make(map[string]domaine2ee.DeviceTrustState)
 				byConversation[conversationID] = deviceSet
 			}
-			deviceSet[deviceKey] = struct{}{}
+			deviceSet[deviceKey] = item.TrustState
 		}
 	}
 
 	overlays := make(map[string]conversationE2EEOverlay, len(byConversation))
 	for conversationID, deviceSet := range byConversation {
-		overlays[conversationID] = conversationE2EEOverlay{
+		overlay := conversationE2EEOverlay{
 			VerificationRequiredDevices: uint32(len(deviceSet)),
 			RequiredAction:              conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES,
 		}
+		for _, trustState := range deviceSet {
+			switch trustState {
+			case domaine2ee.DeviceTrustStateCompromised:
+				overlay.CompromisedDevices++
+			default:
+				overlay.UntrustedDevices++
+			}
+		}
+		overlays[conversationID] = overlay
 	}
 	return overlays, nil
 }

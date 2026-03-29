@@ -43,6 +43,8 @@ message Conversation {
   uint64 unread_mention_count = 17;
   uint32 verification_required_devices = 18;
   ConversationE2EERequiredAction e2ee_required_action = 19;
+  uint32 untrusted_devices = 20;
+  uint32 compromised_devices = 21;
 }
 
 enum ConversationE2EERequiredAction {
