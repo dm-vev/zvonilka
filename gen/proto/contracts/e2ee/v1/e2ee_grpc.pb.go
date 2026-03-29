@@ -22,6 +22,8 @@ const (
 	E2EEService_UploadDevicePreKeys_FullMethodName        = "/zvonilka.e2ee.v1.E2EEService/UploadDevicePreKeys"
 	E2EEService_RotateE2EEKeys_FullMethodName             = "/zvonilka.e2ee.v1.E2EEService/RotateE2EEKeys"
 	E2EEService_GetAccountPreKeyBundles_FullMethodName    = "/zvonilka.e2ee.v1.E2EEService/GetAccountPreKeyBundles"
+	E2EEService_GetDeviceVerificationCode_FullMethodName  = "/zvonilka.e2ee.v1.E2EEService/GetDeviceVerificationCode"
+	E2EEService_VerifyDeviceSafetyNumber_FullMethodName   = "/zvonilka.e2ee.v1.E2EEService/VerifyDeviceSafetyNumber"
 	E2EEService_SetDeviceTrust_FullMethodName             = "/zvonilka.e2ee.v1.E2EEService/SetDeviceTrust"
 	E2EEService_ListDeviceTrusts_FullMethodName           = "/zvonilka.e2ee.v1.E2EEService/ListDeviceTrusts"
 	E2EEService_GetConversationKeyCoverage_FullMethodName = "/zvonilka.e2ee.v1.E2EEService/GetConversationKeyCoverage"
@@ -41,6 +43,8 @@ type E2EEServiceClient interface {
 	UploadDevicePreKeys(ctx context.Context, in *UploadDevicePreKeysRequest, opts ...grpc.CallOption) (*UploadDevicePreKeysResponse, error)
 	RotateE2EEKeys(ctx context.Context, in *RotateE2EEKeysRequest, opts ...grpc.CallOption) (*RotateE2EEKeysResponse, error)
 	GetAccountPreKeyBundles(ctx context.Context, in *GetAccountPreKeyBundlesRequest, opts ...grpc.CallOption) (*GetAccountPreKeyBundlesResponse, error)
+	GetDeviceVerificationCode(ctx context.Context, in *GetDeviceVerificationCodeRequest, opts ...grpc.CallOption) (*GetDeviceVerificationCodeResponse, error)
+	VerifyDeviceSafetyNumber(ctx context.Context, in *VerifyDeviceSafetyNumberRequest, opts ...grpc.CallOption) (*VerifyDeviceSafetyNumberResponse, error)
 	SetDeviceTrust(ctx context.Context, in *SetDeviceTrustRequest, opts ...grpc.CallOption) (*SetDeviceTrustResponse, error)
 	ListDeviceTrusts(ctx context.Context, in *ListDeviceTrustsRequest, opts ...grpc.CallOption) (*ListDeviceTrustsResponse, error)
 	GetConversationKeyCoverage(ctx context.Context, in *GetConversationKeyCoverageRequest, opts ...grpc.CallOption) (*GetConversationKeyCoverageResponse, error)
@@ -82,6 +86,24 @@ func (c *e2EEServiceClient) RotateE2EEKeys(ctx context.Context, in *RotateE2EEKe
 func (c *e2EEServiceClient) GetAccountPreKeyBundles(ctx context.Context, in *GetAccountPreKeyBundlesRequest, opts ...grpc.CallOption) (*GetAccountPreKeyBundlesResponse, error) {
 	out := new(GetAccountPreKeyBundlesResponse)
 	err := c.cc.Invoke(ctx, E2EEService_GetAccountPreKeyBundles_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *e2EEServiceClient) GetDeviceVerificationCode(ctx context.Context, in *GetDeviceVerificationCodeRequest, opts ...grpc.CallOption) (*GetDeviceVerificationCodeResponse, error) {
+	out := new(GetDeviceVerificationCodeResponse)
+	err := c.cc.Invoke(ctx, E2EEService_GetDeviceVerificationCode_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *e2EEServiceClient) VerifyDeviceSafetyNumber(ctx context.Context, in *VerifyDeviceSafetyNumberRequest, opts ...grpc.CallOption) (*VerifyDeviceSafetyNumberResponse, error) {
+	out := new(VerifyDeviceSafetyNumberResponse)
+	err := c.cc.Invoke(ctx, E2EEService_VerifyDeviceSafetyNumber_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -208,6 +230,8 @@ type E2EEServiceServer interface {
 	UploadDevicePreKeys(context.Context, *UploadDevicePreKeysRequest) (*UploadDevicePreKeysResponse, error)
 	RotateE2EEKeys(context.Context, *RotateE2EEKeysRequest) (*RotateE2EEKeysResponse, error)
 	GetAccountPreKeyBundles(context.Context, *GetAccountPreKeyBundlesRequest) (*GetAccountPreKeyBundlesResponse, error)
+	GetDeviceVerificationCode(context.Context, *GetDeviceVerificationCodeRequest) (*GetDeviceVerificationCodeResponse, error)
+	VerifyDeviceSafetyNumber(context.Context, *VerifyDeviceSafetyNumberRequest) (*VerifyDeviceSafetyNumberResponse, error)
 	SetDeviceTrust(context.Context, *SetDeviceTrustRequest) (*SetDeviceTrustResponse, error)
 	ListDeviceTrusts(context.Context, *ListDeviceTrustsRequest) (*ListDeviceTrustsResponse, error)
 	GetConversationKeyCoverage(context.Context, *GetConversationKeyCoverageRequest) (*GetConversationKeyCoverageResponse, error)
@@ -233,6 +257,12 @@ func (UnimplementedE2EEServiceServer) RotateE2EEKeys(context.Context, *RotateE2E
 }
 func (UnimplementedE2EEServiceServer) GetAccountPreKeyBundles(context.Context, *GetAccountPreKeyBundlesRequest) (*GetAccountPreKeyBundlesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAccountPreKeyBundles not implemented")
+}
+func (UnimplementedE2EEServiceServer) GetDeviceVerificationCode(context.Context, *GetDeviceVerificationCodeRequest) (*GetDeviceVerificationCodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetDeviceVerificationCode not implemented")
+}
+func (UnimplementedE2EEServiceServer) VerifyDeviceSafetyNumber(context.Context, *VerifyDeviceSafetyNumberRequest) (*VerifyDeviceSafetyNumberResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method VerifyDeviceSafetyNumber not implemented")
 }
 func (UnimplementedE2EEServiceServer) SetDeviceTrust(context.Context, *SetDeviceTrustRequest) (*SetDeviceTrustResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetDeviceTrust not implemented")
@@ -327,6 +357,42 @@ func _E2EEService_GetAccountPreKeyBundles_Handler(srv interface{}, ctx context.C
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(E2EEServiceServer).GetAccountPreKeyBundles(ctx, req.(*GetAccountPreKeyBundlesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _E2EEService_GetDeviceVerificationCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDeviceVerificationCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(E2EEServiceServer).GetDeviceVerificationCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: E2EEService_GetDeviceVerificationCode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(E2EEServiceServer).GetDeviceVerificationCode(ctx, req.(*GetDeviceVerificationCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _E2EEService_VerifyDeviceSafetyNumber_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyDeviceSafetyNumberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(E2EEServiceServer).VerifyDeviceSafetyNumber(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: E2EEService_VerifyDeviceSafetyNumber_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(E2EEServiceServer).VerifyDeviceSafetyNumber(ctx, req.(*VerifyDeviceSafetyNumberRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -532,6 +598,14 @@ var E2EEService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAccountPreKeyBundles",
 			Handler:    _E2EEService_GetAccountPreKeyBundles_Handler,
+		},
+		{
+			MethodName: "GetDeviceVerificationCode",
+			Handler:    _E2EEService_GetDeviceVerificationCode_Handler,
+		},
+		{
+			MethodName: "VerifyDeviceSafetyNumber",
+			Handler:    _E2EEService_VerifyDeviceSafetyNumber_Handler,
 		},
 		{
 			MethodName: "SetDeviceTrust",

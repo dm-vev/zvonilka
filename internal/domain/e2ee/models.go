@@ -54,6 +54,16 @@ type DeviceTrust struct {
 	UpdatedAt         time.Time
 }
 
+type DeviceVerificationCode struct {
+	ObserverAccountID    string
+	ObserverDeviceID     string
+	TargetAccountID      string
+	TargetDeviceID       string
+	TargetKeyFingerprint string
+	SafetyNumber         string
+	CurrentTrustState    DeviceTrustState
+}
+
 type ConversationKeyCoverageState string
 
 const (
@@ -83,6 +93,7 @@ const (
 	UpdateTypeGroupSenderKeyPublished     UpdateType = "group_sender_key.published"
 	UpdateTypeGroupSenderKeyAcknowledged  UpdateType = "group_sender_key.acknowledged"
 	UpdateTypeConversationCoverageChanged UpdateType = "conversation_key_coverage.changed"
+	UpdateTypeDeviceVerified              UpdateType = "device.verified"
 )
 
 type Update struct {

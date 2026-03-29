@@ -2,6 +2,7 @@ package e2ee_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -544,6 +545,48 @@ func TestGetConversationKeyCoverage(t *testing.T) {
 	}
 	if groupCoverage[0].State == domaine2ee.ConversationKeyCoverageStateMissing && groupCoverage[1].State == domaine2ee.ConversationKeyCoverageStateMissing {
 		t.Fatalf("expected at least one non-missing group coverage entry: %+v", groupCoverage)
+	}
+}
+
+func TestGetAndVerifyDeviceSafetyNumber(t *testing.T) {
+	ctx := context.Background()
+	directory := identitytest.NewMemoryStore()
+	chats := conversationtest.NewMemoryStore()
+	e2eeStore := teststore.NewMemoryStore()
+	service, err := domaine2ee.NewService(e2eeStore, directory, chats)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	seedIdentity(t, ctx, directory, "acc-a", "dev-a", "device-key-a")
+	seedIdentity(t, ctx, directory, "acc-b", "dev-b", "device-key-b")
+
+	code, err := service.GetDeviceVerificationCode(ctx, domaine2ee.GetDeviceVerificationCodeParams{
+		ObserverAccountID: "acc-a",
+		ObserverDeviceID:  "dev-a",
+		TargetAccountID:   "acc-b",
+		TargetDeviceID:    "dev-b",
+	})
+	if err != nil {
+		t.Fatalf("get device verification code: %v", err)
+	}
+	if code.SafetyNumber == "" || code.TargetKeyFingerprint == "" {
+		t.Fatalf("unexpected verification code: %+v", code)
+	}
+
+	trust, err := service.VerifyDeviceSafetyNumber(ctx, domaine2ee.VerifyDeviceSafetyNumberParams{
+		ObserverAccountID: "acc-a",
+		ObserverDeviceID:  "dev-a",
+		TargetAccountID:   "acc-b",
+		TargetDeviceID:    "dev-b",
+		SafetyNumber:      strings.ReplaceAll(code.SafetyNumber, "-", ""),
+		Note:              "verified via qr",
+	})
+	if err != nil {
+		t.Fatalf("verify safety number: %v", err)
+	}
+	if trust.State != domaine2ee.DeviceTrustStateTrusted {
+		t.Fatalf("unexpected trust after verification: %+v", trust)
 	}
 }
 

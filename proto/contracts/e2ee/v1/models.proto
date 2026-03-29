@@ -45,6 +45,16 @@ message DeviceTrust {
   google.protobuf.Timestamp updated_at = 9;
 }
 
+message DeviceVerificationCode {
+  string observer_user_id = 1;
+  string observer_device_id = 2;
+  string target_user_id = 3;
+  string target_device_id = 4;
+  string target_key_fingerprint = 5;
+  string safety_number = 6;
+  DeviceTrustState current_trust_state = 7;
+}
+
 enum ConversationKeyCoverageState {
   CONVERSATION_KEY_COVERAGE_STATE_UNSPECIFIED = 0;
   CONVERSATION_KEY_COVERAGE_STATE_READY = 1;
@@ -70,6 +80,7 @@ enum E2EEUpdateType {
   E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_PUBLISHED = 5;
   E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_ACKNOWLEDGED = 6;
   E2EE_UPDATE_TYPE_CONVERSATION_KEY_COVERAGE_CHANGED = 7;
+  E2EE_UPDATE_TYPE_DEVICE_VERIFIED = 8;
 }
 
 message E2EEUpdate {

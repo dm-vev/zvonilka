@@ -211,6 +211,90 @@ func (s *Service) GetAccountBundles(ctx context.Context, params FetchAccountBund
 	return s.fetchAccountBundles(ctx, s.store, params)
 }
 
+func (s *Service) GetDeviceVerificationCode(ctx context.Context, params GetDeviceVerificationCodeParams) (DeviceVerificationCode, error) {
+	if err := s.validateContext(ctx, "get device verification code"); err != nil {
+		return DeviceVerificationCode{}, err
+	}
+	params.ObserverAccountID = strings.TrimSpace(params.ObserverAccountID)
+	params.ObserverDeviceID = strings.TrimSpace(params.ObserverDeviceID)
+	params.TargetAccountID = strings.TrimSpace(params.TargetAccountID)
+	params.TargetDeviceID = strings.TrimSpace(params.TargetDeviceID)
+	if params.ObserverAccountID == "" || params.ObserverDeviceID == "" || params.TargetAccountID == "" || params.TargetDeviceID == "" {
+		return DeviceVerificationCode{}, ErrInvalidInput
+	}
+
+	observer, err := s.directory.DeviceByID(ctx, params.ObserverDeviceID)
+	if err != nil {
+		if err == identity.ErrNotFound {
+			return DeviceVerificationCode{}, ErrNotFound
+		}
+		return DeviceVerificationCode{}, fmt.Errorf("load observer device %s: %w", params.ObserverDeviceID, err)
+	}
+	if observer.AccountID != params.ObserverAccountID || observer.Status != identity.DeviceStatusActive {
+		return DeviceVerificationCode{}, ErrForbidden
+	}
+
+	target, err := s.directory.DeviceByID(ctx, params.TargetDeviceID)
+	if err != nil {
+		if err == identity.ErrNotFound {
+			return DeviceVerificationCode{}, ErrNotFound
+		}
+		return DeviceVerificationCode{}, fmt.Errorf("load target device %s: %w", params.TargetDeviceID, err)
+	}
+	if target.AccountID != params.TargetAccountID || target.Status != identity.DeviceStatusActive {
+		return DeviceVerificationCode{}, ErrForbidden
+	}
+
+	trusts, err := s.store.DeviceTrustsByObserverDevice(ctx, params.ObserverAccountID, params.ObserverDeviceID, params.TargetAccountID)
+	if err != nil {
+		return DeviceVerificationCode{}, err
+	}
+	currentState := DeviceTrustStateUnspecified
+	for _, item := range trusts {
+		if item.TargetDeviceID == params.TargetDeviceID {
+			currentState = item.State
+			break
+		}
+	}
+
+	return DeviceVerificationCode{
+		ObserverAccountID:    params.ObserverAccountID,
+		ObserverDeviceID:     params.ObserverDeviceID,
+		TargetAccountID:      params.TargetAccountID,
+		TargetDeviceID:       params.TargetDeviceID,
+		TargetKeyFingerprint: deviceKeyFingerprint(target),
+		SafetyNumber:         safetyNumber(observer, target),
+		CurrentTrustState:    currentState,
+	}, nil
+}
+
+func (s *Service) VerifyDeviceSafetyNumber(ctx context.Context, params VerifyDeviceSafetyNumberParams) (DeviceTrust, error) {
+	if err := s.validateContext(ctx, "verify device safety number"); err != nil {
+		return DeviceTrust{}, err
+	}
+	params.SafetyNumber = normalizeSafetyNumber(params.SafetyNumber)
+	code, err := s.GetDeviceVerificationCode(ctx, GetDeviceVerificationCodeParams{
+		ObserverAccountID: params.ObserverAccountID,
+		ObserverDeviceID:  params.ObserverDeviceID,
+		TargetAccountID:   params.TargetAccountID,
+		TargetDeviceID:    params.TargetDeviceID,
+	})
+	if err != nil {
+		return DeviceTrust{}, err
+	}
+	if params.SafetyNumber == "" || code.SafetyNumber != params.SafetyNumber {
+		return DeviceTrust{}, ErrConflict
+	}
+	return s.SetDeviceTrust(ctx, SetDeviceTrustParams{
+		ObserverAccountID: params.ObserverAccountID,
+		ObserverDeviceID:  params.ObserverDeviceID,
+		TargetAccountID:   params.TargetAccountID,
+		TargetDeviceID:    params.TargetDeviceID,
+		State:             DeviceTrustStateTrusted,
+		Note:              params.Note,
+	})
+}
+
 func (s *Service) SetDeviceTrust(ctx context.Context, params SetDeviceTrustParams) (DeviceTrust, error) {
 	if err := s.validateContext(ctx, "set device trust"); err != nil {
 		return DeviceTrust{}, err
@@ -960,6 +1044,43 @@ func isValidDeviceTrustState(value DeviceTrustState) bool {
 func deviceKeyFingerprint(device identity.Device) string {
 	sum := sha256.Sum256([]byte(strings.TrimSpace(device.PublicKey)))
 	return hex.EncodeToString(sum[:])
+}
+
+func safetyNumber(observer identity.Device, target identity.Device) string {
+	observerKey := strings.TrimSpace(observer.PublicKey)
+	targetKey := strings.TrimSpace(target.PublicKey)
+	if observerKey > targetKey {
+		observerKey, targetKey = targetKey, observerKey
+	}
+	sum := sha256.Sum256([]byte(observerKey + ":" + targetKey))
+	encoded := strings.ToUpper(hex.EncodeToString(sum[:16]))
+	parts := make([]string, 0, len(encoded)/4)
+	for i := 0; i < len(encoded); i += 4 {
+		end := i + 4
+		if end > len(encoded) {
+			end = len(encoded)
+		}
+		parts = append(parts, encoded[i:end])
+	}
+	return strings.Join(parts, "-")
+}
+
+func normalizeSafetyNumber(value string) string {
+	value = strings.ToUpper(strings.TrimSpace(value))
+	value = strings.ReplaceAll(value, "-", "")
+	value = strings.ReplaceAll(value, " ", "")
+	if value == "" {
+		return ""
+	}
+	parts := make([]string, 0, len(value)/4)
+	for i := 0; i < len(value); i += 4 {
+		end := i + 4
+		if end > len(value) {
+			end = len(value)
+		}
+		parts = append(parts, value[i:end])
+	}
+	return strings.Join(parts, "-")
 }
 
 func isActiveConversationMember(member conversation.ConversationMember) bool {

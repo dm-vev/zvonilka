@@ -43,6 +43,26 @@ message GetAccountPreKeyBundlesResponse {
   repeated DevicePreKeyBundle bundles = 1;
 }
 
+message GetDeviceVerificationCodeRequest {
+  string target_user_id = 1;
+  string target_device_id = 2;
+}
+
+message GetDeviceVerificationCodeResponse {
+  DeviceVerificationCode verification = 1;
+}
+
+message VerifyDeviceSafetyNumberRequest {
+  string target_user_id = 1;
+  string target_device_id = 2;
+  string safety_number = 3;
+  string note = 4;
+}
+
+message VerifyDeviceSafetyNumberResponse {
+  DeviceTrust trust = 1;
+}
+
 message SetDeviceTrustRequest {
   string target_user_id = 1;
   string target_device_id = 2;

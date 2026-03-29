@@ -141,6 +141,62 @@ func (a *api) GetAccountPreKeyBundles(
 	return &e2eev1.GetAccountPreKeyBundlesResponse{Bundles: result}, nil
 }
 
+func (a *api) GetDeviceVerificationCode(
+	ctx context.Context,
+	req *e2eev1.GetDeviceVerificationCodeRequest,
+) (*e2eev1.GetDeviceVerificationCodeResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	code, err := a.e2ee.GetDeviceVerificationCode(ctx, domaine2ee.GetDeviceVerificationCodeParams{
+		ObserverAccountID: authContext.Account.ID,
+		ObserverDeviceID:  authContext.Session.DeviceID,
+		TargetAccountID:   req.GetTargetUserId(),
+		TargetDeviceID:    req.GetTargetDeviceId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &e2eev1.GetDeviceVerificationCodeResponse{Verification: deviceVerificationCodeProto(code)}, nil
+}
+
+func (a *api) VerifyDeviceSafetyNumber(
+	ctx context.Context,
+	req *e2eev1.VerifyDeviceSafetyNumberRequest,
+) (*e2eev1.VerifyDeviceSafetyNumberResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	trust, err := a.e2ee.VerifyDeviceSafetyNumber(ctx, domaine2ee.VerifyDeviceSafetyNumberParams{
+		ObserverAccountID: authContext.Account.ID,
+		ObserverDeviceID:  authContext.Session.DeviceID,
+		TargetAccountID:   req.GetTargetUserId(),
+		TargetDeviceID:    req.GetTargetDeviceId(),
+		SafetyNumber:      req.GetSafetyNumber(),
+		Note:              req.GetNote(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishE2EEUpdates(domaine2ee.Update{
+		ID:              newGatewayEventID("e2ee"),
+		Type:            domaine2ee.UpdateTypeDeviceVerified,
+		ActorAccountID:  authContext.Account.ID,
+		ActorDeviceID:   authContext.Session.DeviceID,
+		TargetAccountID: trust.TargetAccountID,
+		TargetDeviceID:  trust.TargetDeviceID,
+		Metadata: map[string]string{
+			"state": string(trust.State),
+		},
+		CreatedAt: timeNowUTC(),
+	})
+	return &e2eev1.VerifyDeviceSafetyNumberResponse{Trust: deviceTrustProto(trust)}, nil
+}
+
 func (a *api) SetDeviceTrust(
 	ctx context.Context,
 	req *e2eev1.SetDeviceTrustRequest,
@@ -480,6 +536,18 @@ func deviceTrustProto(value domaine2ee.DeviceTrust) *e2eev1.DeviceTrust {
 	}
 }
 
+func deviceVerificationCodeProto(value domaine2ee.DeviceVerificationCode) *e2eev1.DeviceVerificationCode {
+	return &e2eev1.DeviceVerificationCode{
+		ObserverUserId:       value.ObserverAccountID,
+		ObserverDeviceId:     value.ObserverDeviceID,
+		TargetUserId:         value.TargetAccountID,
+		TargetDeviceId:       value.TargetDeviceID,
+		TargetKeyFingerprint: value.TargetKeyFingerprint,
+		SafetyNumber:         value.SafetyNumber,
+		CurrentTrustState:    deviceTrustStateProto(value.CurrentTrustState),
+	}
+}
+
 func e2eeUpdateProto(value domaine2ee.Update) *e2eev1.E2EEUpdate {
 	return &e2eev1.E2EEUpdate{
 		UpdateId:       value.ID,
@@ -762,6 +830,8 @@ func e2eeUpdateTypeProto(value domaine2ee.UpdateType) e2eev1.E2EEUpdateType {
 		return e2eev1.E2EEUpdateType_E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_ACKNOWLEDGED
 	case domaine2ee.UpdateTypeConversationCoverageChanged:
 		return e2eev1.E2EEUpdateType_E2EE_UPDATE_TYPE_CONVERSATION_KEY_COVERAGE_CHANGED
+	case domaine2ee.UpdateTypeDeviceVerified:
+		return e2eev1.E2EEUpdateType_E2EE_UPDATE_TYPE_DEVICE_VERIFIED
 	default:
 		return e2eev1.E2EEUpdateType_E2EE_UPDATE_TYPE_UNSPECIFIED
 	}

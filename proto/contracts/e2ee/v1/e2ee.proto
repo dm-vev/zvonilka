@@ -10,6 +10,8 @@ service E2EEService {
   rpc UploadDevicePreKeys(UploadDevicePreKeysRequest) returns (UploadDevicePreKeysResponse);
   rpc RotateE2EEKeys(RotateE2EEKeysRequest) returns (RotateE2EEKeysResponse);
   rpc GetAccountPreKeyBundles(GetAccountPreKeyBundlesRequest) returns (GetAccountPreKeyBundlesResponse);
+  rpc GetDeviceVerificationCode(GetDeviceVerificationCodeRequest) returns (GetDeviceVerificationCodeResponse);
+  rpc VerifyDeviceSafetyNumber(VerifyDeviceSafetyNumberRequest) returns (VerifyDeviceSafetyNumberResponse);
   rpc SetDeviceTrust(SetDeviceTrustRequest) returns (SetDeviceTrustResponse);
   rpc ListDeviceTrusts(ListDeviceTrustsRequest) returns (ListDeviceTrustsResponse);
   rpc GetConversationKeyCoverage(GetConversationKeyCoverageRequest) returns (GetConversationKeyCoverageResponse);

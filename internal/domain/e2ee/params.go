@@ -27,6 +27,22 @@ type FetchAccountBundlesParams struct {
 	ConsumeOneTimePreKey bool
 }
 
+type GetDeviceVerificationCodeParams struct {
+	ObserverAccountID string
+	ObserverDeviceID  string
+	TargetAccountID   string
+	TargetDeviceID    string
+}
+
+type VerifyDeviceSafetyNumberParams struct {
+	ObserverAccountID string
+	ObserverDeviceID  string
+	TargetAccountID   string
+	TargetDeviceID    string
+	SafetyNumber      string
+	Note              string
+}
+
 type SetDeviceTrustParams struct {
 	ObserverAccountID string
 	ObserverDeviceID  string

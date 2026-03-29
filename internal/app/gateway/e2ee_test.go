@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -1054,6 +1055,84 @@ func TestSubscribeE2EEUpdatesStreamsTrustChanges(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("timed out waiting for stream shutdown")
+	}
+}
+
+func TestGetAndVerifyDeviceSafetyNumberRPC(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-e2ee-verify",
+		DisplayName: "Alice E2EE Verify",
+		Email:       "alice-e2ee-verify@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-e2ee-verify",
+		DisplayName: "Bob E2EE Verify",
+		Email:       "bob-e2ee-verify@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, _ := login(alice.Username, "alice-verify-phone", "alice-verify-device")
+	_, bobDeviceID := login(bob.Username, "bob-verify-phone", "bob-verify-device")
+
+	codeResp, err := api.GetDeviceVerificationCode(aliceCtx, &e2eev1.GetDeviceVerificationCodeRequest{
+		TargetUserId:   bob.ID,
+		TargetDeviceId: bobDeviceID,
+	})
+	if err != nil {
+		t.Fatalf("get device verification code: %v", err)
+	}
+	if codeResp.Verification == nil || codeResp.Verification.SafetyNumber == "" {
+		t.Fatalf("unexpected verification payload: %+v", codeResp.Verification)
+	}
+
+	verifyResp, err := api.VerifyDeviceSafetyNumber(aliceCtx, &e2eev1.VerifyDeviceSafetyNumberRequest{
+		TargetUserId:   bob.ID,
+		TargetDeviceId: bobDeviceID,
+		SafetyNumber:   strings.ReplaceAll(codeResp.Verification.SafetyNumber, "-", ""),
+		Note:           "verified in person",
+	})
+	if err != nil {
+		t.Fatalf("verify device safety number: %v", err)
+	}
+	if verifyResp.Trust == nil || verifyResp.Trust.State != e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_TRUSTED {
+		t.Fatalf("unexpected verification trust: %+v", verifyResp.Trust)
 	}
 }
 
