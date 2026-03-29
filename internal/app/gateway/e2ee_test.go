@@ -535,6 +535,12 @@ func TestSendMessageRequiresDirectSessionReferenceRPC(t *testing.T) {
 	if allowUntrusted.Conversation.Settings.E2EeTrustPolicy != conversationv1.ConversationE2EETrustPolicy_CONVERSATION_E2EE_TRUST_POLICY_ALLOW_UNTRUSTED {
 		t.Fatalf("expected allow-untrusted policy, got %s", allowUntrusted.Conversation.Settings.E2EeTrustPolicy)
 	}
+	if !allowUntrusted.Conversation.CanSendEncryptedNow {
+		t.Fatal("expected ready direct conversation to allow encrypted send")
+	}
+	if allowUntrusted.Conversation.EncryptedSendBlockReason != conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_NONE {
+		t.Fatalf("expected no encrypted-send block reason, got %s", allowUntrusted.Conversation.EncryptedSendBlockReason)
+	}
 }
 
 func TestSendMessageRequiresGroupSenderKeyReferenceRPC(t *testing.T) {
@@ -1358,6 +1364,12 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 	if flaggedConversation.Conversation.PrimaryE2EeRemediationHint != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_VERIFY_DEVICE {
 		t.Fatalf("expected verify-device remediation hint, got %s", flaggedConversation.Conversation.PrimaryE2EeRemediationHint)
 	}
+	if flaggedConversation.Conversation.CanSendEncryptedNow {
+		t.Fatal("expected encrypted send to stay blocked without key coverage")
+	}
+	if flaggedConversation.Conversation.EncryptedSendBlockReason != conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_MISSING_KEY_COVERAGE {
+		t.Fatalf("expected missing-key-coverage block reason, got %s", flaggedConversation.Conversation.EncryptedSendBlockReason)
+	}
 	if flaggedConversation.Conversation.UntrustedDevices != 1 || flaggedConversation.Conversation.CompromisedDevices != 0 {
 		t.Fatalf("expected untrusted=1 compromised=0, got untrusted=%d compromised=%d", flaggedConversation.Conversation.UntrustedDevices, flaggedConversation.Conversation.CompromisedDevices)
 	}
@@ -1376,6 +1388,12 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 	if plainConversation.Conversation.VerificationRequiredDevices != 0 {
 		t.Fatalf("expected plain conversation to have no verification-required devices, got %d", plainConversation.Conversation.VerificationRequiredDevices)
 	}
+	if !plainConversation.Conversation.CanSendEncryptedNow {
+		t.Fatal("expected plain self-owned group without targets to allow encrypted send")
+	}
+	if plainConversation.Conversation.EncryptedSendBlockReason != conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_NONE {
+		t.Fatalf("expected no encrypted-send block reason, got %s", plainConversation.Conversation.EncryptedSendBlockReason)
+	}
 	if plainConversation.Conversation.E2EeRequiredAction != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_NONE {
 		t.Fatalf("expected no required action, got %s", plainConversation.Conversation.E2EeRequiredAction)
 	}
@@ -1391,6 +1409,12 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 	}
 	if getConversation.Conversation.UntrustedDevices != 1 || getConversation.Conversation.CompromisedDevices != 0 {
 		t.Fatalf("expected get conversation counts to stay untrusted=1 compromised=0, got untrusted=%d compromised=%d", getConversation.Conversation.UntrustedDevices, getConversation.Conversation.CompromisedDevices)
+	}
+	if getConversation.Conversation.CanSendEncryptedNow {
+		t.Fatal("expected get conversation to stay blocked without key coverage")
+	}
+	if getConversation.Conversation.EncryptedSendBlockReason != conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_MISSING_KEY_COVERAGE {
+		t.Fatalf("expected missing-key-coverage block reason on get, got %s", getConversation.Conversation.EncryptedSendBlockReason)
 	}
 	if len(getConversation.Conversation.BlockedDevices) != 1 || getConversation.Conversation.BlockedDevices[0].DeviceId != bobDeviceID {
 		t.Fatalf("unexpected get conversation blocked devices: %+v", getConversation.Conversation.BlockedDevices)
@@ -1421,6 +1445,12 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 			if item.PrimaryE2EeRemediationHint != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_VERIFY_DEVICE {
 				t.Fatalf("expected verify-device remediation hint in list, got %s", item.PrimaryE2EeRemediationHint)
 			}
+			if item.CanSendEncryptedNow {
+				t.Fatal("expected flagged conversation to stay blocked in list without key coverage")
+			}
+			if item.EncryptedSendBlockReason != conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_MISSING_KEY_COVERAGE {
+				t.Fatalf("expected missing-key-coverage block reason in list, got %s", item.EncryptedSendBlockReason)
+			}
 		case plainConversation.Conversation.ConversationId:
 			seenPlain = true
 			if item.VerificationRequiredDevices != 0 {
@@ -1437,6 +1467,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 			}
 			if item.PrimaryE2EeRemediationHint != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_NONE {
 				t.Fatalf("expected no remediation hint for plain conversation, got %s", item.PrimaryE2EeRemediationHint)
+			}
+			if !item.CanSendEncryptedNow || item.EncryptedSendBlockReason != conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_NONE {
+				t.Fatalf("expected plain conversation to allow encrypted send, got can_send=%t reason=%s", item.CanSendEncryptedNow, item.EncryptedSendBlockReason)
 			}
 		}
 	}
@@ -1472,6 +1505,12 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 	}
 	if cleared.Conversation.PrimaryE2EeRemediationHint != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_NONE {
 		t.Fatalf("expected remediation hint to clear after trust update, got %s", cleared.Conversation.PrimaryE2EeRemediationHint)
+	}
+	if cleared.Conversation.CanSendEncryptedNow {
+		t.Fatal("expected encrypted send to remain blocked after trust update when key coverage is still missing")
+	}
+	if cleared.Conversation.EncryptedSendBlockReason != conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_MISSING_KEY_COVERAGE {
+		t.Fatalf("expected missing-key-coverage block reason after trust update, got %s", cleared.Conversation.EncryptedSendBlockReason)
 	}
 }
 
@@ -1775,6 +1814,12 @@ func TestConversationResponsesTrackCompromisedDeviceCounts(t *testing.T) {
 	}
 	if loaded.Conversation.PrimaryE2EeRemediationHint != conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_REMOVE_COMPROMISED_DEVICE {
 		t.Fatalf("expected remove-compromised remediation hint, got %s", loaded.Conversation.PrimaryE2EeRemediationHint)
+	}
+	if loaded.Conversation.CanSendEncryptedNow {
+		t.Fatal("expected compromised conversation to block encrypted send")
+	}
+	if loaded.Conversation.EncryptedSendBlockReason != conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_COMPROMISED_DEVICE_PRESENT {
+		t.Fatalf("expected compromised-device block reason, got %s", loaded.Conversation.EncryptedSendBlockReason)
 	}
 	if len(loaded.Conversation.BlockedDevices) != 1 {
 		t.Fatalf("expected one blocked device preview, got %+v", loaded.Conversation.BlockedDevices)

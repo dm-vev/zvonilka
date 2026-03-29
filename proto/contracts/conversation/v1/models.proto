@@ -49,6 +49,8 @@ message Conversation {
   uint32 compromised_devices = 21;
   repeated ConversationBlockedDevice blocked_devices = 22;
   ConversationE2EERemediationHint primary_e2ee_remediation_hint = 23;
+  bool can_send_encrypted_now = 24;
+  ConversationEncryptedSendBlockReason encrypted_send_block_reason = 25;
 }
 
 enum ConversationE2EERequiredAction {
@@ -76,6 +78,15 @@ enum ConversationE2EERemediationHint {
   CONVERSATION_E2EE_REMEDIATION_HINT_NONE = 1;
   CONVERSATION_E2EE_REMEDIATION_HINT_VERIFY_DEVICE = 2;
   CONVERSATION_E2EE_REMEDIATION_HINT_REMOVE_COMPROMISED_DEVICE = 3;
+}
+
+enum ConversationEncryptedSendBlockReason {
+  CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_UNSPECIFIED = 0;
+  CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_NONE = 1;
+  CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_VERIFY_DEVICES_REQUIRED = 2;
+  CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_COMPROMISED_DEVICE_PRESENT = 3;
+  CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_MISSING_KEY_COVERAGE = 4;
+  CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_UNSUPPORTED_CONVERSATION_KIND = 5;
 }
 
 message ConversationMember {

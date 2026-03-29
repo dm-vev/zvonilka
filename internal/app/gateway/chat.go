@@ -921,6 +921,8 @@ type conversationE2EEOverlay struct {
 	CompromisedDevices          uint32
 	RequiredAction              conversationv1.ConversationE2EERequiredAction
 	PrimaryRemediationHint      conversationv1.ConversationE2EERemediationHint
+	CanSendEncryptedNow         bool
+	EncryptedSendBlockReason    conversationv1.ConversationEncryptedSendBlockReason
 	BlockedDevices              []*conversationv1.ConversationBlockedDevice
 }
 
@@ -935,6 +937,14 @@ func conversationProto(
 	primaryRemediationHint := overlay.PrimaryRemediationHint
 	if primaryRemediationHint == conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_UNSPECIFIED {
 		primaryRemediationHint = conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_NONE
+	}
+	blockReason := overlay.EncryptedSendBlockReason
+	if blockReason == conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_UNSPECIFIED {
+		if overlay.CanSendEncryptedNow {
+			blockReason = conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_NONE
+		} else {
+			blockReason = conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_UNSUPPORTED_CONVERSATION_KIND
+		}
 	}
 
 	return &conversationv1.Conversation{
@@ -960,6 +970,8 @@ func conversationProto(
 		CompromisedDevices:          overlay.CompromisedDevices,
 		BlockedDevices:              cloneBlockedDevices(overlay.BlockedDevices),
 		PrimaryE2EeRemediationHint:  primaryRemediationHint,
+		CanSendEncryptedNow:         overlay.CanSendEncryptedNow,
+		EncryptedSendBlockReason:    blockReason,
 		E2EeRequiredAction:          requiredAction,
 	}
 }
@@ -1051,6 +1063,27 @@ func (a *api) conversationE2EEOverlays(
 		overlay.PrimaryRemediationHint = conversationPrimaryE2EERemediationHint(overlay)
 		overlays[conversationID] = overlay
 	}
+
+	conversations, err := a.conversation.ListConversations(ctx, domainconversation.ListConversationsParams{
+		AccountID:       accountID,
+		IncludeArchived: true,
+		IncludeMuted:    true,
+		IncludeHidden:   true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, conversationRow := range conversations {
+		overlay := overlays[conversationRow.ID]
+		overlay.CanSendEncryptedNow, overlay.EncryptedSendBlockReason = a.conversationEncryptedSendState(
+			ctx,
+			accountID,
+			deviceID,
+			conversationRow,
+			overlay,
+		)
+		overlays[conversationRow.ID] = overlay
+	}
 	return overlays, nil
 }
 
@@ -1105,6 +1138,41 @@ func conversationPrimaryE2EERemediationHint(
 		return conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_VERIFY_DEVICE
 	}
 	return conversationv1.ConversationE2EERemediationHint_CONVERSATION_E2EE_REMEDIATION_HINT_NONE
+}
+
+func (a *api) conversationEncryptedSendState(
+	ctx context.Context,
+	accountID string,
+	deviceID string,
+	conversationRow domainconversation.Conversation,
+	overlay conversationE2EEOverlay,
+) (bool, conversationv1.ConversationEncryptedSendBlockReason) {
+	switch conversationRow.Kind {
+	case domainconversation.ConversationKindDirect, domainconversation.ConversationKindGroup:
+	default:
+		return false, conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_UNSUPPORTED_CONVERSATION_KIND
+	}
+
+	coverage, err := a.e2ee.GetConversationKeyCoverage(ctx, domaine2ee.GetConversationKeyCoverageParams{
+		ConversationID:  conversationRow.ID,
+		SenderAccountID: accountID,
+		SenderDeviceID:  deviceID,
+	})
+	if err != nil {
+		return false, conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_MISSING_KEY_COVERAGE
+	}
+	for _, entry := range coverage {
+		if entry.TrustState == domaine2ee.DeviceTrustStateCompromised {
+			return false, conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_COMPROMISED_DEVICE_PRESENT
+		}
+		if entry.State != domaine2ee.ConversationKeyCoverageStateReady {
+			return false, conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_MISSING_KEY_COVERAGE
+		}
+	}
+	if conversationRow.Settings.RequireTrustedDevices && overlay.UntrustedDevices > 0 {
+		return false, conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_VERIFY_DEVICES_REQUIRED
+	}
+	return true, conversationv1.ConversationEncryptedSendBlockReason_CONVERSATION_ENCRYPTED_SEND_BLOCK_REASON_NONE
 }
 
 func conversationSettingsProto(settings domainconversation.ConversationSettings) *conversationv1.ConversationSettings {
