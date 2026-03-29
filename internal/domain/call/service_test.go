@@ -402,6 +402,82 @@ func TestGroupCallModerationLifecycle(t *testing.T) {
 	require.Equal(t, domaincall.ParticipantStateLeft, removed.State)
 }
 
+func TestGroupCallStageModeAndPinnedSpeaker(t *testing.T) {
+	t.Parallel()
+
+	conversations := conversationtest.NewMemoryStore()
+	require.NoError(t, seedGroupConversation(conversations))
+
+	service, err := domaincall.NewService(
+		calltest.NewMemoryStore(),
+		conversations,
+		platformrtc.NewManager("webrtc://test/calls", 15*time.Minute),
+		domaincall.WithSettings(domaincall.Settings{
+			MaxGroupParticipants: 8,
+			MaxVideoParticipants: 8,
+		}),
+	)
+	require.NoError(t, err)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-group",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+	_, _, _, err = service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+	_, _, _, err = service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-c",
+		DeviceID:  "dev-c",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	callRow, events, err := service.UpdateStageMode(context.Background(), domaincall.UpdateStageModeParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+		Enabled:   true,
+	})
+	require.NoError(t, err)
+	require.True(t, callRow.StageModeEnabled)
+	require.Len(t, events, 1)
+
+	callRow, pinned, events, err := service.PinSpeaker(context.Background(), domaincall.PinSpeakerParams{
+		CallID:         started.ID,
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		TargetDeviceID: "dev-b",
+		Pinned:         true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "acc-b", callRow.PinnedSpeakerAccountID)
+	require.Equal(t, "dev-b", callRow.PinnedSpeakerDeviceID)
+	require.True(t, pinned.PinnedSpeaker)
+	require.True(t, pinned.StageSlot)
+	require.Len(t, events, 1)
+
+	var scaled bool
+	for _, participant := range callRow.Participants {
+		if participant.DeviceID != "dev-c" {
+			continue
+		}
+		require.Equal(t, "stage_mode", participant.Transport.RecommendationReason)
+		require.True(t, participant.Transport.SuppressOutgoingVideo)
+		require.True(t, participant.Transport.SuppressIncomingVideo)
+		scaled = true
+	}
+	require.True(t, scaled)
+}
+
 func TestGroupCallJoinRespectsParticipantLimit(t *testing.T) {
 	t.Parallel()
 
