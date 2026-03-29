@@ -24,6 +24,55 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ConversationE2EERequiredAction int32
+
+const (
+	ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_UNSPECIFIED    ConversationE2EERequiredAction = 0
+	ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_NONE           ConversationE2EERequiredAction = 1
+	ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES ConversationE2EERequiredAction = 2
+)
+
+// Enum value maps for ConversationE2EERequiredAction.
+var (
+	ConversationE2EERequiredAction_name = map[int32]string{
+		0: "CONVERSATION_E2EE_REQUIRED_ACTION_UNSPECIFIED",
+		1: "CONVERSATION_E2EE_REQUIRED_ACTION_NONE",
+		2: "CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES",
+	}
+	ConversationE2EERequiredAction_value = map[string]int32{
+		"CONVERSATION_E2EE_REQUIRED_ACTION_UNSPECIFIED":    0,
+		"CONVERSATION_E2EE_REQUIRED_ACTION_NONE":           1,
+		"CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES": 2,
+	}
+)
+
+func (x ConversationE2EERequiredAction) Enum() *ConversationE2EERequiredAction {
+	p := new(ConversationE2EERequiredAction)
+	*p = x
+	return p
+}
+
+func (x ConversationE2EERequiredAction) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ConversationE2EERequiredAction) Descriptor() protoreflect.EnumDescriptor {
+	return file_contracts_conversation_v1_models_proto_enumTypes[0].Descriptor()
+}
+
+func (ConversationE2EERequiredAction) Type() protoreflect.EnumType {
+	return &file_contracts_conversation_v1_models_proto_enumTypes[0]
+}
+
+func (x ConversationE2EERequiredAction) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ConversationE2EERequiredAction.Descriptor instead.
+func (ConversationE2EERequiredAction) EnumDescriptor() ([]byte, []int) {
+	return file_contracts_conversation_v1_models_proto_rawDescGZIP(), []int{0}
+}
+
 type ConversationSettings struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -148,23 +197,25 @@ type Conversation struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ConversationId     string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	Kind               v1.ConversationKind    `protobuf:"varint,2,opt,name=kind,proto3,enum=zvonilka.common.v1.ConversationKind" json:"kind,omitempty"`
-	Title              string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
-	Description        string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	AvatarMediaId      string                 `protobuf:"bytes,5,opt,name=avatar_media_id,json=avatarMediaId,proto3" json:"avatar_media_id,omitempty"`
-	OwnerUserId        string                 `protobuf:"bytes,6,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
-	Settings           *ConversationSettings  `protobuf:"bytes,7,opt,name=settings,proto3" json:"settings,omitempty"`
-	Archived           bool                   `protobuf:"varint,8,opt,name=archived,proto3" json:"archived,omitempty"`
-	Muted              bool                   `protobuf:"varint,9,opt,name=muted,proto3" json:"muted,omitempty"`
-	Pinned             bool                   `protobuf:"varint,10,opt,name=pinned,proto3" json:"pinned,omitempty"`
-	Hidden             bool                   `protobuf:"varint,11,opt,name=hidden,proto3" json:"hidden,omitempty"`
-	LastSequence       uint64                 `protobuf:"varint,12,opt,name=last_sequence,json=lastSequence,proto3" json:"last_sequence,omitempty"`
-	CreatedAt          *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt          *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	LastMessageAt      *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=last_message_at,json=lastMessageAt,proto3" json:"last_message_at,omitempty"`
-	UnreadCount        uint64                 `protobuf:"varint,16,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`
-	UnreadMentionCount uint64                 `protobuf:"varint,17,opt,name=unread_mention_count,json=unreadMentionCount,proto3" json:"unread_mention_count,omitempty"`
+	ConversationId              string                         `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Kind                        v1.ConversationKind            `protobuf:"varint,2,opt,name=kind,proto3,enum=zvonilka.common.v1.ConversationKind" json:"kind,omitempty"`
+	Title                       string                         `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Description                 string                         `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	AvatarMediaId               string                         `protobuf:"bytes,5,opt,name=avatar_media_id,json=avatarMediaId,proto3" json:"avatar_media_id,omitempty"`
+	OwnerUserId                 string                         `protobuf:"bytes,6,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Settings                    *ConversationSettings          `protobuf:"bytes,7,opt,name=settings,proto3" json:"settings,omitempty"`
+	Archived                    bool                           `protobuf:"varint,8,opt,name=archived,proto3" json:"archived,omitempty"`
+	Muted                       bool                           `protobuf:"varint,9,opt,name=muted,proto3" json:"muted,omitempty"`
+	Pinned                      bool                           `protobuf:"varint,10,opt,name=pinned,proto3" json:"pinned,omitempty"`
+	Hidden                      bool                           `protobuf:"varint,11,opt,name=hidden,proto3" json:"hidden,omitempty"`
+	LastSequence                uint64                         `protobuf:"varint,12,opt,name=last_sequence,json=lastSequence,proto3" json:"last_sequence,omitempty"`
+	CreatedAt                   *timestamppb.Timestamp         `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt                   *timestamppb.Timestamp         `protobuf:"bytes,14,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	LastMessageAt               *timestamppb.Timestamp         `protobuf:"bytes,15,opt,name=last_message_at,json=lastMessageAt,proto3" json:"last_message_at,omitempty"`
+	UnreadCount                 uint64                         `protobuf:"varint,16,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`
+	UnreadMentionCount          uint64                         `protobuf:"varint,17,opt,name=unread_mention_count,json=unreadMentionCount,proto3" json:"unread_mention_count,omitempty"`
+	VerificationRequiredDevices uint32                         `protobuf:"varint,18,opt,name=verification_required_devices,json=verificationRequiredDevices,proto3" json:"verification_required_devices,omitempty"`
+	E2EeRequiredAction          ConversationE2EERequiredAction `protobuf:"varint,19,opt,name=e2ee_required_action,json=e2eeRequiredAction,proto3,enum=zvonilka.conversation.v1.ConversationE2EERequiredAction" json:"e2ee_required_action,omitempty"`
 }
 
 func (x *Conversation) Reset() {
@@ -316,6 +367,20 @@ func (x *Conversation) GetUnreadMentionCount() uint64 {
 		return x.UnreadMentionCount
 	}
 	return 0
+}
+
+func (x *Conversation) GetVerificationRequiredDevices() uint32 {
+	if x != nil {
+		return x.VerificationRequiredDevices
+	}
+	return 0
+}
+
+func (x *Conversation) GetE2EeRequiredAction() ConversationE2EERequiredAction {
+	if x != nil {
+		return x.E2EeRequiredAction
+	}
+	return ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_UNSPECIFIED
 }
 
 type ConversationMember struct {
@@ -949,7 +1014,7 @@ var file_contracts_conversation_v1_models_proto_rawDesc = []byte{
 	0x65, 0x73, 0x12, 0x36, 0x0a, 0x17, 0x72, 0x65, 0x71, 0x75, 0x69, 0x72, 0x65, 0x5f, 0x74, 0x72,
 	0x75, 0x73, 0x74, 0x65, 0x64, 0x5f, 0x64, 0x65, 0x76, 0x69, 0x63, 0x65, 0x73, 0x18, 0x0a, 0x20,
 	0x01, 0x28, 0x08, 0x52, 0x15, 0x72, 0x65, 0x71, 0x75, 0x69, 0x72, 0x65, 0x54, 0x72, 0x75, 0x73,
-	0x74, 0x65, 0x64, 0x44, 0x65, 0x76, 0x69, 0x63, 0x65, 0x73, 0x22, 0xd7, 0x05, 0x0a, 0x0c, 0x43,
+	0x74, 0x65, 0x64, 0x44, 0x65, 0x76, 0x69, 0x63, 0x65, 0x73, 0x22, 0x87, 0x07, 0x0a, 0x0c, 0x43,
 	0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x27, 0x0a, 0x0f, 0x63,
 	0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x69, 0x64, 0x18, 0x01,
 	0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69,
@@ -995,7 +1060,18 @@ var file_contracts_conversation_v1_models_proto_rawDesc = []byte{
 	0x6e, 0x74, 0x12, 0x30, 0x0a, 0x14, 0x75, 0x6e, 0x72, 0x65, 0x61, 0x64, 0x5f, 0x6d, 0x65, 0x6e,
 	0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x18, 0x11, 0x20, 0x01, 0x28, 0x04,
 	0x52, 0x12, 0x75, 0x6e, 0x72, 0x65, 0x61, 0x64, 0x4d, 0x65, 0x6e, 0x74, 0x69, 0x6f, 0x6e, 0x43,
-	0x6f, 0x75, 0x6e, 0x74, 0x22, 0x8d, 0x03, 0x0a, 0x12, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73,
+	0x6f, 0x75, 0x6e, 0x74, 0x12, 0x42, 0x0a, 0x1d, 0x76, 0x65, 0x72, 0x69, 0x66, 0x69, 0x63, 0x61,
+	0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x72, 0x65, 0x71, 0x75, 0x69, 0x72, 0x65, 0x64, 0x5f, 0x64, 0x65,
+	0x76, 0x69, 0x63, 0x65, 0x73, 0x18, 0x12, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x1b, 0x76, 0x65, 0x72,
+	0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x71, 0x75, 0x69, 0x72, 0x65,
+	0x64, 0x44, 0x65, 0x76, 0x69, 0x63, 0x65, 0x73, 0x12, 0x6a, 0x0a, 0x14, 0x65, 0x32, 0x65, 0x65,
+	0x5f, 0x72, 0x65, 0x71, 0x75, 0x69, 0x72, 0x65, 0x64, 0x5f, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e,
+	0x18, 0x13, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x38, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b,
+	0x61, 0x2e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76,
+	0x31, 0x2e, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x45, 0x32,
+	0x45, 0x45, 0x52, 0x65, 0x71, 0x75, 0x69, 0x72, 0x65, 0x64, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e,
+	0x52, 0x12, 0x65, 0x32, 0x65, 0x65, 0x52, 0x65, 0x71, 0x75, 0x69, 0x72, 0x65, 0x64, 0x41, 0x63,
+	0x74, 0x69, 0x6f, 0x6e, 0x22, 0x8d, 0x03, 0x0a, 0x12, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73,
 	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x12, 0x27, 0x0a, 0x0f, 0x63,
 	0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x69, 0x64, 0x18, 0x01,
 	0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69,
@@ -1130,12 +1206,24 @@ var file_contracts_conversation_v1_models_proto_rawDesc = []byte{
 	0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x5f, 0x61, 0x74, 0x18, 0x07, 0x20, 0x01, 0x28, 0x0b,
 	0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62,
 	0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x09, 0x75, 0x70,
-	0x64, 0x61, 0x74, 0x65, 0x64, 0x41, 0x74, 0x42, 0x4f, 0x5a, 0x4d, 0x67, 0x69, 0x74, 0x68, 0x75,
-	0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6d, 0x2d, 0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f,
-	0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2f, 0x67, 0x65, 0x6e, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f,
-	0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74, 0x73, 0x2f, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72,
-	0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x76, 0x31, 0x3b, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72,
-	0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x76, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x64, 0x61, 0x74, 0x65, 0x64, 0x41, 0x74, 0x2a, 0xb5, 0x01, 0x0a, 0x1e, 0x43, 0x6f, 0x6e, 0x76,
+	0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x45, 0x32, 0x45, 0x45, 0x52, 0x65, 0x71, 0x75,
+	0x69, 0x72, 0x65, 0x64, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x31, 0x0a, 0x2d, 0x43, 0x4f,
+	0x4e, 0x56, 0x45, 0x52, 0x53, 0x41, 0x54, 0x49, 0x4f, 0x4e, 0x5f, 0x45, 0x32, 0x45, 0x45, 0x5f,
+	0x52, 0x45, 0x51, 0x55, 0x49, 0x52, 0x45, 0x44, 0x5f, 0x41, 0x43, 0x54, 0x49, 0x4f, 0x4e, 0x5f,
+	0x55, 0x4e, 0x53, 0x50, 0x45, 0x43, 0x49, 0x46, 0x49, 0x45, 0x44, 0x10, 0x00, 0x12, 0x2a, 0x0a,
+	0x26, 0x43, 0x4f, 0x4e, 0x56, 0x45, 0x52, 0x53, 0x41, 0x54, 0x49, 0x4f, 0x4e, 0x5f, 0x45, 0x32,
+	0x45, 0x45, 0x5f, 0x52, 0x45, 0x51, 0x55, 0x49, 0x52, 0x45, 0x44, 0x5f, 0x41, 0x43, 0x54, 0x49,
+	0x4f, 0x4e, 0x5f, 0x4e, 0x4f, 0x4e, 0x45, 0x10, 0x01, 0x12, 0x34, 0x0a, 0x30, 0x43, 0x4f, 0x4e,
+	0x56, 0x45, 0x52, 0x53, 0x41, 0x54, 0x49, 0x4f, 0x4e, 0x5f, 0x45, 0x32, 0x45, 0x45, 0x5f, 0x52,
+	0x45, 0x51, 0x55, 0x49, 0x52, 0x45, 0x44, 0x5f, 0x41, 0x43, 0x54, 0x49, 0x4f, 0x4e, 0x5f, 0x56,
+	0x45, 0x52, 0x49, 0x46, 0x59, 0x5f, 0x44, 0x45, 0x56, 0x49, 0x43, 0x45, 0x53, 0x10, 0x02, 0x42,
+	0x4f, 0x5a, 0x4d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6d,
+	0x2d, 0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2f, 0x67, 0x65,
+	0x6e, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74,
+	0x73, 0x2f, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x76,
+	0x31, 0x3b, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x76, 0x31,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1150,58 +1238,61 @@ func file_contracts_conversation_v1_models_proto_rawDescGZIP() []byte {
 	return file_contracts_conversation_v1_models_proto_rawDescData
 }
 
+var file_contracts_conversation_v1_models_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_contracts_conversation_v1_models_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_contracts_conversation_v1_models_proto_goTypes = []interface{}{
-	(*ConversationSettings)(nil),  // 0: zvonilka.conversation.v1.ConversationSettings
-	(*Conversation)(nil),          // 1: zvonilka.conversation.v1.Conversation
-	(*ConversationMember)(nil),    // 2: zvonilka.conversation.v1.ConversationMember
-	(*Invite)(nil),                // 3: zvonilka.conversation.v1.Invite
-	(*Reaction)(nil),              // 4: zvonilka.conversation.v1.Reaction
-	(*Message)(nil),               // 5: zvonilka.conversation.v1.Message
-	(*Thread)(nil),                // 6: zvonilka.conversation.v1.Thread
-	(*durationpb.Duration)(nil),   // 7: google.protobuf.Duration
-	(v1.ConversationKind)(0),      // 8: zvonilka.common.v1.ConversationKind
-	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
-	(*v11.UserProfile)(nil),       // 10: zvonilka.users.v1.UserProfile
-	(v1.MemberRole)(0),            // 11: zvonilka.common.v1.MemberRole
-	(v1.MessageKind)(0),           // 12: zvonilka.common.v1.MessageKind
-	(v1.MessageStatus)(0),         // 13: zvonilka.common.v1.MessageStatus
-	(*v1.EncryptedPayload)(nil),   // 14: zvonilka.common.v1.EncryptedPayload
-	(*v1.AttachmentRef)(nil),      // 15: zvonilka.common.v1.AttachmentRef
-	(*v1.MessageReference)(nil),   // 16: zvonilka.common.v1.MessageReference
+	(ConversationE2EERequiredAction)(0), // 0: zvonilka.conversation.v1.ConversationE2EERequiredAction
+	(*ConversationSettings)(nil),        // 1: zvonilka.conversation.v1.ConversationSettings
+	(*Conversation)(nil),                // 2: zvonilka.conversation.v1.Conversation
+	(*ConversationMember)(nil),          // 3: zvonilka.conversation.v1.ConversationMember
+	(*Invite)(nil),                      // 4: zvonilka.conversation.v1.Invite
+	(*Reaction)(nil),                    // 5: zvonilka.conversation.v1.Reaction
+	(*Message)(nil),                     // 6: zvonilka.conversation.v1.Message
+	(*Thread)(nil),                      // 7: zvonilka.conversation.v1.Thread
+	(*durationpb.Duration)(nil),         // 8: google.protobuf.Duration
+	(v1.ConversationKind)(0),            // 9: zvonilka.common.v1.ConversationKind
+	(*timestamppb.Timestamp)(nil),       // 10: google.protobuf.Timestamp
+	(*v11.UserProfile)(nil),             // 11: zvonilka.users.v1.UserProfile
+	(v1.MemberRole)(0),                  // 12: zvonilka.common.v1.MemberRole
+	(v1.MessageKind)(0),                 // 13: zvonilka.common.v1.MessageKind
+	(v1.MessageStatus)(0),               // 14: zvonilka.common.v1.MessageStatus
+	(*v1.EncryptedPayload)(nil),         // 15: zvonilka.common.v1.EncryptedPayload
+	(*v1.AttachmentRef)(nil),            // 16: zvonilka.common.v1.AttachmentRef
+	(*v1.MessageReference)(nil),         // 17: zvonilka.common.v1.MessageReference
 }
 var file_contracts_conversation_v1_models_proto_depIdxs = []int32{
-	7,  // 0: zvonilka.conversation.v1.ConversationSettings.slow_mode_interval:type_name -> google.protobuf.Duration
-	8,  // 1: zvonilka.conversation.v1.Conversation.kind:type_name -> zvonilka.common.v1.ConversationKind
-	0,  // 2: zvonilka.conversation.v1.Conversation.settings:type_name -> zvonilka.conversation.v1.ConversationSettings
-	9,  // 3: zvonilka.conversation.v1.Conversation.created_at:type_name -> google.protobuf.Timestamp
-	9,  // 4: zvonilka.conversation.v1.Conversation.updated_at:type_name -> google.protobuf.Timestamp
-	9,  // 5: zvonilka.conversation.v1.Conversation.last_message_at:type_name -> google.protobuf.Timestamp
-	10, // 6: zvonilka.conversation.v1.ConversationMember.profile:type_name -> zvonilka.users.v1.UserProfile
-	11, // 7: zvonilka.conversation.v1.ConversationMember.role:type_name -> zvonilka.common.v1.MemberRole
-	9,  // 8: zvonilka.conversation.v1.ConversationMember.joined_at:type_name -> google.protobuf.Timestamp
-	9,  // 9: zvonilka.conversation.v1.ConversationMember.left_at:type_name -> google.protobuf.Timestamp
-	11, // 10: zvonilka.conversation.v1.Invite.allowed_roles:type_name -> zvonilka.common.v1.MemberRole
-	9,  // 11: zvonilka.conversation.v1.Invite.expires_at:type_name -> google.protobuf.Timestamp
-	9,  // 12: zvonilka.conversation.v1.Invite.revoked_at:type_name -> google.protobuf.Timestamp
-	9,  // 13: zvonilka.conversation.v1.Reaction.created_at:type_name -> google.protobuf.Timestamp
-	10, // 14: zvonilka.conversation.v1.Message.sender_profile:type_name -> zvonilka.users.v1.UserProfile
-	12, // 15: zvonilka.conversation.v1.Message.kind:type_name -> zvonilka.common.v1.MessageKind
-	13, // 16: zvonilka.conversation.v1.Message.status:type_name -> zvonilka.common.v1.MessageStatus
-	14, // 17: zvonilka.conversation.v1.Message.payload:type_name -> zvonilka.common.v1.EncryptedPayload
-	15, // 18: zvonilka.conversation.v1.Message.attachments:type_name -> zvonilka.common.v1.AttachmentRef
-	16, // 19: zvonilka.conversation.v1.Message.reply_to:type_name -> zvonilka.common.v1.MessageReference
-	4,  // 20: zvonilka.conversation.v1.Message.reactions:type_name -> zvonilka.conversation.v1.Reaction
-	9,  // 21: zvonilka.conversation.v1.Message.created_at:type_name -> google.protobuf.Timestamp
-	9,  // 22: zvonilka.conversation.v1.Message.edited_at:type_name -> google.protobuf.Timestamp
-	9,  // 23: zvonilka.conversation.v1.Message.deleted_at:type_name -> google.protobuf.Timestamp
-	9,  // 24: zvonilka.conversation.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
-	9,  // 25: zvonilka.conversation.v1.Thread.updated_at:type_name -> google.protobuf.Timestamp
-	26, // [26:26] is the sub-list for method output_type
-	26, // [26:26] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	8,  // 0: zvonilka.conversation.v1.ConversationSettings.slow_mode_interval:type_name -> google.protobuf.Duration
+	9,  // 1: zvonilka.conversation.v1.Conversation.kind:type_name -> zvonilka.common.v1.ConversationKind
+	1,  // 2: zvonilka.conversation.v1.Conversation.settings:type_name -> zvonilka.conversation.v1.ConversationSettings
+	10, // 3: zvonilka.conversation.v1.Conversation.created_at:type_name -> google.protobuf.Timestamp
+	10, // 4: zvonilka.conversation.v1.Conversation.updated_at:type_name -> google.protobuf.Timestamp
+	10, // 5: zvonilka.conversation.v1.Conversation.last_message_at:type_name -> google.protobuf.Timestamp
+	0,  // 6: zvonilka.conversation.v1.Conversation.e2ee_required_action:type_name -> zvonilka.conversation.v1.ConversationE2EERequiredAction
+	11, // 7: zvonilka.conversation.v1.ConversationMember.profile:type_name -> zvonilka.users.v1.UserProfile
+	12, // 8: zvonilka.conversation.v1.ConversationMember.role:type_name -> zvonilka.common.v1.MemberRole
+	10, // 9: zvonilka.conversation.v1.ConversationMember.joined_at:type_name -> google.protobuf.Timestamp
+	10, // 10: zvonilka.conversation.v1.ConversationMember.left_at:type_name -> google.protobuf.Timestamp
+	12, // 11: zvonilka.conversation.v1.Invite.allowed_roles:type_name -> zvonilka.common.v1.MemberRole
+	10, // 12: zvonilka.conversation.v1.Invite.expires_at:type_name -> google.protobuf.Timestamp
+	10, // 13: zvonilka.conversation.v1.Invite.revoked_at:type_name -> google.protobuf.Timestamp
+	10, // 14: zvonilka.conversation.v1.Reaction.created_at:type_name -> google.protobuf.Timestamp
+	11, // 15: zvonilka.conversation.v1.Message.sender_profile:type_name -> zvonilka.users.v1.UserProfile
+	13, // 16: zvonilka.conversation.v1.Message.kind:type_name -> zvonilka.common.v1.MessageKind
+	14, // 17: zvonilka.conversation.v1.Message.status:type_name -> zvonilka.common.v1.MessageStatus
+	15, // 18: zvonilka.conversation.v1.Message.payload:type_name -> zvonilka.common.v1.EncryptedPayload
+	16, // 19: zvonilka.conversation.v1.Message.attachments:type_name -> zvonilka.common.v1.AttachmentRef
+	17, // 20: zvonilka.conversation.v1.Message.reply_to:type_name -> zvonilka.common.v1.MessageReference
+	5,  // 21: zvonilka.conversation.v1.Message.reactions:type_name -> zvonilka.conversation.v1.Reaction
+	10, // 22: zvonilka.conversation.v1.Message.created_at:type_name -> google.protobuf.Timestamp
+	10, // 23: zvonilka.conversation.v1.Message.edited_at:type_name -> google.protobuf.Timestamp
+	10, // 24: zvonilka.conversation.v1.Message.deleted_at:type_name -> google.protobuf.Timestamp
+	10, // 25: zvonilka.conversation.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
+	10, // 26: zvonilka.conversation.v1.Thread.updated_at:type_name -> google.protobuf.Timestamp
+	27, // [27:27] is the sub-list for method output_type
+	27, // [27:27] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_contracts_conversation_v1_models_proto_init() }
@@ -1300,13 +1391,14 @@ func file_contracts_conversation_v1_models_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_contracts_conversation_v1_models_proto_rawDesc,
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_contracts_conversation_v1_models_proto_goTypes,
 		DependencyIndexes: file_contracts_conversation_v1_models_proto_depIdxs,
+		EnumInfos:         file_contracts_conversation_v1_models_proto_enumTypes,
 		MessageInfos:      file_contracts_conversation_v1_models_proto_msgTypes,
 	}.Build()
 	File_contracts_conversation_v1_models_proto = out.File

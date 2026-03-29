@@ -35,10 +35,14 @@ func (a *api) CreateConversation(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	overlays, err := a.conversationE2EEOverlays(ctx, authContext.Account.ID, authContext.Session.DeviceID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
 	a.notifySyncSubscribers()
 
 	return &conversationv1.CreateConversationResponse{
-		Conversation: conversationProto(conversationRow),
+		Conversation: conversationProto(conversationRow, overlays[conversationRow.ID]),
 	}, nil
 }
 
@@ -64,9 +68,13 @@ func (a *api) GetConversation(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	overlays, err := a.conversationE2EEOverlays(ctx, authContext.Account.ID, authContext.Session.DeviceID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
 
 	return &conversationv1.GetConversationResponse{
-		Conversation: conversationProto(conversationRow),
+		Conversation: conversationProto(conversationRow, overlays[conversationRow.ID]),
 		Members:      membersProto(members, memberProfiles),
 	}, nil
 }
@@ -87,6 +95,10 @@ func (a *api) ListConversations(
 		IncludeMuted:    true,
 		IncludeHidden:   req.GetIncludeHidden(),
 	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	overlays, err := a.conversationE2EEOverlays(ctx, authContext.Account.ID, authContext.Session.DeviceID)
 	if err != nil {
 		return nil, grpcError(err)
 	}
@@ -125,7 +137,7 @@ func (a *api) ListConversations(
 
 	result := make([]*conversationv1.Conversation, 0, len(page))
 	for _, conversationRow := range page {
-		result = append(result, conversationProto(conversationRow))
+		result = append(result, conversationProto(conversationRow, overlays[conversationRow.ID]))
 	}
 
 	return &conversationv1.ListConversationsResponse{
@@ -166,10 +178,14 @@ func (a *api) UpdateConversation(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	overlays, err := a.conversationE2EEOverlays(ctx, authContext.Account.ID, authContext.Session.DeviceID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
 	a.notifySyncSubscribers()
 
 	return &conversationv1.UpdateConversationResponse{
-		Conversation: conversationProto(conversationRow),
+		Conversation: conversationProto(conversationRow, overlays[conversationRow.ID]),
 	}, nil
 }
 
@@ -890,26 +906,81 @@ func conversationSettingsFromProto(settings *conversationv1.ConversationSettings
 	}
 }
 
-func conversationProto(conversationRow domainconversation.Conversation) *conversationv1.Conversation {
-	return &conversationv1.Conversation{
-		ConversationId:     conversationRow.ID,
-		Kind:               conversationKindToProto(conversationRow.Kind),
-		Title:              conversationRow.Title,
-		Description:        conversationRow.Description,
-		AvatarMediaId:      conversationRow.AvatarMediaID,
-		OwnerUserId:        conversationRow.OwnerAccountID,
-		Settings:           conversationSettingsProto(conversationRow.Settings),
-		Archived:           conversationRow.Archived,
-		Muted:              conversationRow.Muted,
-		Pinned:             conversationRow.Pinned,
-		Hidden:             conversationRow.Hidden,
-		LastSequence:       conversationRow.LastSequence,
-		CreatedAt:          protoTime(conversationRow.CreatedAt),
-		UpdatedAt:          protoTime(conversationRow.UpdatedAt),
-		LastMessageAt:      protoTime(conversationRow.LastMessageAt),
-		UnreadCount:        conversationRow.UnreadCount,
-		UnreadMentionCount: conversationRow.UnreadMentionCount,
+type conversationE2EEOverlay struct {
+	VerificationRequiredDevices uint32
+	RequiredAction              conversationv1.ConversationE2EERequiredAction
+}
+
+func conversationProto(
+	conversationRow domainconversation.Conversation,
+	overlay conversationE2EEOverlay,
+) *conversationv1.Conversation {
+	requiredAction := overlay.RequiredAction
+	if requiredAction == conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_UNSPECIFIED {
+		requiredAction = conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_NONE
 	}
+
+	return &conversationv1.Conversation{
+		ConversationId:              conversationRow.ID,
+		Kind:                        conversationKindToProto(conversationRow.Kind),
+		Title:                       conversationRow.Title,
+		Description:                 conversationRow.Description,
+		AvatarMediaId:               conversationRow.AvatarMediaID,
+		OwnerUserId:                 conversationRow.OwnerAccountID,
+		Settings:                    conversationSettingsProto(conversationRow.Settings),
+		Archived:                    conversationRow.Archived,
+		Muted:                       conversationRow.Muted,
+		Pinned:                      conversationRow.Pinned,
+		Hidden:                      conversationRow.Hidden,
+		LastSequence:                conversationRow.LastSequence,
+		CreatedAt:                   protoTime(conversationRow.CreatedAt),
+		UpdatedAt:                   protoTime(conversationRow.UpdatedAt),
+		LastMessageAt:               protoTime(conversationRow.LastMessageAt),
+		UnreadCount:                 conversationRow.UnreadCount,
+		UnreadMentionCount:          conversationRow.UnreadMentionCount,
+		VerificationRequiredDevices: overlay.VerificationRequiredDevices,
+		E2EeRequiredAction:          requiredAction,
+	}
+}
+
+func (a *api) conversationE2EEOverlays(
+	ctx context.Context,
+	accountID string,
+	deviceID string,
+) (map[string]conversationE2EEOverlay, error) {
+	if a == nil || a.e2ee == nil {
+		return nil, nil
+	}
+
+	devices, err := a.e2ee.ListVerificationRequiredDevices(ctx, domaine2ee.ListVerificationRequiredDevicesParams{
+		ObserverAccountID: accountID,
+		ObserverDeviceID:  deviceID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	byConversation := make(map[string]map[string]struct{})
+	for _, item := range devices {
+		deviceKey := item.AccountID + ":" + item.DeviceID
+		for _, conversationID := range item.ConversationIDs {
+			deviceSet := byConversation[conversationID]
+			if deviceSet == nil {
+				deviceSet = make(map[string]struct{})
+				byConversation[conversationID] = deviceSet
+			}
+			deviceSet[deviceKey] = struct{}{}
+		}
+	}
+
+	overlays := make(map[string]conversationE2EEOverlay, len(byConversation))
+	for conversationID, deviceSet := range byConversation {
+		overlays[conversationID] = conversationE2EEOverlay{
+			VerificationRequiredDevices: uint32(len(deviceSet)),
+			RequiredAction:              conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES,
+		}
+	}
+	return overlays, nil
 }
 
 func conversationSettingsProto(settings domainconversation.ConversationSettings) *conversationv1.ConversationSettings {

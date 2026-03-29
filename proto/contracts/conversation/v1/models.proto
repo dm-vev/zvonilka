@@ -41,6 +41,14 @@ message Conversation {
   google.protobuf.Timestamp last_message_at = 15;
   uint64 unread_count = 16;
   uint64 unread_mention_count = 17;
+  uint32 verification_required_devices = 18;
+  ConversationE2EERequiredAction e2ee_required_action = 19;
+}
+
+enum ConversationE2EERequiredAction {
+  CONVERSATION_E2EE_REQUIRED_ACTION_UNSPECIFIED = 0;
+  CONVERSATION_E2EE_REQUIRED_ACTION_NONE = 1;
+  CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES = 2;
 }
 
 message ConversationMember {
