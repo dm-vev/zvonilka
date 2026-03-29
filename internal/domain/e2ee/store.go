@@ -26,11 +26,13 @@ type Store interface {
 	SaveDirectSession(ctx context.Context, value DirectSession) (DirectSession, error)
 	DirectSessionByID(ctx context.Context, sessionID string) (DirectSession, error)
 	DirectSessionsByRecipientDevice(ctx context.Context, accountID string, deviceID string) ([]DirectSession, error)
+	DirectSessionsByParticipantDevice(ctx context.Context, accountID string, deviceID string) ([]DirectSession, error)
 	ExpirePendingGroupSenderKeysBySenderDevice(ctx context.Context, accountID string, deviceID string, expiresAt time.Time) (uint32, error)
 	SaveGroupSenderKeyDistribution(ctx context.Context, value GroupSenderKeyDistribution) (GroupSenderKeyDistribution, error)
 	GroupSenderKeyDistributionByID(ctx context.Context, distributionID string) (GroupSenderKeyDistribution, error)
 	GroupSenderKeyDistributionsByRecipientDevice(ctx context.Context, conversationID string, accountID string, deviceID string) ([]GroupSenderKeyDistribution, error)
 	GroupSenderKeyDistributionsBySenderKey(ctx context.Context, conversationID string, senderAccountID string, senderDeviceID string, senderKeyID string) ([]GroupSenderKeyDistribution, error)
+	GroupSenderKeyDistributionsBySenderDevice(ctx context.Context, conversationID string, senderAccountID string, senderDeviceID string) ([]GroupSenderKeyDistribution, error)
 	SaveDeviceTrust(ctx context.Context, value DeviceTrust) (DeviceTrust, error)
 	DeviceTrustsByObserverDevice(ctx context.Context, observerAccountID string, observerDeviceID string, targetAccountID string) ([]DeviceTrust, error)
 }

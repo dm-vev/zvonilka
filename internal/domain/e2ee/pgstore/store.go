@@ -375,6 +375,41 @@ ORDER BY created_at DESC, id DESC
 	return result, nil
 }
 
+func (s *Store) DirectSessionsByParticipantDevice(ctx context.Context, accountID string, deviceID string) ([]e2ee.DirectSession, error) {
+	query := fmt.Sprintf(`
+SELECT
+	id, initiator_account_id, initiator_device_id, recipient_account_id, recipient_device_id,
+	initiator_ephemeral_key_id, initiator_ephemeral_algorithm, initiator_ephemeral_public_key,
+	identity_key_id, identity_key_algorithm, identity_key_public_key,
+	signed_prekey_id, signed_prekey_algorithm, signed_prekey_public_key, signed_prekey_signature,
+	one_time_prekey_id, one_time_prekey_algorithm, one_time_prekey_public_key,
+	bootstrap_algorithm, bootstrap_nonce, bootstrap_ciphertext, bootstrap_metadata,
+	state, created_at, acknowledged_at, expires_at
+FROM %s
+WHERE (initiator_account_id = $1 AND initiator_device_id = $2)
+   OR (recipient_account_id = $1 AND recipient_device_id = $2)
+ORDER BY created_at DESC, id DESC
+`, s.table("e2ee_direct_sessions"))
+	rows, err := s.conn().QueryContext(ctx, query, accountID, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]e2ee.DirectSession, 0)
+	for rows.Next() {
+		value, scanErr := scanDirectSession(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		result = append(result, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (s *Store) ExpirePendingGroupSenderKeysBySenderDevice(ctx context.Context, accountID string, deviceID string, expiresAt time.Time) (uint32, error) {
 	query := fmt.Sprintf(`
 UPDATE %s
@@ -502,6 +537,36 @@ WHERE conversation_id = $1 AND sender_account_id = $2 AND sender_device_id = $3 
 ORDER BY created_at DESC, id DESC
 `, s.table("e2ee_group_sender_keys"))
 	rows, err := s.conn().QueryContext(ctx, query, conversationID, senderAccountID, senderDeviceID, senderKeyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]e2ee.GroupSenderKeyDistribution, 0)
+	for rows.Next() {
+		value, scanErr := scanGroupSenderKeyDistribution(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		result = append(result, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *Store) GroupSenderKeyDistributionsBySenderDevice(ctx context.Context, conversationID string, senderAccountID string, senderDeviceID string) ([]e2ee.GroupSenderKeyDistribution, error) {
+	query := fmt.Sprintf(`
+SELECT
+	id, conversation_id, sender_account_id, sender_device_id, recipient_account_id, recipient_device_id,
+	sender_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_metadata,
+	state, created_at, acknowledged_at, expires_at
+FROM %s
+WHERE conversation_id = $1 AND sender_account_id = $2 AND sender_device_id = $3
+ORDER BY created_at DESC, id DESC
+`, s.table("e2ee_group_sender_keys"))
+	rows, err := s.conn().QueryContext(ctx, query, conversationID, senderAccountID, senderDeviceID)
 	if err != nil {
 		return nil, err
 	}

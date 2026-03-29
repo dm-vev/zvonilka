@@ -296,6 +296,51 @@ func (s *Service) ListDeviceTrusts(ctx context.Context, params ListDeviceTrustsP
 	return rows, nil
 }
 
+func (s *Service) GetConversationKeyCoverage(ctx context.Context, params GetConversationKeyCoverageParams) ([]ConversationKeyCoverageEntry, error) {
+	if err := s.validateContext(ctx, "get conversation key coverage"); err != nil {
+		return nil, err
+	}
+	params.ConversationID = strings.TrimSpace(params.ConversationID)
+	params.SenderAccountID = strings.TrimSpace(params.SenderAccountID)
+	params.SenderDeviceID = strings.TrimSpace(params.SenderDeviceID)
+	params.SenderKeyID = strings.TrimSpace(params.SenderKeyID)
+	if params.ConversationID == "" || params.SenderAccountID == "" || params.SenderDeviceID == "" {
+		return nil, ErrInvalidInput
+	}
+
+	device, err := s.directory.DeviceByID(ctx, params.SenderDeviceID)
+	if err != nil {
+		if err == identity.ErrNotFound {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("load sender device %s: %w", params.SenderDeviceID, err)
+	}
+	if device.AccountID != params.SenderAccountID || device.Status != identity.DeviceStatusActive {
+		return nil, ErrForbidden
+	}
+
+	conversationRow, err := s.chats.ConversationByID(ctx, params.ConversationID)
+	if err != nil {
+		return nil, mapConversationError("load conversation", params.ConversationID, err)
+	}
+	member, err := s.chats.ConversationMemberByConversationAndAccount(ctx, params.ConversationID, params.SenderAccountID)
+	if err != nil {
+		return nil, mapConversationError("authorize sender", params.ConversationID, err)
+	}
+	if !isActiveConversationMember(member) {
+		return nil, ErrForbidden
+	}
+
+	switch conversationRow.Kind {
+	case conversation.ConversationKindDirect:
+		return s.directConversationKeyCoverage(ctx, params)
+	case conversation.ConversationKindGroup:
+		return s.groupConversationKeyCoverage(ctx, params)
+	default:
+		return nil, ErrForbidden
+	}
+}
+
 func (s *Service) CreateDirectSessions(ctx context.Context, params CreateDirectSessionsParams) ([]DirectSession, error) {
 	if err := s.validateContext(ctx, "create direct sessions"); err != nil {
 		return nil, err
@@ -989,6 +1034,145 @@ func (s *Service) validateGroupConversationPayload(ctx context.Context, params V
 		}
 	}
 	return ErrConflict
+}
+
+func (s *Service) directConversationKeyCoverage(ctx context.Context, params GetConversationKeyCoverageParams) ([]ConversationKeyCoverageEntry, error) {
+	members, err := s.chats.ConversationMembersByConversationID(ctx, params.ConversationID)
+	if err != nil {
+		return nil, mapConversationError("list conversation members", params.ConversationID, err)
+	}
+
+	sessions, err := s.store.DirectSessionsByParticipantDevice(ctx, params.SenderAccountID, params.SenderDeviceID)
+	if err != nil {
+		return nil, err
+	}
+	now := s.now()
+	result := make([]ConversationKeyCoverageEntry, 0)
+	for _, member := range members {
+		if !isActiveConversationMember(member) || member.AccountID == params.SenderAccountID {
+			continue
+		}
+		devices, loadErr := s.directory.DevicesByAccountID(ctx, member.AccountID)
+		if loadErr != nil {
+			return nil, fmt.Errorf("list devices for %s: %w", member.AccountID, loadErr)
+		}
+		for _, device := range devices {
+			if device.Status != identity.DeviceStatusActive || strings.TrimSpace(device.PublicKey) == "" {
+				continue
+			}
+			entry := ConversationKeyCoverageEntry{
+				AccountID: member.AccountID,
+				DeviceID:  device.ID,
+				State:     ConversationKeyCoverageStateMissing,
+			}
+			for _, session := range sessions {
+				if session.InitiatorAccountID == params.SenderAccountID && session.InitiatorDeviceID == params.SenderDeviceID {
+					if session.RecipientAccountID != member.AccountID || session.RecipientDeviceID != device.ID {
+						continue
+					}
+				} else if session.RecipientAccountID == params.SenderAccountID && session.RecipientDeviceID == params.SenderDeviceID {
+					if session.InitiatorAccountID != member.AccountID || session.InitiatorDeviceID != device.ID {
+						continue
+					}
+				} else {
+					continue
+				}
+				entry = coverageEntryFromDirectSession(session, now)
+				entry.AccountID = member.AccountID
+				entry.DeviceID = device.ID
+				break
+			}
+			result = append(result, entry)
+		}
+	}
+	return result, nil
+}
+
+func (s *Service) groupConversationKeyCoverage(ctx context.Context, params GetConversationKeyCoverageParams) ([]ConversationKeyCoverageEntry, error) {
+	members, err := s.chats.ConversationMembersByConversationID(ctx, params.ConversationID)
+	if err != nil {
+		return nil, mapConversationError("list conversation members", params.ConversationID, err)
+	}
+	distributions, err := s.store.GroupSenderKeyDistributionsBySenderDevice(ctx, params.ConversationID, params.SenderAccountID, params.SenderDeviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	now := s.now()
+	result := make([]ConversationKeyCoverageEntry, 0)
+	for _, member := range members {
+		if !isActiveConversationMember(member) || member.AccountID == params.SenderAccountID {
+			continue
+		}
+		devices, loadErr := s.directory.DevicesByAccountID(ctx, member.AccountID)
+		if loadErr != nil {
+			return nil, fmt.Errorf("list devices for %s: %w", member.AccountID, loadErr)
+		}
+		for _, device := range devices {
+			if device.Status != identity.DeviceStatusActive || strings.TrimSpace(device.PublicKey) == "" {
+				continue
+			}
+			entry := ConversationKeyCoverageEntry{
+				AccountID: member.AccountID,
+				DeviceID:  device.ID,
+				State:     ConversationKeyCoverageStateMissing,
+			}
+			for _, item := range distributions {
+				if item.RecipientAccountID != member.AccountID || item.RecipientDeviceID != device.ID {
+					continue
+				}
+				if params.SenderKeyID != "" && item.SenderKeyID != params.SenderKeyID {
+					continue
+				}
+				entry = coverageEntryFromSenderKeyDistribution(item, now)
+				entry.AccountID = member.AccountID
+				entry.DeviceID = device.ID
+				break
+			}
+			result = append(result, entry)
+		}
+	}
+	return result, nil
+}
+
+func coverageEntryFromDirectSession(value DirectSession, now time.Time) ConversationKeyCoverageEntry {
+	entry := ConversationKeyCoverageEntry{
+		ReferenceID: value.ID,
+		ExpiresAt:   value.ExpiresAt,
+	}
+	if !value.ExpiresAt.IsZero() && !now.Before(value.ExpiresAt) {
+		entry.State = ConversationKeyCoverageStateExpired
+		return entry
+	}
+	switch value.State {
+	case DirectSessionStateAcknowledged:
+		entry.State = ConversationKeyCoverageStateReady
+	case DirectSessionStatePending:
+		entry.State = ConversationKeyCoverageStatePending
+	default:
+		entry.State = ConversationKeyCoverageStateMissing
+	}
+	return entry
+}
+
+func coverageEntryFromSenderKeyDistribution(value GroupSenderKeyDistribution, now time.Time) ConversationKeyCoverageEntry {
+	entry := ConversationKeyCoverageEntry{
+		ReferenceID: value.SenderKeyID,
+		ExpiresAt:   value.ExpiresAt,
+	}
+	if !value.ExpiresAt.IsZero() && !now.Before(value.ExpiresAt) {
+		entry.State = ConversationKeyCoverageStateExpired
+		return entry
+	}
+	switch value.State {
+	case GroupSenderKeyStateAcknowledged:
+		entry.State = ConversationKeyCoverageStateReady
+	case GroupSenderKeyStatePending:
+		entry.State = ConversationKeyCoverageStatePending
+	default:
+		entry.State = ConversationKeyCoverageStateMissing
+	}
+	return entry
 }
 
 func normalizeSignedPreKey(value SignedPreKey) SignedPreKey {

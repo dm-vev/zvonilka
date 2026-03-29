@@ -796,3 +796,167 @@ func TestSetAndListDeviceTrustRPC(t *testing.T) {
 		t.Fatalf("unexpected trust list: %+v", listResp.Trusts)
 	}
 }
+
+func TestGetConversationKeyCoverageRPC(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	alice, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "alice-coverage",
+		DisplayName: "Alice Coverage",
+		Email:       "alice-coverage@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "bob-coverage",
+		DisplayName: "Bob Coverage",
+		Email:       "bob-coverage@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+	carol, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "carol-coverage",
+		DisplayName: "Carol Coverage",
+		Email:       "carol-coverage@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create carol: %v", err)
+	}
+
+	login := func(username string, deviceName string, publicKey string) (context.Context, string) {
+		begin, beginErr := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+			Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+			DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+			DeviceName:      deviceName,
+			DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		})
+		if beginErr != nil {
+			t.Fatalf("begin login for %s: %v", username, beginErr)
+		}
+		verify, verifyErr := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+			ChallengeId:    begin.ChallengeId,
+			Code:           sender.code(begin.Targets[0].DestinationMask),
+			DeviceName:     deviceName,
+			DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+			DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+		})
+		if verifyErr != nil {
+			t.Fatalf("verify login for %s: %v", username, verifyErr)
+		}
+		return metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", "Bearer "+verify.Tokens.AccessToken)), verify.Device.DeviceId
+	}
+
+	aliceCtx, _ := login(alice.Username, "alice-coverage-phone", "alice-coverage-device")
+	bobCtx, bobDeviceID := login(bob.Username, "bob-coverage-phone", "bob-coverage-device")
+	_, _ = login(carol.Username, "carol-coverage-phone", "carol-coverage-device")
+
+	_, err = api.UploadDevicePreKeys(bobCtx, &e2eev1.UploadDevicePreKeysRequest{
+		SignedPrekey: &e2eev1.SignedPreKey{
+			Key:       &commonv1.PublicKeyBundle{KeyId: "spk-bob-coverage", Algorithm: "x25519", PublicKey: []byte("spk-bob-coverage")},
+			Signature: []byte("sig-bob-coverage"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("upload bob prekeys: %v", err)
+	}
+
+	direct, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{bob.ID},
+	})
+	if err != nil {
+		t.Fatalf("create direct conversation: %v", err)
+	}
+	sessions, err := api.CreateDirectSessions(aliceCtx, &e2eev1.CreateDirectSessionsRequest{
+		UserId: bob.ID,
+		InitiatorEphemeralKey: &commonv1.PublicKeyBundle{
+			KeyId:     "eph-coverage",
+			Algorithm: "x25519",
+			PublicKey: []byte("eph-coverage"),
+		},
+		Bootstrap: &e2eev1.SessionBootstrapPayload{
+			Algorithm:  "x3dh-v1",
+			Ciphertext: []byte("cipher"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("create direct session: %v", err)
+	}
+	_, err = api.AcknowledgeDirectSession(bobCtx, &e2eev1.AcknowledgeDirectSessionRequest{
+		SessionId: sessions.Sessions[0].SessionId,
+	})
+	if err != nil {
+		t.Fatalf("ack direct session: %v", err)
+	}
+
+	directCoverage, err := api.GetConversationKeyCoverage(aliceCtx, &e2eev1.GetConversationKeyCoverageRequest{
+		ConversationId: direct.Conversation.ConversationId,
+	})
+	if err != nil {
+		t.Fatalf("get direct coverage: %v", err)
+	}
+	if len(directCoverage.Entries) != 1 || directCoverage.Entries[0].State != e2eev1.ConversationKeyCoverageState_CONVERSATION_KEY_COVERAGE_STATE_READY {
+		t.Fatalf("unexpected direct coverage: %+v", directCoverage.Entries)
+	}
+
+	group, err := api.CreateConversation(aliceCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Coverage Group",
+		MemberUserIds: []string{bob.ID, carol.ID},
+	})
+	if err != nil {
+		t.Fatalf("create group conversation: %v", err)
+	}
+	_, err = api.PublishGroupSenderKeys(aliceCtx, &e2eev1.PublishGroupSenderKeysRequest{
+		ConversationId: group.Conversation.ConversationId,
+		SenderKeyId:    "sender-key-coverage",
+		Recipients: []*e2eev1.RecipientSenderKey{
+			{
+				RecipientUserId:   bob.ID,
+				RecipientDeviceId: bobDeviceID,
+				Payload: &e2eev1.SenderKeyPayload{
+					Algorithm:  "sender-key-v1",
+					Ciphertext: []byte("ciphertext"),
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("publish sender key: %v", err)
+	}
+
+	groupCoverage, err := api.GetConversationKeyCoverage(aliceCtx, &e2eev1.GetConversationKeyCoverageRequest{
+		ConversationId: group.Conversation.ConversationId,
+		SenderKeyId:    "sender-key-coverage",
+	})
+	if err != nil {
+		t.Fatalf("get group coverage: %v", err)
+	}
+	if len(groupCoverage.Entries) != 2 {
+		t.Fatalf("expected two coverage entries, got %d", len(groupCoverage.Entries))
+	}
+	seenReady := false
+	seenMissing := false
+	for _, entry := range groupCoverage.Entries {
+		if entry.State == e2eev1.ConversationKeyCoverageState_CONVERSATION_KEY_COVERAGE_STATE_PENDING {
+			seenReady = true
+		}
+		if entry.State == e2eev1.ConversationKeyCoverageState_CONVERSATION_KEY_COVERAGE_STATE_MISSING {
+			seenMissing = true
+		}
+	}
+	if !seenReady || !seenMissing {
+		t.Fatalf("unexpected group coverage states: %+v", groupCoverage.Entries)
+	}
+}

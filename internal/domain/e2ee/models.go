@@ -54,6 +54,24 @@ type DeviceTrust struct {
 	UpdatedAt         time.Time
 }
 
+type ConversationKeyCoverageState string
+
+const (
+	ConversationKeyCoverageStateUnspecified ConversationKeyCoverageState = ""
+	ConversationKeyCoverageStateReady       ConversationKeyCoverageState = "ready"
+	ConversationKeyCoverageStatePending     ConversationKeyCoverageState = "pending"
+	ConversationKeyCoverageStateExpired     ConversationKeyCoverageState = "expired"
+	ConversationKeyCoverageStateMissing     ConversationKeyCoverageState = "missing"
+)
+
+type ConversationKeyCoverageEntry struct {
+	AccountID   string
+	DeviceID    string
+	State       ConversationKeyCoverageState
+	ReferenceID string
+	ExpiresAt   time.Time
+}
+
 type BootstrapPayload struct {
 	Algorithm  string
 	Nonce      []byte

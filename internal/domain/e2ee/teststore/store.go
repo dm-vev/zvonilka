@@ -160,6 +160,23 @@ func (s *memoryStore) DirectSessionsByRecipientDevice(_ context.Context, account
 	return result, nil
 }
 
+func (s *memoryStore) DirectSessionsByParticipantDevice(_ context.Context, accountID string, deviceID string) ([]e2ee.DirectSession, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]e2ee.DirectSession, 0)
+	for _, value := range s.sessions {
+		if value.InitiatorAccountID == accountID && value.InitiatorDeviceID == deviceID {
+			result = append(result, cloneDirectSession(value))
+			continue
+		}
+		if value.RecipientAccountID == accountID && value.RecipientDeviceID == deviceID {
+			result = append(result, cloneDirectSession(value))
+		}
+	}
+	return result, nil
+}
+
 func (s *memoryStore) ExpirePendingGroupSenderKeysBySenderDevice(_ context.Context, accountID string, deviceID string, expiresAt time.Time) (uint32, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -218,6 +235,20 @@ func (s *memoryStore) GroupSenderKeyDistributionsBySenderKey(_ context.Context, 
 	result := make([]e2ee.GroupSenderKeyDistribution, 0)
 	for _, value := range s.groupSender {
 		if value.ConversationID != conversationID || value.SenderAccountID != senderAccountID || value.SenderDeviceID != senderDeviceID || value.SenderKeyID != senderKeyID {
+			continue
+		}
+		result = append(result, cloneGroupSenderKeyDistribution(value))
+	}
+	return result, nil
+}
+
+func (s *memoryStore) GroupSenderKeyDistributionsBySenderDevice(_ context.Context, conversationID string, senderAccountID string, senderDeviceID string) ([]e2ee.GroupSenderKeyDistribution, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]e2ee.GroupSenderKeyDistribution, 0)
+	for _, value := range s.groupSender {
+		if value.ConversationID != conversationID || value.SenderAccountID != senderAccountID || value.SenderDeviceID != senderDeviceID {
 			continue
 		}
 		result = append(result, cloneGroupSenderKeyDistribution(value))

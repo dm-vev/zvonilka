@@ -152,6 +152,31 @@ func (a *api) ListDeviceTrusts(
 	return &e2eev1.ListDeviceTrustsResponse{Trusts: result}, nil
 }
 
+func (a *api) GetConversationKeyCoverage(
+	ctx context.Context,
+	req *e2eev1.GetConversationKeyCoverageRequest,
+) (*e2eev1.GetConversationKeyCoverageResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	entries, err := a.e2ee.GetConversationKeyCoverage(ctx, domaine2ee.GetConversationKeyCoverageParams{
+		ConversationID:  req.GetConversationId(),
+		SenderAccountID: authContext.Account.ID,
+		SenderDeviceID:  authContext.Session.DeviceID,
+		SenderKeyID:     req.GetSenderKeyId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	result := make([]*e2eev1.ConversationKeyCoverageEntry, 0, len(entries))
+	for _, item := range entries {
+		result = append(result, conversationKeyCoverageEntryProto(item))
+	}
+	return &e2eev1.GetConversationKeyCoverageResponse{Entries: result}, nil
+}
+
 func (a *api) CreateDirectSessions(
 	ctx context.Context,
 	req *e2eev1.CreateDirectSessionsRequest,
@@ -323,6 +348,16 @@ func deviceTrustProto(value domaine2ee.DeviceTrust) *e2eev1.DeviceTrust {
 		Note:             value.Note,
 		CreatedAt:        protoTime(value.CreatedAt),
 		UpdatedAt:        protoTime(value.UpdatedAt),
+	}
+}
+
+func conversationKeyCoverageEntryProto(value domaine2ee.ConversationKeyCoverageEntry) *e2eev1.ConversationKeyCoverageEntry {
+	return &e2eev1.ConversationKeyCoverageEntry{
+		UserId:      value.AccountID,
+		DeviceId:    value.DeviceID,
+		State:       conversationKeyCoverageStateProto(value.State),
+		ReferenceId: value.ReferenceID,
+		ExpiresAt:   protoTime(value.ExpiresAt),
 	}
 }
 
@@ -575,5 +610,20 @@ func deviceTrustStateFromProto(value e2eev1.DeviceTrustState) domaine2ee.DeviceT
 		return domaine2ee.DeviceTrustStateCompromised
 	default:
 		return domaine2ee.DeviceTrustStateUnspecified
+	}
+}
+
+func conversationKeyCoverageStateProto(value domaine2ee.ConversationKeyCoverageState) e2eev1.ConversationKeyCoverageState {
+	switch value {
+	case domaine2ee.ConversationKeyCoverageStateReady:
+		return e2eev1.ConversationKeyCoverageState_CONVERSATION_KEY_COVERAGE_STATE_READY
+	case domaine2ee.ConversationKeyCoverageStatePending:
+		return e2eev1.ConversationKeyCoverageState_CONVERSATION_KEY_COVERAGE_STATE_PENDING
+	case domaine2ee.ConversationKeyCoverageStateExpired:
+		return e2eev1.ConversationKeyCoverageState_CONVERSATION_KEY_COVERAGE_STATE_EXPIRED
+	case domaine2ee.ConversationKeyCoverageStateMissing:
+		return e2eev1.ConversationKeyCoverageState_CONVERSATION_KEY_COVERAGE_STATE_MISSING
+	default:
+		return e2eev1.ConversationKeyCoverageState_CONVERSATION_KEY_COVERAGE_STATE_UNSPECIFIED
 	}
 }

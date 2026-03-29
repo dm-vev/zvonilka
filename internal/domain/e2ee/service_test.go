@@ -431,6 +431,122 @@ func TestSetAndListDeviceTrust(t *testing.T) {
 	}
 }
 
+func TestGetConversationKeyCoverage(t *testing.T) {
+	ctx := context.Background()
+	directory := identitytest.NewMemoryStore()
+	chats := conversationtest.NewMemoryStore()
+	e2eeStore := teststore.NewMemoryStore()
+	service, err := domaine2ee.NewService(e2eeStore, directory, chats)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	now := time.Now().UTC()
+	seedIdentity(t, ctx, directory, "acc-a", "dev-a", "device-key-a")
+	seedIdentity(t, ctx, directory, "acc-b", "dev-b", "device-key-b")
+	seedIdentity(t, ctx, directory, "acc-c", "dev-c", "device-key-c")
+
+	_, err = service.UploadDevicePreKeys(ctx, domaine2ee.UploadDevicePreKeysParams{
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		SignedPreKey: domaine2ee.SignedPreKey{
+			Key:       domaine2ee.PublicKey{KeyID: "spk-b", Algorithm: "x25519", PublicKey: []byte("spk-b"), CreatedAt: now},
+			Signature: []byte("sig-b"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("upload bob prekeys: %v", err)
+	}
+
+	conversationService, err := conversation.NewService(chats)
+	if err != nil {
+		t.Fatalf("new conversation service: %v", err)
+	}
+	direct, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-a",
+		Kind:             conversation.ConversationKindDirect,
+		MemberAccountIDs: []string{"acc-b"},
+		CreatedAt:        now,
+	})
+	if err != nil {
+		t.Fatalf("create direct: %v", err)
+	}
+	group, _, err := conversationService.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-a",
+		Kind:             conversation.ConversationKindGroup,
+		Title:            "Coverage group",
+		MemberAccountIDs: []string{"acc-b", "acc-c"},
+		CreatedAt:        now,
+	})
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+
+	sessions, err := service.CreateDirectSessions(ctx, domaine2ee.CreateDirectSessionsParams{
+		InitiatorAccountID: "acc-a",
+		InitiatorDeviceID:  "dev-a",
+		TargetAccountID:    "acc-b",
+		InitiatorEphemeral: domaine2ee.PublicKey{KeyID: "eph", Algorithm: "x25519", PublicKey: []byte("eph"), CreatedAt: now},
+		Bootstrap:          domaine2ee.BootstrapPayload{Algorithm: "x3dh-v1", Ciphertext: []byte("cipher")},
+	})
+	if err != nil {
+		t.Fatalf("create sessions: %v", err)
+	}
+	_, err = service.AcknowledgeDirectSession(ctx, domaine2ee.AcknowledgeDirectSessionParams{
+		SessionID:          sessions[0].ID,
+		RecipientAccountID: "acc-b",
+		RecipientDeviceID:  "dev-b",
+	})
+	if err != nil {
+		t.Fatalf("ack session: %v", err)
+	}
+
+	_, err = service.PublishGroupSenderKeys(ctx, domaine2ee.PublishGroupSenderKeysParams{
+		ConversationID:  group.ID,
+		SenderAccountID: "acc-a",
+		SenderDeviceID:  "dev-a",
+		SenderKeyID:     "sender-key-coverage",
+		Recipients: []domaine2ee.RecipientSenderKey{
+			{
+				RecipientAccountID: "acc-b",
+				RecipientDeviceID:  "dev-b",
+				Payload:            domaine2ee.SenderKeyPayload{Algorithm: "sender-key-v1", Ciphertext: []byte("payload-b")},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("publish sender keys: %v", err)
+	}
+
+	directCoverage, err := service.GetConversationKeyCoverage(ctx, domaine2ee.GetConversationKeyCoverageParams{
+		ConversationID:  direct.ID,
+		SenderAccountID: "acc-a",
+		SenderDeviceID:  "dev-a",
+	})
+	if err != nil {
+		t.Fatalf("direct coverage: %v", err)
+	}
+	if len(directCoverage) != 1 || directCoverage[0].State != domaine2ee.ConversationKeyCoverageStateReady {
+		t.Fatalf("unexpected direct coverage: %+v", directCoverage)
+	}
+
+	groupCoverage, err := service.GetConversationKeyCoverage(ctx, domaine2ee.GetConversationKeyCoverageParams{
+		ConversationID:  group.ID,
+		SenderAccountID: "acc-a",
+		SenderDeviceID:  "dev-a",
+		SenderKeyID:     "sender-key-coverage",
+	})
+	if err != nil {
+		t.Fatalf("group coverage: %v", err)
+	}
+	if len(groupCoverage) != 2 {
+		t.Fatalf("expected two group coverage entries, got %d", len(groupCoverage))
+	}
+	if groupCoverage[0].State == domaine2ee.ConversationKeyCoverageStateMissing && groupCoverage[1].State == domaine2ee.ConversationKeyCoverageStateMissing {
+		t.Fatalf("expected at least one non-missing group coverage entry: %+v", groupCoverage)
+	}
+}
+
 func seedIdentity(t *testing.T, ctx context.Context, store identity.Store, accountID string, deviceID string, publicKey string) {
 	t.Helper()
 	if _, err := store.SaveAccount(ctx, identity.Account{

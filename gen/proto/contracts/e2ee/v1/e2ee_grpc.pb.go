@@ -19,17 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	E2EEService_UploadDevicePreKeys_FullMethodName       = "/zvonilka.e2ee.v1.E2EEService/UploadDevicePreKeys"
-	E2EEService_RotateE2EEKeys_FullMethodName            = "/zvonilka.e2ee.v1.E2EEService/RotateE2EEKeys"
-	E2EEService_GetAccountPreKeyBundles_FullMethodName   = "/zvonilka.e2ee.v1.E2EEService/GetAccountPreKeyBundles"
-	E2EEService_SetDeviceTrust_FullMethodName            = "/zvonilka.e2ee.v1.E2EEService/SetDeviceTrust"
-	E2EEService_ListDeviceTrusts_FullMethodName          = "/zvonilka.e2ee.v1.E2EEService/ListDeviceTrusts"
-	E2EEService_CreateDirectSessions_FullMethodName      = "/zvonilka.e2ee.v1.E2EEService/CreateDirectSessions"
-	E2EEService_ListDeviceSessions_FullMethodName        = "/zvonilka.e2ee.v1.E2EEService/ListDeviceSessions"
-	E2EEService_AcknowledgeDirectSession_FullMethodName  = "/zvonilka.e2ee.v1.E2EEService/AcknowledgeDirectSession"
-	E2EEService_PublishGroupSenderKeys_FullMethodName    = "/zvonilka.e2ee.v1.E2EEService/PublishGroupSenderKeys"
-	E2EEService_ListGroupSenderKeys_FullMethodName       = "/zvonilka.e2ee.v1.E2EEService/ListGroupSenderKeys"
-	E2EEService_AcknowledgeGroupSenderKey_FullMethodName = "/zvonilka.e2ee.v1.E2EEService/AcknowledgeGroupSenderKey"
+	E2EEService_UploadDevicePreKeys_FullMethodName        = "/zvonilka.e2ee.v1.E2EEService/UploadDevicePreKeys"
+	E2EEService_RotateE2EEKeys_FullMethodName             = "/zvonilka.e2ee.v1.E2EEService/RotateE2EEKeys"
+	E2EEService_GetAccountPreKeyBundles_FullMethodName    = "/zvonilka.e2ee.v1.E2EEService/GetAccountPreKeyBundles"
+	E2EEService_SetDeviceTrust_FullMethodName             = "/zvonilka.e2ee.v1.E2EEService/SetDeviceTrust"
+	E2EEService_ListDeviceTrusts_FullMethodName           = "/zvonilka.e2ee.v1.E2EEService/ListDeviceTrusts"
+	E2EEService_GetConversationKeyCoverage_FullMethodName = "/zvonilka.e2ee.v1.E2EEService/GetConversationKeyCoverage"
+	E2EEService_CreateDirectSessions_FullMethodName       = "/zvonilka.e2ee.v1.E2EEService/CreateDirectSessions"
+	E2EEService_ListDeviceSessions_FullMethodName         = "/zvonilka.e2ee.v1.E2EEService/ListDeviceSessions"
+	E2EEService_AcknowledgeDirectSession_FullMethodName   = "/zvonilka.e2ee.v1.E2EEService/AcknowledgeDirectSession"
+	E2EEService_PublishGroupSenderKeys_FullMethodName     = "/zvonilka.e2ee.v1.E2EEService/PublishGroupSenderKeys"
+	E2EEService_ListGroupSenderKeys_FullMethodName        = "/zvonilka.e2ee.v1.E2EEService/ListGroupSenderKeys"
+	E2EEService_AcknowledgeGroupSenderKey_FullMethodName  = "/zvonilka.e2ee.v1.E2EEService/AcknowledgeGroupSenderKey"
 )
 
 // E2EEServiceClient is the client API for E2EEService service.
@@ -41,6 +42,7 @@ type E2EEServiceClient interface {
 	GetAccountPreKeyBundles(ctx context.Context, in *GetAccountPreKeyBundlesRequest, opts ...grpc.CallOption) (*GetAccountPreKeyBundlesResponse, error)
 	SetDeviceTrust(ctx context.Context, in *SetDeviceTrustRequest, opts ...grpc.CallOption) (*SetDeviceTrustResponse, error)
 	ListDeviceTrusts(ctx context.Context, in *ListDeviceTrustsRequest, opts ...grpc.CallOption) (*ListDeviceTrustsResponse, error)
+	GetConversationKeyCoverage(ctx context.Context, in *GetConversationKeyCoverageRequest, opts ...grpc.CallOption) (*GetConversationKeyCoverageResponse, error)
 	CreateDirectSessions(ctx context.Context, in *CreateDirectSessionsRequest, opts ...grpc.CallOption) (*CreateDirectSessionsResponse, error)
 	ListDeviceSessions(ctx context.Context, in *ListDeviceSessionsRequest, opts ...grpc.CallOption) (*ListDeviceSessionsResponse, error)
 	AcknowledgeDirectSession(ctx context.Context, in *AcknowledgeDirectSessionRequest, opts ...grpc.CallOption) (*AcknowledgeDirectSessionResponse, error)
@@ -96,6 +98,15 @@ func (c *e2EEServiceClient) SetDeviceTrust(ctx context.Context, in *SetDeviceTru
 func (c *e2EEServiceClient) ListDeviceTrusts(ctx context.Context, in *ListDeviceTrustsRequest, opts ...grpc.CallOption) (*ListDeviceTrustsResponse, error) {
 	out := new(ListDeviceTrustsResponse)
 	err := c.cc.Invoke(ctx, E2EEService_ListDeviceTrusts_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *e2EEServiceClient) GetConversationKeyCoverage(ctx context.Context, in *GetConversationKeyCoverageRequest, opts ...grpc.CallOption) (*GetConversationKeyCoverageResponse, error) {
+	out := new(GetConversationKeyCoverageResponse)
+	err := c.cc.Invoke(ctx, E2EEService_GetConversationKeyCoverage_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +176,7 @@ type E2EEServiceServer interface {
 	GetAccountPreKeyBundles(context.Context, *GetAccountPreKeyBundlesRequest) (*GetAccountPreKeyBundlesResponse, error)
 	SetDeviceTrust(context.Context, *SetDeviceTrustRequest) (*SetDeviceTrustResponse, error)
 	ListDeviceTrusts(context.Context, *ListDeviceTrustsRequest) (*ListDeviceTrustsResponse, error)
+	GetConversationKeyCoverage(context.Context, *GetConversationKeyCoverageRequest) (*GetConversationKeyCoverageResponse, error)
 	CreateDirectSessions(context.Context, *CreateDirectSessionsRequest) (*CreateDirectSessionsResponse, error)
 	ListDeviceSessions(context.Context, *ListDeviceSessionsRequest) (*ListDeviceSessionsResponse, error)
 	AcknowledgeDirectSession(context.Context, *AcknowledgeDirectSessionRequest) (*AcknowledgeDirectSessionResponse, error)
@@ -192,6 +204,9 @@ func (UnimplementedE2EEServiceServer) SetDeviceTrust(context.Context, *SetDevice
 }
 func (UnimplementedE2EEServiceServer) ListDeviceTrusts(context.Context, *ListDeviceTrustsRequest) (*ListDeviceTrustsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListDeviceTrusts not implemented")
+}
+func (UnimplementedE2EEServiceServer) GetConversationKeyCoverage(context.Context, *GetConversationKeyCoverageRequest) (*GetConversationKeyCoverageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetConversationKeyCoverage not implemented")
 }
 func (UnimplementedE2EEServiceServer) CreateDirectSessions(context.Context, *CreateDirectSessionsRequest) (*CreateDirectSessionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateDirectSessions not implemented")
@@ -310,6 +325,24 @@ func _E2EEService_ListDeviceTrusts_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(E2EEServiceServer).ListDeviceTrusts(ctx, req.(*ListDeviceTrustsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _E2EEService_GetConversationKeyCoverage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetConversationKeyCoverageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(E2EEServiceServer).GetConversationKeyCoverage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: E2EEService_GetConversationKeyCoverage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(E2EEServiceServer).GetConversationKeyCoverage(ctx, req.(*GetConversationKeyCoverageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -448,6 +481,10 @@ var E2EEService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListDeviceTrusts",
 			Handler:    _E2EEService_ListDeviceTrusts_Handler,
+		},
+		{
+			MethodName: "GetConversationKeyCoverage",
+			Handler:    _E2EEService_GetConversationKeyCoverage_Handler,
 		},
 		{
 			MethodName: "CreateDirectSessions",

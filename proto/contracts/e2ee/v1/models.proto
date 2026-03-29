@@ -45,6 +45,22 @@ message DeviceTrust {
   google.protobuf.Timestamp updated_at = 9;
 }
 
+enum ConversationKeyCoverageState {
+  CONVERSATION_KEY_COVERAGE_STATE_UNSPECIFIED = 0;
+  CONVERSATION_KEY_COVERAGE_STATE_READY = 1;
+  CONVERSATION_KEY_COVERAGE_STATE_PENDING = 2;
+  CONVERSATION_KEY_COVERAGE_STATE_EXPIRED = 3;
+  CONVERSATION_KEY_COVERAGE_STATE_MISSING = 4;
+}
+
+message ConversationKeyCoverageEntry {
+  string user_id = 1;
+  string device_id = 2;
+  ConversationKeyCoverageState state = 3;
+  string reference_id = 4;
+  google.protobuf.Timestamp expires_at = 5;
+}
+
 enum DirectSessionState {
   DIRECT_SESSION_STATE_UNSPECIFIED = 0;
   DIRECT_SESSION_STATE_PENDING = 1;

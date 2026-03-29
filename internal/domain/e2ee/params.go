@@ -42,6 +42,13 @@ type ListDeviceTrustsParams struct {
 	TargetAccountID   string
 }
 
+type GetConversationKeyCoverageParams struct {
+	ConversationID  string
+	SenderAccountID string
+	SenderDeviceID  string
+	SenderKeyID     string
+}
+
 type CreateDirectSessionsParams struct {
 	InitiatorAccountID string
 	InitiatorDeviceID  string

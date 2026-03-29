@@ -62,6 +62,15 @@ message ListDeviceTrustsResponse {
   repeated DeviceTrust trusts = 1;
 }
 
+message GetConversationKeyCoverageRequest {
+  string conversation_id = 1;
+  string sender_key_id = 2;
+}
+
+message GetConversationKeyCoverageResponse {
+  repeated ConversationKeyCoverageEntry entries = 1;
+}
+
 message CreateDirectSessionsRequest {
   string user_id = 1;
   string device_id = 2;
