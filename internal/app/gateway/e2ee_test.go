@@ -1358,6 +1358,12 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 	if flaggedConversation.Conversation.UntrustedDevices != 1 || flaggedConversation.Conversation.CompromisedDevices != 0 {
 		t.Fatalf("expected untrusted=1 compromised=0, got untrusted=%d compromised=%d", flaggedConversation.Conversation.UntrustedDevices, flaggedConversation.Conversation.CompromisedDevices)
 	}
+	if len(flaggedConversation.Conversation.BlockedDevices) != 1 {
+		t.Fatalf("expected one blocked device preview, got %+v", flaggedConversation.Conversation.BlockedDevices)
+	}
+	if flaggedConversation.Conversation.BlockedDevices[0].UserId != bob.ID || flaggedConversation.Conversation.BlockedDevices[0].TrustState != e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_UNTRUSTED {
+		t.Fatalf("unexpected blocked device preview: %+v", flaggedConversation.Conversation.BlockedDevices[0])
+	}
 	if flaggedConversation.Conversation.E2EeRequiredAction != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES {
 		t.Fatalf("expected verify-devices action, got %s", flaggedConversation.Conversation.E2EeRequiredAction)
 	}
@@ -1380,6 +1386,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 	if getConversation.Conversation.UntrustedDevices != 1 || getConversation.Conversation.CompromisedDevices != 0 {
 		t.Fatalf("expected get conversation counts to stay untrusted=1 compromised=0, got untrusted=%d compromised=%d", getConversation.Conversation.UntrustedDevices, getConversation.Conversation.CompromisedDevices)
 	}
+	if len(getConversation.Conversation.BlockedDevices) != 1 || getConversation.Conversation.BlockedDevices[0].DeviceId != bobDeviceID {
+		t.Fatalf("unexpected get conversation blocked devices: %+v", getConversation.Conversation.BlockedDevices)
+	}
 
 	listed, err := api.ListConversations(aliceCtx, &conversationv1.ListConversationsRequest{})
 	if err != nil {
@@ -1397,6 +1406,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 			if item.UntrustedDevices != 1 || item.CompromisedDevices != 0 {
 				t.Fatalf("expected list counts untrusted=1 compromised=0, got untrusted=%d compromised=%d", item.UntrustedDevices, item.CompromisedDevices)
 			}
+			if len(item.BlockedDevices) != 1 || item.BlockedDevices[0].DeviceId != bobDeviceID {
+				t.Fatalf("unexpected list blocked devices: %+v", item.BlockedDevices)
+			}
 			if item.E2EeRequiredAction != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES {
 				t.Fatalf("expected verify-devices action in list, got %s", item.E2EeRequiredAction)
 			}
@@ -1407,6 +1419,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 			}
 			if item.UntrustedDevices != 0 || item.CompromisedDevices != 0 {
 				t.Fatalf("expected plain conversation counts to stay zero, got untrusted=%d compromised=%d", item.UntrustedDevices, item.CompromisedDevices)
+			}
+			if len(item.BlockedDevices) != 0 {
+				t.Fatalf("expected no blocked devices for plain conversation, got %+v", item.BlockedDevices)
 			}
 			if item.E2EeRequiredAction != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_NONE {
 				t.Fatalf("expected no action for plain conversation, got %s", item.E2EeRequiredAction)
@@ -1436,6 +1451,9 @@ func TestConversationResponsesIncludeVerificationRequiredOverlays(t *testing.T) 
 	}
 	if cleared.Conversation.UntrustedDevices != 0 || cleared.Conversation.CompromisedDevices != 0 {
 		t.Fatalf("expected counts to clear after trust update, got untrusted=%d compromised=%d", cleared.Conversation.UntrustedDevices, cleared.Conversation.CompromisedDevices)
+	}
+	if len(cleared.Conversation.BlockedDevices) != 0 {
+		t.Fatalf("expected blocked devices preview to clear after trust update, got %+v", cleared.Conversation.BlockedDevices)
 	}
 	if cleared.Conversation.E2EeRequiredAction != conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_NONE {
 		t.Fatalf("expected required action to clear after trust update, got %s", cleared.Conversation.E2EeRequiredAction)
@@ -1733,6 +1751,12 @@ func TestConversationResponsesTrackCompromisedDeviceCounts(t *testing.T) {
 	}
 	if loaded.Conversation.UntrustedDevices != 0 || loaded.Conversation.CompromisedDevices != 1 {
 		t.Fatalf("expected untrusted=0 compromised=1, got untrusted=%d compromised=%d", loaded.Conversation.UntrustedDevices, loaded.Conversation.CompromisedDevices)
+	}
+	if len(loaded.Conversation.BlockedDevices) != 1 {
+		t.Fatalf("expected one blocked device preview, got %+v", loaded.Conversation.BlockedDevices)
+	}
+	if loaded.Conversation.BlockedDevices[0].TrustState != e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_COMPROMISED {
+		t.Fatalf("expected compromised blocked device preview, got %+v", loaded.Conversation.BlockedDevices[0])
 	}
 }
 

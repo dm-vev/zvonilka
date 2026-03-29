@@ -3,11 +3,13 @@ package gateway
 import (
 	"context"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
 	conversationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1"
+	e2eev1 "github.com/dm-vev/zvonilka/gen/proto/contracts/e2ee/v1"
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
 	domainconversation "github.com/dm-vev/zvonilka/internal/domain/conversation"
 	domaine2ee "github.com/dm-vev/zvonilka/internal/domain/e2ee"
@@ -918,6 +920,7 @@ type conversationE2EEOverlay struct {
 	UntrustedDevices            uint32
 	CompromisedDevices          uint32
 	RequiredAction              conversationv1.ConversationE2EERequiredAction
+	BlockedDevices              []*conversationv1.ConversationBlockedDevice
 }
 
 func conversationProto(
@@ -950,6 +953,7 @@ func conversationProto(
 		VerificationRequiredDevices: overlay.VerificationRequiredDevices,
 		UntrustedDevices:            overlay.UntrustedDevices,
 		CompromisedDevices:          overlay.CompromisedDevices,
+		BlockedDevices:              cloneBlockedDevices(overlay.BlockedDevices),
 		E2EeRequiredAction:          requiredAction,
 	}
 }
@@ -971,16 +975,16 @@ func (a *api) conversationE2EEOverlays(
 		return nil, err
 	}
 
-	byConversation := make(map[string]map[string]domaine2ee.DeviceTrustState)
+	byConversation := make(map[string]map[string]domaine2ee.VerificationRequiredDevice)
 	for _, item := range devices {
 		deviceKey := item.AccountID + ":" + item.DeviceID
 		for _, conversationID := range item.ConversationIDs {
 			deviceSet := byConversation[conversationID]
 			if deviceSet == nil {
-				deviceSet = make(map[string]domaine2ee.DeviceTrustState)
+				deviceSet = make(map[string]domaine2ee.VerificationRequiredDevice)
 				byConversation[conversationID] = deviceSet
 			}
-			deviceSet[deviceKey] = item.TrustState
+			deviceSet[deviceKey] = item
 		}
 	}
 
@@ -990,17 +994,84 @@ func (a *api) conversationE2EEOverlays(
 			VerificationRequiredDevices: uint32(len(deviceSet)),
 			RequiredAction:              conversationv1.ConversationE2EERequiredAction_CONVERSATION_E2EE_REQUIRED_ACTION_VERIFY_DEVICES,
 		}
-		for _, trustState := range deviceSet {
-			switch trustState {
+		blockedDevices := make([]domaine2ee.VerificationRequiredDevice, 0, len(deviceSet))
+		for _, device := range deviceSet {
+			blockedDevices = append(blockedDevices, device)
+			switch device.TrustState {
 			case domaine2ee.DeviceTrustStateCompromised:
 				overlay.CompromisedDevices++
 			default:
 				overlay.UntrustedDevices++
 			}
 		}
+		slices.SortFunc(blockedDevices, func(left domaine2ee.VerificationRequiredDevice, right domaine2ee.VerificationRequiredDevice) int {
+			if left.TrustState != right.TrustState {
+				if left.TrustState == domaine2ee.DeviceTrustStateCompromised {
+					return -1
+				}
+				if right.TrustState == domaine2ee.DeviceTrustStateCompromised {
+					return 1
+				}
+			}
+			if left.AccountID != right.AccountID {
+				if left.AccountID < right.AccountID {
+					return -1
+				}
+				return 1
+			}
+			if left.DeviceID < right.DeviceID {
+				return -1
+			}
+			if left.DeviceID > right.DeviceID {
+				return 1
+			}
+			return 0
+		})
+		overlay.BlockedDevices = make([]*conversationv1.ConversationBlockedDevice, 0, len(blockedDevices))
+		for _, device := range blockedDevices {
+			trustState := deviceTrustStateProto(device.TrustState)
+			if trustState == 0 {
+				trustState = e2eeDeviceTrustStateForConversationPreview(device.TrustState)
+			}
+			overlay.BlockedDevices = append(overlay.BlockedDevices, &conversationv1.ConversationBlockedDevice{
+				UserId:         device.AccountID,
+				DeviceId:       device.DeviceID,
+				TrustState:     trustState,
+				KeyFingerprint: device.KeyFingerprint,
+			})
+		}
 		overlays[conversationID] = overlay
 	}
 	return overlays, nil
+}
+
+func cloneBlockedDevices(values []*conversationv1.ConversationBlockedDevice) []*conversationv1.ConversationBlockedDevice {
+	if len(values) == 0 {
+		return nil
+	}
+
+	cloned := make([]*conversationv1.ConversationBlockedDevice, 0, len(values))
+	for _, value := range values {
+		if value == nil {
+			continue
+		}
+		cloned = append(cloned, &conversationv1.ConversationBlockedDevice{
+			UserId:         value.UserId,
+			DeviceId:       value.DeviceId,
+			TrustState:     value.TrustState,
+			KeyFingerprint: value.KeyFingerprint,
+		})
+	}
+	return cloned
+}
+
+func e2eeDeviceTrustStateForConversationPreview(value domaine2ee.DeviceTrustState) e2eev1.DeviceTrustState {
+	switch value {
+	case domaine2ee.DeviceTrustStateCompromised:
+		return e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_COMPROMISED
+	default:
+		return e2eev1.DeviceTrustState_DEVICE_TRUST_STATE_UNTRUSTED
+	}
 }
 
 func conversationSettingsProto(settings domainconversation.ConversationSettings) *conversationv1.ConversationSettings {

@@ -8,7 +8,8 @@ package conversationv1
 
 import (
 	v1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
-	v11 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
+	v11 "github.com/dm-vev/zvonilka/gen/proto/contracts/e2ee/v1"
+	v12 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -275,6 +276,7 @@ type Conversation struct {
 	E2EeRequiredAction          ConversationE2EERequiredAction `protobuf:"varint,19,opt,name=e2ee_required_action,json=e2eeRequiredAction,proto3,enum=zvonilka.conversation.v1.ConversationE2EERequiredAction" json:"e2ee_required_action,omitempty"`
 	UntrustedDevices            uint32                         `protobuf:"varint,20,opt,name=untrusted_devices,json=untrustedDevices,proto3" json:"untrusted_devices,omitempty"`
 	CompromisedDevices          uint32                         `protobuf:"varint,21,opt,name=compromised_devices,json=compromisedDevices,proto3" json:"compromised_devices,omitempty"`
+	BlockedDevices              []*ConversationBlockedDevice   `protobuf:"bytes,22,rep,name=blocked_devices,json=blockedDevices,proto3" json:"blocked_devices,omitempty"`
 }
 
 func (x *Conversation) Reset() {
@@ -456,6 +458,84 @@ func (x *Conversation) GetCompromisedDevices() uint32 {
 	return 0
 }
 
+func (x *Conversation) GetBlockedDevices() []*ConversationBlockedDevice {
+	if x != nil {
+		return x.BlockedDevices
+	}
+	return nil
+}
+
+type ConversationBlockedDevice struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	UserId         string               `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	DeviceId       string               `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	TrustState     v11.DeviceTrustState `protobuf:"varint,3,opt,name=trust_state,json=trustState,proto3,enum=zvonilka.e2ee.v1.DeviceTrustState" json:"trust_state,omitempty"`
+	KeyFingerprint string               `protobuf:"bytes,4,opt,name=key_fingerprint,json=keyFingerprint,proto3" json:"key_fingerprint,omitempty"`
+}
+
+func (x *ConversationBlockedDevice) Reset() {
+	*x = ConversationBlockedDevice{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_conversation_v1_models_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ConversationBlockedDevice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConversationBlockedDevice) ProtoMessage() {}
+
+func (x *ConversationBlockedDevice) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_conversation_v1_models_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConversationBlockedDevice.ProtoReflect.Descriptor instead.
+func (*ConversationBlockedDevice) Descriptor() ([]byte, []int) {
+	return file_contracts_conversation_v1_models_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ConversationBlockedDevice) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ConversationBlockedDevice) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *ConversationBlockedDevice) GetTrustState() v11.DeviceTrustState {
+	if x != nil {
+		return x.TrustState
+	}
+	return v11.DeviceTrustState(0)
+}
+
+func (x *ConversationBlockedDevice) GetKeyFingerprint() string {
+	if x != nil {
+		return x.KeyFingerprint
+	}
+	return ""
+}
+
 type ConversationMember struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -463,7 +543,7 @@ type ConversationMember struct {
 
 	ConversationId  string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
 	UserId          string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Profile         *v11.UserProfile       `protobuf:"bytes,3,opt,name=profile,proto3" json:"profile,omitempty"`
+	Profile         *v12.UserProfile       `protobuf:"bytes,3,opt,name=profile,proto3" json:"profile,omitempty"`
 	Role            v1.MemberRole          `protobuf:"varint,4,opt,name=role,proto3,enum=zvonilka.common.v1.MemberRole" json:"role,omitempty"`
 	InvitedByUserId string                 `protobuf:"bytes,5,opt,name=invited_by_user_id,json=invitedByUserId,proto3" json:"invited_by_user_id,omitempty"`
 	Muted           bool                   `protobuf:"varint,6,opt,name=muted,proto3" json:"muted,omitempty"`
@@ -475,7 +555,7 @@ type ConversationMember struct {
 func (x *ConversationMember) Reset() {
 	*x = ConversationMember{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_conversation_v1_models_proto_msgTypes[2]
+		mi := &file_contracts_conversation_v1_models_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -488,7 +568,7 @@ func (x *ConversationMember) String() string {
 func (*ConversationMember) ProtoMessage() {}
 
 func (x *ConversationMember) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_conversation_v1_models_proto_msgTypes[2]
+	mi := &file_contracts_conversation_v1_models_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -501,7 +581,7 @@ func (x *ConversationMember) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConversationMember.ProtoReflect.Descriptor instead.
 func (*ConversationMember) Descriptor() ([]byte, []int) {
-	return file_contracts_conversation_v1_models_proto_rawDescGZIP(), []int{2}
+	return file_contracts_conversation_v1_models_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ConversationMember) GetConversationId() string {
@@ -518,7 +598,7 @@ func (x *ConversationMember) GetUserId() string {
 	return ""
 }
 
-func (x *ConversationMember) GetProfile() *v11.UserProfile {
+func (x *ConversationMember) GetProfile() *v12.UserProfile {
 	if x != nil {
 		return x.Profile
 	}
@@ -587,7 +667,7 @@ type Invite struct {
 func (x *Invite) Reset() {
 	*x = Invite{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_conversation_v1_models_proto_msgTypes[3]
+		mi := &file_contracts_conversation_v1_models_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -600,7 +680,7 @@ func (x *Invite) String() string {
 func (*Invite) ProtoMessage() {}
 
 func (x *Invite) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_conversation_v1_models_proto_msgTypes[3]
+	mi := &file_contracts_conversation_v1_models_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -613,7 +693,7 @@ func (x *Invite) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Invite.ProtoReflect.Descriptor instead.
 func (*Invite) Descriptor() ([]byte, []int) {
-	return file_contracts_conversation_v1_models_proto_rawDescGZIP(), []int{3}
+	return file_contracts_conversation_v1_models_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Invite) GetInviteId() string {
@@ -699,7 +779,7 @@ type Reaction struct {
 func (x *Reaction) Reset() {
 	*x = Reaction{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_conversation_v1_models_proto_msgTypes[4]
+		mi := &file_contracts_conversation_v1_models_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -712,7 +792,7 @@ func (x *Reaction) String() string {
 func (*Reaction) ProtoMessage() {}
 
 func (x *Reaction) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_conversation_v1_models_proto_msgTypes[4]
+	mi := &file_contracts_conversation_v1_models_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -725,7 +805,7 @@ func (x *Reaction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reaction.ProtoReflect.Descriptor instead.
 func (*Reaction) Descriptor() ([]byte, []int) {
-	return file_contracts_conversation_v1_models_proto_rawDescGZIP(), []int{4}
+	return file_contracts_conversation_v1_models_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Reaction) GetEmoji() string {
@@ -757,7 +837,7 @@ type Message struct {
 	MessageId      string                 `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
 	ConversationId string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
 	SenderUserId   string                 `protobuf:"bytes,3,opt,name=sender_user_id,json=senderUserId,proto3" json:"sender_user_id,omitempty"`
-	SenderProfile  *v11.UserProfile       `protobuf:"bytes,4,opt,name=sender_profile,json=senderProfile,proto3" json:"sender_profile,omitempty"`
+	SenderProfile  *v12.UserProfile       `protobuf:"bytes,4,opt,name=sender_profile,json=senderProfile,proto3" json:"sender_profile,omitempty"`
 	SenderDeviceId string                 `protobuf:"bytes,5,opt,name=sender_device_id,json=senderDeviceId,proto3" json:"sender_device_id,omitempty"`
 	Kind           v1.MessageKind         `protobuf:"varint,6,opt,name=kind,proto3,enum=zvonilka.common.v1.MessageKind" json:"kind,omitempty"`
 	Status         v1.MessageStatus       `protobuf:"varint,7,opt,name=status,proto3,enum=zvonilka.common.v1.MessageStatus" json:"status,omitempty"`
@@ -778,7 +858,7 @@ type Message struct {
 func (x *Message) Reset() {
 	*x = Message{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_conversation_v1_models_proto_msgTypes[5]
+		mi := &file_contracts_conversation_v1_models_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -791,7 +871,7 @@ func (x *Message) String() string {
 func (*Message) ProtoMessage() {}
 
 func (x *Message) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_conversation_v1_models_proto_msgTypes[5]
+	mi := &file_contracts_conversation_v1_models_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -804,7 +884,7 @@ func (x *Message) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Message.ProtoReflect.Descriptor instead.
 func (*Message) Descriptor() ([]byte, []int) {
-	return file_contracts_conversation_v1_models_proto_rawDescGZIP(), []int{5}
+	return file_contracts_conversation_v1_models_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Message) GetMessageId() string {
@@ -828,7 +908,7 @@ func (x *Message) GetSenderUserId() string {
 	return ""
 }
 
-func (x *Message) GetSenderProfile() *v11.UserProfile {
+func (x *Message) GetSenderProfile() *v12.UserProfile {
 	if x != nil {
 		return x.SenderProfile
 	}
@@ -957,7 +1037,7 @@ type Thread struct {
 func (x *Thread) Reset() {
 	*x = Thread{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_conversation_v1_models_proto_msgTypes[6]
+		mi := &file_contracts_conversation_v1_models_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -970,7 +1050,7 @@ func (x *Thread) String() string {
 func (*Thread) ProtoMessage() {}
 
 func (x *Thread) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_conversation_v1_models_proto_msgTypes[6]
+	mi := &file_contracts_conversation_v1_models_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -983,7 +1063,7 @@ func (x *Thread) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Thread.ProtoReflect.Descriptor instead.
 func (*Thread) Descriptor() ([]byte, []int) {
-	return file_contracts_conversation_v1_models_proto_rawDescGZIP(), []int{6}
+	return file_contracts_conversation_v1_models_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Thread) GetThreadId() string {
@@ -1050,7 +1130,9 @@ var file_contracts_conversation_v1_models_proto_rawDesc = []byte{
 	0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2f, 0x76, 0x31, 0x2f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65,
 	0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x1f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63,
 	0x74, 0x73, 0x2f, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2f, 0x76, 0x31, 0x2f, 0x74, 0x79, 0x70,
-	0x65, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x1f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61,
+	0x65, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x1e, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61,
+	0x63, 0x74, 0x73, 0x2f, 0x65, 0x32, 0x65, 0x65, 0x2f, 0x76, 0x31, 0x2f, 0x6d, 0x6f, 0x64, 0x65,
+	0x6c, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x1f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61,
 	0x63, 0x74, 0x73, 0x2f, 0x75, 0x73, 0x65, 0x72, 0x73, 0x2f, 0x76, 0x31, 0x2f, 0x6d, 0x6f, 0x64,
 	0x65, 0x6c, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x91, 0x05, 0x0a, 0x14, 0x43, 0x6f,
 	0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x53, 0x65, 0x74, 0x74, 0x69, 0x6e,
@@ -1093,7 +1175,7 @@ var file_contracts_conversation_v1_models_proto_rawDesc = []byte{
 	0x2e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31,
 	0x2e, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x45, 0x32, 0x45,
 	0x45, 0x54, 0x72, 0x75, 0x73, 0x74, 0x50, 0x6f, 0x6c, 0x69, 0x63, 0x79, 0x52, 0x0f, 0x65, 0x32,
-	0x65, 0x65, 0x54, 0x72, 0x75, 0x73, 0x74, 0x50, 0x6f, 0x6c, 0x69, 0x63, 0x79, 0x22, 0xe5, 0x07,
+	0x65, 0x65, 0x54, 0x72, 0x75, 0x73, 0x74, 0x50, 0x6f, 0x6c, 0x69, 0x63, 0x79, 0x22, 0xc3, 0x08,
 	0x0a, 0x0c, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x27,
 	0x0a, 0x0f, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x69,
 	0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73,
@@ -1156,7 +1238,25 @@ var file_contracts_conversation_v1_models_proto_rawDesc = []byte{
 	0x69, 0x63, 0x65, 0x73, 0x12, 0x2f, 0x0a, 0x13, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x6f, 0x6d, 0x69,
 	0x73, 0x65, 0x64, 0x5f, 0x64, 0x65, 0x76, 0x69, 0x63, 0x65, 0x73, 0x18, 0x15, 0x20, 0x01, 0x28,
 	0x0d, 0x52, 0x12, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x6f, 0x6d, 0x69, 0x73, 0x65, 0x64, 0x44, 0x65,
-	0x76, 0x69, 0x63, 0x65, 0x73, 0x22, 0x8d, 0x03, 0x0a, 0x12, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72,
+	0x76, 0x69, 0x63, 0x65, 0x73, 0x12, 0x5c, 0x0a, 0x0f, 0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x65, 0x64,
+	0x5f, 0x64, 0x65, 0x76, 0x69, 0x63, 0x65, 0x73, 0x18, 0x16, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x33,
+	0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72,
+	0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72,
+	0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x65, 0x64, 0x44, 0x65, 0x76,
+	0x69, 0x63, 0x65, 0x52, 0x0e, 0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x65, 0x64, 0x44, 0x65, 0x76, 0x69,
+	0x63, 0x65, 0x73, 0x22, 0xbf, 0x01, 0x0a, 0x19, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61,
+	0x74, 0x69, 0x6f, 0x6e, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x65, 0x64, 0x44, 0x65, 0x76, 0x69, 0x63,
+	0x65, 0x12, 0x17, 0x0a, 0x07, 0x75, 0x73, 0x65, 0x72, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x06, 0x75, 0x73, 0x65, 0x72, 0x49, 0x64, 0x12, 0x1b, 0x0a, 0x09, 0x64, 0x65,
+	0x76, 0x69, 0x63, 0x65, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x64,
+	0x65, 0x76, 0x69, 0x63, 0x65, 0x49, 0x64, 0x12, 0x43, 0x0a, 0x0b, 0x74, 0x72, 0x75, 0x73, 0x74,
+	0x5f, 0x73, 0x74, 0x61, 0x74, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x22, 0x2e, 0x7a,
+	0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x65, 0x32, 0x65, 0x65, 0x2e, 0x76, 0x31, 0x2e,
+	0x44, 0x65, 0x76, 0x69, 0x63, 0x65, 0x54, 0x72, 0x75, 0x73, 0x74, 0x53, 0x74, 0x61, 0x74, 0x65,
+	0x52, 0x0a, 0x74, 0x72, 0x75, 0x73, 0x74, 0x53, 0x74, 0x61, 0x74, 0x65, 0x12, 0x27, 0x0a, 0x0f,
+	0x6b, 0x65, 0x79, 0x5f, 0x66, 0x69, 0x6e, 0x67, 0x65, 0x72, 0x70, 0x72, 0x69, 0x6e, 0x74, 0x18,
+	0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x6b, 0x65, 0x79, 0x46, 0x69, 0x6e, 0x67, 0x65, 0x72,
+	0x70, 0x72, 0x69, 0x6e, 0x74, 0x22, 0x8d, 0x03, 0x0a, 0x12, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72,
 	0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4d, 0x65, 0x6d, 0x62, 0x65, 0x72, 0x12, 0x27, 0x0a, 0x0f,
 	0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x69, 0x64, 0x18,
 	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74,
@@ -1335,62 +1435,66 @@ func file_contracts_conversation_v1_models_proto_rawDescGZIP() []byte {
 }
 
 var file_contracts_conversation_v1_models_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_contracts_conversation_v1_models_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_contracts_conversation_v1_models_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_contracts_conversation_v1_models_proto_goTypes = []interface{}{
 	(ConversationE2EERequiredAction)(0), // 0: zvonilka.conversation.v1.ConversationE2EERequiredAction
 	(ConversationE2EETrustPolicy)(0),    // 1: zvonilka.conversation.v1.ConversationE2EETrustPolicy
 	(*ConversationSettings)(nil),        // 2: zvonilka.conversation.v1.ConversationSettings
 	(*Conversation)(nil),                // 3: zvonilka.conversation.v1.Conversation
-	(*ConversationMember)(nil),          // 4: zvonilka.conversation.v1.ConversationMember
-	(*Invite)(nil),                      // 5: zvonilka.conversation.v1.Invite
-	(*Reaction)(nil),                    // 6: zvonilka.conversation.v1.Reaction
-	(*Message)(nil),                     // 7: zvonilka.conversation.v1.Message
-	(*Thread)(nil),                      // 8: zvonilka.conversation.v1.Thread
-	(*durationpb.Duration)(nil),         // 9: google.protobuf.Duration
-	(v1.ConversationKind)(0),            // 10: zvonilka.common.v1.ConversationKind
-	(*timestamppb.Timestamp)(nil),       // 11: google.protobuf.Timestamp
-	(*v11.UserProfile)(nil),             // 12: zvonilka.users.v1.UserProfile
-	(v1.MemberRole)(0),                  // 13: zvonilka.common.v1.MemberRole
-	(v1.MessageKind)(0),                 // 14: zvonilka.common.v1.MessageKind
-	(v1.MessageStatus)(0),               // 15: zvonilka.common.v1.MessageStatus
-	(*v1.EncryptedPayload)(nil),         // 16: zvonilka.common.v1.EncryptedPayload
-	(*v1.AttachmentRef)(nil),            // 17: zvonilka.common.v1.AttachmentRef
-	(*v1.MessageReference)(nil),         // 18: zvonilka.common.v1.MessageReference
+	(*ConversationBlockedDevice)(nil),   // 4: zvonilka.conversation.v1.ConversationBlockedDevice
+	(*ConversationMember)(nil),          // 5: zvonilka.conversation.v1.ConversationMember
+	(*Invite)(nil),                      // 6: zvonilka.conversation.v1.Invite
+	(*Reaction)(nil),                    // 7: zvonilka.conversation.v1.Reaction
+	(*Message)(nil),                     // 8: zvonilka.conversation.v1.Message
+	(*Thread)(nil),                      // 9: zvonilka.conversation.v1.Thread
+	(*durationpb.Duration)(nil),         // 10: google.protobuf.Duration
+	(v1.ConversationKind)(0),            // 11: zvonilka.common.v1.ConversationKind
+	(*timestamppb.Timestamp)(nil),       // 12: google.protobuf.Timestamp
+	(v11.DeviceTrustState)(0),           // 13: zvonilka.e2ee.v1.DeviceTrustState
+	(*v12.UserProfile)(nil),             // 14: zvonilka.users.v1.UserProfile
+	(v1.MemberRole)(0),                  // 15: zvonilka.common.v1.MemberRole
+	(v1.MessageKind)(0),                 // 16: zvonilka.common.v1.MessageKind
+	(v1.MessageStatus)(0),               // 17: zvonilka.common.v1.MessageStatus
+	(*v1.EncryptedPayload)(nil),         // 18: zvonilka.common.v1.EncryptedPayload
+	(*v1.AttachmentRef)(nil),            // 19: zvonilka.common.v1.AttachmentRef
+	(*v1.MessageReference)(nil),         // 20: zvonilka.common.v1.MessageReference
 }
 var file_contracts_conversation_v1_models_proto_depIdxs = []int32{
-	9,  // 0: zvonilka.conversation.v1.ConversationSettings.slow_mode_interval:type_name -> google.protobuf.Duration
+	10, // 0: zvonilka.conversation.v1.ConversationSettings.slow_mode_interval:type_name -> google.protobuf.Duration
 	1,  // 1: zvonilka.conversation.v1.ConversationSettings.e2ee_trust_policy:type_name -> zvonilka.conversation.v1.ConversationE2EETrustPolicy
-	10, // 2: zvonilka.conversation.v1.Conversation.kind:type_name -> zvonilka.common.v1.ConversationKind
+	11, // 2: zvonilka.conversation.v1.Conversation.kind:type_name -> zvonilka.common.v1.ConversationKind
 	2,  // 3: zvonilka.conversation.v1.Conversation.settings:type_name -> zvonilka.conversation.v1.ConversationSettings
-	11, // 4: zvonilka.conversation.v1.Conversation.created_at:type_name -> google.protobuf.Timestamp
-	11, // 5: zvonilka.conversation.v1.Conversation.updated_at:type_name -> google.protobuf.Timestamp
-	11, // 6: zvonilka.conversation.v1.Conversation.last_message_at:type_name -> google.protobuf.Timestamp
+	12, // 4: zvonilka.conversation.v1.Conversation.created_at:type_name -> google.protobuf.Timestamp
+	12, // 5: zvonilka.conversation.v1.Conversation.updated_at:type_name -> google.protobuf.Timestamp
+	12, // 6: zvonilka.conversation.v1.Conversation.last_message_at:type_name -> google.protobuf.Timestamp
 	0,  // 7: zvonilka.conversation.v1.Conversation.e2ee_required_action:type_name -> zvonilka.conversation.v1.ConversationE2EERequiredAction
-	12, // 8: zvonilka.conversation.v1.ConversationMember.profile:type_name -> zvonilka.users.v1.UserProfile
-	13, // 9: zvonilka.conversation.v1.ConversationMember.role:type_name -> zvonilka.common.v1.MemberRole
-	11, // 10: zvonilka.conversation.v1.ConversationMember.joined_at:type_name -> google.protobuf.Timestamp
-	11, // 11: zvonilka.conversation.v1.ConversationMember.left_at:type_name -> google.protobuf.Timestamp
-	13, // 12: zvonilka.conversation.v1.Invite.allowed_roles:type_name -> zvonilka.common.v1.MemberRole
-	11, // 13: zvonilka.conversation.v1.Invite.expires_at:type_name -> google.protobuf.Timestamp
-	11, // 14: zvonilka.conversation.v1.Invite.revoked_at:type_name -> google.protobuf.Timestamp
-	11, // 15: zvonilka.conversation.v1.Reaction.created_at:type_name -> google.protobuf.Timestamp
-	12, // 16: zvonilka.conversation.v1.Message.sender_profile:type_name -> zvonilka.users.v1.UserProfile
-	14, // 17: zvonilka.conversation.v1.Message.kind:type_name -> zvonilka.common.v1.MessageKind
-	15, // 18: zvonilka.conversation.v1.Message.status:type_name -> zvonilka.common.v1.MessageStatus
-	16, // 19: zvonilka.conversation.v1.Message.payload:type_name -> zvonilka.common.v1.EncryptedPayload
-	17, // 20: zvonilka.conversation.v1.Message.attachments:type_name -> zvonilka.common.v1.AttachmentRef
-	18, // 21: zvonilka.conversation.v1.Message.reply_to:type_name -> zvonilka.common.v1.MessageReference
-	6,  // 22: zvonilka.conversation.v1.Message.reactions:type_name -> zvonilka.conversation.v1.Reaction
-	11, // 23: zvonilka.conversation.v1.Message.created_at:type_name -> google.protobuf.Timestamp
-	11, // 24: zvonilka.conversation.v1.Message.edited_at:type_name -> google.protobuf.Timestamp
-	11, // 25: zvonilka.conversation.v1.Message.deleted_at:type_name -> google.protobuf.Timestamp
-	11, // 26: zvonilka.conversation.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
-	11, // 27: zvonilka.conversation.v1.Thread.updated_at:type_name -> google.protobuf.Timestamp
-	28, // [28:28] is the sub-list for method output_type
-	28, // [28:28] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	4,  // 8: zvonilka.conversation.v1.Conversation.blocked_devices:type_name -> zvonilka.conversation.v1.ConversationBlockedDevice
+	13, // 9: zvonilka.conversation.v1.ConversationBlockedDevice.trust_state:type_name -> zvonilka.e2ee.v1.DeviceTrustState
+	14, // 10: zvonilka.conversation.v1.ConversationMember.profile:type_name -> zvonilka.users.v1.UserProfile
+	15, // 11: zvonilka.conversation.v1.ConversationMember.role:type_name -> zvonilka.common.v1.MemberRole
+	12, // 12: zvonilka.conversation.v1.ConversationMember.joined_at:type_name -> google.protobuf.Timestamp
+	12, // 13: zvonilka.conversation.v1.ConversationMember.left_at:type_name -> google.protobuf.Timestamp
+	15, // 14: zvonilka.conversation.v1.Invite.allowed_roles:type_name -> zvonilka.common.v1.MemberRole
+	12, // 15: zvonilka.conversation.v1.Invite.expires_at:type_name -> google.protobuf.Timestamp
+	12, // 16: zvonilka.conversation.v1.Invite.revoked_at:type_name -> google.protobuf.Timestamp
+	12, // 17: zvonilka.conversation.v1.Reaction.created_at:type_name -> google.protobuf.Timestamp
+	14, // 18: zvonilka.conversation.v1.Message.sender_profile:type_name -> zvonilka.users.v1.UserProfile
+	16, // 19: zvonilka.conversation.v1.Message.kind:type_name -> zvonilka.common.v1.MessageKind
+	17, // 20: zvonilka.conversation.v1.Message.status:type_name -> zvonilka.common.v1.MessageStatus
+	18, // 21: zvonilka.conversation.v1.Message.payload:type_name -> zvonilka.common.v1.EncryptedPayload
+	19, // 22: zvonilka.conversation.v1.Message.attachments:type_name -> zvonilka.common.v1.AttachmentRef
+	20, // 23: zvonilka.conversation.v1.Message.reply_to:type_name -> zvonilka.common.v1.MessageReference
+	7,  // 24: zvonilka.conversation.v1.Message.reactions:type_name -> zvonilka.conversation.v1.Reaction
+	12, // 25: zvonilka.conversation.v1.Message.created_at:type_name -> google.protobuf.Timestamp
+	12, // 26: zvonilka.conversation.v1.Message.edited_at:type_name -> google.protobuf.Timestamp
+	12, // 27: zvonilka.conversation.v1.Message.deleted_at:type_name -> google.protobuf.Timestamp
+	12, // 28: zvonilka.conversation.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
+	12, // 29: zvonilka.conversation.v1.Thread.updated_at:type_name -> google.protobuf.Timestamp
+	30, // [30:30] is the sub-list for method output_type
+	30, // [30:30] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_contracts_conversation_v1_models_proto_init() }
@@ -1424,7 +1528,7 @@ func file_contracts_conversation_v1_models_proto_init() {
 			}
 		}
 		file_contracts_conversation_v1_models_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ConversationMember); i {
+			switch v := v.(*ConversationBlockedDevice); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1436,7 +1540,7 @@ func file_contracts_conversation_v1_models_proto_init() {
 			}
 		}
 		file_contracts_conversation_v1_models_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Invite); i {
+			switch v := v.(*ConversationMember); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1448,7 +1552,7 @@ func file_contracts_conversation_v1_models_proto_init() {
 			}
 		}
 		file_contracts_conversation_v1_models_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Reaction); i {
+			switch v := v.(*Invite); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1460,7 +1564,7 @@ func file_contracts_conversation_v1_models_proto_init() {
 			}
 		}
 		file_contracts_conversation_v1_models_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Message); i {
+			switch v := v.(*Reaction); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1472,6 +1576,18 @@ func file_contracts_conversation_v1_models_proto_init() {
 			}
 		}
 		file_contracts_conversation_v1_models_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Message); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_conversation_v1_models_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Thread); i {
 			case 0:
 				return &v.state
@@ -1490,7 +1606,7 @@ func file_contracts_conversation_v1_models_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_contracts_conversation_v1_models_proto_rawDesc,
 			NumEnums:      2,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -6,6 +6,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "contracts/common/v1/messages.proto";
 import "contracts/common/v1/types.proto";
+import "contracts/e2ee/v1/models.proto";
 import "contracts/users/v1/models.proto";
 
 option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1;conversationv1";
@@ -46,6 +47,7 @@ message Conversation {
   ConversationE2EERequiredAction e2ee_required_action = 19;
   uint32 untrusted_devices = 20;
   uint32 compromised_devices = 21;
+  repeated ConversationBlockedDevice blocked_devices = 22;
 }
 
 enum ConversationE2EERequiredAction {
@@ -58,6 +60,13 @@ enum ConversationE2EETrustPolicy {
   CONVERSATION_E2EE_TRUST_POLICY_UNSPECIFIED = 0;
   CONVERSATION_E2EE_TRUST_POLICY_ALLOW_UNTRUSTED = 1;
   CONVERSATION_E2EE_TRUST_POLICY_TRUSTED_ONLY = 2;
+}
+
+message ConversationBlockedDevice {
+  string user_id = 1;
+  string device_id = 2;
+  zvonilka.e2ee.v1.DeviceTrustState trust_state = 3;
+  string key_fingerprint = 4;
 }
 
 message ConversationMember {
