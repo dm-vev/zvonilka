@@ -16,20 +16,9 @@ import (
 	"github.com/dm-vev/zvonilka/internal/domain/media"
 )
 
-const (
-	defaultExecutorPollInterval = 2 * time.Second
-	defaultExecutorBatchSize    = 100
-)
-
 // MediaUploader persists generated recording/transcription artifacts.
 type MediaUploader interface {
 	Upload(ctx context.Context, params media.UploadParams) (media.MediaAsset, error)
-}
-
-// ExecutorSettings control background job execution cadence.
-type ExecutorSettings struct {
-	PollInterval time.Duration
-	BatchSize    int
 }
 
 // Executor consumes persisted callhook jobs and materializes media artifacts.
@@ -56,17 +45,11 @@ func NewExecutor(store Store, uploader MediaUploader, settings ExecutorSettings)
 	if store == nil || uploader == nil {
 		return nil, ErrInvalidInput
 	}
-	if settings.PollInterval <= 0 {
-		settings.PollInterval = defaultExecutorPollInterval
-	}
-	if settings.BatchSize <= 0 {
-		settings.BatchSize = defaultExecutorBatchSize
-	}
 
 	return &Executor{
 		store:    store,
 		uploader: uploader,
-		settings: settings,
+		settings: settings.normalize(),
 		now:      func() time.Time { return time.Now().UTC() },
 	}, nil
 }
@@ -102,29 +85,41 @@ func (e *Executor) ProcessOnceForTests(ctx context.Context) error {
 }
 
 func (e *Executor) processOnce(ctx context.Context) error {
+	var result error
 	if err := e.processRecordingJobs(ctx); err != nil {
-		return err
+		result = errors.Join(result, err)
 	}
 	if err := e.processTranscriptionJobs(ctx); err != nil {
-		return err
+		result = errors.Join(result, err)
 	}
 
-	return nil
+	return result
 }
 
 func (e *Executor) processRecordingJobs(ctx context.Context) error {
-	jobs, err := e.store.PendingRecordingJobs(ctx, e.settings.BatchSize)
+	leaseToken, err := newID("recording")
 	if err != nil {
-		return fmt.Errorf("load pending recording jobs: %w", err)
+		return fmt.Errorf("generate recording lease token: %w", err)
 	}
 
+	jobs, err := e.store.ClaimPendingRecordingJobs(ctx, ClaimJobsParams{
+		Before:        e.currentTime(),
+		Limit:         e.settings.BatchSize,
+		LeaseToken:    leaseToken,
+		LeaseDuration: e.settings.LeaseTTL,
+	})
+	if err != nil {
+		return fmt.Errorf("claim pending recording jobs: %w", err)
+	}
+
+	var result error
 	for _, job := range jobs {
 		if err := e.processRecordingJob(ctx, job); err != nil {
-			return err
+			result = errors.Join(result, err)
 		}
 	}
 
-	return nil
+	return result
 }
 
 func (e *Executor) processRecordingJob(ctx context.Context, job RecordingJob) error {
@@ -163,31 +158,73 @@ func (e *Executor) processRecordingJob(ctx context.Context, job RecordingJob) er
 		CreatedAt: now,
 	})
 	if err != nil {
-		return fmt.Errorf("upload recording artifact %s: %w", job.CallID, err)
+		return e.retryRecordingJob(ctx, job, now, fmt.Errorf("upload recording artifact %s: %w", job.CallID, err))
 	}
 
-	job.OutputMediaID = asset.ID
-	job.UpdatedAt = now
-	if _, err := e.store.SaveRecordingJob(ctx, job); err != nil {
-		return fmt.Errorf("save recording artifact state %s: %w", job.CallID, err)
+	if _, err := e.store.CompleteRecordingJob(ctx, CompleteRecordingJobParams{
+		CallID:        job.CallID,
+		LeaseToken:    job.LeaseToken,
+		OutputMediaID: asset.ID,
+		CompletedAt:   now,
+	}); err != nil {
+		if errors.Is(err, ErrConflict) {
+			return nil
+		}
+
+		return fmt.Errorf("complete recording job %s: %w", job.CallID, err)
 	}
 
 	return nil
 }
 
-func (e *Executor) processTranscriptionJobs(ctx context.Context) error {
-	jobs, err := e.store.PendingTranscriptionJobs(ctx, e.settings.BatchSize)
+func (e *Executor) retryRecordingJob(
+	ctx context.Context,
+	job RecordingJob,
+	attemptedAt time.Time,
+	cause error,
+) error {
+	_, err := e.store.RetryRecordingJob(ctx, RetryJobParams{
+		CallID:      job.CallID,
+		LeaseToken:  job.LeaseToken,
+		LastError:   cause.Error(),
+		AttemptedAt: attemptedAt,
+		RetryAt:     attemptedAt.Add(e.retryDelay(job.Attempts + 1)),
+	})
 	if err != nil {
-		return fmt.Errorf("load pending transcription jobs: %w", err)
+		if errors.Is(err, ErrConflict) {
+			return nil
+		}
+
+		return fmt.Errorf("retry recording job %s: %w", job.CallID, err)
 	}
 
+	return cause
+}
+
+func (e *Executor) processTranscriptionJobs(ctx context.Context) error {
+	leaseToken, err := newID("transcription")
+	if err != nil {
+		return fmt.Errorf("generate transcription lease token: %w", err)
+	}
+
+	jobs, err := e.store.ClaimPendingTranscriptionJobs(ctx, ClaimJobsParams{
+		Before:        e.currentTime(),
+		Limit:         e.settings.BatchSize,
+		LeaseToken:    leaseToken,
+		LeaseDuration: e.settings.LeaseTTL,
+	})
+	if err != nil {
+		return fmt.Errorf("claim pending transcription jobs: %w", err)
+	}
+
+	var result error
 	for _, job := range jobs {
 		if err := e.processTranscriptionJob(ctx, job); err != nil {
-			return err
+			result = errors.Join(result, err)
 		}
 	}
 
-	return nil
+	return result
 }
 
 func (e *Executor) processTranscriptionJob(ctx context.Context, job TranscriptionJob) error {
@@ -213,16 +250,70 @@ func (e *Executor) processTranscriptionJob(ctx context.Context, job Transcriptio
 		CreatedAt: now,
 	})
 	if err != nil {
-		return fmt.Errorf("upload transcription artifact %s: %w", job.CallID, err)
+		return e.retryTranscriptionJob(ctx, job, now, fmt.Errorf("upload transcription artifact %s: %w", job.CallID, err))
 	}
 
-	job.TranscriptMediaID = asset.ID
-	job.UpdatedAt = now
-	if _, err := e.store.SaveTranscriptionJob(ctx, job); err != nil {
-		return fmt.Errorf("save transcription artifact state %s: %w", job.CallID, err)
+	if _, err := e.store.CompleteTranscriptionJob(ctx, CompleteTranscriptionJobParams{
+		CallID:            job.CallID,
+		LeaseToken:        job.LeaseToken,
+		TranscriptMediaID: asset.ID,
+		CompletedAt:       now,
+	}); err != nil {
+		if errors.Is(err, ErrConflict) {
+			return nil
+		}
+
+		return fmt.Errorf("complete transcription job %s: %w", job.CallID, err)
 	}
 
 	return nil
+}
+
+func (e *Executor) retryTranscriptionJob(
+	ctx context.Context,
+	job TranscriptionJob,
+	attemptedAt time.Time,
+	cause error,
+) error {
+	_, err := e.store.RetryTranscriptionJob(ctx, RetryJobParams{
+		CallID:      job.CallID,
+		LeaseToken:  job.LeaseToken,
+		LastError:   cause.Error(),
+		AttemptedAt: attemptedAt,
+		RetryAt:     attemptedAt.Add(e.retryDelay(job.Attempts + 1)),
+	})
+	if err != nil {
+		if errors.Is(err, ErrConflict) {
+			return nil
+		}
+
+		return fmt.Errorf("retry transcription job %s: %w", job.CallID, err)
+	}
+
+	return cause
+}
+
+func (e *Executor) retryDelay(attempt int) time.Duration {
+	delay := e.settings.RetryInitialBackoff
+	if attempt <= 1 {
+		return delay
+	}
+
+	for i := 1; i < attempt; i++ {
+		if delay >= e.settings.RetryMaxBackoff {
+			return e.settings.RetryMaxBackoff
+		}
+		if delay > e.settings.RetryMaxBackoff/2 {
+			return e.settings.RetryMaxBackoff
+		}
+		delay *= 2
+	}
+
+	if delay > e.settings.RetryMaxBackoff {
+		return e.settings.RetryMaxBackoff
+	}
+
+	return delay
 }
 
 func (e *Executor) currentTime() time.Time {
@@ -248,7 +339,10 @@ func validateRecordingJob(job RecordingJob) error {
 	if strings.TrimSpace(job.OwnerAccountID) == "" || strings.TrimSpace(job.ConversationID) == "" {
 		return ErrInvalidInput
 	}
-	if strings.TrimSpace(job.CallID) == "" || job.StoppedAt.IsZero() || job.State != domaincall.RecordingStateInactive || strings.TrimSpace(job.OutputMediaID) != "" {
+	if strings.TrimSpace(job.CallID) == "" || strings.TrimSpace(job.LeaseToken) == "" {
+		return ErrInvalidInput
+	}
+	if job.StoppedAt.IsZero() || job.State != domaincall.RecordingStateInactive || strings.TrimSpace(job.OutputMediaID) != "" {
 		return ErrInvalidInput
 	}
 
@@ -259,7 +353,10 @@ func validateTranscriptionJob(job TranscriptionJob) error {
 	if strings.TrimSpace(job.OwnerAccountID) == "" || strings.TrimSpace(job.ConversationID) == "" {
 		return ErrInvalidInput
 	}
-	if strings.TrimSpace(job.CallID) == "" || job.StoppedAt.IsZero() || job.State != domaincall.TranscriptionStateInactive || strings.TrimSpace(job.TranscriptMediaID) != "" {
+	if strings.TrimSpace(job.CallID) == "" || strings.TrimSpace(job.LeaseToken) == "" {
+		return ErrInvalidInput
+	}
+	if job.StoppedAt.IsZero() || job.State != domaincall.TranscriptionStateInactive || strings.TrimSpace(job.TranscriptMediaID) != "" {
 		return ErrInvalidInput
 	}
 

@@ -262,6 +262,28 @@ func (s *Service) PushTokensByAccountID(ctx context.Context, accountID string) (
 	return tokens, nil
 }
 
+// PushTokenByID resolves one active push token by ID.
+func (s *Service) PushTokenByID(ctx context.Context, tokenID string) (PushToken, error) {
+	if err := s.validateContext(ctx, "load push token"); err != nil {
+		return PushToken{}, err
+	}
+
+	tokenID = strings.TrimSpace(tokenID)
+	if tokenID == "" {
+		return PushToken{}, ErrInvalidInput
+	}
+
+	token, err := s.store.PushTokenByID(ctx, tokenID)
+	if err != nil {
+		return PushToken{}, fmt.Errorf("load push token %s: %w", tokenID, err)
+	}
+	if !token.Enabled || !token.RevokedAt.IsZero() {
+		return PushToken{}, ErrNotFound
+	}
+
+	return token, nil
+}
+
 // RevokePushToken revokes a push token by ID.
 func (s *Service) RevokePushToken(ctx context.Context, params RevokePushTokenParams) (PushToken, error) {
 	if err := s.validateContext(ctx, "revoke push token"); err != nil {
@@ -327,11 +349,7 @@ func (s *Service) QueueDelivery(ctx context.Context, params QueueDeliveryParams)
 		delivery.NextAttemptAt = delivery.CreatedAt
 	}
 	if delivery.ID == "" {
-		deliveryID, idErr := newID("del")
-		if idErr != nil {
-			return Delivery{}, fmt.Errorf("generate delivery id: %w", idErr)
-		}
-		delivery.ID = deliveryID
+		delivery.ID = delivery.DedupKey
 	}
 
 	delivery, err := delivery.normalize(now)
@@ -347,6 +365,88 @@ func (s *Service) QueueDelivery(ctx context.Context, params QueueDeliveryParams)
 	return saved, nil
 }
 
+// ClaimDeliveries acquires a lease on queued deliveries that are ready for execution.
+func (s *Service) ClaimDeliveries(ctx context.Context, params ClaimDeliveriesParams) ([]Delivery, error) {
+	if err := s.validateContext(ctx, "claim deliveries"); err != nil {
+		return nil, err
+	}
+	if params.Limit <= 0 {
+		return nil, nil
+	}
+
+	now := s.currentTime()
+	if params.Before.IsZero() {
+		params.Before = now
+	}
+	if params.LeaseDuration <= 0 {
+		params.LeaseDuration = s.settings.DeliveryLeaseTTL
+	}
+	if params.LeaseDuration <= 0 {
+		return nil, ErrInvalidInput
+	}
+	if strings.TrimSpace(params.LeaseToken) == "" {
+		leaseToken, err := newID("lease")
+		if err != nil {
+			return nil, fmt.Errorf("generate delivery lease token: %w", err)
+		}
+		params.LeaseToken = leaseToken
+	}
+
+	deliveries, err := s.store.ClaimDeliveries(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("claim deliveries: %w", err)
+	}
+
+	return deliveries, nil
+}
+
+// MarkDeliveryDelivered records a successful delivery attempt.
+func (s *Service) MarkDeliveryDelivered(ctx context.Context, params MarkDeliveryDeliveredParams) (Delivery, error) {
+	if err := s.validateContext(ctx, "mark delivery delivered"); err != nil {
+		return Delivery{}, err
+	}
+
+	params.DeliveryID = strings.TrimSpace(params.DeliveryID)
+	params.LeaseToken = strings.TrimSpace(params.LeaseToken)
+	if params.DeliveryID == "" || params.LeaseToken == "" {
+		return Delivery{}, ErrInvalidInput
+	}
+	if params.DeliveredAt.IsZero() {
+		params.DeliveredAt = s.currentTime()
+	}
+
+	delivery, err := s.store.MarkDeliveryDelivered(ctx, params)
+	if err != nil {
+		return Delivery{}, fmt.Errorf("mark delivery %s delivered: %w", params.DeliveryID, err)
+	}
+
+	return delivery, nil
+}
+
+// FailDelivery records a terminal delivery failure.
+func (s *Service) FailDelivery(ctx context.Context, params FailDeliveryParams) (Delivery, error) {
+	if err := s.validateContext(ctx, "fail delivery"); err != nil {
+		return Delivery{}, err
+	}
+
+	params.DeliveryID = strings.TrimSpace(params.DeliveryID)
+	params.LeaseToken = strings.TrimSpace(params.LeaseToken)
+	params.LastError = strings.TrimSpace(params.LastError)
+	if params.DeliveryID == "" || params.LeaseToken == "" || params.LastError == "" {
+		return Delivery{}, ErrInvalidInput
+	}
+	if params.FailedAt.IsZero() {
+		params.FailedAt = s.currentTime()
+	}
+
+	delivery, err := s.store.FailDelivery(ctx, params)
+	if err != nil {
+		return Delivery{}, fmt.Errorf("fail delivery %s: %w", params.DeliveryID, err)
+	}
+
+	return delivery, nil
+}
+
 // RetryDelivery schedules a retry for a delivery hint.
 func (s *Service) RetryDelivery(ctx context.Context, params RetryDeliveryParams) (Delivery, error) {
 	if err := s.validateContext(ctx, "retry delivery"); err != nil {
@@ -354,8 +454,9 @@ func (s *Service) RetryDelivery(ctx context.Context, params RetryDeliveryParams)
 	}
 
 	params.DeliveryID = strings.TrimSpace(params.DeliveryID)
+	params.LeaseToken = strings.TrimSpace(params.LeaseToken)
 	params.LastError = strings.TrimSpace(params.LastError)
-	if params.DeliveryID == "" {
+	if params.DeliveryID == "" || params.LastError == "" {
 		return Delivery{}, ErrInvalidInput
 	}
 
@@ -369,29 +470,30 @@ func (s *Service) RetryDelivery(ctx context.Context, params RetryDeliveryParams)
 		return Delivery{}, ErrConflict
 	}
 
+	retryAt := params.RetryAt
 	now := s.currentTime()
-	delivery.Attempts++
-	delivery.LastError = params.LastError
-	delivery.LastAttemptAt = now
-	delivery.UpdatedAt = now
-	if delivery.Attempts >= s.settings.MaxAttempts {
-		delivery.State = DeliveryStateFailed
-		delivery.NextAttemptAt = now
-	} else {
-		retryAt := params.RetryAt
-		if retryAt.IsZero() {
-			retryAt = now.Add(s.retryBackoff(delivery.Attempts))
-		}
-		if retryAt.Before(now) {
-			retryAt = now
-		}
-		delivery.State = DeliveryStateQueued
-		delivery.NextAttemptAt = retryAt
+	if params.AttemptedAt.IsZero() {
+		params.AttemptedAt = now
 	}
+	if retryAt.IsZero() {
+		retryAt = now.Add(s.retryBackoff(delivery.Attempts + 1))
+	}
+	if retryAt.Before(params.AttemptedAt) {
+		retryAt = params.AttemptedAt
+	}
+	params.RetryAt = retryAt
+	params.MaxAttempts = s.settings.MaxAttempts
 
-	saved, err := s.store.SaveDelivery(ctx, delivery)
+	saved, err := s.store.RetryDelivery(ctx, RetryDeliveryParams{
+		DeliveryID:  params.DeliveryID,
+		LeaseToken:  params.LeaseToken,
+		LastError:   params.LastError,
+		RetryAt:     params.RetryAt,
+		MaxAttempts: params.MaxAttempts,
+		AttemptedAt: params.AttemptedAt,
+	})
 	if err != nil {
-		return Delivery{}, fmt.Errorf("save delivery retry %s: %w", params.DeliveryID, err)
+		return Delivery{}, fmt.Errorf("retry delivery %s: %w", params.DeliveryID, err)
 	}
 
 	return saved, nil

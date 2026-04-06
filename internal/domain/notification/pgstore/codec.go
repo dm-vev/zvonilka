@@ -123,8 +123,9 @@ func scanPushToken(row rowScanner) (notification.PushToken, error) {
 
 func scanDelivery(row rowScanner) (notification.Delivery, error) {
 	var (
-		delivery      notification.Delivery
-		lastAttemptAt sql.NullTime
+		delivery       notification.Delivery
+		leaseExpiresAt sql.NullTime
+		lastAttemptAt  sql.NullTime
 	)
 
 	if err := row.Scan(
@@ -143,6 +144,8 @@ func scanDelivery(row rowScanner) (notification.Delivery, error) {
 		&delivery.Priority,
 		&delivery.Attempts,
 		&delivery.NextAttemptAt,
+		&delivery.LeaseToken,
+		&leaseExpiresAt,
 		&lastAttemptAt,
 		&delivery.LastError,
 		&delivery.CreatedAt,
@@ -152,6 +155,7 @@ func scanDelivery(row rowScanner) (notification.Delivery, error) {
 	}
 
 	delivery.NextAttemptAt = delivery.NextAttemptAt.UTC()
+	delivery.LeaseExpiresAt = decodeTime(leaseExpiresAt)
 	delivery.LastAttemptAt = decodeTime(lastAttemptAt)
 	delivery.CreatedAt = delivery.CreatedAt.UTC()
 	delivery.UpdatedAt = delivery.UpdatedAt.UTC()

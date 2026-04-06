@@ -173,6 +173,9 @@ func TestLoadAppliesNotificationOverrides(t *testing.T) {
 	t.Setenv("ZVONILKA_NOTIFICATION_WORKER_POLL_INTERVAL", "750ms")
 	t.Setenv("ZVONILKA_NOTIFICATION_RETRY_INITIAL_BACKOFF", "2s")
 	t.Setenv("ZVONILKA_NOTIFICATION_RETRY_MAX_BACKOFF", "30s")
+	t.Setenv("ZVONILKA_NOTIFICATION_DELIVERY_LEASE_TTL", "45s")
+	t.Setenv("ZVONILKA_NOTIFICATION_DELIVERY_WEBHOOK_URL", "https://notify.example.com/deliveries")
+	t.Setenv("ZVONILKA_NOTIFICATION_DELIVERY_WEBHOOK_TIMEOUT", "12s")
 	t.Setenv("ZVONILKA_NOTIFICATION_MAX_ATTEMPTS", "9")
 	t.Setenv("ZVONILKA_NOTIFICATION_BATCH_SIZE", "42")
 
@@ -189,6 +192,15 @@ func TestLoadAppliesNotificationOverrides(t *testing.T) {
 	}
 	if cfg.Notification.RetryMaxBackoff != 30*time.Second {
 		t.Fatalf("retry max backoff: got %s, want 30s", cfg.Notification.RetryMaxBackoff)
+	}
+	if cfg.Notification.DeliveryLeaseTTL != 45*time.Second {
+		t.Fatalf("delivery lease ttl: got %s, want 45s", cfg.Notification.DeliveryLeaseTTL)
+	}
+	if cfg.Notification.DeliveryWebhookURL != "https://notify.example.com/deliveries" {
+		t.Fatalf("delivery webhook url: got %s", cfg.Notification.DeliveryWebhookURL)
+	}
+	if cfg.Notification.DeliveryWebhookTimeout != 12*time.Second {
+		t.Fatalf("delivery webhook timeout: got %s, want 12s", cfg.Notification.DeliveryWebhookTimeout)
 	}
 	if cfg.Notification.MaxAttempts != 9 {
 		t.Fatalf("max attempts: got %d, want 9", cfg.Notification.MaxAttempts)
@@ -209,6 +221,80 @@ func TestLoadRejectsInvalidNotificationRetryWindow(t *testing.T) {
 		t.Fatal("expected load to fail")
 	}
 	if !strings.Contains(err.Error(), "notification retry max backoff must be greater than or equal to the initial backoff") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadRejectsInvalidNotificationWebhookURL(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_NOTIFICATION_DELIVERY_WEBHOOK_URL", "://bad")
+
+	_, err := Load("notificationworker")
+	if err == nil {
+		t.Fatal("expected load to fail")
+	}
+	if !strings.Contains(err.Error(), "notification delivery webhook url must be absolute") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadAppliesCallHookOverrides(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_CALL_HOOK_SECRET", "shared-secret")
+	t.Setenv("ZVONILKA_CALL_HOOK_MAX_BODY_BYTES", "2048")
+	t.Setenv("ZVONILKA_CALL_HOOK_LEASE_TTL", "45s")
+	t.Setenv("ZVONILKA_CALL_HOOK_RETRY_INITIAL_BACKOFF", "3s")
+	t.Setenv("ZVONILKA_CALL_HOOK_RETRY_MAX_BACKOFF", "90s")
+
+	cfg, err := Load("callhooks")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.Call.HookSecret != "shared-secret" {
+		t.Fatalf("hook secret: got %s", cfg.Call.HookSecret)
+	}
+	if cfg.Call.HookMaxBodyBytes != 2048 {
+		t.Fatalf("hook max body bytes: got %d, want 2048", cfg.Call.HookMaxBodyBytes)
+	}
+	if cfg.Call.HookLeaseTTL != 45*time.Second {
+		t.Fatalf("hook lease ttl: got %s, want 45s", cfg.Call.HookLeaseTTL)
+	}
+	if cfg.Call.HookRetryInitialBackoff != 3*time.Second {
+		t.Fatalf("hook retry initial backoff: got %s, want 3s", cfg.Call.HookRetryInitialBackoff)
+	}
+	if cfg.Call.HookRetryMaxBackoff != 90*time.Second {
+		t.Fatalf("hook retry max backoff: got %s, want 90s", cfg.Call.HookRetryMaxBackoff)
+	}
+}
+
+func TestLoadRejectsInvalidCallHookRetryWindow(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_CALL_HOOK_RETRY_INITIAL_BACKOFF", "10s")
+	t.Setenv("ZVONILKA_CALL_HOOK_RETRY_MAX_BACKOFF", "5s")
+
+	_, err := Load("callhooks")
+	if err == nil {
+		t.Fatal("expected load to fail")
+	}
+	if !strings.Contains(err.Error(), "call hook retry max backoff must be greater than or equal to the initial backoff") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadRejectsInvalidCallHookURL(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_CALL_RECORDING_HOOK_URL", "://bad")
+
+	_, err := Load("callworker")
+	if err == nil {
+		t.Fatal("expected load to fail")
+	}
+	if !strings.Contains(err.Error(), "call recording hook url must be absolute") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -742,11 +828,17 @@ func resetConfigEnv(t *testing.T) {
 		"ZVONILKA_NOTIFICATION_WORKER_POLL_INTERVAL",
 		"ZVONILKA_NOTIFICATION_RETRY_INITIAL_BACKOFF",
 		"ZVONILKA_NOTIFICATION_RETRY_MAX_BACKOFF",
+		"ZVONILKA_NOTIFICATION_DELIVERY_LEASE_TTL",
+		"ZVONILKA_NOTIFICATION_DELIVERY_WEBHOOK_URL",
+		"ZVONILKA_NOTIFICATION_DELIVERY_WEBHOOK_TIMEOUT",
 		"ZVONILKA_NOTIFICATION_MAX_ATTEMPTS",
 		"ZVONILKA_NOTIFICATION_BATCH_SIZE",
 		"ZVONILKA_NOTIFICATIONWORKER_NOTIFICATION_WORKER_POLL_INTERVAL",
 		"ZVONILKA_NOTIFICATIONWORKER_NOTIFICATION_RETRY_INITIAL_BACKOFF",
 		"ZVONILKA_NOTIFICATIONWORKER_NOTIFICATION_RETRY_MAX_BACKOFF",
+		"ZVONILKA_NOTIFICATIONWORKER_NOTIFICATION_DELIVERY_LEASE_TTL",
+		"ZVONILKA_NOTIFICATIONWORKER_NOTIFICATION_DELIVERY_WEBHOOK_URL",
+		"ZVONILKA_NOTIFICATIONWORKER_NOTIFICATION_DELIVERY_WEBHOOK_TIMEOUT",
 		"ZVONILKA_NOTIFICATIONWORKER_NOTIFICATION_MAX_ATTEMPTS",
 		"ZVONILKA_NOTIFICATIONWORKER_NOTIFICATION_BATCH_SIZE",
 		"ZVONILKA_CONTROLPLANE_STORAGE_PRIMARY_PROVIDER",

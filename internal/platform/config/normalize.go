@@ -20,6 +20,9 @@ func (c *Configuration) normalize() {
 
 	c.Runtime.HTTP.Address = strings.TrimSpace(c.Runtime.HTTP.Address)
 	c.Runtime.GRPC.Address = strings.TrimSpace(c.Runtime.GRPC.Address)
+	c.Call.RecordingHookURL = strings.TrimSpace(c.Call.RecordingHookURL)
+	c.Call.TranscriptionHookURL = strings.TrimSpace(c.Call.TranscriptionHookURL)
+	c.Call.HookSecret = strings.TrimSpace(c.Call.HookSecret)
 	c.RTC.PublicEndpoint = strings.TrimSpace(c.RTC.PublicEndpoint)
 	c.RTC.CandidateHost = strings.TrimSpace(c.RTC.CandidateHost)
 	c.RTC.TURNSecret = strings.TrimSpace(c.RTC.TURNSecret)

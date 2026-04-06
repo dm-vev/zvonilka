@@ -7,6 +7,7 @@ type Settings struct {
 	WorkerPollInterval  time.Duration
 	RetryInitialBackoff time.Duration
 	RetryMaxBackoff     time.Duration
+	DeliveryLeaseTTL    time.Duration
 	MaxAttempts         int
 	BatchSize           int
 }
@@ -17,6 +18,7 @@ func DefaultSettings() Settings {
 		WorkerPollInterval:  2 * time.Second,
 		RetryInitialBackoff: 10 * time.Second,
 		RetryMaxBackoff:     5 * time.Minute,
+		DeliveryLeaseTTL:    30 * time.Second,
 		MaxAttempts:         5,
 		BatchSize:           200,
 	}
@@ -35,6 +37,9 @@ func (s Settings) normalize() Settings {
 	}
 	if s.RetryMaxBackoff < s.RetryInitialBackoff {
 		s.RetryMaxBackoff = s.RetryInitialBackoff
+	}
+	if s.DeliveryLeaseTTL <= 0 {
+		s.DeliveryLeaseTTL = defaults.DeliveryLeaseTTL
 	}
 	if s.MaxAttempts <= 0 {
 		s.MaxAttempts = defaults.MaxAttempts

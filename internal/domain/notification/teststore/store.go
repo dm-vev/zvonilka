@@ -260,23 +260,139 @@ func (s *memoryStore) DeliveriesDue(_ context.Context, before time.Time, limit i
 		if delivery.NextAttemptAt.After(before) {
 			continue
 		}
+		if !delivery.LeaseExpiresAt.IsZero() && delivery.LeaseExpiresAt.After(before) {
+			continue
+		}
 		deliveries = append(deliveries, cloneDelivery(delivery))
 	}
 
 	sort.Slice(deliveries, func(i, j int) bool {
-		if deliveries[i].NextAttemptAt.Equal(deliveries[j].NextAttemptAt) {
-			if deliveries[i].CreatedAt.Equal(deliveries[j].CreatedAt) {
-				return deliveries[i].ID < deliveries[j].ID
+		if deliveries[i].Priority == deliveries[j].Priority {
+			if deliveries[i].NextAttemptAt.Equal(deliveries[j].NextAttemptAt) {
+				if deliveries[i].CreatedAt.Equal(deliveries[j].CreatedAt) {
+					return deliveries[i].ID < deliveries[j].ID
+				}
+				return deliveries[i].CreatedAt.Before(deliveries[j].CreatedAt)
 			}
-			return deliveries[i].CreatedAt.Before(deliveries[j].CreatedAt)
+			return deliveries[i].NextAttemptAt.Before(deliveries[j].NextAttemptAt)
 		}
-		return deliveries[i].NextAttemptAt.Before(deliveries[j].NextAttemptAt)
+		return deliveries[i].Priority > deliveries[j].Priority
 	})
 	if len(deliveries) > limit {
 		deliveries = deliveries[:limit]
 	}
 
 	return deliveries, nil
+}
+
+func (s *memoryStore) ClaimDeliveries(_ context.Context, params notification.ClaimDeliveriesParams) ([]notification.Delivery, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if params.Limit <= 0 {
+		return nil, nil
+	}
+
+	claimTime := params.Before.UTC()
+	if claimTime.IsZero() {
+		claimTime = time.Now().UTC()
+	}
+	leaseToken := params.LeaseToken
+	if leaseToken == "" || params.LeaseDuration <= 0 {
+		return nil, notification.ErrInvalidInput
+	}
+
+	deliveries := make([]notification.Delivery, 0)
+	for _, delivery := range s.deliveriesByID {
+		if delivery.State != notification.DeliveryStateQueued {
+			continue
+		}
+		if delivery.NextAttemptAt.After(claimTime) {
+			continue
+		}
+		if !delivery.LeaseExpiresAt.IsZero() && delivery.LeaseExpiresAt.After(claimTime) {
+			continue
+		}
+		deliveries = append(deliveries, cloneDelivery(delivery))
+	}
+
+	sort.Slice(deliveries, func(i, j int) bool {
+		if deliveries[i].Priority == deliveries[j].Priority {
+			if deliveries[i].NextAttemptAt.Equal(deliveries[j].NextAttemptAt) {
+				if deliveries[i].CreatedAt.Equal(deliveries[j].CreatedAt) {
+					return deliveries[i].ID < deliveries[j].ID
+				}
+				return deliveries[i].CreatedAt.Before(deliveries[j].CreatedAt)
+			}
+			return deliveries[i].NextAttemptAt.Before(deliveries[j].NextAttemptAt)
+		}
+		return deliveries[i].Priority > deliveries[j].Priority
+	})
+	if len(deliveries) > params.Limit {
+		deliveries = deliveries[:params.Limit]
+	}
+
+	claimed := make([]notification.Delivery, 0, len(deliveries))
+	for _, delivery := range deliveries {
+		stored := s.deliveriesByID[delivery.ID]
+		stored.LeaseToken = leaseToken
+		stored.LeaseExpiresAt = claimTime.Add(params.LeaseDuration)
+		stored.UpdatedAt = claimTime
+		s.deliveriesByID[stored.ID] = cloneDelivery(stored)
+		claimed = append(claimed, cloneDelivery(stored))
+	}
+
+	return claimed, nil
+}
+
+func (s *memoryStore) MarkDeliveryDelivered(_ context.Context, params notification.MarkDeliveryDeliveredParams) (notification.Delivery, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := params.DeliveredAt.UTC()
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	delivery, err := s.lockedDeliveryForLeaseAt(params.DeliveryID, params.LeaseToken, now)
+	if err != nil {
+		return notification.Delivery{}, err
+	}
+	delivery.Attempts++
+	delivery.State = notification.DeliveryStateDelivered
+	delivery.LastAttemptAt = now
+	delivery.LastError = ""
+	delivery.NextAttemptAt = now
+	delivery.LeaseToken = ""
+	delivery.LeaseExpiresAt = time.Time{}
+	delivery.UpdatedAt = now
+	s.deliveriesByID[delivery.ID] = cloneDelivery(delivery)
+
+	return cloneDelivery(delivery), nil
+}
+
+func (s *memoryStore) FailDelivery(_ context.Context, params notification.FailDeliveryParams) (notification.Delivery, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := params.FailedAt.UTC()
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	delivery, err := s.lockedDeliveryForLeaseAt(params.DeliveryID, params.LeaseToken, now)
+	if err != nil {
+		return notification.Delivery{}, err
+	}
+	delivery.Attempts++
+	delivery.State = notification.DeliveryStateFailed
+	delivery.LastAttemptAt = now
+	delivery.LastError = params.LastError
+	delivery.NextAttemptAt = now
+	delivery.LeaseToken = ""
+	delivery.LeaseExpiresAt = time.Time{}
+	delivery.UpdatedAt = now
+	s.deliveriesByID[delivery.ID] = cloneDelivery(delivery)
+
+	return cloneDelivery(delivery), nil
 }
 
 func (s *memoryStore) RetryDelivery(_ context.Context, params notification.RetryDeliveryParams) (notification.Delivery, error) {
@@ -287,15 +403,37 @@ func (s *memoryStore) RetryDelivery(_ context.Context, params notification.Retry
 	if !ok {
 		return notification.Delivery{}, notification.ErrNotFound
 	}
+	if params.LeaseToken != "" {
+		var err error
+		delivery, err = s.lockedDeliveryForLeaseAt(params.DeliveryID, params.LeaseToken, params.AttemptedAt)
+		if err != nil {
+			return notification.Delivery{}, err
+		}
+	}
+	switch delivery.State {
+	case notification.DeliveryStateDelivered, notification.DeliveryStateSuppressed:
+		return notification.Delivery{}, notification.ErrConflict
+	}
 
+	now := params.AttemptedAt.UTC()
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
 	delivery.Attempts++
 	delivery.LastError = params.LastError
-	delivery.LastAttemptAt = time.Now().UTC()
+	delivery.LastAttemptAt = now
 	delivery.NextAttemptAt = params.RetryAt
 	if delivery.NextAttemptAt.IsZero() {
 		delivery.NextAttemptAt = delivery.LastAttemptAt
 	}
-	delivery.State = notification.DeliveryStateQueued
+	if params.MaxAttempts > 0 && delivery.Attempts >= params.MaxAttempts {
+		delivery.State = notification.DeliveryStateFailed
+		delivery.NextAttemptAt = now
+	} else {
+		delivery.State = notification.DeliveryStateQueued
+	}
+	delivery.LeaseToken = ""
+	delivery.LeaseExpiresAt = time.Time{}
 	delivery.UpdatedAt = delivery.LastAttemptAt
 
 	s.deliveriesByID[delivery.ID] = cloneDelivery(delivery)
@@ -402,6 +540,38 @@ func (s *memoryStore) deletePushTokenLocked(token notification.PushToken) {
 			delete(s.pushTokenIDsByAccount, token.AccountID)
 		}
 	}
+}
+
+func (s *memoryStore) lockedDeliveryForLease(deliveryID string, leaseToken string) (notification.Delivery, error) {
+	return s.lockedDeliveryForLeaseAt(deliveryID, leaseToken, time.Time{})
+}
+
+func (s *memoryStore) lockedDeliveryForLeaseAt(
+	deliveryID string,
+	leaseToken string,
+	at time.Time,
+) (notification.Delivery, error) {
+	delivery, ok := s.deliveriesByID[deliveryID]
+	if !ok {
+		return notification.Delivery{}, notification.ErrNotFound
+	}
+	if delivery.State != notification.DeliveryStateQueued {
+		return notification.Delivery{}, notification.ErrConflict
+	}
+	if leaseToken != "" {
+		if delivery.LeaseToken != leaseToken {
+			return notification.Delivery{}, notification.ErrConflict
+		}
+		now := at.UTC()
+		if now.IsZero() {
+			now = time.Now().UTC()
+		}
+		if delivery.LeaseExpiresAt.IsZero() || delivery.LeaseExpiresAt.Before(now) {
+			return notification.Delivery{}, notification.ErrConflict
+		}
+	}
+
+	return cloneDelivery(delivery), nil
 }
 
 func overrideKey(conversationID string, accountID string) string {

@@ -2,6 +2,7 @@ package notification_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"testing"
@@ -96,6 +97,184 @@ func TestWorkerProcessesMessageCreatedEvents(t *testing.T) {
 	require.NoError(t, <-errCh)
 }
 
+func TestWorkerDispatchesClaimedDeliveries(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	now := time.Date(2026, time.March, 25, 12, 0, 0, 0, time.UTC)
+	identityStore := identitytest.NewMemoryStore()
+	seedActiveAccount(t, identityStore, "acc-1")
+
+	presenceStore := presencetest.NewMemoryStore()
+	presenceSvc, err := presence.NewService(
+		presenceStore,
+		identityStore,
+		presence.WithNow(func() time.Time { return now }),
+	)
+	require.NoError(t, err)
+
+	notificationSvc := mustNotificationService(t, notificationtest.NewMemoryStore(), identityStore, notification.WithNow(func() time.Time {
+		return now
+	}), notification.WithSettings(notification.Settings{
+		WorkerPollInterval:  time.Second,
+		RetryInitialBackoff: time.Second,
+		RetryMaxBackoff:     4 * time.Second,
+		DeliveryLeaseTTL:    30 * time.Second,
+		MaxAttempts:         3,
+		BatchSize:           10,
+	}))
+
+	queued, err := notificationSvc.QueueDelivery(ctx, notification.QueueDeliveryParams{
+		DedupKey:       "evt-1:conv-1:msg-1:acc-1::group:group",
+		EventID:        "evt-1",
+		ConversationID: "conv-1",
+		MessageID:      "msg-1",
+		AccountID:      "acc-1",
+		Kind:           notification.NotificationKindGroup,
+		Reason:         "group",
+		Mode:           notification.DeliveryModeInApp,
+		State:          notification.DeliveryStateQueued,
+		Priority:       10,
+	})
+	require.NoError(t, err)
+
+	executor := &fakeExecutor{}
+	worker, err := notification.NewWorker(
+		notificationSvc,
+		conversationtest.NewMemoryStore(),
+		presenceSvc,
+		notification.WithDeliveryExecutor(executor),
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, worker.ProcessOnceForTests(ctx))
+	require.Len(t, executor.calls, 1)
+	require.Equal(t, queued.ID, executor.calls[0].delivery.ID)
+	require.Nil(t, executor.calls[0].target.PushToken)
+
+	delivered, err := notificationSvc.DeliveryByID(ctx, queued.ID)
+	require.NoError(t, err)
+	require.Equal(t, notification.DeliveryStateDelivered, delivered.State)
+	require.Equal(t, 1, delivered.Attempts)
+}
+
+func TestWorkerRetriesTransientDispatchFailures(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	now := time.Date(2026, time.March, 25, 12, 0, 0, 0, time.UTC)
+	identityStore := identitytest.NewMemoryStore()
+	seedActiveAccount(t, identityStore, "acc-1")
+
+	presenceStore := presencetest.NewMemoryStore()
+	presenceSvc, err := presence.NewService(
+		presenceStore,
+		identityStore,
+		presence.WithNow(func() time.Time { return now }),
+	)
+	require.NoError(t, err)
+
+	notificationSvc := mustNotificationService(t, notificationtest.NewMemoryStore(), identityStore, notification.WithNow(func() time.Time {
+		return now
+	}), notification.WithSettings(notification.Settings{
+		WorkerPollInterval:  time.Second,
+		RetryInitialBackoff: time.Second,
+		RetryMaxBackoff:     4 * time.Second,
+		DeliveryLeaseTTL:    30 * time.Second,
+		MaxAttempts:         3,
+		BatchSize:           10,
+	}))
+
+	queued, err := notificationSvc.QueueDelivery(ctx, notification.QueueDeliveryParams{
+		DedupKey:       "evt-1:conv-1:msg-1:acc-1::group:group",
+		EventID:        "evt-1",
+		ConversationID: "conv-1",
+		MessageID:      "msg-1",
+		AccountID:      "acc-1",
+		Kind:           notification.NotificationKindGroup,
+		Reason:         "group",
+		Mode:           notification.DeliveryModeInApp,
+		State:          notification.DeliveryStateQueued,
+		Priority:       10,
+	})
+	require.NoError(t, err)
+
+	worker, err := notification.NewWorker(
+		notificationSvc,
+		conversationtest.NewMemoryStore(),
+		presenceSvc,
+		notification.WithDeliveryExecutor(&fakeExecutor{err: errors.New("temporary outage")}),
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, worker.ProcessOnceForTests(ctx))
+
+	retried, err := notificationSvc.DeliveryByID(ctx, queued.ID)
+	require.NoError(t, err)
+	require.Equal(t, notification.DeliveryStateQueued, retried.State)
+	require.Equal(t, 1, retried.Attempts)
+	require.True(t, retried.NextAttemptAt.Equal(now.Add(time.Second)))
+}
+
+func TestWorkerFailsPermanentDispatchFailures(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	now := time.Date(2026, time.March, 25, 12, 0, 0, 0, time.UTC)
+	identityStore := identitytest.NewMemoryStore()
+	seedActiveAccount(t, identityStore, "acc-1")
+
+	presenceStore := presencetest.NewMemoryStore()
+	presenceSvc, err := presence.NewService(
+		presenceStore,
+		identityStore,
+		presence.WithNow(func() time.Time { return now }),
+	)
+	require.NoError(t, err)
+
+	notificationSvc := mustNotificationService(t, notificationtest.NewMemoryStore(), identityStore, notification.WithNow(func() time.Time {
+		return now
+	}), notification.WithSettings(notification.Settings{
+		WorkerPollInterval:  time.Second,
+		RetryInitialBackoff: time.Second,
+		RetryMaxBackoff:     4 * time.Second,
+		DeliveryLeaseTTL:    30 * time.Second,
+		MaxAttempts:         3,
+		BatchSize:           10,
+	}))
+
+	queued, err := notificationSvc.QueueDelivery(ctx, notification.QueueDeliveryParams{
+		DedupKey:       "evt-1:conv-1:msg-1:acc-1::group:group",
+		EventID:        "evt-1",
+		ConversationID: "conv-1",
+		MessageID:      "msg-1",
+		AccountID:      "acc-1",
+		Kind:           notification.NotificationKindGroup,
+		Reason:         "group",
+		Mode:           notification.DeliveryModeInApp,
+		State:          notification.DeliveryStateQueued,
+		Priority:       10,
+	})
+	require.NoError(t, err)
+
+	worker, err := notification.NewWorker(
+		notificationSvc,
+		conversationtest.NewMemoryStore(),
+		presenceSvc,
+		notification.WithDeliveryExecutor(&fakeExecutor{
+			err: notification.PermanentDeliveryError(errors.New("bad payload")),
+		}),
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, worker.ProcessOnceForTests(ctx))
+
+	failed, err := notificationSvc.DeliveryByID(ctx, queued.ID)
+	require.NoError(t, err)
+	require.Equal(t, notification.DeliveryStateFailed, failed.State)
+	require.Equal(t, 1, failed.Attempts)
+}
+
 func seedConversationEventFixture(ctx context.Context, store conversation.Store, now time.Time) error {
 	conversationID := "conv-1"
 	senderID := "acc-sender"
@@ -167,4 +346,27 @@ func seedConversationEventFixture(ctx context.Context, store conversation.Store,
 		CreatedAt:      now,
 	})
 	return err
+}
+
+type fakeExecutor struct {
+	err   error
+	calls []executorCall
+}
+
+type executorCall struct {
+	delivery notification.Delivery
+	target   notification.DeliveryTarget
+}
+
+func (e *fakeExecutor) Deliver(
+	_ context.Context,
+	delivery notification.Delivery,
+	target notification.DeliveryTarget,
+) error {
+	e.calls = append(e.calls, executorCall{
+		delivery: delivery,
+		target:   target,
+	})
+
+	return e.err
 }

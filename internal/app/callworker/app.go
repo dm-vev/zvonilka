@@ -11,6 +11,7 @@ import (
 
 	"github.com/dm-vev/zvonilka/internal/domain/call"
 	callpg "github.com/dm-vev/zvonilka/internal/domain/call/pgstore"
+	"github.com/dm-vev/zvonilka/internal/domain/callhook"
 	"github.com/dm-vev/zvonilka/internal/platform/buildinfo"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
 	"github.com/dm-vev/zvonilka/internal/platform/runtime"
@@ -33,6 +34,7 @@ type webhookHandler struct {
 	client           *http.Client
 	recordingURL     string
 	transcriptionURL string
+	secret           string
 }
 
 type webhookEnvelope struct {
@@ -63,6 +65,7 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 		},
 		recordingURL:     cfg.Call.RecordingHookURL,
 		transcriptionURL: cfg.Call.TranscriptionHookURL,
+		secret:           cfg.Call.HookSecret,
 	}
 
 	worker, err := call.NewWorker(callStore, handler, call.WorkerSettings{
@@ -113,6 +116,9 @@ func (h *webhookHandler) post(ctx context.Context, url string, payload call.Hook
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Zvonilka-Event-ID", payload.Event.EventID)
 	req.Header.Set("X-Zvonilka-Event-Type", string(payload.Event.EventType))
+	if signature := callhook.SignPayload(h.secret, body); signature != "" {
+		req.Header.Set(callhook.SignatureHeader, signature)
+	}
 
 	resp, err := h.client.Do(req)
 	if err != nil {

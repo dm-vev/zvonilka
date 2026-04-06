@@ -115,6 +115,8 @@ type Delivery struct {
 	Priority       int
 	Attempts       int
 	NextAttemptAt  time.Time
+	LeaseToken     string
+	LeaseExpiresAt time.Time
 	LastAttemptAt  time.Time
 	LastError      string
 	CreatedAt      time.Time
@@ -235,6 +237,12 @@ func (d Delivery) normalize(now time.Time) (Delivery, error) {
 	}
 	if d.NextAttemptAt.IsZero() {
 		d.NextAttemptAt = now.UTC()
+	}
+	d.LeaseToken = strings.TrimSpace(d.LeaseToken)
+	if d.LeaseToken == "" {
+		d.LeaseExpiresAt = time.Time{}
+	} else if d.LeaseExpiresAt.IsZero() {
+		return Delivery{}, ErrInvalidInput
 	}
 	if d.CreatedAt.IsZero() {
 		d.CreatedAt = now.UTC()

@@ -215,12 +215,13 @@ func TestDeliveriesDueOrderingAndLimit(t *testing.T) {
 	limited, err := svc.DeliveriesDue(ctx, now.Add(30*time.Second), 1)
 	require.NoError(t, err)
 	require.Len(t, limited, 1)
-	require.Equal(t, first.ID, limited[0].ID)
+	require.Equal(t, "evt-2:conv-1:msg-2:acc-1::mention:mention", limited[0].ID)
 
 	all, err := svc.DeliveriesDue(ctx, now.Add(30*time.Second), 10)
 	require.NoError(t, err)
 	require.Len(t, all, 2)
-	require.Equal(t, first.ID, all[0].ID)
+	require.Equal(t, "evt-2:conv-1:msg-2:acc-1::mention:mention", all[0].ID)
+	require.Equal(t, first.ID, all[1].ID)
 }
 
 func TestQueueDeliveryRejectsPushWithoutRoutingFields(t *testing.T) {
@@ -248,6 +249,136 @@ func TestQueueDeliveryRejectsPushWithoutRoutingFields(t *testing.T) {
 		Priority:       10,
 	})
 	require.ErrorIs(t, err, notification.ErrInvalidInput)
+}
+
+func TestDeliveryClaimAndCompletionLifecycle(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	now := time.Date(2026, time.March, 25, 12, 0, 0, 0, time.UTC)
+	identityStore := identitytest.NewMemoryStore()
+	seedActiveAccount(t, identityStore, "acc-1")
+
+	svc := mustNotificationService(t, notificationtest.NewMemoryStore(), identityStore, notification.WithNow(func() time.Time {
+		return now
+	}), notification.WithSettings(notification.Settings{
+		WorkerPollInterval:  time.Second,
+		RetryInitialBackoff: time.Second,
+		RetryMaxBackoff:     4 * time.Second,
+		DeliveryLeaseTTL:    30 * time.Second,
+		MaxAttempts:         3,
+		BatchSize:           10,
+	}))
+
+	queued, err := svc.QueueDelivery(ctx, notification.QueueDeliveryParams{
+		DedupKey:       "evt-1:conv-1:msg-1:acc-1::group:group",
+		EventID:        "evt-1",
+		ConversationID: "conv-1",
+		MessageID:      "msg-1",
+		AccountID:      "acc-1",
+		Kind:           notification.NotificationKindGroup,
+		Reason:         "group",
+		Mode:           notification.DeliveryModeInApp,
+		State:          notification.DeliveryStateQueued,
+		Priority:       10,
+	})
+	require.NoError(t, err)
+	require.Equal(t, queued.DedupKey, queued.ID)
+
+	claimed, err := svc.ClaimDeliveries(ctx, notification.ClaimDeliveriesParams{
+		Before:        now,
+		Limit:         10,
+		LeaseDuration: 30 * time.Second,
+	})
+	require.NoError(t, err)
+	require.Len(t, claimed, 1)
+	require.NotEmpty(t, claimed[0].LeaseToken)
+	require.True(t, claimed[0].LeaseExpiresAt.Equal(now.Add(30*time.Second)))
+
+	due, err := svc.DeliveriesDue(ctx, now, 10)
+	require.NoError(t, err)
+	require.Empty(t, due)
+
+	delivered, err := svc.MarkDeliveryDelivered(ctx, notification.MarkDeliveryDeliveredParams{
+		DeliveryID: claimed[0].ID,
+		LeaseToken: claimed[0].LeaseToken,
+	})
+	require.NoError(t, err)
+	require.Equal(t, notification.DeliveryStateDelivered, delivered.State)
+	require.Equal(t, 1, delivered.Attempts)
+	require.True(t, delivered.LeaseExpiresAt.IsZero())
+	require.Empty(t, delivered.LeaseToken)
+}
+
+func TestDeliveryClaimFailurePaths(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	now := time.Date(2026, time.March, 25, 12, 0, 0, 0, time.UTC)
+	identityStore := identitytest.NewMemoryStore()
+	seedActiveAccount(t, identityStore, "acc-1")
+
+	svc := mustNotificationService(t, notificationtest.NewMemoryStore(), identityStore, notification.WithNow(func() time.Time {
+		return now
+	}), notification.WithSettings(notification.Settings{
+		WorkerPollInterval:  time.Second,
+		RetryInitialBackoff: time.Second,
+		RetryMaxBackoff:     4 * time.Second,
+		DeliveryLeaseTTL:    30 * time.Second,
+		MaxAttempts:         2,
+		BatchSize:           10,
+	}))
+
+	queued, err := svc.QueueDelivery(ctx, notification.QueueDeliveryParams{
+		DedupKey:       "evt-1:conv-1:msg-1:acc-1::direct:direct",
+		EventID:        "evt-1",
+		ConversationID: "conv-1",
+		MessageID:      "msg-1",
+		AccountID:      "acc-1",
+		Kind:           notification.NotificationKindDirect,
+		Reason:         "direct",
+		Mode:           notification.DeliveryModeInApp,
+		State:          notification.DeliveryStateQueued,
+		Priority:       10,
+	})
+	require.NoError(t, err)
+
+	claimed, err := svc.ClaimDeliveries(ctx, notification.ClaimDeliveriesParams{
+		Before:        now,
+		Limit:         10,
+		LeaseDuration: 30 * time.Second,
+	})
+	require.NoError(t, err)
+	require.Len(t, claimed, 1)
+
+	retried, err := svc.RetryDelivery(ctx, notification.RetryDeliveryParams{
+		DeliveryID: claimed[0].ID,
+		LeaseToken: claimed[0].LeaseToken,
+		LastError:  "temporary outage",
+	})
+	require.NoError(t, err)
+	require.Equal(t, notification.DeliveryStateQueued, retried.State)
+	require.Equal(t, 1, retried.Attempts)
+	require.True(t, retried.LeaseExpiresAt.IsZero())
+	require.True(t, retried.NextAttemptAt.Equal(now.Add(time.Second)))
+
+	reclaimed, err := svc.ClaimDeliveries(ctx, notification.ClaimDeliveriesParams{
+		Before:        now.Add(time.Second),
+		Limit:         10,
+		LeaseDuration: 30 * time.Second,
+	})
+	require.NoError(t, err)
+	require.Len(t, reclaimed, 1)
+	require.Equal(t, queued.ID, reclaimed[0].ID)
+
+	failed, err := svc.FailDelivery(ctx, notification.FailDeliveryParams{
+		DeliveryID: reclaimed[0].ID,
+		LeaseToken: reclaimed[0].LeaseToken,
+		LastError:  "permanent failure",
+	})
+	require.NoError(t, err)
+	require.Equal(t, notification.DeliveryStateFailed, failed.State)
+	require.Equal(t, 2, failed.Attempts)
 }
 
 func mustNotificationService(t *testing.T, store notification.Store, identityStore identity.Store, opts ...notification.Option) *notification.Service {

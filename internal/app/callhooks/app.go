@@ -1,11 +1,13 @@
 package callhooks
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -35,7 +37,9 @@ type bootstrapCloser interface {
 }
 
 type api struct {
-	service *callhook.Service
+	service      *callhook.Service
+	hookSecret   string
+	maxBodyBytes int64
 }
 
 type webhookEnvelope struct {
@@ -103,8 +107,11 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 		return nil, err
 	}
 	executor, err := callhook.NewExecutor(store, mediaService, callhook.ExecutorSettings{
-		PollInterval: cfg.Call.WorkerPollInterval,
-		BatchSize:    cfg.Call.WorkerBatchSize,
+		PollInterval:        cfg.Call.WorkerPollInterval,
+		BatchSize:           cfg.Call.WorkerBatchSize,
+		LeaseTTL:            cfg.Call.HookLeaseTTL,
+		RetryInitialBackoff: cfg.Call.HookRetryInitialBackoff,
+		RetryMaxBackoff:     cfg.Call.HookRetryMaxBackoff,
 	})
 	if err != nil {
 		_ = closeBootstrap(ctx, bootstrap, cfg.Runtime.ShutdownTimeout)
@@ -112,10 +119,14 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 	}
 
 	return &app{
-		bootstrap:      bootstrap,
-		executor:       executor,
-		health:         runtime.NewHealth(cfg.Service.Name, buildinfo.Version, buildinfo.Commit, buildinfo.Date),
-		handler:        (&api{service: service}).routes(),
+		bootstrap: bootstrap,
+		executor:  executor,
+		health:    runtime.NewHealth(cfg.Service.Name, buildinfo.Version, buildinfo.Commit, buildinfo.Date),
+		handler: (&api{
+			service:      service,
+			hookSecret:   cfg.Call.HookSecret,
+			maxBodyBytes: cfg.Call.HookMaxBodyBytes,
+		}).routes(),
 		cleanupTimeout: cfg.Runtime.ShutdownTimeout,
 	}, nil
 }
@@ -146,37 +157,45 @@ func (a *api) routes() http.Handler {
 }
 
 func (a *api) recording(writer http.ResponseWriter, request *http.Request) {
-	if request.Method != http.MethodPost {
-		http.Error(writer, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-		return
-	}
-	payload, err := decodePayload(request)
-	if err != nil {
-		http.Error(writer, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
-	if _, err := a.service.ApplyRecordingHook(request.Context(), payload); err != nil {
-		if errors.Is(err, callhook.ErrInvalidInput) {
-			http.Error(writer, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-			return
-		}
-		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	writer.WriteHeader(http.StatusNoContent)
+	a.handleHook(writer, request, func(ctx context.Context, payload domaincall.HookPayload) error {
+		_, err := a.service.ApplyRecordingHook(ctx, payload)
+		return err
+	})
 }
 
 func (a *api) transcription(writer http.ResponseWriter, request *http.Request) {
+	a.handleHook(writer, request, func(ctx context.Context, payload domaincall.HookPayload) error {
+		_, err := a.service.ApplyTranscriptionHook(ctx, payload)
+		return err
+	})
+}
+
+func (a *api) handleHook(
+	writer http.ResponseWriter,
+	request *http.Request,
+	apply func(context.Context, domaincall.HookPayload) error,
+) {
 	if request.Method != http.MethodPost {
 		http.Error(writer, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
-	payload, err := decodePayload(request)
+
+	body, status, err := a.readBody(writer, request)
+	if err != nil {
+		http.Error(writer, http.StatusText(status), status)
+		return
+	}
+	if !callhook.VerifySignature(a.hookSecret, body, request.Header.Get(callhook.SignatureHeader)) {
+		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	payload, err := decodePayload(body)
 	if err != nil {
 		http.Error(writer, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
-	if _, err := a.service.ApplyTranscriptionHook(request.Context(), payload); err != nil {
+	if err := apply(request.Context(), payload); err != nil {
 		if errors.Is(err, callhook.ErrInvalidInput) {
 			http.Error(writer, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
@@ -187,12 +206,38 @@ func (a *api) transcription(writer http.ResponseWriter, request *http.Request) {
 	writer.WriteHeader(http.StatusNoContent)
 }
 
-func decodePayload(request *http.Request) (domaincall.HookPayload, error) {
+func (a *api) readBody(writer http.ResponseWriter, request *http.Request) ([]byte, int, error) {
+	maxBodyBytes := a.maxBodyBytes
+	if maxBodyBytes <= 0 {
+		maxBodyBytes = 1 << 20
+	}
+
+	request.Body = http.MaxBytesReader(writer, request.Body, maxBodyBytes)
 	defer request.Body.Close()
 
+	body, err := io.ReadAll(request.Body)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			return nil, http.StatusRequestEntityTooLarge, err
+		}
+
+		return nil, http.StatusBadRequest, err
+	}
+
+	return body, http.StatusOK, nil
+}
+
+func decodePayload(body []byte) (domaincall.HookPayload, error) {
 	var envelope webhookEnvelope
-	if err := json.NewDecoder(request.Body).Decode(&envelope); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(&envelope); err != nil {
 		return domaincall.HookPayload{}, fmt.Errorf("decode call hook payload: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return domaincall.HookPayload{}, callhook.ErrInvalidInput
 	}
 
 	return domaincall.HookPayload{

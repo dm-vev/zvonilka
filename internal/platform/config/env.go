@@ -174,6 +174,31 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Call.HookTimeout = value
 	}
+	if value, ok, err := stringValueWithPresence(serviceName, "CALL_HOOK_SECRET", cfg.Call.HookSecret); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.HookSecret = value
+	}
+	if value, ok, err := intValue(serviceName, "CALL_HOOK_MAX_BODY_BYTES", int(cfg.Call.HookMaxBodyBytes)); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.HookMaxBodyBytes = int64(value)
+	}
+	if value, ok, err := durationValue(serviceName, "CALL_HOOK_LEASE_TTL", cfg.Call.HookLeaseTTL); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.HookLeaseTTL = value
+	}
+	if value, ok, err := durationValue(serviceName, "CALL_HOOK_RETRY_INITIAL_BACKOFF", cfg.Call.HookRetryInitialBackoff); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.HookRetryInitialBackoff = value
+	}
+	if value, ok, err := durationValue(serviceName, "CALL_HOOK_RETRY_MAX_BACKOFF", cfg.Call.HookRetryMaxBackoff); err != nil {
+		return err
+	} else if ok {
+		cfg.Call.HookRetryMaxBackoff = value
+	}
 	if value, ok, err := stringValueWithPresence(serviceName, "RTC_PUBLIC_ENDPOINT", cfg.RTC.PublicEndpoint); err != nil {
 		return err
 	} else if ok {
@@ -323,6 +348,21 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 		return err
 	} else if ok {
 		cfg.Notification.RetryMaxBackoff = value
+	}
+	if value, ok, err := durationValue(serviceName, "NOTIFICATION_DELIVERY_LEASE_TTL", cfg.Notification.DeliveryLeaseTTL); err != nil {
+		return err
+	} else if ok {
+		cfg.Notification.DeliveryLeaseTTL = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "NOTIFICATION_DELIVERY_WEBHOOK_URL", cfg.Notification.DeliveryWebhookURL); err != nil {
+		return err
+	} else if ok {
+		cfg.Notification.DeliveryWebhookURL = value
+	}
+	if value, ok, err := durationValue(serviceName, "NOTIFICATION_DELIVERY_WEBHOOK_TIMEOUT", cfg.Notification.DeliveryWebhookTimeout); err != nil {
+		return err
+	} else if ok {
+		cfg.Notification.DeliveryWebhookTimeout = value
 	}
 	if value, ok, err := intValue(serviceName, "NOTIFICATION_MAX_ATTEMPTS", cfg.Notification.MaxAttempts); err != nil {
 		return err

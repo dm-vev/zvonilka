@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -81,8 +82,35 @@ func (c Configuration) Validate() error {
 	if c.Call.HookTimeout <= 0 {
 		errs = append(errs, errors.New("call hook timeout must be positive"))
 	}
+	if c.Call.HookMaxBodyBytes <= 0 {
+		errs = append(errs, errors.New("call hook max body bytes must be positive"))
+	}
+	if c.Call.HookLeaseTTL <= 0 {
+		errs = append(errs, errors.New("call hook lease ttl must be positive"))
+	}
+	if c.Call.HookRetryInitialBackoff <= 0 {
+		errs = append(errs, errors.New("call hook retry initial backoff must be positive"))
+	}
+	if c.Call.HookRetryMaxBackoff <= 0 {
+		errs = append(errs, errors.New("call hook retry max backoff must be positive"))
+	}
+	if c.Call.HookRetryMaxBackoff < c.Call.HookRetryInitialBackoff {
+		errs = append(errs, errors.New("call hook retry max backoff must be greater than or equal to the initial backoff"))
+	}
 	if c.Service.Name == "callworker" && strings.TrimSpace(c.Call.RecordingHookURL) == "" && strings.TrimSpace(c.Call.TranscriptionHookURL) == "" {
 		errs = append(errs, errors.New("call recording or transcription hook url is required"))
+	}
+	if hookURL := strings.TrimSpace(c.Call.RecordingHookURL); hookURL != "" {
+		parsed, err := url.Parse(hookURL)
+		if err != nil || !parsed.IsAbs() || parsed.Host == "" {
+			errs = append(errs, errors.New("call recording hook url must be absolute"))
+		}
+	}
+	if hookURL := strings.TrimSpace(c.Call.TranscriptionHookURL); hookURL != "" {
+		parsed, err := url.Parse(hookURL)
+		if err != nil || !parsed.IsAbs() || parsed.Host == "" {
+			errs = append(errs, errors.New("call transcription hook url must be absolute"))
+		}
 	}
 	if c.RTC.CredentialTTL <= 0 {
 		errs = append(errs, errors.New("rtc credential ttl must be positive"))
@@ -170,6 +198,18 @@ func (c Configuration) Validate() error {
 	}
 	if c.Notification.RetryMaxBackoff < c.Notification.RetryInitialBackoff {
 		errs = append(errs, errors.New("notification retry max backoff must be greater than or equal to the initial backoff"))
+	}
+	if c.Notification.DeliveryLeaseTTL <= 0 {
+		errs = append(errs, errors.New("notification delivery lease ttl must be positive"))
+	}
+	if c.Notification.DeliveryWebhookTimeout <= 0 {
+		errs = append(errs, errors.New("notification delivery webhook timeout must be positive"))
+	}
+	if webhookURL := strings.TrimSpace(c.Notification.DeliveryWebhookURL); webhookURL != "" {
+		parsed, err := url.Parse(webhookURL)
+		if err != nil || !parsed.IsAbs() || parsed.Host == "" {
+			errs = append(errs, errors.New("notification delivery webhook url must be absolute"))
+		}
 	}
 	if c.Notification.MaxAttempts <= 0 {
 		errs = append(errs, errors.New("notification max attempts must be positive"))

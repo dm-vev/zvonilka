@@ -11,6 +11,11 @@ import (
 	"github.com/dm-vev/zvonilka/internal/domain/notification"
 )
 
+const deliveryColumnList = `
+id, dedup_key, event_id, conversation_id, message_id, account_id, device_id, push_token_id,
+kind, reason, mode, state, priority, attempts, next_attempt_at, lease_token, lease_expires_at,
+last_attempt_at, last_error, created_at, updated_at`
+
 // SaveDelivery inserts or updates a delivery hint.
 func (s *Store) SaveDelivery(ctx context.Context, delivery notification.Delivery) (notification.Delivery, error) {
 	if err := s.requireStore(); err != nil {
@@ -60,12 +65,14 @@ INSERT INTO %s AS existing (
 	priority,
 	attempts,
 	next_attempt_at,
+	lease_token,
+	lease_expires_at,
 	last_attempt_at,
 	last_error,
 	created_at,
 	updated_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
 )
 ON CONFLICT (dedup_key) DO UPDATE SET
 	event_id = CASE
@@ -117,6 +124,14 @@ ON CONFLICT (dedup_key) DO UPDATE SET
 		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.next_attempt_at
 		ELSE existing.next_attempt_at
 	END,
+	lease_token = CASE
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.lease_token
+		ELSE existing.lease_token
+	END,
+	lease_expires_at = CASE
+		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.lease_expires_at
+		ELSE existing.lease_expires_at
+	END,
 	last_attempt_at = CASE
 		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.last_attempt_at
 		ELSE existing.last_attempt_at
@@ -129,8 +144,7 @@ ON CONFLICT (dedup_key) DO UPDATE SET
 		WHEN EXCLUDED.attempts > existing.attempts THEN EXCLUDED.updated_at
 		ELSE existing.updated_at
 	END
-RETURNING id, dedup_key, event_id, conversation_id, message_id, account_id, device_id, push_token_id,
-	kind, reason, mode, state, priority, attempts, next_attempt_at, last_attempt_at, last_error, created_at, updated_at
+RETURNING `+deliveryColumnList+`
 `, s.table("notification_deliveries"))
 
 	row := s.conn().QueryRowContext(
@@ -151,6 +165,8 @@ RETURNING id, dedup_key, event_id, conversation_id, message_id, account_id, devi
 		delivery.Priority,
 		delivery.Attempts,
 		delivery.NextAttemptAt.UTC(),
+		delivery.LeaseToken,
+		encodeTime(delivery.LeaseExpiresAt),
 		encodeTime(delivery.LastAttemptAt),
 		delivery.LastError,
 		delivery.CreatedAt.UTC(),
@@ -186,8 +202,7 @@ func (s *Store) DeliveryByID(ctx context.Context, deliveryID string) (notificati
 	}
 
 	query := fmt.Sprintf(`
-SELECT id, dedup_key, event_id, conversation_id, message_id, account_id, device_id, push_token_id,
-	kind, reason, mode, state, priority, attempts, next_attempt_at, last_attempt_at, last_error, created_at, updated_at
+SELECT `+deliveryColumnList+`
 FROM %s
 WHERE id = $1
 `, s.table("notification_deliveries"))
@@ -217,10 +232,11 @@ func (s *Store) DeliveriesDue(ctx context.Context, before time.Time, limit int) 
 	}
 
 	query := fmt.Sprintf(`
-SELECT id, dedup_key, event_id, conversation_id, message_id, account_id, device_id, push_token_id,
-	kind, reason, mode, state, priority, attempts, next_attempt_at, last_attempt_at, last_error, created_at, updated_at
+SELECT `+deliveryColumnList+`
 FROM %s
-WHERE state = $1 AND next_attempt_at <= $2
+WHERE state = $1
+	AND next_attempt_at <= $2
+	AND (lease_expires_at IS NULL OR lease_expires_at <= $2)
 ORDER BY priority DESC, next_attempt_at ASC, created_at ASC, id ASC
 LIMIT $3
 `, s.table("notification_deliveries"))
@@ -246,8 +262,77 @@ LIMIT $3
 	return deliveries, nil
 }
 
-// RetryDelivery schedules another attempt for an existing delivery.
-func (s *Store) RetryDelivery(ctx context.Context, params notification.RetryDeliveryParams) (notification.Delivery, error) {
+// ClaimDeliveries acquires a lease on due queued deliveries.
+func (s *Store) ClaimDeliveries(ctx context.Context, params notification.ClaimDeliveriesParams) ([]notification.Delivery, error) {
+	if err := s.requireStore(); err != nil {
+		return nil, err
+	}
+	if err := s.requireContext(ctx); err != nil {
+		return nil, err
+	}
+	params.LeaseToken = strings.TrimSpace(params.LeaseToken)
+	if params.Limit <= 0 {
+		return nil, nil
+	}
+	if params.Before.IsZero() || params.LeaseDuration <= 0 || params.LeaseToken == "" {
+		return nil, notification.ErrInvalidInput
+	}
+
+	leaseUntil := params.Before.UTC().Add(params.LeaseDuration)
+	query := fmt.Sprintf(`
+WITH due AS (
+	SELECT id
+	FROM %s
+	WHERE state = $1
+		AND next_attempt_at <= $2
+		AND (lease_expires_at IS NULL OR lease_expires_at <= $2)
+	ORDER BY priority DESC, next_attempt_at ASC, created_at ASC, id ASC
+	LIMIT $3
+	FOR UPDATE SKIP LOCKED
+)
+UPDATE %s AS deliveries
+SET lease_token = $4,
+	lease_expires_at = $5,
+	updated_at = $2
+FROM due
+WHERE deliveries.id = due.id
+RETURNING `+deliveryColumnList+`
+`, s.table("notification_deliveries"), s.table("notification_deliveries"))
+
+	rows, err := s.conn().QueryContext(
+		ctx,
+		query,
+		notification.DeliveryStateQueued,
+		params.Before.UTC(),
+		params.Limit,
+		params.LeaseToken,
+		leaseUntil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("claim deliveries: %w", err)
+	}
+	defer rows.Close()
+
+	deliveries := make([]notification.Delivery, 0, params.Limit)
+	for rows.Next() {
+		delivery, scanErr := scanDelivery(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan claimed delivery: %w", scanErr)
+		}
+		deliveries = append(deliveries, delivery)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate claimed deliveries: %w", err)
+	}
+
+	return deliveries, nil
+}
+
+// MarkDeliveryDelivered records a successful delivery attempt.
+func (s *Store) MarkDeliveryDelivered(
+	ctx context.Context,
+	params notification.MarkDeliveryDeliveredParams,
+) (notification.Delivery, error) {
 	if err := s.requireStore(); err != nil {
 		return notification.Delivery{}, err
 	}
@@ -255,8 +340,8 @@ func (s *Store) RetryDelivery(ctx context.Context, params notification.RetryDeli
 		return notification.Delivery{}, err
 	}
 	params.DeliveryID = strings.TrimSpace(params.DeliveryID)
-	params.LastError = strings.TrimSpace(params.LastError)
-	if params.DeliveryID == "" {
+	params.LeaseToken = strings.TrimSpace(params.LeaseToken)
+	if params.DeliveryID == "" || params.LeaseToken == "" {
 		return notification.Delivery{}, notification.ErrInvalidInput
 	}
 
@@ -267,22 +352,137 @@ func (s *Store) RetryDelivery(ctx context.Context, params notification.RetryDeli
 		if loadErr != nil {
 			return loadErr
 		}
+		now := params.DeliveredAt.UTC()
+		if now.IsZero() {
+			now = time.Now().UTC()
+		}
+		if leaseErr := validateDeliveryLease(delivery, params.LeaseToken, now); leaseErr != nil {
+			return leaseErr
+		}
+
+		delivery.Attempts++
+		delivery.State = notification.DeliveryStateDelivered
+		delivery.NextAttemptAt = now
+		delivery.LeaseToken = ""
+		delivery.LeaseExpiresAt = time.Time{}
+		delivery.LastAttemptAt = now
+		delivery.LastError = ""
+		delivery.UpdatedAt = now
+
+		var saveErr error
+		saved, saveErr = txStore.saveDelivery(ctx, delivery)
+		return saveErr
+	})
+	if err != nil {
+		return notification.Delivery{}, err
+	}
+
+	return saved, nil
+}
+
+// FailDelivery records a terminal delivery failure.
+func (s *Store) FailDelivery(ctx context.Context, params notification.FailDeliveryParams) (notification.Delivery, error) {
+	if err := s.requireStore(); err != nil {
+		return notification.Delivery{}, err
+	}
+	if err := s.requireContext(ctx); err != nil {
+		return notification.Delivery{}, err
+	}
+	params.DeliveryID = strings.TrimSpace(params.DeliveryID)
+	params.LeaseToken = strings.TrimSpace(params.LeaseToken)
+	params.LastError = strings.TrimSpace(params.LastError)
+	if params.DeliveryID == "" || params.LeaseToken == "" || params.LastError == "" {
+		return notification.Delivery{}, notification.ErrInvalidInput
+	}
+
+	var saved notification.Delivery
+	err := s.WithinTx(ctx, func(tx notification.Store) error {
+		txStore := tx.(*Store)
+		delivery, loadErr := txStore.deliveryByIDForUpdate(ctx, params.DeliveryID)
+		if loadErr != nil {
+			return loadErr
+		}
+		now := params.FailedAt.UTC()
+		if now.IsZero() {
+			now = time.Now().UTC()
+		}
+		if leaseErr := validateDeliveryLease(delivery, params.LeaseToken, now); leaseErr != nil {
+			return leaseErr
+		}
+
+		delivery.Attempts++
+		delivery.State = notification.DeliveryStateFailed
+		delivery.NextAttemptAt = now
+		delivery.LeaseToken = ""
+		delivery.LeaseExpiresAt = time.Time{}
+		delivery.LastAttemptAt = now
+		delivery.LastError = params.LastError
+		delivery.UpdatedAt = now
+
+		var saveErr error
+		saved, saveErr = txStore.saveDelivery(ctx, delivery)
+		return saveErr
+	})
+	if err != nil {
+		return notification.Delivery{}, err
+	}
+
+	return saved, nil
+}
+
+// RetryDelivery schedules another attempt for an existing delivery.
+func (s *Store) RetryDelivery(ctx context.Context, params notification.RetryDeliveryParams) (notification.Delivery, error) {
+	if err := s.requireStore(); err != nil {
+		return notification.Delivery{}, err
+	}
+	if err := s.requireContext(ctx); err != nil {
+		return notification.Delivery{}, err
+	}
+	params.DeliveryID = strings.TrimSpace(params.DeliveryID)
+	params.LeaseToken = strings.TrimSpace(params.LeaseToken)
+	params.LastError = strings.TrimSpace(params.LastError)
+	if params.DeliveryID == "" || params.LastError == "" {
+		return notification.Delivery{}, notification.ErrInvalidInput
+	}
+
+	var saved notification.Delivery
+	err := s.WithinTx(ctx, func(tx notification.Store) error {
+		txStore := tx.(*Store)
+		delivery, loadErr := txStore.deliveryByIDForUpdate(ctx, params.DeliveryID)
+		if loadErr != nil {
+			return loadErr
+		}
+		now := params.AttemptedAt.UTC()
+		if now.IsZero() {
+			now = time.Now().UTC()
+		}
+		if params.LeaseToken != "" {
+			if leaseErr := validateDeliveryLease(delivery, params.LeaseToken, now); leaseErr != nil {
+				return leaseErr
+			}
+		}
 
 		switch delivery.State {
 		case notification.DeliveryStateDelivered, notification.DeliveryStateSuppressed:
 			return notification.ErrConflict
 		}
 
-		now := time.Now().UTC()
 		delivery.Attempts++
 		delivery.LastError = params.LastError
 		delivery.LastAttemptAt = now
-		if params.RetryAt.IsZero() {
+		delivery.LeaseToken = ""
+		delivery.LeaseExpiresAt = time.Time{}
+		if params.MaxAttempts > 0 && delivery.Attempts >= params.MaxAttempts {
+			delivery.State = notification.DeliveryStateFailed
 			delivery.NextAttemptAt = now
 		} else {
-			delivery.NextAttemptAt = params.RetryAt.UTC()
+			if params.RetryAt.IsZero() || params.RetryAt.Before(now) {
+				delivery.NextAttemptAt = now
+			} else {
+				delivery.NextAttemptAt = params.RetryAt.UTC()
+			}
+			delivery.State = notification.DeliveryStateQueued
 		}
-		delivery.State = notification.DeliveryStateQueued
 		delivery.UpdatedAt = now
 
 		var saveErr error
@@ -298,8 +498,7 @@ func (s *Store) RetryDelivery(ctx context.Context, params notification.RetryDeli
 
 func (s *Store) deliveryByIDForUpdate(ctx context.Context, deliveryID string) (notification.Delivery, error) {
 	query := fmt.Sprintf(`
-SELECT id, dedup_key, event_id, conversation_id, message_id, account_id, device_id, push_token_id,
-	kind, reason, mode, state, priority, attempts, next_attempt_at, last_attempt_at, last_error, created_at, updated_at
+SELECT `+deliveryColumnList+`
 FROM %s
 WHERE id = $1
 FOR UPDATE
@@ -316,4 +515,21 @@ FOR UPDATE
 	}
 
 	return delivery, nil
+}
+
+func validateDeliveryLease(delivery notification.Delivery, leaseToken string, now time.Time) error {
+	if delivery.State != notification.DeliveryStateQueued {
+		return notification.ErrConflict
+	}
+	if strings.TrimSpace(leaseToken) == "" {
+		return notification.ErrInvalidInput
+	}
+	if delivery.LeaseToken != leaseToken {
+		return notification.ErrConflict
+	}
+	if delivery.LeaseExpiresAt.IsZero() || delivery.LeaseExpiresAt.Before(now) {
+		return notification.ErrConflict
+	}
+
+	return nil
 }

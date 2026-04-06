@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/dm-vev/zvonilka/internal/domain/callhook"
 )
 
@@ -93,10 +95,32 @@ func (s *Store) WithinTx(ctx context.Context, fn func(callhook.Store) error) err
 	}
 
 	if err := tx.Commit(); err != nil {
+		if mappedErr := mapConstraintError(err); mappedErr != nil {
+			return mappedErr
+		}
+
 		return fmt.Errorf("commit callhook transaction: %w", err)
 	}
 
 	return nil
+}
+
+func mapConstraintError(err error) error {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return nil
+	}
+
+	switch pgErr.Code {
+	case "23505":
+		return callhook.ErrConflict
+	case "23503":
+		return callhook.ErrNotFound
+	case "23514":
+		return callhook.ErrInvalidInput
+	default:
+		return nil
+	}
 }
 
 var _ callhook.Store = (*Store)(nil)

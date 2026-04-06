@@ -123,7 +123,7 @@ func TestSaveDeliveryRoundTrip(t *testing.T) {
 
 	now := time.Date(2026, time.March, 25, 12, 0, 0, 0, time.UTC)
 	mock.ExpectBegin()
-	mock.ExpectQuery(`(?s)INSERT INTO "notif"\."notification_deliveries".*ON CONFLICT \(dedup_key\) DO UPDATE SET.*RETURNING id, dedup_key, event_id, conversation_id, message_id, account_id, device_id, push_token_id, kind, reason, mode, state, priority, attempts, next_attempt_at, last_attempt_at, last_error, created_at, updated_at`).
+	mock.ExpectQuery(`(?s)INSERT INTO "notif"\."notification_deliveries".*ON CONFLICT \(dedup_key\) DO UPDATE SET.*RETURNING.*lease_token.*lease_expires_at.*updated_at`).
 		WithArgs(
 			"del-1",
 			"evt-1:conv-1:msg-1:acc-1::group:group",
@@ -140,6 +140,8 @@ func TestSaveDeliveryRoundTrip(t *testing.T) {
 			10,
 			0,
 			now.UTC(),
+			"",
+			sqlmock.AnyArg(),
 			sqlmock.AnyArg(),
 			"",
 			now.UTC(),
@@ -161,6 +163,8 @@ func TestSaveDeliveryRoundTrip(t *testing.T) {
 			"priority",
 			"attempts",
 			"next_attempt_at",
+			"lease_token",
+			"lease_expires_at",
 			"last_attempt_at",
 			"last_error",
 			"created_at",
@@ -181,6 +185,8 @@ func TestSaveDeliveryRoundTrip(t *testing.T) {
 			10,
 			0,
 			now.UTC(),
+			"",
+			nil,
 			nil,
 			"",
 			now.UTC(),
@@ -217,7 +223,7 @@ func TestDeliveriesDueOrdering(t *testing.T) {
 	defer db.Close()
 
 	now := time.Date(2026, time.March, 25, 12, 0, 0, 0, time.UTC)
-	mock.ExpectQuery(`(?s)SELECT id, dedup_key, event_id, conversation_id, message_id, account_id, device_id, push_token_id, kind, reason, mode, state, priority, attempts, next_attempt_at, last_attempt_at, last_error, created_at, updated_at FROM "notif"\."notification_deliveries" WHERE state = \$1 AND next_attempt_at <= \$2 ORDER BY priority DESC, next_attempt_at ASC, created_at ASC, id ASC LIMIT \$3`).
+	mock.ExpectQuery(`(?s)SELECT.*lease_token.*lease_expires_at.*FROM "notif"\."notification_deliveries" WHERE state = \$1 AND next_attempt_at <= \$2 AND \(lease_expires_at IS NULL OR lease_expires_at <= \$2\) ORDER BY priority DESC, next_attempt_at ASC, created_at ASC, id ASC LIMIT \$3`).
 		WithArgs(notification.DeliveryStateQueued, now.UTC(), 10).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id",
@@ -235,13 +241,15 @@ func TestDeliveriesDueOrdering(t *testing.T) {
 			"priority",
 			"attempts",
 			"next_attempt_at",
+			"lease_token",
+			"lease_expires_at",
 			"last_attempt_at",
 			"last_error",
 			"created_at",
 			"updated_at",
 		}).
-			AddRow("del-1", "dedup-1", "evt-1", "conv-1", "msg-1", "acc-1", "", "", notification.NotificationKindGroup, "group", notification.DeliveryModeInApp, notification.DeliveryStateQueued, 100, 0, now.UTC(), nil, "", now.UTC(), now.UTC()).
-			AddRow("del-2", "dedup-2", "evt-2", "conv-1", "msg-2", "acc-2", "", "", notification.NotificationKindGroup, "group", notification.DeliveryModeInApp, notification.DeliveryStateQueued, 50, 0, now.Add(5*time.Second).UTC(), nil, "", now.UTC(), now.UTC()))
+			AddRow("del-1", "dedup-1", "evt-1", "conv-1", "msg-1", "acc-1", "", "", notification.NotificationKindGroup, "group", notification.DeliveryModeInApp, notification.DeliveryStateQueued, 100, 0, now.UTC(), "", nil, nil, "", now.UTC(), now.UTC()).
+			AddRow("del-2", "dedup-2", "evt-2", "conv-1", "msg-2", "acc-2", "", "", notification.NotificationKindGroup, "group", notification.DeliveryModeInApp, notification.DeliveryStateQueued, 50, 0, now.Add(5*time.Second).UTC(), "", nil, nil, "", now.UTC(), now.UTC()))
 
 	deliveries, err := store.DeliveriesDue(context.Background(), now, 10)
 	require.NoError(t, err)
@@ -261,7 +269,7 @@ func TestSaveDeliveryMonotonicUpsert(t *testing.T) {
 	now := time.Date(2026, time.March, 25, 12, 0, 0, 0, time.UTC)
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(`(?s)INSERT INTO "notif"\."notification_deliveries" AS existing .*ON CONFLICT \(dedup_key\) DO UPDATE SET.*WHEN EXCLUDED\.attempts > existing\.attempts THEN EXCLUDED\.state.*attempts = GREATEST\(existing\.attempts, EXCLUDED\.attempts\).*RETURNING id, dedup_key, event_id, conversation_id, message_id, account_id, device_id, push_token_id, kind, reason, mode, state, priority, attempts, next_attempt_at, last_attempt_at, last_error, created_at, updated_at`).
+	mock.ExpectQuery(`(?s)INSERT INTO "notif"\."notification_deliveries" AS existing .*ON CONFLICT \(dedup_key\) DO UPDATE SET.*WHEN EXCLUDED\.attempts > existing\.attempts THEN EXCLUDED\.state.*attempts = GREATEST\(existing\.attempts, EXCLUDED\.attempts\).*RETURNING.*lease_token.*lease_expires_at.*updated_at`).
 		WithArgs(
 			"del-1",
 			"evt-1:conv-1:msg-1:acc-1::group:group",
@@ -278,6 +286,8 @@ func TestSaveDeliveryMonotonicUpsert(t *testing.T) {
 			10,
 			1,
 			now.UTC(),
+			"",
+			sqlmock.AnyArg(),
 			sqlmock.AnyArg(),
 			"",
 			now.UTC(),
@@ -299,6 +309,8 @@ func TestSaveDeliveryMonotonicUpsert(t *testing.T) {
 			"priority",
 			"attempts",
 			"next_attempt_at",
+			"lease_token",
+			"lease_expires_at",
 			"last_attempt_at",
 			"last_error",
 			"created_at",
@@ -319,6 +331,8 @@ func TestSaveDeliveryMonotonicUpsert(t *testing.T) {
 			10,
 			2,
 			now.UTC(),
+			"",
+			nil,
 			nil,
 			"",
 			now.UTC(),

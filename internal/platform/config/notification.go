@@ -8,11 +8,14 @@ import (
 
 // NotificationConfig defines notification worker cadence and retry settings.
 type NotificationConfig struct {
-	WorkerPollInterval  time.Duration
-	RetryInitialBackoff time.Duration
-	RetryMaxBackoff     time.Duration
-	MaxAttempts         int
-	BatchSize           int
+	WorkerPollInterval     time.Duration
+	RetryInitialBackoff    time.Duration
+	RetryMaxBackoff        time.Duration
+	DeliveryLeaseTTL       time.Duration
+	DeliveryWebhookURL     string
+	DeliveryWebhookTimeout time.Duration
+	MaxAttempts            int
+	BatchSize              int
 }
 
 // ToSettings converts configuration into domain notification settings.
@@ -26,6 +29,9 @@ func (c NotificationConfig) ToSettings() domainnotification.Settings {
 	}
 	if c.RetryMaxBackoff > 0 {
 		settings.RetryMaxBackoff = c.RetryMaxBackoff
+	}
+	if c.DeliveryLeaseTTL > 0 {
+		settings.DeliveryLeaseTTL = c.DeliveryLeaseTTL
 	}
 	if c.MaxAttempts > 0 {
 		settings.MaxAttempts = c.MaxAttempts

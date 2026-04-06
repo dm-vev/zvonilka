@@ -45,25 +45,27 @@ var serviceListenDefaults = map[string]listenDefaults{
 }
 
 const (
-	defaultEnvironment          = "production"
-	defaultShutdownTimeout      = 10 * time.Second
-	defaultMediaUploadURLTTL    = 15 * time.Minute
-	defaultMediaDownloadURLTTL  = 15 * time.Minute
-	defaultMediaMaxUploadSize   = 100 << 20
-	defaultReadHeaderTimeout    = 5 * time.Second
-	defaultReadTimeout          = 10 * time.Second
-	defaultWriteTimeout         = 10 * time.Second
-	defaultIdleTimeout          = 60 * time.Second
-	defaultMaxHeaderBytes       = 1 << 20
-	defaultPostgresMaxOpen      = 10
-	defaultPostgresMaxIdle      = 5
-	defaultPostgresConnLifetime = 30 * time.Minute
-	defaultPostgresConnIdle     = 5 * time.Minute
-	defaultRedisPoolSize        = 10
-	defaultRedisDialTimeout     = 5 * time.Second
-	defaultRedisReadTimeout     = 3 * time.Second
-	defaultRedisWriteTimeout    = 3 * time.Second
-	defaultRedisConnIdle        = 5 * time.Minute
+	defaultEnvironment                = "production"
+	defaultShutdownTimeout            = 10 * time.Second
+	defaultMediaUploadURLTTL          = 15 * time.Minute
+	defaultMediaDownloadURLTTL        = 15 * time.Minute
+	defaultMediaMaxUploadSize         = 100 << 20
+	defaultReadHeaderTimeout          = 5 * time.Second
+	defaultReadTimeout                = 10 * time.Second
+	defaultWriteTimeout               = 10 * time.Second
+	defaultIdleTimeout                = 60 * time.Second
+	defaultMaxHeaderBytes             = 1 << 20
+	defaultPostgresMaxOpen            = 10
+	defaultPostgresMaxIdle            = 5
+	defaultPostgresConnLifetime       = 30 * time.Minute
+	defaultPostgresConnIdle           = 5 * time.Minute
+	defaultRedisPoolSize              = 10
+	defaultRedisDialTimeout           = 5 * time.Second
+	defaultRedisReadTimeout           = 3 * time.Second
+	defaultRedisWriteTimeout          = 3 * time.Second
+	defaultRedisConnIdle              = 5 * time.Minute
+	defaultCallHookMaxBodyBytes       = 1 << 20
+	defaultNotificationWebhookTimeout = 10 * time.Second
 )
 
 func defaultConfiguration(serviceName string) Configuration {
@@ -95,17 +97,21 @@ func defaultConfiguration(serviceName string) Configuration {
 			LoginCodeLength: identityDefaults.LoginCodeLength,
 		},
 		Call: CallConfig{
-			InviteTimeout:        callDefaults.InviteTimeout,
-			RingingTimeout:       callDefaults.RingingTimeout,
-			ReconnectGrace:       callDefaults.ReconnectGrace,
-			MaxDuration:          callDefaults.MaxDuration,
-			MaxGroupParticipants: callDefaults.MaxGroupParticipants,
-			MaxVideoParticipants: callDefaults.MaxVideoParticipants,
-			WorkerPollInterval:   2 * time.Second,
-			WorkerBatchSize:      100,
-			RehomePollInterval:   3 * time.Second,
-			RehomeBatchSize:      64,
-			HookTimeout:          10 * time.Second,
+			InviteTimeout:           callDefaults.InviteTimeout,
+			RingingTimeout:          callDefaults.RingingTimeout,
+			ReconnectGrace:          callDefaults.ReconnectGrace,
+			MaxDuration:             callDefaults.MaxDuration,
+			MaxGroupParticipants:    callDefaults.MaxGroupParticipants,
+			MaxVideoParticipants:    callDefaults.MaxVideoParticipants,
+			WorkerPollInterval:      2 * time.Second,
+			WorkerBatchSize:         100,
+			RehomePollInterval:      3 * time.Second,
+			RehomeBatchSize:         64,
+			HookTimeout:             10 * time.Second,
+			HookMaxBodyBytes:        defaultCallHookMaxBodyBytes,
+			HookLeaseTTL:            30 * time.Second,
+			HookRetryInitialBackoff: 5 * time.Second,
+			HookRetryMaxBackoff:     5 * time.Minute,
 		},
 		RTC: RTCConfig{
 			PublicEndpoint: "webrtc://gateway/calls",
@@ -138,11 +144,13 @@ func defaultConfiguration(serviceName string) Configuration {
 			OnlineWindow: presenceDefaults.OnlineWindow,
 		},
 		Notification: NotificationConfig{
-			WorkerPollInterval:  notificationDefaults.WorkerPollInterval,
-			RetryInitialBackoff: notificationDefaults.RetryInitialBackoff,
-			RetryMaxBackoff:     notificationDefaults.RetryMaxBackoff,
-			MaxAttempts:         notificationDefaults.MaxAttempts,
-			BatchSize:           notificationDefaults.BatchSize,
+			WorkerPollInterval:     notificationDefaults.WorkerPollInterval,
+			RetryInitialBackoff:    notificationDefaults.RetryInitialBackoff,
+			RetryMaxBackoff:        notificationDefaults.RetryMaxBackoff,
+			DeliveryLeaseTTL:       notificationDefaults.DeliveryLeaseTTL,
+			DeliveryWebhookTimeout: defaultNotificationWebhookTimeout,
+			MaxAttempts:            notificationDefaults.MaxAttempts,
+			BatchSize:              notificationDefaults.BatchSize,
 		},
 		Search: SearchConfig{
 			DefaultLimit:   searchDefaults.DefaultLimit,

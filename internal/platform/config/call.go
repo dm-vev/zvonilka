@@ -8,19 +8,24 @@ import (
 
 // CallConfig defines signaling lifecycle settings for direct calls.
 type CallConfig struct {
-	InviteTimeout        time.Duration
-	RingingTimeout       time.Duration
-	ReconnectGrace       time.Duration
-	MaxDuration          time.Duration
-	MaxGroupParticipants uint32
-	MaxVideoParticipants uint32
-	WorkerPollInterval   time.Duration
-	WorkerBatchSize      int
-	RehomePollInterval   time.Duration
-	RehomeBatchSize      int
-	RecordingHookURL     string
-	TranscriptionHookURL string
-	HookTimeout          time.Duration
+	InviteTimeout           time.Duration
+	RingingTimeout          time.Duration
+	ReconnectGrace          time.Duration
+	MaxDuration             time.Duration
+	MaxGroupParticipants    uint32
+	MaxVideoParticipants    uint32
+	WorkerPollInterval      time.Duration
+	WorkerBatchSize         int
+	RehomePollInterval      time.Duration
+	RehomeBatchSize         int
+	RecordingHookURL        string
+	TranscriptionHookURL    string
+	HookTimeout             time.Duration
+	HookSecret              string
+	HookMaxBodyBytes        int64
+	HookLeaseTTL            time.Duration
+	HookRetryInitialBackoff time.Duration
+	HookRetryMaxBackoff     time.Duration
 }
 
 // ToSettings converts config values into domain call settings.

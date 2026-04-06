@@ -61,7 +61,7 @@ INSERT INTO %s (
 ) VALUES (
 	$1, $2, $3, $4, $5,
 	$6, $7, $8, $9, $10,
-	$11, $12, $13, $14, $15, $16
+	$11, $12, $13, $14, $15, $16, $17
 )
 ON CONFLICT (target_kind, target_id) DO UPDATE SET
 	only_admins_can_write = EXCLUDED.only_admins_can_write,

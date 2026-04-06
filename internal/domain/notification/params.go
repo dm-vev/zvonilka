@@ -67,9 +67,35 @@ type QueueDeliveryParams struct {
 
 // RetryDeliveryParams schedules a retry for a delivery hint.
 type RetryDeliveryParams struct {
+	DeliveryID  string
+	LeaseToken  string
+	LastError   string
+	RetryAt     time.Time
+	MaxAttempts int
+	AttemptedAt time.Time
+}
+
+// ClaimDeliveriesParams acquires a lease on queued deliveries that are ready to run.
+type ClaimDeliveriesParams struct {
+	Before        time.Time
+	Limit         int
+	LeaseToken    string
+	LeaseDuration time.Duration
+}
+
+// MarkDeliveryDeliveredParams acknowledges a successful delivery attempt.
+type MarkDeliveryDeliveredParams struct {
+	DeliveryID  string
+	LeaseToken  string
+	DeliveredAt time.Time
+}
+
+// FailDeliveryParams records a terminal delivery failure.
+type FailDeliveryParams struct {
 	DeliveryID string
+	LeaseToken string
 	LastError  string
-	RetryAt    time.Time
+	FailedAt   time.Time
 }
 
 // SaveWorkerCursorParams advances the worker cursor.

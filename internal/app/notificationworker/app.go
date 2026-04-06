@@ -99,7 +99,17 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 		_ = closeBootstrap(ctx, bootstrap, cfg.Runtime.ShutdownTimeout)
 		return nil, err
 	}
-	worker, err := notification.NewWorker(notificationService, conversationStore, presenceService)
+
+	executor, err := newWebhookExecutor(cfg.Notification)
+	if err != nil {
+		_ = closeBootstrap(ctx, bootstrap, cfg.Runtime.ShutdownTimeout)
+		return nil, err
+	}
+	workerOptions := make([]notification.WorkerOption, 0, 1)
+	if executor != nil {
+		workerOptions = append(workerOptions, notification.WithDeliveryExecutor(executor))
+	}
+	worker, err := notification.NewWorker(notificationService, conversationStore, presenceService, workerOptions...)
 	if err != nil {
 		_ = closeBootstrap(ctx, bootstrap, cfg.Runtime.ShutdownTimeout)
 		return nil, err
