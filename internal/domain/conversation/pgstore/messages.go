@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 )
@@ -81,14 +82,14 @@ INSERT INTO %s (
 	id, conversation_id, sender_account_id, sender_device_id, client_message_id, sequence, kind, status,
 	payload_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_aad, payload_metadata,
 	reply_conversation_id, reply_message_id, reply_sender_account_id, reply_kind, reply_snippet,
-	thread_id, silent, pinned, disable_link_previews, view_count, metadata,
+	thread_id, silent, pinned, disable_link_previews, view_count, deliver_at, metadata,
 	created_at, updated_at, edited_at, deleted_at
 ) VALUES (
 	$1, $2, $3, $4, $5, $6, $7, $8,
 	$9, $10, $11, $12, $13, $14,
 	$15, $16, $17, $18, $19,
-	$20, $21, $22, $23, $24, $25,
-	$26, $27, $28, $29
+	$20, $21, $22, $23, $24, $25, $26,
+	$27, $28, $29, $30
 )
 ON CONFLICT (id) DO UPDATE SET
 	conversation_id = EXCLUDED.conversation_id,
@@ -114,6 +115,7 @@ ON CONFLICT (id) DO UPDATE SET
 	pinned = EXCLUDED.pinned,
 	disable_link_previews = EXCLUDED.disable_link_previews,
 	view_count = EXCLUDED.view_count,
+	deliver_at = EXCLUDED.deliver_at,
 	metadata = EXCLUDED.metadata,
 	updated_at = EXCLUDED.updated_at,
 	edited_at = EXCLUDED.edited_at,
@@ -146,6 +148,7 @@ RETURNING %s
 		message.Pinned,
 		message.DisableLinkPreviews,
 		message.ViewCount,
+		encodeTime(message.DeliverAt),
 		metadata,
 		message.CreatedAt.UTC(),
 		message.UpdatedAt.UTC(),
@@ -290,6 +293,7 @@ func (s *Store) MessagesByConversationID(ctx context.Context, conversationID str
 SELECT %s
 FROM %s
 WHERE conversation_id = $1 AND thread_id = $2 AND sequence > $3
+	AND status NOT IN ('pending', 'failed')
 ORDER BY sequence ASC, created_at ASC, id ASC
 LIMIT $4
 `, messageColumnList, s.table("conversation_messages"))
@@ -299,6 +303,124 @@ LIMIT $4
 	}
 	defer rows.Close()
 
+	messages := make([]conversation.Message, 0)
+	messageIDs := make([]string, 0)
+	for rows.Next() {
+		message, scanErr := scanMessage(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan message for conversation %s: %w", conversationID, scanErr)
+		}
+		messages = append(messages, message)
+		messageIDs = append(messageIDs, message.ID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate messages for conversation %s: %w", conversationID, err)
+	}
+
+	attachments, err := s.attachmentsByMessageIDs(ctx, messageIDs)
+	if err != nil {
+		return nil, err
+	}
+	for idx := range messages {
+		messages[idx].Attachments = attachments[messages[idx].ID]
+	}
+
+	mentions, err := s.mentionsByMessageIDs(ctx, messageIDs)
+	if err != nil {
+		return nil, err
+	}
+	for idx := range messages {
+		messages[idx].MentionAccountIDs = mentions[messages[idx].ID]
+	}
+
+	reactions, err := s.reactionsByMessageIDs(ctx, messageIDs)
+	if err != nil {
+		return nil, err
+	}
+	for idx := range messages {
+		messages[idx].Reactions = reactions[messages[idx].ID]
+	}
+
+	return messages, nil
+}
+
+func (s *Store) ScheduledMessagesByConversationAndSender(
+	ctx context.Context,
+	conversationID string,
+	senderAccountID string,
+	threadID string,
+	includeFailed bool,
+	limit int,
+) ([]conversation.Message, error) {
+	if err := s.requireStore(); err != nil {
+		return nil, err
+	}
+	if err := s.requireContext(ctx); err != nil {
+		return nil, err
+	}
+	conversationID = strings.TrimSpace(conversationID)
+	senderAccountID = strings.TrimSpace(senderAccountID)
+	threadID = strings.TrimSpace(threadID)
+	if conversationID == "" || senderAccountID == "" {
+		return nil, conversation.ErrInvalidInput
+	}
+
+	statusFilter := `status = 'pending'`
+	if includeFailed {
+		statusFilter = `status IN ('pending', 'failed')`
+	}
+
+	query := fmt.Sprintf(`
+SELECT %s
+FROM %s
+WHERE conversation_id = $1
+	AND sender_account_id = $2
+	AND thread_id = $3
+	AND %s
+ORDER BY CASE WHEN status = 'pending' THEN 0 ELSE 1 END ASC, deliver_at ASC NULLS LAST, created_at ASC, id ASC
+LIMIT $4
+`, messageColumnList, s.table("conversation_messages"), statusFilter)
+
+	rows, err := s.conn().QueryContext(ctx, query, conversationID, senderAccountID, threadID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list scheduled messages for conversation %s: %w", conversationID, err)
+	}
+	defer rows.Close()
+
+	return s.scanMessages(ctx, rows, conversationID)
+}
+
+func (s *Store) DueScheduledMessages(ctx context.Context, before time.Time, limit int) ([]conversation.Message, error) {
+	if err := s.requireStore(); err != nil {
+		return nil, err
+	}
+	if err := s.requireContext(ctx); err != nil {
+		return nil, err
+	}
+	if before.IsZero() {
+		before = time.Now().UTC()
+	}
+
+	query := fmt.Sprintf(`
+SELECT %s
+FROM %s
+WHERE status = 'pending'
+	AND deliver_at IS NOT NULL
+	AND deliver_at <= $1
+ORDER BY deliver_at ASC, created_at ASC, id ASC
+LIMIT $2
+FOR UPDATE SKIP LOCKED
+`, messageColumnList, s.table("conversation_messages"))
+	rows, err := s.conn().QueryContext(ctx, query, before.UTC(), limit)
+	if err != nil {
+		return nil, fmt.Errorf("list due scheduled messages: %w", err)
+	}
+	defer rows.Close()
+
+	return s.scanMessages(ctx, rows, "")
+}
+
+func (s *Store) scanMessages(ctx context.Context, rows *sql.Rows, conversationID string) ([]conversation.Message, error) {
 	messages := make([]conversation.Message, 0)
 	messageIDs := make([]string, 0)
 	for rows.Next() {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 )
@@ -93,6 +94,9 @@ func (s *memoryStore) MessagesByConversationID(ctx context.Context, conversation
 
 	filtered := rows[:0]
 	for _, message := range rows {
+		if message.Status == conversation.MessageStatusPending || message.Status == conversation.MessageStatusFailed {
+			continue
+		}
 		if message.Sequence <= fromSequence {
 			continue
 		}
@@ -114,4 +118,112 @@ func (s *memoryStore) MessagesByConversationID(ctx context.Context, conversation
 	}
 
 	return filtered, nil
+}
+
+func (s *memoryStore) ScheduledMessagesByConversationAndSender(
+	ctx context.Context,
+	conversationID string,
+	senderAccountID string,
+	threadID string,
+	includeFailed bool,
+	limit int,
+) ([]conversation.Message, error) {
+	if err := s.validateRead(ctx); err != nil {
+		return nil, err
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	conversationID = strings.TrimSpace(conversationID)
+	senderAccountID = strings.TrimSpace(senderAccountID)
+	threadID = strings.TrimSpace(threadID)
+	if conversationID == "" || senderAccountID == "" {
+		return nil, conversation.ErrInvalidInput
+	}
+
+	rows := make([]conversation.Message, 0)
+	for _, message := range s.messagesByID {
+		if message.ConversationID != conversationID ||
+			message.SenderAccountID != senderAccountID ||
+			strings.TrimSpace(message.ThreadID) != threadID {
+			continue
+		}
+		if message.Status != conversation.MessageStatusPending &&
+			(!includeFailed || message.Status != conversation.MessageStatusFailed) {
+			continue
+		}
+		rows = append(rows, cloneMessage(message))
+	}
+
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].Status != rows[j].Status {
+			return rows[i].Status == conversation.MessageStatusPending
+		}
+		if rows[i].DeliverAt.Equal(rows[j].DeliverAt) {
+			if rows[i].CreatedAt.Equal(rows[j].CreatedAt) {
+				return rows[i].ID < rows[j].ID
+			}
+			return rows[i].CreatedAt.Before(rows[j].CreatedAt)
+		}
+		return rows[i].DeliverAt.Before(rows[j].DeliverAt)
+	})
+
+	if limit > 0 && len(rows) > limit {
+		rows = rows[:limit]
+	}
+
+	reactions := s.reactionsByMessageIDs(func() []string {
+		ids := make([]string, 0, len(rows))
+		for _, message := range rows {
+			ids = append(ids, message.ID)
+		}
+		return ids
+	}())
+	for idx := range rows {
+		rows[idx].Reactions = reactions[rows[idx].ID]
+	}
+
+	return rows, nil
+}
+
+func (s *memoryStore) DueScheduledMessages(
+	ctx context.Context,
+	before time.Time,
+	limit int,
+) ([]conversation.Message, error) {
+	if err := s.validateRead(ctx); err != nil {
+		return nil, err
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if before.IsZero() {
+		before = time.Now().UTC()
+	}
+
+	rows := make([]conversation.Message, 0)
+	for _, message := range s.messagesByID {
+		if message.Status != conversation.MessageStatusPending ||
+			message.DeliverAt.IsZero() ||
+			message.DeliverAt.After(before) {
+			continue
+		}
+		rows = append(rows, cloneMessage(message))
+	}
+
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].DeliverAt.Equal(rows[j].DeliverAt) {
+			if rows[i].CreatedAt.Equal(rows[j].CreatedAt) {
+				return rows[i].ID < rows[j].ID
+			}
+			return rows[i].CreatedAt.Before(rows[j].CreatedAt)
+		}
+		return rows[i].DeliverAt.Before(rows[j].DeliverAt)
+	})
+
+	if limit > 0 && len(rows) > limit {
+		rows = rows[:limit]
+	}
+
+	return rows, nil
 }

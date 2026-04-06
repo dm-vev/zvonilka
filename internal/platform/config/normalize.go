@@ -35,6 +35,9 @@ func (c *Configuration) normalize() {
 	c.Storage.AuditProvider = strings.ToLower(strings.TrimSpace(c.Storage.AuditProvider))
 	c.Storage.SearchProvider = strings.ToLower(strings.TrimSpace(c.Storage.SearchProvider))
 	c.Search = c.Search.normalize()
+	c.Translation.EndpointURL = strings.TrimSpace(c.Translation.EndpointURL)
+	c.Translation.APIKey = strings.TrimSpace(c.Translation.APIKey)
+	c.Translation.ProviderName = strings.TrimSpace(c.Translation.ProviderName)
 
 	c.Infrastructure.Postgres.DSN = strings.TrimSpace(c.Infrastructure.Postgres.DSN)
 	c.Infrastructure.Postgres.MigrationsPath = strings.TrimSpace(c.Infrastructure.Postgres.MigrationsPath)

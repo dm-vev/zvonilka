@@ -292,7 +292,7 @@ INSERT INTO %s.identity_sessions (
 func openDockerPostgres(t *testing.T) *sql.DB {
 	t.Helper()
 
-	release := dockermutex.Acquire(t, "presence-postgres")
+	release := dockermutex.Acquire(t, "postgres-integration")
 	t.Cleanup(release)
 
 	if err := runDockerCompose("up", "-d", "postgres"); err != nil {

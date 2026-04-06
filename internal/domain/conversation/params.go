@@ -110,6 +110,15 @@ type ListMessagesParams struct {
 	IncludeDeleted bool
 }
 
+// ListScheduledMessagesParams filters a sender's scheduled-message list.
+type ListScheduledMessagesParams struct {
+	AccountID      string
+	ConversationID string
+	ThreadID       string
+	Limit          int
+	IncludeFailed  bool
+}
+
 // SendMessageParams describes a message send request.
 type SendMessageParams struct {
 	ConversationID  string

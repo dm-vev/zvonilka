@@ -18,6 +18,7 @@ type Configuration struct {
 	Presence       PresenceConfig
 	Notification   NotificationConfig
 	Search         SearchConfig
+	Translation    TranslationConfig
 	Infrastructure InfrastructureConfig
 	Storage        StorageConfig
 	Features       FeatureConfig

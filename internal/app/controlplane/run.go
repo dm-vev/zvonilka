@@ -48,7 +48,7 @@ func Run(ctx context.Context) (err error) {
 		logger,
 		app.health,
 		app.handler,
-		nil,
+		app.registerGRPC,
 	)
 	return err
 }

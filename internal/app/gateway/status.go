@@ -10,8 +10,10 @@ import (
 	domaine2ee "github.com/dm-vev/zvonilka/internal/domain/e2ee"
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
 	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
+	domainnotification "github.com/dm-vev/zvonilka/internal/domain/notification"
 	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
 	domainsearch "github.com/dm-vev/zvonilka/internal/domain/search"
+	domaintranslation "github.com/dm-vev/zvonilka/internal/domain/translation"
 	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -39,11 +41,14 @@ func grpcError(err error) error {
 		return status.Error(codes.FailedPrecondition, "join request expired")
 	case errors.Is(err, domainconversation.ErrRateLimited):
 		return status.Error(codes.ResourceExhausted, "rate limited")
+	case errors.Is(err, domaintranslation.ErrUnsupported):
+		return status.Error(codes.FailedPrecondition, "operation unsupported")
 	case errors.Is(err, domainidentity.ErrForbidden),
 		errors.Is(err, domaincall.ErrForbidden),
 		errors.Is(err, domainconversation.ErrForbidden),
 		errors.Is(err, domaine2ee.ErrForbidden),
 		errors.Is(err, domainmedia.ErrForbidden),
+		errors.Is(err, domaintranslation.ErrForbidden),
 		errors.Is(err, domainuser.ErrForbidden):
 		return status.Error(codes.PermissionDenied, "operation forbidden")
 	case errors.Is(err, domainidentity.ErrNotFound),
@@ -51,7 +56,9 @@ func grpcError(err error) error {
 		errors.Is(err, domainconversation.ErrNotFound),
 		errors.Is(err, domaine2ee.ErrNotFound),
 		errors.Is(err, domainmedia.ErrNotFound),
+		errors.Is(err, domainnotification.ErrNotFound),
 		errors.Is(err, domainpresence.ErrNotFound),
+		errors.Is(err, domaintranslation.ErrNotFound),
 		errors.Is(err, domainuser.ErrNotFound):
 		return status.Error(codes.NotFound, "resource not found")
 	case errors.Is(err, domainidentity.ErrConflict),
@@ -59,6 +66,8 @@ func grpcError(err error) error {
 		errors.Is(err, domainconversation.ErrConflict),
 		errors.Is(err, domaine2ee.ErrConflict),
 		errors.Is(err, domainmedia.ErrConflict),
+		errors.Is(err, domainnotification.ErrConflict),
+		errors.Is(err, domaintranslation.ErrConflict),
 		errors.Is(err, domainuser.ErrConflict):
 		return status.Error(codes.FailedPrecondition, "state conflict")
 	case errors.Is(err, domainidentity.ErrInvalidInput),
@@ -66,8 +75,10 @@ func grpcError(err error) error {
 		errors.Is(err, domainconversation.ErrInvalidInput),
 		errors.Is(err, domaine2ee.ErrInvalidInput),
 		errors.Is(err, domainmedia.ErrInvalidInput),
+		errors.Is(err, domainnotification.ErrInvalidInput),
 		errors.Is(err, domainpresence.ErrInvalidInput),
 		errors.Is(err, domainsearch.ErrInvalidInput),
+		errors.Is(err, domaintranslation.ErrInvalidInput),
 		errors.Is(err, domainuser.ErrInvalidInput):
 		return status.Error(codes.InvalidArgument, "invalid request")
 	default:

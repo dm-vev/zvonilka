@@ -182,7 +182,7 @@ func TestSearchSchemaConstraints(t *testing.T) {
 func openDockerPostgres(t *testing.T) *sql.DB {
 	t.Helper()
 
-	unlock := dockermutex.Acquire(t, "search-postgres-integration")
+	unlock := dockermutex.Acquire(t, "postgres-integration")
 	t.Cleanup(unlock)
 
 	if _, err := exec.LookPath("docker"); err != nil {

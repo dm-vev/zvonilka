@@ -394,6 +394,31 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Search.SnippetLength = value
 	}
+	if value, ok, err := stringValueWithPresence(serviceName, "TRANSLATION_ENDPOINT_URL", cfg.Translation.EndpointURL); err != nil {
+		return err
+	} else if ok {
+		cfg.Translation.EndpointURL = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "TRANSLATION_API_KEY", cfg.Translation.APIKey); err != nil {
+		return err
+	} else if ok {
+		cfg.Translation.APIKey = value
+	}
+	if value, ok, err := durationValue(serviceName, "TRANSLATION_TIMEOUT", cfg.Translation.Timeout); err != nil {
+		return err
+	} else if ok {
+		cfg.Translation.Timeout = value
+	}
+	if value, ok, err := intValue(serviceName, "TRANSLATION_MAX_TEXT_BYTES", cfg.Translation.MaxTextBytes); err != nil {
+		return err
+	} else if ok {
+		cfg.Translation.MaxTextBytes = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "TRANSLATION_PROVIDER_NAME", cfg.Translation.ProviderName); err != nil {
+		return err
+	} else if ok {
+		cfg.Translation.ProviderName = value
+	}
 
 	postgresEnabledSet := false
 	if value, ok, err := boolValue(serviceName, "POSTGRES_ENABLED", cfg.Infrastructure.Postgres.Enabled); err != nil {

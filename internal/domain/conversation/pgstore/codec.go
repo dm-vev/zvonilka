@@ -319,6 +319,7 @@ func scanMessage(row rowScanner) (conversation.Message, error) {
 		replySenderID       sql.NullString
 		replyKind           sql.NullString
 		replySnippet        sql.NullString
+		deliverAt           sql.NullTime
 		editedAt            sql.NullTime
 		deletedAt           sql.NullTime
 	)
@@ -348,6 +349,7 @@ func scanMessage(row rowScanner) (conversation.Message, error) {
 		&message.Pinned,
 		&message.DisableLinkPreviews,
 		&message.ViewCount,
+		&deliverAt,
 		&rawMetadata,
 		&message.CreatedAt,
 		&message.UpdatedAt,
@@ -370,6 +372,7 @@ func scanMessage(row rowScanner) (conversation.Message, error) {
 		MessageKind:     conversation.MessageKind(replyKind.String),
 		Snippet:         replySnippet.String,
 	}
+	message.DeliverAt = decodeTime(deliverAt)
 	message.CreatedAt = message.CreatedAt.UTC()
 	message.UpdatedAt = message.UpdatedAt.UTC()
 	message.EditedAt = decodeTime(editedAt)

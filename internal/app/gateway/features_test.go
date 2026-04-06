@@ -15,6 +15,7 @@ import (
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
 	conversationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1"
 	mediav1 "github.com/dm-vev/zvonilka/gen/proto/contracts/media/v1"
+	notificationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/notification/v1"
 	syncv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/sync/v1"
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
 	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
@@ -24,18 +25,24 @@ import (
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	identitytest "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
 	"github.com/dm-vev/zvonilka/internal/domain/media"
+	"github.com/dm-vev/zvonilka/internal/domain/notification"
+	notificationtest "github.com/dm-vev/zvonilka/internal/domain/notification/teststore"
 	"github.com/dm-vev/zvonilka/internal/domain/presence"
 	presencetest "github.com/dm-vev/zvonilka/internal/domain/presence/teststore"
 	"github.com/dm-vev/zvonilka/internal/domain/search"
 	searchtest "github.com/dm-vev/zvonilka/internal/domain/search/teststore"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
+	domaintranslation "github.com/dm-vev/zvonilka/internal/domain/translation"
+	translationtest "github.com/dm-vev/zvonilka/internal/domain/translation/teststore"
 	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
 	usertest "github.com/dm-vev/zvonilka/internal/domain/user/teststore"
+	"github.com/dm-vev/zvonilka/internal/platform/config"
 	platformrtc "github.com/dm-vev/zvonilka/internal/platform/rtc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestCreateThreadAcceptsRootMessageID(t *testing.T) {
@@ -712,6 +719,132 @@ func TestMediaFiltersVariantAndHardDelete(t *testing.T) {
 	}
 }
 
+func TestNotificationRPC(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	owner, ownerCtx := fixture.mustCreateUserAndLogin(t, "notification-owner", "notification-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "notification-peer", "notification-peer@example.com")
+
+	defaultPreference, err := fixture.api.GetNotificationPreference(ownerCtx, &notificationv1.GetNotificationPreferenceRequest{})
+	if err != nil {
+		t.Fatalf("get default notification preference: %v", err)
+	}
+	if !defaultPreference.GetPreference().GetEnabled() || !defaultPreference.GetPreference().GetDirectEnabled() {
+		t.Fatalf("unexpected default preference: %+v", defaultPreference.GetPreference())
+	}
+
+	savedPreference, err := fixture.api.SetNotificationPreference(ownerCtx, &notificationv1.SetNotificationPreferenceRequest{
+		Preference: &notificationv1.NotificationPreference{
+			Enabled:        true,
+			DirectEnabled:  true,
+			GroupEnabled:   false,
+			ChannelEnabled: false,
+			MentionEnabled: true,
+			ReplyEnabled:   false,
+			QuietHours: &notificationv1.QuietHours{
+				Enabled:     true,
+				StartMinute: 60,
+				EndMinute:   420,
+				Timezone:    "Europe/Moscow",
+			},
+			MutedUntil: protoTime(fixture.now().Add(30 * time.Minute)),
+		},
+	})
+	if err != nil {
+		t.Fatalf("set notification preference: %v", err)
+	}
+	if savedPreference.GetPreference().GetGroupEnabled() || savedPreference.GetPreference().GetReplyEnabled() {
+		t.Fatalf("unexpected saved preference: %+v", savedPreference.GetPreference())
+	}
+	if savedPreference.GetPreference().GetQuietHours().GetTimezone() != "Europe/Moscow" {
+		t.Fatalf("expected quiet hours timezone to round-trip, got %+v", savedPreference.GetPreference().GetQuietHours())
+	}
+
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Notification Overrides",
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	override, err := fixture.api.SetConversationNotificationOverride(ownerCtx, &notificationv1.SetConversationNotificationOverrideRequest{
+		Override: &notificationv1.ConversationNotificationOverride{
+			ConversationId: created.GetConversation().GetConversationId(),
+			Muted:          true,
+			MentionsOnly:   true,
+			MutedUntil:     protoTime(fixture.now().Add(2 * time.Hour)),
+		},
+	})
+	if err != nil {
+		t.Fatalf("set conversation notification override: %v", err)
+	}
+	if !override.GetOverride().GetMuted() || !override.GetOverride().GetMentionsOnly() {
+		t.Fatalf("unexpected override: %+v", override.GetOverride())
+	}
+
+	loadedOverride, err := fixture.api.GetConversationNotificationOverride(ownerCtx, &notificationv1.GetConversationNotificationOverrideRequest{
+		ConversationId: created.GetConversation().GetConversationId(),
+	})
+	if err != nil {
+		t.Fatalf("get conversation notification override: %v", err)
+	}
+	if loadedOverride.GetOverride().GetConversationId() != created.GetConversation().GetConversationId() {
+		t.Fatalf("unexpected loaded override: %+v", loadedOverride.GetOverride())
+	}
+
+	registered, err := fixture.api.RegisterPushToken(ownerCtx, &notificationv1.RegisterPushTokenRequest{
+		Provider: "apns",
+		Token:    "push-token-1",
+	})
+	if err != nil {
+		t.Fatalf("register push token: %v", err)
+	}
+	if registered.GetPushToken().GetProvider() != "apns" || registered.GetPushToken().GetDeviceId() == "" {
+		t.Fatalf("unexpected registered push token: %+v", registered.GetPushToken())
+	}
+
+	listed, err := fixture.api.ListPushTokens(ownerCtx, &notificationv1.ListPushTokensRequest{})
+	if err != nil {
+		t.Fatalf("list push tokens: %v", err)
+	}
+	if len(listed.GetPushTokens()) != 1 || listed.GetPushTokens()[0].GetTokenId() != registered.GetPushToken().GetTokenId() {
+		t.Fatalf("unexpected push token list: %+v", listed.GetPushTokens())
+	}
+
+	_, err = fixture.api.RevokePushToken(peerCtx, &notificationv1.RevokePushTokenRequest{
+		TokenId: registered.GetPushToken().GetTokenId(),
+	})
+	if status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("expected permission denied revoking foreign push token, got %v", err)
+	}
+
+	revoked, err := fixture.api.RevokePushToken(ownerCtx, &notificationv1.RevokePushTokenRequest{
+		TokenId: registered.GetPushToken().GetTokenId(),
+	})
+	if err != nil {
+		t.Fatalf("revoke push token: %v", err)
+	}
+	if revoked.GetPushToken().GetRevokedAt() == nil {
+		t.Fatalf("expected revoked timestamp, got %+v", revoked.GetPushToken())
+	}
+
+	listedAfterRevoke, err := fixture.api.ListPushTokens(ownerCtx, &notificationv1.ListPushTokensRequest{})
+	if err != nil {
+		t.Fatalf("list push tokens after revoke: %v", err)
+	}
+	if len(listedAfterRevoke.GetPushTokens()) != 0 {
+		t.Fatalf("expected no active push tokens after revoke, got %+v", listedAfterRevoke.GetPushTokens())
+	}
+
+	if owner.ID == "" {
+		t.Fatal("expected owner account id to be populated")
+	}
+}
+
 func TestSubscribeEventsWakesOnConversationChanges(t *testing.T) {
 	t.Parallel()
 
@@ -1177,6 +1310,165 @@ func TestGetMessageDoesNotWakeSubscribeEvents(t *testing.T) {
 	}
 }
 
+func TestScheduledMessageRPCLifecycle(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	owner, ownerCtx := fixture.mustCreateUserAndLogin(t, "scheduled-owner", "scheduled-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "scheduled-peer", "scheduled-peer@example.com")
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+	if created.Conversation.OwnerUserId != owner.ID {
+		t.Fatalf("unexpected owner: %+v", created.Conversation)
+	}
+
+	deliverAt := fixture.now().Add(10 * time.Minute)
+	scheduled, err := fixture.api.SendMessage(ownerCtx, &conversationv1.SendMessageRequest{
+		ConversationId: created.Conversation.ConversationId,
+		Draft: &commonv1.MessageDraft{
+			ClientMessageId: "scheduled-rpc",
+			Kind:            commonv1.MessageKind_MESSAGE_KIND_TEXT,
+			Payload: &commonv1.EncryptedPayload{
+				Ciphertext: []byte("scheduled rpc body"),
+			},
+			DeliverAt: timestamppb.New(deliverAt),
+		},
+	})
+	if err != nil {
+		t.Fatalf("send scheduled message: %v", err)
+	}
+	if scheduled.Event != nil {
+		t.Fatalf("expected no sync event before dispatch, got %+v", scheduled.Event)
+	}
+	if scheduled.Message.Status != commonv1.MessageStatus_MESSAGE_STATUS_PENDING {
+		t.Fatalf("expected pending message, got %+v", scheduled.Message)
+	}
+	if scheduled.Message.DeliverAt == nil || !scheduled.Message.DeliverAt.AsTime().Equal(deliverAt) {
+		t.Fatalf("unexpected deliver_at: %+v", scheduled.Message)
+	}
+
+	scheduledList, err := fixture.api.ListScheduledMessages(ownerCtx, &conversationv1.ListScheduledMessagesRequest{
+		ConversationId: created.Conversation.ConversationId,
+	})
+	if err != nil {
+		t.Fatalf("list scheduled messages: %v", err)
+	}
+	if len(scheduledList.Messages) != 1 || scheduledList.Messages[0].MessageId != scheduled.Message.MessageId {
+		t.Fatalf("expected scheduled message in private list, got %+v", scheduledList.Messages)
+	}
+
+	peerMessages, err := fixture.api.ListMessages(peerCtx, &conversationv1.ListMessagesRequest{
+		ConversationId: created.Conversation.ConversationId,
+	})
+	if err != nil {
+		t.Fatalf("list peer messages before dispatch: %v", err)
+	}
+	if len(peerMessages.Messages) != 0 {
+		t.Fatalf("expected no visible peer messages before dispatch, got %+v", peerMessages.Messages)
+	}
+	if _, err := fixture.api.GetMessage(peerCtx, &conversationv1.GetMessageRequest{
+		ConversationId: created.Conversation.ConversationId,
+		MessageId:      scheduled.Message.MessageId,
+	}); status.Code(err) != codes.NotFound {
+		t.Fatalf("expected scheduled message to stay hidden from peer, got %v", err)
+	}
+
+	events, err := fixture.api.conversation.DispatchDueMessages(context.Background(), deliverAt.Add(time.Second), 10)
+	if err != nil {
+		t.Fatalf("dispatch scheduled messages: %v", err)
+	}
+	if err := fixture.api.HandleScheduledMessageEvents(context.Background(), events); err != nil {
+		t.Fatalf("publish scheduled message events: %v", err)
+	}
+
+	published, err := fixture.api.GetMessage(peerCtx, &conversationv1.GetMessageRequest{
+		ConversationId: created.Conversation.ConversationId,
+		MessageId:      scheduled.Message.MessageId,
+	})
+	if err != nil {
+		t.Fatalf("get dispatched message: %v", err)
+	}
+	if published.Message.Status != commonv1.MessageStatus_MESSAGE_STATUS_SENT {
+		t.Fatalf("expected sent status after dispatch, got %+v", published.Message)
+	}
+
+	scheduledList, err = fixture.api.ListScheduledMessages(ownerCtx, &conversationv1.ListScheduledMessagesRequest{
+		ConversationId: created.Conversation.ConversationId,
+	})
+	if err != nil {
+		t.Fatalf("list scheduled messages after dispatch: %v", err)
+	}
+	if len(scheduledList.Messages) != 0 {
+		t.Fatalf("expected empty scheduled queue after dispatch, got %+v", scheduledList.Messages)
+	}
+}
+
+func TestTranslateMessageRPCUsesCache(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	_, ownerCtx := fixture.mustCreateUserAndLogin(t, "translate-owner", "translate-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "translate-peer", "translate-peer@example.com")
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	sent, err := fixture.api.SendMessage(ownerCtx, &conversationv1.SendMessageRequest{
+		ConversationId: created.Conversation.ConversationId,
+		Draft: &commonv1.MessageDraft{
+			ClientMessageId: "translate-message",
+			Kind:            commonv1.MessageKind_MESSAGE_KIND_TEXT,
+			Payload: &commonv1.EncryptedPayload{
+				Ciphertext: []byte("hello translation"),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("send message: %v", err)
+	}
+
+	first, err := fixture.api.TranslateMessage(peerCtx, &conversationv1.TranslateMessageRequest{
+		ConversationId: created.Conversation.ConversationId,
+		MessageId:      sent.Message.MessageId,
+		TargetLanguage: "ru",
+	})
+	if err != nil {
+		t.Fatalf("translate message: %v", err)
+	}
+	if first.Translation == nil || first.Translation.Cached {
+		t.Fatalf("expected first translation to bypass cache, got %+v", first.Translation)
+	}
+	if first.Translation.TranslatedText != "[ru] hello translation" {
+		t.Fatalf("unexpected translated text: %+v", first.Translation)
+	}
+
+	second, err := fixture.api.TranslateMessage(peerCtx, &conversationv1.TranslateMessageRequest{
+		ConversationId: created.Conversation.ConversationId,
+		MessageId:      sent.Message.MessageId,
+		TargetLanguage: "ru",
+	})
+	if err != nil {
+		t.Fatalf("translate message from cache: %v", err)
+	}
+	if second.Translation == nil || !second.Translation.Cached {
+		t.Fatalf("expected cached translation, got %+v", second.Translation)
+	}
+	if second.Translation.Provider != "test-translation" {
+		t.Fatalf("unexpected cached provider: %+v", second.Translation)
+	}
+}
+
 type gatewayFeatureFixture struct {
 	api        *api
 	sender     *recordingSender
@@ -1259,6 +1551,23 @@ func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
 	if err != nil {
 		t.Fatalf("new media service: %v", err)
 	}
+	notificationService, err := notification.NewService(
+		notificationtest.NewMemoryStore(),
+		identityStore,
+		notification.WithNow(nowFunc),
+	)
+	if err != nil {
+		t.Fatalf("new notification service: %v", err)
+	}
+	translationService, err := domaintranslation.NewService(
+		translationtest.NewMemoryStore(),
+		conversationService,
+		testTranslationProvider{},
+		domaintranslation.WithNow(nowFunc),
+	)
+	if err != nil {
+		t.Fatalf("new translation service: %v", err)
+	}
 	userService, err := domainuser.NewService(usertest.NewMemoryStore(), identityService, domainuser.WithNow(nowFunc))
 	if err != nil {
 		t.Fatalf("new user service: %v", err)
@@ -1271,10 +1580,18 @@ func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
 			presence:     presenceService,
 			conversation: conversationService,
 			media:        mediaService,
+			notification: notificationService,
 			search:       searchService,
+			translation:  translationService,
 			user:         userService,
 			callNotifier: newCallNotifier(),
 			syncNotifier: newSyncNotifier(),
+			features: config.FeatureConfig{
+				CallsEnabled:             true,
+				SearchEnabled:            true,
+				ScheduledMessagesEnabled: true,
+				TranslationEnabled:       true,
+			},
 		},
 		sender:     sender,
 		mediaStore: mediaStore,
@@ -1415,6 +1732,19 @@ func testMessageDraft(id string) *commonv1.MessageDraft {
 			Ciphertext: []byte("ciphertext-" + id),
 		},
 	}
+}
+
+type testTranslationProvider struct{}
+
+func (testTranslationProvider) Translate(
+	_ context.Context,
+	request domaintranslation.ProviderRequest,
+) (domaintranslation.ProviderResult, error) {
+	return domaintranslation.ProviderResult{
+		TranslatedText: "[" + request.TargetLanguage + "] " + request.Text,
+		SourceLanguage: "en",
+		Provider:       "test-translation",
+	}, nil
 }
 
 type testSubscribeEventsStream struct {

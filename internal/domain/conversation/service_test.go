@@ -188,6 +188,135 @@ func TestCreateConversationRejectsDirectWithoutPeer(t *testing.T) {
 	}
 }
 
+func TestScheduledMessageDispatchLifecycle(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	now := time.Date(2026, time.March, 24, 18, 0, 0, 0, time.UTC)
+
+	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time { return now }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	created, _, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{
+		OwnerAccountID:   "acc-owner",
+		Kind:             conversation.ConversationKindDirect,
+		Title:            "Scheduled",
+		MemberAccountIDs: []string{"acc-peer"},
+		CreatedAt:        now,
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	deliverAt := now.Add(10 * time.Minute)
+	message, event, err := svc.SendMessage(ctx, conversation.SendMessageParams{
+		ConversationID:  created.ID,
+		SenderAccountID: "acc-owner",
+		SenderDeviceID:  "dev-owner",
+		Draft: conversation.MessageDraft{
+			ClientMessageID: "scheduled-1",
+			Kind:            conversation.MessageKindText,
+			Payload: conversation.EncryptedPayload{
+				Ciphertext: []byte("scheduled body"),
+			},
+			DeliverAt: deliverAt,
+		},
+		CreatedAt: now,
+	})
+	if err != nil {
+		t.Fatalf("send scheduled message: %v", err)
+	}
+	if message.Status != conversation.MessageStatusPending {
+		t.Fatalf("expected pending scheduled message, got %s", message.Status)
+	}
+	if message.Sequence != 0 {
+		t.Fatalf("expected zero sequence before dispatch, got %d", message.Sequence)
+	}
+	if event.EventID != "" {
+		t.Fatalf("expected no sync event before dispatch, got %+v", event)
+	}
+	if !message.DeliverAt.Equal(deliverAt) {
+		t.Fatalf("expected deliver_at %s, got %s", deliverAt, message.DeliverAt)
+	}
+
+	listed, err := svc.ListScheduledMessages(ctx, conversation.ListScheduledMessagesParams{
+		AccountID:      "acc-owner",
+		ConversationID: created.ID,
+	})
+	if err != nil {
+		t.Fatalf("list scheduled messages: %v", err)
+	}
+	if len(listed) != 1 || listed[0].ID != message.ID {
+		t.Fatalf("expected scheduled message in private list, got %+v", listed)
+	}
+
+	peerMessages, err := svc.ListMessages(ctx, conversation.ListMessagesParams{
+		AccountID:      "acc-peer",
+		ConversationID: created.ID,
+	})
+	if err != nil {
+		t.Fatalf("list peer messages before dispatch: %v", err)
+	}
+	if len(peerMessages) != 0 {
+		t.Fatalf("expected no visible messages before dispatch, got %d", len(peerMessages))
+	}
+	if _, err := svc.GetMessage(ctx, conversation.GetMessageParams{
+		ConversationID: created.ID,
+		MessageID:      message.ID,
+		AccountID:      "acc-peer",
+	}); !errors.Is(err, conversation.ErrNotFound) {
+		t.Fatalf("expected pending message to stay hidden from peer, got %v", err)
+	}
+
+	events, err := svc.DispatchDueMessages(ctx, deliverAt.Add(time.Second), 10)
+	if err != nil {
+		t.Fatalf("dispatch scheduled messages: %v", err)
+	}
+	if len(events) != 1 || events[0].EventType != conversation.EventTypeMessageCreated {
+		t.Fatalf("expected one message.created event, got %+v", events)
+	}
+
+	published, err := svc.GetMessage(ctx, conversation.GetMessageParams{
+		ConversationID: created.ID,
+		MessageID:      message.ID,
+		AccountID:      "acc-peer",
+	})
+	if err != nil {
+		t.Fatalf("get published message: %v", err)
+	}
+	if published.Status != conversation.MessageStatusSent {
+		t.Fatalf("expected sent status after dispatch, got %s", published.Status)
+	}
+	if published.Sequence == 0 {
+		t.Fatal("expected message sequence after dispatch")
+	}
+
+	peerMessages, err = svc.ListMessages(ctx, conversation.ListMessagesParams{
+		AccountID:      "acc-peer",
+		ConversationID: created.ID,
+	})
+	if err != nil {
+		t.Fatalf("list peer messages after dispatch: %v", err)
+	}
+	if len(peerMessages) != 1 || peerMessages[0].ID != message.ID {
+		t.Fatalf("expected dispatched message in peer history, got %+v", peerMessages)
+	}
+
+	listed, err = svc.ListScheduledMessages(ctx, conversation.ListScheduledMessagesParams{
+		AccountID:      "acc-owner",
+		ConversationID: created.ID,
+	})
+	if err != nil {
+		t.Fatalf("list scheduled messages after dispatch: %v", err)
+	}
+	if len(listed) != 0 {
+		t.Fatalf("expected scheduled queue to be empty, got %+v", listed)
+	}
+}
+
 func TestConversationMembershipAndInviteLifecycle(t *testing.T) {
 	t.Parallel()
 

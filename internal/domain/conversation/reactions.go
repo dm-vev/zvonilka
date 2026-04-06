@@ -86,6 +86,9 @@ func (s *Service) AddMessageReaction(ctx context.Context, params AddMessageReact
 		if !decision.Allowed {
 			return ErrForbidden
 		}
+		if state.message.Status == MessageStatusPending || state.message.Status == MessageStatusFailed {
+			return ErrConflict
+		}
 		if !state.message.DeletedAt.IsZero() || state.message.Status == MessageStatusDeleted {
 			return ErrConflict
 		}
@@ -210,6 +213,9 @@ func (s *Service) RemoveMessageReaction(ctx context.Context, params RemoveMessag
 		}
 		if !decision.Allowed {
 			return ErrForbidden
+		}
+		if state.message.Status == MessageStatusPending || state.message.Status == MessageStatusFailed {
+			return ErrConflict
 		}
 		if !state.message.DeletedAt.IsZero() || state.message.Status == MessageStatusDeleted {
 			return ErrConflict

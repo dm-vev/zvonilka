@@ -145,6 +145,9 @@ func (s *Service) EditMessage(ctx context.Context, params EditMessageParams) (Me
 		if !canEditMessage(state.member, state.message) {
 			return ErrForbidden
 		}
+		if state.message.Status == MessageStatusPending || state.message.Status == MessageStatusFailed {
+			return ErrConflict
+		}
 		if !state.message.DeletedAt.IsZero() || state.message.Status == MessageStatusDeleted {
 			return ErrConflict
 		}
@@ -255,6 +258,20 @@ func (s *Service) DeleteMessage(ctx context.Context, params DeleteMessageParams)
 			savedMessage = state.message
 			return nil
 		}
+		if state.message.Status == MessageStatusPending || state.message.Status == MessageStatusFailed {
+			nextMessage := state.message
+			nextMessage.Status = MessageStatusDeleted
+			nextMessage.Pinned = false
+			nextMessage.UpdatedAt = now
+			nextMessage.DeletedAt = now
+
+			savedMessage, err = tx.SaveMessage(ctx, nextMessage)
+			if err != nil {
+				return fmt.Errorf("save deleted scheduled message %s: %w", nextMessage.ID, err)
+			}
+
+			return nil
+		}
 
 		nextMessage := state.message
 		nextMessage.Status = MessageStatusDeleted
@@ -334,6 +351,9 @@ func (s *Service) PinMessage(ctx context.Context, params PinMessageParams) (Mess
 		}
 		if !canPinMessage(state.member, policy) {
 			return ErrForbidden
+		}
+		if state.message.Status == MessageStatusPending || state.message.Status == MessageStatusFailed {
+			return ErrConflict
 		}
 		if !state.message.DeletedAt.IsZero() || state.message.Status == MessageStatusDeleted {
 			return ErrConflict

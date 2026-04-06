@@ -66,6 +66,8 @@ const (
 	defaultRedisConnIdle              = 5 * time.Minute
 	defaultCallHookMaxBodyBytes       = 1 << 20
 	defaultNotificationWebhookTimeout = 10 * time.Second
+	defaultTranslationTimeout         = 10 * time.Second
+	defaultTranslationMaxTextBytes    = 16 << 10
 )
 
 func defaultConfiguration(serviceName string) Configuration {
@@ -157,6 +159,11 @@ func defaultConfiguration(serviceName string) Configuration {
 			MaxLimit:       searchDefaults.MaxLimit,
 			MinQueryLength: searchDefaults.MinQueryLength,
 			SnippetLength:  searchDefaults.SnippetLength,
+		},
+		Translation: TranslationConfig{
+			Timeout:      defaultTranslationTimeout,
+			MaxTextBytes: defaultTranslationMaxTextBytes,
+			ProviderName: "translation-http",
 		},
 		Infrastructure: InfrastructureConfig{
 			Postgres: PostgresConfig{

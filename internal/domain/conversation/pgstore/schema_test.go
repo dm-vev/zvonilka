@@ -993,7 +993,7 @@ ON CONFLICT (id) DO NOTHING
 func openDockerPostgres(t *testing.T) *sql.DB {
 	t.Helper()
 
-	release := dockermutex.Acquire(t, "conversation-postgres")
+	release := dockermutex.Acquire(t, "postgres-integration")
 	t.Cleanup(release)
 
 	if _, err := exec.LookPath("docker"); err != nil {

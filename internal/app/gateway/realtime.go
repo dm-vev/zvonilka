@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"sync"
 
 	domainconversation "github.com/dm-vev/zvonilka/internal/domain/conversation"
@@ -122,6 +123,12 @@ func (a *api) subscribeSyncNotifications() (<-chan syncSignal, func()) {
 	}
 
 	return a.syncNotifier.subscribe()
+}
+
+func (a *api) HandleScheduledMessageEvents(ctx context.Context, events []domainconversation.EventEnvelope) error {
+	_ = ctx
+	a.publishSyncEvents(events...)
+	return nil
 }
 
 func cloneSyncEvent(event domainconversation.EventEnvelope) domainconversation.EventEnvelope {

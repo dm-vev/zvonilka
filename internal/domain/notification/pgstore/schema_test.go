@@ -641,7 +641,7 @@ func requirePgCode(t *testing.T, err error, code string) {
 func openDockerPostgres(t *testing.T) *sql.DB {
 	t.Helper()
 
-	unlock := dockermutex.Acquire(t, "notification-postgres")
+	unlock := dockermutex.Acquire(t, "postgres-integration")
 	t.Cleanup(unlock)
 
 	if _, err := exec.LookPath("docker"); err != nil {

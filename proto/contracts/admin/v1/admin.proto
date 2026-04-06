@@ -11,14 +11,4 @@ service AdminService {
   rpc ApproveJoinRequest(ApproveJoinRequestRequest) returns (ApproveJoinRequestResponse);
   rpc RejectJoinRequest(RejectJoinRequestRequest) returns (RejectJoinRequestResponse);
   rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse);
-  rpc SuspendAccount(SuspendAccountRequest) returns (SuspendAccountResponse);
-  rpc RestoreAccount(RestoreAccountRequest) returns (RestoreAccountResponse);
-  rpc UpdateAccountRoles(UpdateAccountRolesRequest) returns (UpdateAccountRolesResponse);
-  rpc CreateInvite(CreateInviteRequest) returns (CreateInviteResponse);
-  rpc RevokeInvite(RevokeInviteRequest) returns (RevokeInviteResponse);
-  rpc GetPolicySet(GetPolicySetRequest) returns (GetPolicySetResponse);
-  rpc UpdatePolicySet(UpdatePolicySetRequest) returns (UpdatePolicySetResponse);
-  rpc ListAuditLogs(ListAuditLogsRequest) returns (ListAuditLogsResponse);
-  rpc ListModerationCases(ListModerationCasesRequest) returns (ListModerationCasesResponse);
-  rpc ResolveModerationCase(ResolveModerationCaseRequest) returns (ResolveModerationCaseResponse);
 }

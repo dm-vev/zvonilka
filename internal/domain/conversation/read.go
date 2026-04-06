@@ -74,6 +74,10 @@ func (s *Service) GetMessage(ctx context.Context, params GetMessageParams) (Mess
 			err,
 		)
 	}
+	if (message.Status == MessageStatusPending || message.Status == MessageStatusFailed) &&
+		message.SenderAccountID != params.AccountID {
+		return Message{}, ErrNotFound
+	}
 	if !message.DeletedAt.IsZero() && member.Role != MemberRoleOwner && member.Role != MemberRoleAdmin {
 		return Message{}, ErrNotFound
 	}

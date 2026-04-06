@@ -1,6 +1,9 @@
 package conversation
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Store persists conversation state.
 type Store interface {
@@ -25,6 +28,15 @@ type Store interface {
 	SaveMessage(ctx context.Context, message Message) (Message, error)
 	MessageByID(ctx context.Context, conversationID string, messageID string) (Message, error)
 	MessagesByConversationID(ctx context.Context, conversationID string, threadID string, fromSequence uint64, limit int) ([]Message, error)
+	ScheduledMessagesByConversationAndSender(
+		ctx context.Context,
+		conversationID string,
+		senderAccountID string,
+		threadID string,
+		includeFailed bool,
+		limit int,
+	) ([]Message, error)
+	DueScheduledMessages(ctx context.Context, before time.Time, limit int) ([]Message, error)
 	SaveMessageReaction(ctx context.Context, reaction MessageReaction) (MessageReaction, error)
 	DeleteMessageReaction(ctx context.Context, messageID string, accountID string) error
 

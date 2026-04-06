@@ -21,6 +21,18 @@ message ListMessagesResponse {
   zvonilka.common.v1.PageResponse page = 2;
 }
 
+message ListScheduledMessagesRequest {
+  string conversation_id = 1;
+  zvonilka.common.v1.PageRequest page = 2;
+  string thread_id = 3;
+  bool include_failed = 4;
+}
+
+message ListScheduledMessagesResponse {
+  repeated Message messages = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
 message GetMessageRequest {
   string conversation_id = 1;
   string message_id = 2;
@@ -39,6 +51,18 @@ message SendMessageRequest {
 message SendMessageResponse {
   Message message = 1;
   zvonilka.common.v1.EventEnvelope event = 2;
+}
+
+message TranslateMessageRequest {
+  string conversation_id = 1;
+  string message_id = 2;
+  string target_language = 3;
+  string source_language = 4;
+  bool force_refresh = 5;
+}
+
+message TranslateMessageResponse {
+  MessageTranslation translation = 1;
 }
 
 message EditMessageRequest {

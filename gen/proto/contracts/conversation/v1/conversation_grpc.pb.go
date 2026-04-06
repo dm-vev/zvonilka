@@ -31,8 +31,10 @@ const (
 	ConversationService_ListInvites_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/ListInvites"
 	ConversationService_RevokeInvite_FullMethodName               = "/zvonilka.conversation.v1.ConversationService/RevokeInvite"
 	ConversationService_ListMessages_FullMethodName               = "/zvonilka.conversation.v1.ConversationService/ListMessages"
+	ConversationService_ListScheduledMessages_FullMethodName      = "/zvonilka.conversation.v1.ConversationService/ListScheduledMessages"
 	ConversationService_GetMessage_FullMethodName                 = "/zvonilka.conversation.v1.ConversationService/GetMessage"
 	ConversationService_SendMessage_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/SendMessage"
+	ConversationService_TranslateMessage_FullMethodName           = "/zvonilka.conversation.v1.ConversationService/TranslateMessage"
 	ConversationService_EditMessage_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/EditMessage"
 	ConversationService_DeleteMessage_FullMethodName              = "/zvonilka.conversation.v1.ConversationService/DeleteMessage"
 	ConversationService_AddReaction_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/AddReaction"
@@ -76,8 +78,10 @@ type ConversationServiceClient interface {
 	ListInvites(ctx context.Context, in *ListInvitesRequest, opts ...grpc.CallOption) (*ListInvitesResponse, error)
 	RevokeInvite(ctx context.Context, in *RevokeInviteRequest, opts ...grpc.CallOption) (*RevokeInviteResponse, error)
 	ListMessages(ctx context.Context, in *ListMessagesRequest, opts ...grpc.CallOption) (*ListMessagesResponse, error)
+	ListScheduledMessages(ctx context.Context, in *ListScheduledMessagesRequest, opts ...grpc.CallOption) (*ListScheduledMessagesResponse, error)
 	GetMessage(ctx context.Context, in *GetMessageRequest, opts ...grpc.CallOption) (*GetMessageResponse, error)
 	SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*SendMessageResponse, error)
+	TranslateMessage(ctx context.Context, in *TranslateMessageRequest, opts ...grpc.CallOption) (*TranslateMessageResponse, error)
 	EditMessage(ctx context.Context, in *EditMessageRequest, opts ...grpc.CallOption) (*EditMessageResponse, error)
 	DeleteMessage(ctx context.Context, in *DeleteMessageRequest, opts ...grpc.CallOption) (*DeleteMessageResponse, error)
 	AddReaction(ctx context.Context, in *AddReactionRequest, opts ...grpc.CallOption) (*AddReactionResponse, error)
@@ -221,6 +225,15 @@ func (c *conversationServiceClient) ListMessages(ctx context.Context, in *ListMe
 	return out, nil
 }
 
+func (c *conversationServiceClient) ListScheduledMessages(ctx context.Context, in *ListScheduledMessagesRequest, opts ...grpc.CallOption) (*ListScheduledMessagesResponse, error) {
+	out := new(ListScheduledMessagesResponse)
+	err := c.cc.Invoke(ctx, ConversationService_ListScheduledMessages_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *conversationServiceClient) GetMessage(ctx context.Context, in *GetMessageRequest, opts ...grpc.CallOption) (*GetMessageResponse, error) {
 	out := new(GetMessageResponse)
 	err := c.cc.Invoke(ctx, ConversationService_GetMessage_FullMethodName, in, out, opts...)
@@ -233,6 +246,15 @@ func (c *conversationServiceClient) GetMessage(ctx context.Context, in *GetMessa
 func (c *conversationServiceClient) SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*SendMessageResponse, error) {
 	out := new(SendMessageResponse)
 	err := c.cc.Invoke(ctx, ConversationService_SendMessage_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) TranslateMessage(ctx context.Context, in *TranslateMessageRequest, opts ...grpc.CallOption) (*TranslateMessageResponse, error) {
+	out := new(TranslateMessageResponse)
+	err := c.cc.Invoke(ctx, ConversationService_TranslateMessage_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -480,8 +502,10 @@ type ConversationServiceServer interface {
 	ListInvites(context.Context, *ListInvitesRequest) (*ListInvitesResponse, error)
 	RevokeInvite(context.Context, *RevokeInviteRequest) (*RevokeInviteResponse, error)
 	ListMessages(context.Context, *ListMessagesRequest) (*ListMessagesResponse, error)
+	ListScheduledMessages(context.Context, *ListScheduledMessagesRequest) (*ListScheduledMessagesResponse, error)
 	GetMessage(context.Context, *GetMessageRequest) (*GetMessageResponse, error)
 	SendMessage(context.Context, *SendMessageRequest) (*SendMessageResponse, error)
+	TranslateMessage(context.Context, *TranslateMessageRequest) (*TranslateMessageResponse, error)
 	EditMessage(context.Context, *EditMessageRequest) (*EditMessageResponse, error)
 	DeleteMessage(context.Context, *DeleteMessageRequest) (*DeleteMessageResponse, error)
 	AddReaction(context.Context, *AddReactionRequest) (*AddReactionResponse, error)
@@ -550,11 +574,17 @@ func (UnimplementedConversationServiceServer) RevokeInvite(context.Context, *Rev
 func (UnimplementedConversationServiceServer) ListMessages(context.Context, *ListMessagesRequest) (*ListMessagesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListMessages not implemented")
 }
+func (UnimplementedConversationServiceServer) ListScheduledMessages(context.Context, *ListScheduledMessagesRequest) (*ListScheduledMessagesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListScheduledMessages not implemented")
+}
 func (UnimplementedConversationServiceServer) GetMessage(context.Context, *GetMessageRequest) (*GetMessageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMessage not implemented")
 }
 func (UnimplementedConversationServiceServer) SendMessage(context.Context, *SendMessageRequest) (*SendMessageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendMessage not implemented")
+}
+func (UnimplementedConversationServiceServer) TranslateMessage(context.Context, *TranslateMessageRequest) (*TranslateMessageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TranslateMessage not implemented")
 }
 func (UnimplementedConversationServiceServer) EditMessage(context.Context, *EditMessageRequest) (*EditMessageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EditMessage not implemented")
@@ -860,6 +890,24 @@ func _ConversationService_ListMessages_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConversationService_ListScheduledMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListScheduledMessagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).ListScheduledMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_ListScheduledMessages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).ListScheduledMessages(ctx, req.(*ListScheduledMessagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ConversationService_GetMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetMessageRequest)
 	if err := dec(in); err != nil {
@@ -892,6 +940,24 @@ func _ConversationService_SendMessage_Handler(srv interface{}, ctx context.Conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ConversationServiceServer).SendMessage(ctx, req.(*SendMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_TranslateMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TranslateMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).TranslateMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_TranslateMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).TranslateMessage(ctx, req.(*TranslateMessageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1402,12 +1468,20 @@ var ConversationService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ConversationService_ListMessages_Handler,
 		},
 		{
+			MethodName: "ListScheduledMessages",
+			Handler:    _ConversationService_ListScheduledMessages_Handler,
+		},
+		{
 			MethodName: "GetMessage",
 			Handler:    _ConversationService_GetMessage_Handler,
 		},
 		{
 			MethodName: "SendMessage",
 			Handler:    _ConversationService_SendMessage_Handler,
+		},
+		{
+			MethodName: "TranslateMessage",
+			Handler:    _ConversationService_TranslateMessage_Handler,
 		},
 		{
 			MethodName: "EditMessage",

@@ -495,6 +495,61 @@ func (a *api) ListMessages(
 	}, nil
 }
 
+// ListScheduledMessages returns the authenticated sender's scheduled messages.
+func (a *api) ListScheduledMessages(
+	ctx context.Context,
+	req *conversationv1.ListScheduledMessagesRequest,
+) (*conversationv1.ListScheduledMessagesResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !a.features.ScheduledMessagesEnabled {
+		return nil, featureDisabledError("scheduled messages")
+	}
+
+	offset, err := decodeOffset(req.GetPage(), "scheduled_messages")
+	if err != nil {
+		return nil, grpcError(domainconversation.ErrInvalidInput)
+	}
+	size := pageSize(req.GetPage())
+	end := offset + size
+
+	messages, err := a.conversation.ListScheduledMessages(ctx, domainconversation.ListScheduledMessagesParams{
+		AccountID:      authContext.Account.ID,
+		ConversationID: req.GetConversationId(),
+		ThreadID:       req.GetThreadId(),
+		Limit:          end,
+		IncludeFailed:  req.GetIncludeFailed(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	if end > len(messages) {
+		end = len(messages)
+	}
+
+	page := messages
+	if offset < len(messages) {
+		page = messages[offset:end]
+	} else {
+		page = nil
+	}
+
+	profiles, err := a.messageProfiles(ctx, page, authContext.Account.ID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &conversationv1.ListScheduledMessagesResponse{
+		Messages: messagesProto(page, profiles),
+		Page: &commonv1.PageResponse{
+			NextPageToken: offsetToken("scheduled_messages", end),
+			TotalSize:     uint64(len(messages)),
+		},
+	}, nil
+}
+
 // GetMessage returns one message visible to the caller.
 func (a *api) GetMessage(
 	ctx context.Context,
@@ -534,6 +589,9 @@ func (a *api) SendMessage(
 		return nil, err
 	}
 	draft := draftFromProto(req.GetDraft())
+	if !draft.DeliverAt.IsZero() && !a.features.ScheduledMessagesEnabled {
+		return nil, featureDisabledError("scheduled messages")
+	}
 	conversationRow, _, err := a.conversation.GetConversation(ctx, domainconversation.GetConversationParams{
 		ConversationID: req.GetConversationId(),
 		AccountID:      authContext.Account.ID,
@@ -564,16 +622,23 @@ func (a *api) SendMessage(
 	if err != nil {
 		return nil, grpcError(err)
 	}
-	a.publishSyncEvent(event)
+	if event.EventID != "" {
+		a.publishSyncEvent(event)
+	}
 
 	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
 	if err != nil {
 		return nil, grpcError(err)
 	}
 
+	var responseEvent *commonv1.EventEnvelope
+	if event.EventID != "" {
+		responseEvent = eventProto(event)
+	}
+
 	return &conversationv1.SendMessageResponse{
 		Message: messageProto(message, profiles[message.SenderAccountID]),
-		Event:   eventProto(event),
+		Event:   responseEvent,
 	}, nil
 }
 
@@ -1855,6 +1920,7 @@ func messageProto(message domainconversation.Message, senderProfile *usersv1.Use
 		Reactions:      reactions,
 		ViewCount:      message.ViewCount,
 		MentionUserIds: message.MentionAccountIDs,
+		DeliverAt:      protoTime(message.DeliverAt),
 		CreatedAt:      protoTime(message.CreatedAt),
 		EditedAt:       protoTime(message.EditedAt),
 		DeletedAt:      protoTime(message.DeletedAt),

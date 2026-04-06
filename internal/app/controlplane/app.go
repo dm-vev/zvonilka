@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	adminv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/admin/v1"
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	"github.com/dm-vev/zvonilka/internal/domain/media"
@@ -13,17 +14,34 @@ import (
 	"github.com/dm-vev/zvonilka/internal/platform/buildinfo"
 	"github.com/dm-vev/zvonilka/internal/platform/config"
 	"github.com/dm-vev/zvonilka/internal/platform/runtime"
+	"google.golang.org/grpc"
 )
 
 type app struct {
 	health         *runtime.Health
 	handler        http.Handler
 	catalog        *domainstorage.Catalog
+	api            *api
 	conversation   *conversation.Service
 	identity       *identity.Service
 	media          *media.Service
 	presence       *presence.Service
 	cleanupTimeout time.Duration
+}
+
+type api struct {
+	adminv1.UnimplementedAdminServiceServer
+
+	identity *identity.Service
+	presence *presence.Service
+}
+
+func (a *app) registerGRPC(server *grpc.Server) {
+	if a == nil || a.api == nil || server == nil {
+		return
+	}
+
+	adminv1.RegisterAdminServiceServer(server, a.api)
 }
 
 func (a *app) close(ctx context.Context) error {
@@ -48,6 +66,7 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 		health:         health,
 		handler:        http.NotFoundHandler(),
 		catalog:        storageCatalog,
+		api:            &api{identity: identityService, presence: presenceService},
 		conversation:   conversationService,
 		identity:       identityService,
 		media:          mediaService,

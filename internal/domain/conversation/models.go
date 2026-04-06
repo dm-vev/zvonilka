@@ -259,6 +259,7 @@ type Message struct {
 	Pinned              bool
 	DisableLinkPreviews bool
 	ViewCount           uint64
+	DeliverAt           time.Time
 	Metadata            map[string]string
 	Reactions           []MessageReaction
 	CreatedAt           time.Time

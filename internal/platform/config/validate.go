@@ -232,6 +232,23 @@ func (c Configuration) Validate() error {
 	if c.Search.SnippetLength <= 0 {
 		errs = append(errs, errors.New("search snippet length must be positive"))
 	}
+	if c.Translation.Timeout <= 0 {
+		errs = append(errs, errors.New("translation timeout must be positive"))
+	}
+	if c.Translation.MaxTextBytes <= 0 {
+		errs = append(errs, errors.New("translation max text bytes must be positive"))
+	}
+	if c.Features.TranslationEnabled {
+		translationURL := strings.TrimSpace(c.Translation.EndpointURL)
+		if translationURL == "" {
+			errs = append(errs, errors.New("translation endpoint url is required when translation is enabled"))
+		} else {
+			parsed, err := url.Parse(translationURL)
+			if err != nil || !parsed.IsAbs() || parsed.Host == "" {
+				errs = append(errs, errors.New("translation endpoint url must be absolute"))
+			}
+		}
+	}
 	if c.Runtime.HTTP.ReadHeaderTimeout <= 0 {
 		errs = append(errs, errors.New("HTTP read header timeout must be positive"))
 	}

@@ -151,6 +151,18 @@ message Message {
   google.protobuf.Timestamp created_at = 17;
   google.protobuf.Timestamp edited_at = 18;
   google.protobuf.Timestamp deleted_at = 19;
+  google.protobuf.Timestamp deliver_at = 20;
+}
+
+message MessageTranslation {
+  string conversation_id = 1;
+  string message_id = 2;
+  string target_language = 3;
+  string source_language = 4;
+  string provider = 5;
+  string translated_text = 6;
+  bool cached = 7;
+  google.protobuf.Timestamp translated_at = 8;
 }
 
 message Thread {

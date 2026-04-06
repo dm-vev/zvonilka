@@ -19,20 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	AdminService_ListJoinRequests_FullMethodName      = "/zvonilka.admin.v1.AdminService/ListJoinRequests"
-	AdminService_ApproveJoinRequest_FullMethodName    = "/zvonilka.admin.v1.AdminService/ApproveJoinRequest"
-	AdminService_RejectJoinRequest_FullMethodName     = "/zvonilka.admin.v1.AdminService/RejectJoinRequest"
-	AdminService_CreateAccount_FullMethodName         = "/zvonilka.admin.v1.AdminService/CreateAccount"
-	AdminService_SuspendAccount_FullMethodName        = "/zvonilka.admin.v1.AdminService/SuspendAccount"
-	AdminService_RestoreAccount_FullMethodName        = "/zvonilka.admin.v1.AdminService/RestoreAccount"
-	AdminService_UpdateAccountRoles_FullMethodName    = "/zvonilka.admin.v1.AdminService/UpdateAccountRoles"
-	AdminService_CreateInvite_FullMethodName          = "/zvonilka.admin.v1.AdminService/CreateInvite"
-	AdminService_RevokeInvite_FullMethodName          = "/zvonilka.admin.v1.AdminService/RevokeInvite"
-	AdminService_GetPolicySet_FullMethodName          = "/zvonilka.admin.v1.AdminService/GetPolicySet"
-	AdminService_UpdatePolicySet_FullMethodName       = "/zvonilka.admin.v1.AdminService/UpdatePolicySet"
-	AdminService_ListAuditLogs_FullMethodName         = "/zvonilka.admin.v1.AdminService/ListAuditLogs"
-	AdminService_ListModerationCases_FullMethodName   = "/zvonilka.admin.v1.AdminService/ListModerationCases"
-	AdminService_ResolveModerationCase_FullMethodName = "/zvonilka.admin.v1.AdminService/ResolveModerationCase"
+	AdminService_ListJoinRequests_FullMethodName   = "/zvonilka.admin.v1.AdminService/ListJoinRequests"
+	AdminService_ApproveJoinRequest_FullMethodName = "/zvonilka.admin.v1.AdminService/ApproveJoinRequest"
+	AdminService_RejectJoinRequest_FullMethodName  = "/zvonilka.admin.v1.AdminService/RejectJoinRequest"
+	AdminService_CreateAccount_FullMethodName      = "/zvonilka.admin.v1.AdminService/CreateAccount"
 )
 
 // AdminServiceClient is the client API for AdminService service.
@@ -43,16 +33,6 @@ type AdminServiceClient interface {
 	ApproveJoinRequest(ctx context.Context, in *ApproveJoinRequestRequest, opts ...grpc.CallOption) (*ApproveJoinRequestResponse, error)
 	RejectJoinRequest(ctx context.Context, in *RejectJoinRequestRequest, opts ...grpc.CallOption) (*RejectJoinRequestResponse, error)
 	CreateAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*CreateAccountResponse, error)
-	SuspendAccount(ctx context.Context, in *SuspendAccountRequest, opts ...grpc.CallOption) (*SuspendAccountResponse, error)
-	RestoreAccount(ctx context.Context, in *RestoreAccountRequest, opts ...grpc.CallOption) (*RestoreAccountResponse, error)
-	UpdateAccountRoles(ctx context.Context, in *UpdateAccountRolesRequest, opts ...grpc.CallOption) (*UpdateAccountRolesResponse, error)
-	CreateInvite(ctx context.Context, in *CreateInviteRequest, opts ...grpc.CallOption) (*CreateInviteResponse, error)
-	RevokeInvite(ctx context.Context, in *RevokeInviteRequest, opts ...grpc.CallOption) (*RevokeInviteResponse, error)
-	GetPolicySet(ctx context.Context, in *GetPolicySetRequest, opts ...grpc.CallOption) (*GetPolicySetResponse, error)
-	UpdatePolicySet(ctx context.Context, in *UpdatePolicySetRequest, opts ...grpc.CallOption) (*UpdatePolicySetResponse, error)
-	ListAuditLogs(ctx context.Context, in *ListAuditLogsRequest, opts ...grpc.CallOption) (*ListAuditLogsResponse, error)
-	ListModerationCases(ctx context.Context, in *ListModerationCasesRequest, opts ...grpc.CallOption) (*ListModerationCasesResponse, error)
-	ResolveModerationCase(ctx context.Context, in *ResolveModerationCaseRequest, opts ...grpc.CallOption) (*ResolveModerationCaseResponse, error)
 }
 
 type adminServiceClient struct {
@@ -99,96 +79,6 @@ func (c *adminServiceClient) CreateAccount(ctx context.Context, in *CreateAccoun
 	return out, nil
 }
 
-func (c *adminServiceClient) SuspendAccount(ctx context.Context, in *SuspendAccountRequest, opts ...grpc.CallOption) (*SuspendAccountResponse, error) {
-	out := new(SuspendAccountResponse)
-	err := c.cc.Invoke(ctx, AdminService_SuspendAccount_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adminServiceClient) RestoreAccount(ctx context.Context, in *RestoreAccountRequest, opts ...grpc.CallOption) (*RestoreAccountResponse, error) {
-	out := new(RestoreAccountResponse)
-	err := c.cc.Invoke(ctx, AdminService_RestoreAccount_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adminServiceClient) UpdateAccountRoles(ctx context.Context, in *UpdateAccountRolesRequest, opts ...grpc.CallOption) (*UpdateAccountRolesResponse, error) {
-	out := new(UpdateAccountRolesResponse)
-	err := c.cc.Invoke(ctx, AdminService_UpdateAccountRoles_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adminServiceClient) CreateInvite(ctx context.Context, in *CreateInviteRequest, opts ...grpc.CallOption) (*CreateInviteResponse, error) {
-	out := new(CreateInviteResponse)
-	err := c.cc.Invoke(ctx, AdminService_CreateInvite_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adminServiceClient) RevokeInvite(ctx context.Context, in *RevokeInviteRequest, opts ...grpc.CallOption) (*RevokeInviteResponse, error) {
-	out := new(RevokeInviteResponse)
-	err := c.cc.Invoke(ctx, AdminService_RevokeInvite_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adminServiceClient) GetPolicySet(ctx context.Context, in *GetPolicySetRequest, opts ...grpc.CallOption) (*GetPolicySetResponse, error) {
-	out := new(GetPolicySetResponse)
-	err := c.cc.Invoke(ctx, AdminService_GetPolicySet_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adminServiceClient) UpdatePolicySet(ctx context.Context, in *UpdatePolicySetRequest, opts ...grpc.CallOption) (*UpdatePolicySetResponse, error) {
-	out := new(UpdatePolicySetResponse)
-	err := c.cc.Invoke(ctx, AdminService_UpdatePolicySet_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adminServiceClient) ListAuditLogs(ctx context.Context, in *ListAuditLogsRequest, opts ...grpc.CallOption) (*ListAuditLogsResponse, error) {
-	out := new(ListAuditLogsResponse)
-	err := c.cc.Invoke(ctx, AdminService_ListAuditLogs_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adminServiceClient) ListModerationCases(ctx context.Context, in *ListModerationCasesRequest, opts ...grpc.CallOption) (*ListModerationCasesResponse, error) {
-	out := new(ListModerationCasesResponse)
-	err := c.cc.Invoke(ctx, AdminService_ListModerationCases_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adminServiceClient) ResolveModerationCase(ctx context.Context, in *ResolveModerationCaseRequest, opts ...grpc.CallOption) (*ResolveModerationCaseResponse, error) {
-	out := new(ResolveModerationCaseResponse)
-	err := c.cc.Invoke(ctx, AdminService_ResolveModerationCase_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // AdminServiceServer is the server API for AdminService service.
 // All implementations must embed UnimplementedAdminServiceServer
 // for forward compatibility
@@ -197,16 +87,6 @@ type AdminServiceServer interface {
 	ApproveJoinRequest(context.Context, *ApproveJoinRequestRequest) (*ApproveJoinRequestResponse, error)
 	RejectJoinRequest(context.Context, *RejectJoinRequestRequest) (*RejectJoinRequestResponse, error)
 	CreateAccount(context.Context, *CreateAccountRequest) (*CreateAccountResponse, error)
-	SuspendAccount(context.Context, *SuspendAccountRequest) (*SuspendAccountResponse, error)
-	RestoreAccount(context.Context, *RestoreAccountRequest) (*RestoreAccountResponse, error)
-	UpdateAccountRoles(context.Context, *UpdateAccountRolesRequest) (*UpdateAccountRolesResponse, error)
-	CreateInvite(context.Context, *CreateInviteRequest) (*CreateInviteResponse, error)
-	RevokeInvite(context.Context, *RevokeInviteRequest) (*RevokeInviteResponse, error)
-	GetPolicySet(context.Context, *GetPolicySetRequest) (*GetPolicySetResponse, error)
-	UpdatePolicySet(context.Context, *UpdatePolicySetRequest) (*UpdatePolicySetResponse, error)
-	ListAuditLogs(context.Context, *ListAuditLogsRequest) (*ListAuditLogsResponse, error)
-	ListModerationCases(context.Context, *ListModerationCasesRequest) (*ListModerationCasesResponse, error)
-	ResolveModerationCase(context.Context, *ResolveModerationCaseRequest) (*ResolveModerationCaseResponse, error)
 	mustEmbedUnimplementedAdminServiceServer()
 }
 
@@ -225,36 +105,6 @@ func (UnimplementedAdminServiceServer) RejectJoinRequest(context.Context, *Rejec
 }
 func (UnimplementedAdminServiceServer) CreateAccount(context.Context, *CreateAccountRequest) (*CreateAccountResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateAccount not implemented")
-}
-func (UnimplementedAdminServiceServer) SuspendAccount(context.Context, *SuspendAccountRequest) (*SuspendAccountResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SuspendAccount not implemented")
-}
-func (UnimplementedAdminServiceServer) RestoreAccount(context.Context, *RestoreAccountRequest) (*RestoreAccountResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RestoreAccount not implemented")
-}
-func (UnimplementedAdminServiceServer) UpdateAccountRoles(context.Context, *UpdateAccountRolesRequest) (*UpdateAccountRolesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateAccountRoles not implemented")
-}
-func (UnimplementedAdminServiceServer) CreateInvite(context.Context, *CreateInviteRequest) (*CreateInviteResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateInvite not implemented")
-}
-func (UnimplementedAdminServiceServer) RevokeInvite(context.Context, *RevokeInviteRequest) (*RevokeInviteResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RevokeInvite not implemented")
-}
-func (UnimplementedAdminServiceServer) GetPolicySet(context.Context, *GetPolicySetRequest) (*GetPolicySetResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetPolicySet not implemented")
-}
-func (UnimplementedAdminServiceServer) UpdatePolicySet(context.Context, *UpdatePolicySetRequest) (*UpdatePolicySetResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdatePolicySet not implemented")
-}
-func (UnimplementedAdminServiceServer) ListAuditLogs(context.Context, *ListAuditLogsRequest) (*ListAuditLogsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListAuditLogs not implemented")
-}
-func (UnimplementedAdminServiceServer) ListModerationCases(context.Context, *ListModerationCasesRequest) (*ListModerationCasesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListModerationCases not implemented")
-}
-func (UnimplementedAdminServiceServer) ResolveModerationCase(context.Context, *ResolveModerationCaseRequest) (*ResolveModerationCaseResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ResolveModerationCase not implemented")
 }
 func (UnimplementedAdminServiceServer) mustEmbedUnimplementedAdminServiceServer() {}
 
@@ -341,186 +191,6 @@ func _AdminService_CreateAccount_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AdminService_SuspendAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SuspendAccountRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).SuspendAccount(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_SuspendAccount_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).SuspendAccount(ctx, req.(*SuspendAccountRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AdminService_RestoreAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RestoreAccountRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).RestoreAccount(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_RestoreAccount_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).RestoreAccount(ctx, req.(*RestoreAccountRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AdminService_UpdateAccountRoles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateAccountRolesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).UpdateAccountRoles(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_UpdateAccountRoles_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).UpdateAccountRoles(ctx, req.(*UpdateAccountRolesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AdminService_CreateInvite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateInviteRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).CreateInvite(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_CreateInvite_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).CreateInvite(ctx, req.(*CreateInviteRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AdminService_RevokeInvite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RevokeInviteRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).RevokeInvite(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_RevokeInvite_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).RevokeInvite(ctx, req.(*RevokeInviteRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AdminService_GetPolicySet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetPolicySetRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).GetPolicySet(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_GetPolicySet_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).GetPolicySet(ctx, req.(*GetPolicySetRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AdminService_UpdatePolicySet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdatePolicySetRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).UpdatePolicySet(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_UpdatePolicySet_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).UpdatePolicySet(ctx, req.(*UpdatePolicySetRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AdminService_ListAuditLogs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListAuditLogsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).ListAuditLogs(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_ListAuditLogs_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).ListAuditLogs(ctx, req.(*ListAuditLogsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AdminService_ListModerationCases_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListModerationCasesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).ListModerationCases(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_ListModerationCases_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).ListModerationCases(ctx, req.(*ListModerationCasesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AdminService_ResolveModerationCase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ResolveModerationCaseRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).ResolveModerationCase(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_ResolveModerationCase_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).ResolveModerationCase(ctx, req.(*ResolveModerationCaseRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // AdminService_ServiceDesc is the grpc.ServiceDesc for AdminService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -543,46 +213,6 @@ var AdminService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateAccount",
 			Handler:    _AdminService_CreateAccount_Handler,
-		},
-		{
-			MethodName: "SuspendAccount",
-			Handler:    _AdminService_SuspendAccount_Handler,
-		},
-		{
-			MethodName: "RestoreAccount",
-			Handler:    _AdminService_RestoreAccount_Handler,
-		},
-		{
-			MethodName: "UpdateAccountRoles",
-			Handler:    _AdminService_UpdateAccountRoles_Handler,
-		},
-		{
-			MethodName: "CreateInvite",
-			Handler:    _AdminService_CreateInvite_Handler,
-		},
-		{
-			MethodName: "RevokeInvite",
-			Handler:    _AdminService_RevokeInvite_Handler,
-		},
-		{
-			MethodName: "GetPolicySet",
-			Handler:    _AdminService_GetPolicySet_Handler,
-		},
-		{
-			MethodName: "UpdatePolicySet",
-			Handler:    _AdminService_UpdatePolicySet_Handler,
-		},
-		{
-			MethodName: "ListAuditLogs",
-			Handler:    _AdminService_ListAuditLogs_Handler,
-		},
-		{
-			MethodName: "ListModerationCases",
-			Handler:    _AdminService_ListModerationCases_Handler,
-		},
-		{
-			MethodName: "ResolveModerationCase",
-			Handler:    _AdminService_ResolveModerationCase_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

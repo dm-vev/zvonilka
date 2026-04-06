@@ -22,8 +22,10 @@ service ConversationService {
   rpc ListInvites(ListInvitesRequest) returns (ListInvitesResponse);
   rpc RevokeInvite(RevokeInviteRequest) returns (RevokeInviteResponse);
   rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
+  rpc ListScheduledMessages(ListScheduledMessagesRequest) returns (ListScheduledMessagesResponse);
   rpc GetMessage(GetMessageRequest) returns (GetMessageResponse);
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  rpc TranslateMessage(TranslateMessageRequest) returns (TranslateMessageResponse);
   rpc EditMessage(EditMessageRequest) returns (EditMessageResponse);
   rpc DeleteMessage(DeleteMessageRequest) returns (DeleteMessageResponse);
   rpc AddReaction(AddReactionRequest) returns (AddReactionResponse);
