@@ -1224,19 +1224,19 @@ func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
 	callService, err := domaincall.NewService(
 		calltest.NewMemoryStore(),
 		conversationStore,
-		platformrtc.NewManager(
-			"webrtc://test/calls",
-			15*time.Minute,
-			platformrtc.WithCandidateHost("127.0.0.1"),
-			platformrtc.WithUDPPortRange(41000, 41010),
-		),
+		mustTestRTCCluster(t),
 		domaincall.WithNow(nowFunc),
 		domaincall.WithRTC(domaincall.RTCConfig{
-			PublicEndpoint: "webrtc://test/calls",
+			PublicEndpoint: "webrtc://node-a/calls",
 			CredentialTTL:  15 * time.Minute,
+			NodeID:         "node-a",
 			CandidateHost:  "127.0.0.1",
 			UDPPortMin:     41000,
-			UDPPortMax:     41010,
+			UDPPortMax:     41019,
+			Nodes: []domaincall.RTCNode{
+				{ID: "node-a", Endpoint: "webrtc://node-a/calls"},
+				{ID: "node-b", Endpoint: "webrtc://node-b/calls"},
+			},
 		}),
 	)
 	if err != nil {
@@ -1281,6 +1281,34 @@ func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
 		mediaBlob:  mediaBlob,
 		nowFunc:    nowFunc,
 	}
+}
+
+func mustTestRTCCluster(t *testing.T) domaincall.Runtime {
+	t.Helper()
+
+	local := platformrtc.NewManager(
+		"webrtc://node-a/calls",
+		15*time.Minute,
+		platformrtc.WithCandidateHost("127.0.0.1"),
+		platformrtc.WithUDPPortRange(41000, 41009),
+	)
+	cluster, err := platformrtc.NewCluster(domaincall.RTCConfig{
+		PublicEndpoint: "webrtc://node-a/calls",
+		CredentialTTL:  15 * time.Minute,
+		NodeID:         "node-a",
+		CandidateHost:  "127.0.0.1",
+		UDPPortMin:     41000,
+		UDPPortMax:     41019,
+		Nodes: []domaincall.RTCNode{
+			{ID: "node-a", Endpoint: "webrtc://node-a/calls"},
+			{ID: "node-b", Endpoint: "webrtc://node-b/calls"},
+		},
+	}, local)
+	if err != nil {
+		t.Fatalf("new test rtc cluster: %v", err)
+	}
+
+	return cluster
 }
 
 func (f *gatewayFeatureFixture) now() time.Time {

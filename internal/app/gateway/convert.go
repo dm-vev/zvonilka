@@ -307,6 +307,58 @@ func callStatsSnapshotProto(value domaincall.Call, observedAt time.Time) *callv1
 	}
 }
 
+func callRuntimeStateProto(value domaincall.RuntimeState) *callv1.CallRuntimeState {
+	return &callv1.CallRuntimeState{
+		CallId:                        value.CallID,
+		ConversationId:                value.ConversationID,
+		SessionId:                     value.SessionID,
+		NodeId:                        value.NodeID,
+		RuntimeEndpoint:               value.RuntimeEndpoint,
+		Active:                        value.Active,
+		Healthy:                       value.Healthy,
+		ConfiguredReplicaNodeIds:      append([]string(nil), value.ConfiguredReplicaNodeIDs...),
+		HealthyMigrationTargetNodeIds: append([]string(nil), value.HealthyMigrationTargetNodeIDs...),
+		ObservedAt:                    protoTime(value.ObservedAt),
+	}
+}
+
+func callSessionSnapshotProto(value domaincall.RuntimeSnapshot) *callv1.CallSessionSnapshot {
+	participants := make([]*callv1.CallSessionSnapshotParticipant, 0, len(value.Participants))
+	for _, participant := range value.Participants {
+		relayTracks := make([]*callv1.CallSessionRelayTrack, 0, len(participant.Relay))
+		for _, relay := range participant.Relay {
+			relayTracks = append(relayTracks, &callv1.CallSessionRelayTrack{
+				SourceUserId:   relay.SourceAccountID,
+				SourceDeviceId: relay.SourceDeviceID,
+				TrackId:        relay.TrackID,
+				StreamId:       relay.StreamID,
+				Kind:           relay.Kind,
+				ScreenShare:    relay.ScreenShare,
+				CodecMimeType:  relay.CodecMimeType,
+				CodecClockRate: relay.CodecClockRate,
+				CodecChannels:  relay.CodecChannels,
+			})
+		}
+		participants = append(participants, &callv1.CallSessionSnapshotParticipant{
+			UserId:         participant.AccountID,
+			DeviceId:       participant.DeviceID,
+			WithVideo:      participant.WithVideo,
+			MediaState:     callMediaStateProto(participant.Media),
+			TransportStats: callTransportStatsProto(participant.Transport),
+			RelayTracks:    relayTracks,
+		})
+	}
+
+	return &callv1.CallSessionSnapshot{
+		CallId:         value.CallID,
+		ConversationId: value.ConversationID,
+		SessionId:      value.SessionID,
+		NodeId:         value.NodeID,
+		ObservedAt:     protoTime(value.ObservedAt),
+		Participants:   participants,
+	}
+}
+
 func iceServerProto(server domaincall.IceServer) *callv1.IceServer {
 	return &callv1.IceServer{
 		Urls:       append([]string(nil), server.URLs...),

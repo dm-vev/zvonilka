@@ -22,6 +22,8 @@ const (
 	CallService_StartCall_FullMethodName                 = "/zvonilka.call.v1.CallService/StartCall"
 	CallService_GetCall_FullMethodName                   = "/zvonilka.call.v1.CallService/GetCall"
 	CallService_GetCallDiagnostics_FullMethodName        = "/zvonilka.call.v1.CallService/GetCallDiagnostics"
+	CallService_GetCallRuntimeState_FullMethodName       = "/zvonilka.call.v1.CallService/GetCallRuntimeState"
+	CallService_GetCallSessionSnapshot_FullMethodName    = "/zvonilka.call.v1.CallService/GetCallSessionSnapshot"
 	CallService_ListCalls_FullMethodName                 = "/zvonilka.call.v1.CallService/ListCalls"
 	CallService_AcceptCall_FullMethodName                = "/zvonilka.call.v1.CallService/AcceptCall"
 	CallService_DeclineCall_FullMethodName               = "/zvonilka.call.v1.CallService/DeclineCall"
@@ -30,6 +32,7 @@ const (
 	CallService_JoinCall_FullMethodName                  = "/zvonilka.call.v1.CallService/JoinCall"
 	CallService_ReconnectCall_FullMethodName             = "/zvonilka.call.v1.CallService/ReconnectCall"
 	CallService_HandoffCall_FullMethodName               = "/zvonilka.call.v1.CallService/HandoffCall"
+	CallService_MigrateCallSession_FullMethodName        = "/zvonilka.call.v1.CallService/MigrateCallSession"
 	CallService_PublishCallDescription_FullMethodName    = "/zvonilka.call.v1.CallService/PublishCallDescription"
 	CallService_PublishCallIceCandidate_FullMethodName   = "/zvonilka.call.v1.CallService/PublishCallIceCandidate"
 	CallService_LeaveCall_FullMethodName                 = "/zvonilka.call.v1.CallService/LeaveCall"
@@ -57,6 +60,8 @@ type CallServiceClient interface {
 	StartCall(ctx context.Context, in *StartCallRequest, opts ...grpc.CallOption) (*StartCallResponse, error)
 	GetCall(ctx context.Context, in *GetCallRequest, opts ...grpc.CallOption) (*GetCallResponse, error)
 	GetCallDiagnostics(ctx context.Context, in *GetCallDiagnosticsRequest, opts ...grpc.CallOption) (*GetCallDiagnosticsResponse, error)
+	GetCallRuntimeState(ctx context.Context, in *GetCallRuntimeStateRequest, opts ...grpc.CallOption) (*GetCallRuntimeStateResponse, error)
+	GetCallSessionSnapshot(ctx context.Context, in *GetCallSessionSnapshotRequest, opts ...grpc.CallOption) (*GetCallSessionSnapshotResponse, error)
 	ListCalls(ctx context.Context, in *ListCallsRequest, opts ...grpc.CallOption) (*ListCallsResponse, error)
 	AcceptCall(ctx context.Context, in *AcceptCallRequest, opts ...grpc.CallOption) (*AcceptCallResponse, error)
 	DeclineCall(ctx context.Context, in *DeclineCallRequest, opts ...grpc.CallOption) (*DeclineCallResponse, error)
@@ -65,6 +70,7 @@ type CallServiceClient interface {
 	JoinCall(ctx context.Context, in *JoinCallRequest, opts ...grpc.CallOption) (*JoinCallResponse, error)
 	ReconnectCall(ctx context.Context, in *ReconnectCallRequest, opts ...grpc.CallOption) (*ReconnectCallResponse, error)
 	HandoffCall(ctx context.Context, in *HandoffCallRequest, opts ...grpc.CallOption) (*HandoffCallResponse, error)
+	MigrateCallSession(ctx context.Context, in *MigrateCallSessionRequest, opts ...grpc.CallOption) (*MigrateCallSessionResponse, error)
 	PublishCallDescription(ctx context.Context, in *PublishCallDescriptionRequest, opts ...grpc.CallOption) (*PublishCallDescriptionResponse, error)
 	PublishCallIceCandidate(ctx context.Context, in *PublishCallIceCandidateRequest, opts ...grpc.CallOption) (*PublishCallIceCandidateResponse, error)
 	LeaveCall(ctx context.Context, in *LeaveCallRequest, opts ...grpc.CallOption) (*LeaveCallResponse, error)
@@ -114,6 +120,24 @@ func (c *callServiceClient) GetCall(ctx context.Context, in *GetCallRequest, opt
 func (c *callServiceClient) GetCallDiagnostics(ctx context.Context, in *GetCallDiagnosticsRequest, opts ...grpc.CallOption) (*GetCallDiagnosticsResponse, error) {
 	out := new(GetCallDiagnosticsResponse)
 	err := c.cc.Invoke(ctx, CallService_GetCallDiagnostics_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *callServiceClient) GetCallRuntimeState(ctx context.Context, in *GetCallRuntimeStateRequest, opts ...grpc.CallOption) (*GetCallRuntimeStateResponse, error) {
+	out := new(GetCallRuntimeStateResponse)
+	err := c.cc.Invoke(ctx, CallService_GetCallRuntimeState_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *callServiceClient) GetCallSessionSnapshot(ctx context.Context, in *GetCallSessionSnapshotRequest, opts ...grpc.CallOption) (*GetCallSessionSnapshotResponse, error) {
+	out := new(GetCallSessionSnapshotResponse)
+	err := c.cc.Invoke(ctx, CallService_GetCallSessionSnapshot_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -186,6 +210,15 @@ func (c *callServiceClient) ReconnectCall(ctx context.Context, in *ReconnectCall
 func (c *callServiceClient) HandoffCall(ctx context.Context, in *HandoffCallRequest, opts ...grpc.CallOption) (*HandoffCallResponse, error) {
 	out := new(HandoffCallResponse)
 	err := c.cc.Invoke(ctx, CallService_HandoffCall_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *callServiceClient) MigrateCallSession(ctx context.Context, in *MigrateCallSessionRequest, opts ...grpc.CallOption) (*MigrateCallSessionResponse, error) {
+	out := new(MigrateCallSessionResponse)
+	err := c.cc.Invoke(ctx, CallService_MigrateCallSession_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -407,6 +440,8 @@ type CallServiceServer interface {
 	StartCall(context.Context, *StartCallRequest) (*StartCallResponse, error)
 	GetCall(context.Context, *GetCallRequest) (*GetCallResponse, error)
 	GetCallDiagnostics(context.Context, *GetCallDiagnosticsRequest) (*GetCallDiagnosticsResponse, error)
+	GetCallRuntimeState(context.Context, *GetCallRuntimeStateRequest) (*GetCallRuntimeStateResponse, error)
+	GetCallSessionSnapshot(context.Context, *GetCallSessionSnapshotRequest) (*GetCallSessionSnapshotResponse, error)
 	ListCalls(context.Context, *ListCallsRequest) (*ListCallsResponse, error)
 	AcceptCall(context.Context, *AcceptCallRequest) (*AcceptCallResponse, error)
 	DeclineCall(context.Context, *DeclineCallRequest) (*DeclineCallResponse, error)
@@ -415,6 +450,7 @@ type CallServiceServer interface {
 	JoinCall(context.Context, *JoinCallRequest) (*JoinCallResponse, error)
 	ReconnectCall(context.Context, *ReconnectCallRequest) (*ReconnectCallResponse, error)
 	HandoffCall(context.Context, *HandoffCallRequest) (*HandoffCallResponse, error)
+	MigrateCallSession(context.Context, *MigrateCallSessionRequest) (*MigrateCallSessionResponse, error)
 	PublishCallDescription(context.Context, *PublishCallDescriptionRequest) (*PublishCallDescriptionResponse, error)
 	PublishCallIceCandidate(context.Context, *PublishCallIceCandidateRequest) (*PublishCallIceCandidateResponse, error)
 	LeaveCall(context.Context, *LeaveCallRequest) (*LeaveCallResponse, error)
@@ -449,6 +485,12 @@ func (UnimplementedCallServiceServer) GetCall(context.Context, *GetCallRequest) 
 func (UnimplementedCallServiceServer) GetCallDiagnostics(context.Context, *GetCallDiagnosticsRequest) (*GetCallDiagnosticsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetCallDiagnostics not implemented")
 }
+func (UnimplementedCallServiceServer) GetCallRuntimeState(context.Context, *GetCallRuntimeStateRequest) (*GetCallRuntimeStateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCallRuntimeState not implemented")
+}
+func (UnimplementedCallServiceServer) GetCallSessionSnapshot(context.Context, *GetCallSessionSnapshotRequest) (*GetCallSessionSnapshotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCallSessionSnapshot not implemented")
+}
 func (UnimplementedCallServiceServer) ListCalls(context.Context, *ListCallsRequest) (*ListCallsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListCalls not implemented")
 }
@@ -472,6 +514,9 @@ func (UnimplementedCallServiceServer) ReconnectCall(context.Context, *ReconnectC
 }
 func (UnimplementedCallServiceServer) HandoffCall(context.Context, *HandoffCallRequest) (*HandoffCallResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HandoffCall not implemented")
+}
+func (UnimplementedCallServiceServer) MigrateCallSession(context.Context, *MigrateCallSessionRequest) (*MigrateCallSessionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method MigrateCallSession not implemented")
 }
 func (UnimplementedCallServiceServer) PublishCallDescription(context.Context, *PublishCallDescriptionRequest) (*PublishCallDescriptionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PublishCallDescription not implemented")
@@ -590,6 +635,42 @@ func _CallService_GetCallDiagnostics_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CallServiceServer).GetCallDiagnostics(ctx, req.(*GetCallDiagnosticsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CallService_GetCallRuntimeState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCallRuntimeStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).GetCallRuntimeState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_GetCallRuntimeState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).GetCallRuntimeState(ctx, req.(*GetCallRuntimeStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CallService_GetCallSessionSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCallSessionSnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).GetCallSessionSnapshot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_GetCallSessionSnapshot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).GetCallSessionSnapshot(ctx, req.(*GetCallSessionSnapshotRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -734,6 +815,24 @@ func _CallService_HandoffCall_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CallServiceServer).HandoffCall(ctx, req.(*HandoffCallRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CallService_MigrateCallSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MigrateCallSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CallServiceServer).MigrateCallSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CallService_MigrateCallSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CallServiceServer).MigrateCallSession(ctx, req.(*MigrateCallSessionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1088,6 +1187,14 @@ var CallService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _CallService_GetCallDiagnostics_Handler,
 		},
 		{
+			MethodName: "GetCallRuntimeState",
+			Handler:    _CallService_GetCallRuntimeState_Handler,
+		},
+		{
+			MethodName: "GetCallSessionSnapshot",
+			Handler:    _CallService_GetCallSessionSnapshot_Handler,
+		},
+		{
 			MethodName: "ListCalls",
 			Handler:    _CallService_ListCalls_Handler,
 		},
@@ -1118,6 +1225,10 @@ var CallService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HandoffCall",
 			Handler:    _CallService_HandoffCall_Handler,
+		},
+		{
+			MethodName: "MigrateCallSession",
+			Handler:    _CallService_MigrateCallSession_Handler,
 		},
 		{
 			MethodName: "PublishCallDescription",

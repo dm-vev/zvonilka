@@ -26,6 +26,7 @@ type fakeRuntime struct {
 	closed    []string
 	left      []string
 	signals   []domaincall.RuntimeSignal
+	snapshot  domaincall.RuntimeSnapshot
 	joinError error
 	ackError  error
 	ensureN   int
@@ -188,6 +189,43 @@ func (f *fakeRuntime) LeaveSession(_ context.Context, sessionID string, accountI
 func (f *fakeRuntime) CloseSession(_ context.Context, sessionID string) error {
 	f.closed = append(f.closed, sessionID)
 	return nil
+}
+
+func (f *fakeRuntime) SessionState(_ context.Context, callRow domaincall.Call) (domaincall.RuntimeState, error) {
+	return domaincall.RuntimeState{
+		CallID:                        callRow.ID,
+		ConversationID:                callRow.ConversationID,
+		SessionID:                     callRow.ActiveSessionID,
+		NodeID:                        domaincall.NodeIDFromSessionID(callRow.ActiveSessionID),
+		RuntimeEndpoint:               f.session.RuntimeEndpoint,
+		Active:                        callRow.State == domaincall.StateActive && callRow.ActiveSessionID != "",
+		Healthy:                       callRow.ActiveSessionID != "",
+		ConfiguredReplicaNodeIDs:      []string{"node-b"},
+		HealthyMigrationTargetNodeIDs: []string{"node-b"},
+		ObservedAt:                    time.Date(2026, time.March, 27, 12, 0, 0, 0, time.UTC),
+	}, nil
+}
+
+func (f *fakeRuntime) SessionSnapshot(_ context.Context, callRow domaincall.Call) (domaincall.RuntimeSnapshot, error) {
+	snapshot := f.snapshot
+	if snapshot.CallID == "" {
+		snapshot = domaincall.RuntimeSnapshot{
+			CallID:         callRow.ID,
+			ConversationID: callRow.ConversationID,
+			SessionID:      callRow.ActiveSessionID,
+			NodeID:         domaincall.NodeIDFromSessionID(callRow.ActiveSessionID),
+			ObservedAt:     time.Date(2026, time.March, 27, 12, 0, 0, 0, time.UTC),
+		}
+		for _, item := range f.stats {
+			snapshot.Participants = append(snapshot.Participants, domaincall.RuntimeSnapshotParticipant{
+				AccountID: item.AccountID,
+				DeviceID:  item.DeviceID,
+				Transport: item.Transport,
+			})
+		}
+	}
+
+	return domaincall.CloneRuntimeSnapshot(snapshot), nil
 }
 
 func runtimeParticipantKey(accountID string, deviceID string) string {
@@ -1089,4 +1127,135 @@ func TestReconnectCallMigratesSessionOnRuntimeUnavailable(t *testing.T) {
 	require.Equal(t, "reconnect", events[0].Metadata["failover_reason"])
 	require.Equal(t, "acc-b", events[1].Metadata["target_account_id"])
 	require.Equal(t, "dev-b", events[1].Metadata["target_device_id"])
+}
+
+func TestGetRuntimeStateAndSnapshot(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 28, 3, 0, 0, 0, time.UTC)
+	runtime := newFakeRuntime(now)
+	service := newTestService(t, now, runtime)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-direct",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+
+	_, _, err = service.AcceptCall(context.Background(), domaincall.AcceptParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.NoError(t, err)
+
+	joined, _, _, err := service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	runtime.snapshot = domaincall.RuntimeSnapshot{
+		CallID:         started.ID,
+		ConversationID: "conv-direct",
+		SessionID:      joined.ActiveSessionID,
+		NodeID:         domaincall.NodeIDFromSessionID(joined.ActiveSessionID),
+		ObservedAt:     now,
+		Participants: []domaincall.RuntimeSnapshotParticipant{
+			{
+				AccountID: "acc-b",
+				DeviceID:  "dev-b",
+				WithVideo: true,
+				Media: domaincall.MediaState{
+					CameraEnabled: true,
+				},
+				Transport: domaincall.TransportStats{
+					Quality: "connected",
+				},
+				Relay: []domaincall.RuntimeRelayTrack{
+					{
+						SourceAccountID: "acc-a",
+						SourceDeviceID:  "dev-a",
+						TrackID:         "track-1",
+					},
+				},
+			},
+		},
+	}
+
+	state, err := service.GetRuntimeState(context.Background(), domaincall.GetParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+	})
+	require.NoError(t, err)
+	require.Equal(t, started.ID, state.CallID)
+	require.Equal(t, joined.ActiveSessionID, state.SessionID)
+	require.True(t, state.Active)
+	require.True(t, state.Healthy)
+
+	snapshot, err := service.GetSessionSnapshot(context.Background(), domaincall.GetParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+	})
+	require.NoError(t, err)
+	require.Equal(t, joined.ActiveSessionID, snapshot.SessionID)
+	require.Len(t, snapshot.Participants, 1)
+	require.Equal(t, "acc-b", snapshot.Participants[0].AccountID)
+	require.Len(t, snapshot.Participants[0].Relay, 1)
+	require.Equal(t, "track-1", snapshot.Participants[0].Relay[0].TrackID)
+}
+
+func TestMigrateCallSessionRequiresHostAndUpdatesSession(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.March, 28, 4, 0, 0, 0, time.UTC)
+	runtime := newFakeRuntime(now)
+	service := newTestService(t, now, runtime)
+
+	started, _, err := service.StartCall(context.Background(), domaincall.StartParams{
+		ConversationID: "conv-direct",
+		AccountID:      "acc-a",
+		DeviceID:       "dev-a",
+		WithVideo:      true,
+	})
+	require.NoError(t, err)
+
+	_, _, err = service.AcceptCall(context.Background(), domaincall.AcceptParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.NoError(t, err)
+
+	_, _, _, err = service.JoinCall(context.Background(), domaincall.JoinParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+		WithVideo: true,
+	})
+	require.NoError(t, err)
+
+	_, _, err = service.MigrateCallSession(context.Background(), domaincall.MigrateParams{
+		CallID:    started.ID,
+		AccountID: "acc-b",
+		DeviceID:  "dev-b",
+	})
+	require.ErrorIs(t, err, domaincall.ErrForbidden)
+
+	callRow, events, err := service.MigrateCallSession(context.Background(), domaincall.MigrateParams{
+		CallID:    started.ID,
+		AccountID: "acc-a",
+		DeviceID:  "dev-a",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "sess-2", callRow.ActiveSessionID)
+	require.Len(t, events, 2)
+	require.Equal(t, domaincall.EventTypeSessionMigrated, events[0].EventType)
+	require.Equal(t, "manual", events[0].Metadata["failover_reason"])
+	require.Equal(t, "sess-1", events[0].Metadata["previous_session_id"])
+	require.Equal(t, "sess-2", events[0].Metadata["session_id"])
 }

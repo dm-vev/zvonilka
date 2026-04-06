@@ -70,6 +70,53 @@ type RuntimeStats struct {
 	Transport TransportStats
 }
 
+// RuntimeState describes the current cluster/runtime placement for one call session.
+type RuntimeState struct {
+	CallID                        string
+	ConversationID                string
+	SessionID                     string
+	NodeID                        string
+	RuntimeEndpoint               string
+	Active                        bool
+	Healthy                       bool
+	ConfiguredReplicaNodeIDs      []string
+	HealthyMigrationTargetNodeIDs []string
+	ObservedAt                    time.Time
+}
+
+// RuntimeRelayTrack describes one relayed media track captured in a runtime snapshot.
+type RuntimeRelayTrack struct {
+	SourceAccountID string
+	SourceDeviceID  string
+	TrackID         string
+	StreamID        string
+	Kind            string
+	ScreenShare     bool
+	CodecMimeType   string
+	CodecClockRate  uint32
+	CodecChannels   uint32
+}
+
+// RuntimeSnapshotParticipant describes one participant captured in a runtime snapshot.
+type RuntimeSnapshotParticipant struct {
+	AccountID string
+	DeviceID  string
+	WithVideo bool
+	Media     MediaState
+	Transport TransportStats
+	Relay     []RuntimeRelayTrack
+}
+
+// RuntimeSnapshot describes one exported runtime session snapshot.
+type RuntimeSnapshot struct {
+	CallID         string
+	ConversationID string
+	SessionID      string
+	NodeID         string
+	ObservedAt     time.Time
+	Participants   []RuntimeSnapshotParticipant
+}
+
 // RuntimeParticipant describes one participant join request for the media plane.
 type RuntimeParticipant struct {
 	CallID    string
@@ -110,6 +157,16 @@ type Runtime interface {
 	SessionStats(ctx context.Context, sessionID string) ([]RuntimeStats, error)
 	LeaveSession(ctx context.Context, sessionID string, accountID string, deviceID string) error
 	CloseSession(ctx context.Context, sessionID string) error
+}
+
+// RuntimeStateReader exposes stable runtime placement inspection.
+type RuntimeStateReader interface {
+	SessionState(ctx context.Context, call Call) (RuntimeState, error)
+}
+
+// RuntimeSnapshotReader exposes stable runtime snapshot inspection.
+type RuntimeSnapshotReader interface {
+	SessionSnapshot(ctx context.Context, call Call) (RuntimeSnapshot, error)
 }
 
 func (c RTCConfig) normalize() RTCConfig {
@@ -181,6 +238,57 @@ func normalizeRTCNodes(values []RTCNode) []RTCNode {
 	}
 
 	return result
+}
+
+func cloneRuntimeState(value RuntimeState) RuntimeState {
+	if len(value.ConfiguredReplicaNodeIDs) > 0 {
+		value.ConfiguredReplicaNodeIDs = append([]string(nil), value.ConfiguredReplicaNodeIDs...)
+	}
+	if len(value.HealthyMigrationTargetNodeIDs) > 0 {
+		value.HealthyMigrationTargetNodeIDs = append([]string(nil), value.HealthyMigrationTargetNodeIDs...)
+	}
+
+	return value
+}
+
+// CloneRuntimeState returns one detached runtime-state copy.
+func CloneRuntimeState(value RuntimeState) RuntimeState {
+	return cloneRuntimeState(value)
+}
+
+func cloneRuntimeSnapshot(value RuntimeSnapshot) RuntimeSnapshot {
+	if len(value.Participants) == 0 {
+		value.Participants = nil
+		return value
+	}
+
+	participants := make([]RuntimeSnapshotParticipant, len(value.Participants))
+	for i := range value.Participants {
+		participants[i] = cloneRuntimeSnapshotParticipant(value.Participants[i])
+	}
+	value.Participants = participants
+
+	return value
+}
+
+// CloneRuntimeSnapshot returns one detached runtime-snapshot copy.
+func CloneRuntimeSnapshot(value RuntimeSnapshot) RuntimeSnapshot {
+	return cloneRuntimeSnapshot(value)
+}
+
+func cloneRuntimeSnapshotParticipant(value RuntimeSnapshotParticipant) RuntimeSnapshotParticipant {
+	value.Media = MediaState{
+		AudioMuted:         value.Media.AudioMuted,
+		VideoMuted:         value.Media.VideoMuted,
+		CameraEnabled:      value.Media.CameraEnabled,
+		ScreenShareEnabled: value.Media.ScreenShareEnabled,
+	}
+	value.Transport = cloneTransportStats(value.Transport)
+	if len(value.Relay) > 0 {
+		value.Relay = append([]RuntimeRelayTrack(nil), value.Relay...)
+	}
+
+	return value
 }
 
 func (c RTCConfig) endpointForSession(sessionID string) string {

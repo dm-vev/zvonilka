@@ -33,6 +33,22 @@ message GetCallDiagnosticsResponse {
   CallDiagnostics diagnostics = 1;
 }
 
+message GetCallRuntimeStateRequest {
+  string call_id = 1;
+}
+
+message GetCallRuntimeStateResponse {
+  CallRuntimeState runtime = 1;
+}
+
+message GetCallSessionSnapshotRequest {
+  string call_id = 1;
+}
+
+message GetCallSessionSnapshotResponse {
+  CallSessionSnapshot snapshot = 1;
+}
+
 message ListCallsRequest {
   string conversation_id = 1;
   bool include_ended = 2;
@@ -105,6 +121,15 @@ message HandoffCallResponse {
   Call call = 1;
   CallParticipant participant = 2;
   JoinTransport transport = 3;
+}
+
+message MigrateCallSessionRequest {
+  string call_id = 1;
+}
+
+message MigrateCallSessionResponse {
+  Call call = 1;
+  CallRuntimeState runtime = 2;
 }
 
 message PublishCallDescriptionRequest {

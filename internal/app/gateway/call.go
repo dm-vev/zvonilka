@@ -69,6 +69,48 @@ func (a *api) GetCallDiagnostics(
 	return &callv1.GetCallDiagnosticsResponse{Diagnostics: callDiagnosticsProto(report)}, nil
 }
 
+// GetCallRuntimeState returns the stable runtime placement for one visible call.
+func (a *api) GetCallRuntimeState(
+	ctx context.Context,
+	req *callv1.GetCallRuntimeStateRequest,
+) (*callv1.GetCallRuntimeStateResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	state, err := a.call.GetRuntimeState(ctx, domaincall.GetParams{
+		CallID:    req.GetCallId(),
+		AccountID: authContext.Account.ID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &callv1.GetCallRuntimeStateResponse{Runtime: callRuntimeStateProto(state)}, nil
+}
+
+// GetCallSessionSnapshot returns the current stable runtime snapshot for one visible active call.
+func (a *api) GetCallSessionSnapshot(
+	ctx context.Context,
+	req *callv1.GetCallSessionSnapshotRequest,
+) (*callv1.GetCallSessionSnapshotResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	snapshot, err := a.call.GetSessionSnapshot(ctx, domaincall.GetParams{
+		CallID:    req.GetCallId(),
+		AccountID: authContext.Account.ID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &callv1.GetCallSessionSnapshotResponse{Snapshot: callSessionSnapshotProto(snapshot)}, nil
+}
+
 // ListCalls returns calls for one conversation visible to the caller.
 func (a *api) ListCalls(ctx context.Context, req *callv1.ListCallsRequest) (*callv1.ListCallsResponse, error) {
 	authContext, err := a.requireAuth(ctx)
@@ -271,6 +313,40 @@ func (a *api) HandoffCall(ctx context.Context, req *callv1.HandoffCallRequest) (
 		Call:        callProto(callRow),
 		Participant: callParticipantProto(participant),
 		Transport:   joinDetailsProto(details),
+	}, nil
+}
+
+// MigrateCallSession explicitly migrates one active call session to another healthy runtime node.
+func (a *api) MigrateCallSession(
+	ctx context.Context,
+	req *callv1.MigrateCallSessionRequest,
+) (*callv1.MigrateCallSessionResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	callRow, events, err := a.call.MigrateCallSession(ctx, domaincall.MigrateParams{
+		CallID:    req.GetCallId(),
+		AccountID: authContext.Account.ID,
+		DeviceID:  authContext.Device.ID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishCallEvents(events...)
+
+	state, err := a.call.GetRuntimeState(ctx, domaincall.GetParams{
+		CallID:    callRow.ID,
+		AccountID: authContext.Account.ID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &callv1.MigrateCallSessionResponse{
+		Call:    callProto(callRow),
+		Runtime: callRuntimeStateProto(state),
 	}, nil
 }
 

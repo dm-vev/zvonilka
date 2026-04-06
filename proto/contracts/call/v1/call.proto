@@ -10,6 +10,8 @@ service CallService {
   rpc StartCall(StartCallRequest) returns (StartCallResponse);
   rpc GetCall(GetCallRequest) returns (GetCallResponse);
   rpc GetCallDiagnostics(GetCallDiagnosticsRequest) returns (GetCallDiagnosticsResponse);
+  rpc GetCallRuntimeState(GetCallRuntimeStateRequest) returns (GetCallRuntimeStateResponse);
+  rpc GetCallSessionSnapshot(GetCallSessionSnapshotRequest) returns (GetCallSessionSnapshotResponse);
   rpc ListCalls(ListCallsRequest) returns (ListCallsResponse);
   rpc AcceptCall(AcceptCallRequest) returns (AcceptCallResponse);
   rpc DeclineCall(DeclineCallRequest) returns (DeclineCallResponse);
@@ -18,6 +20,7 @@ service CallService {
   rpc JoinCall(JoinCallRequest) returns (JoinCallResponse);
   rpc ReconnectCall(ReconnectCallRequest) returns (ReconnectCallResponse);
   rpc HandoffCall(HandoffCallRequest) returns (HandoffCallResponse);
+  rpc MigrateCallSession(MigrateCallSessionRequest) returns (MigrateCallSessionResponse);
   rpc PublishCallDescription(PublishCallDescriptionRequest) returns (PublishCallDescriptionResponse);
   rpc PublishCallIceCandidate(PublishCallIceCandidateRequest) returns (PublishCallIceCandidateResponse);
   rpc LeaveCall(LeaveCallRequest) returns (LeaveCallResponse);

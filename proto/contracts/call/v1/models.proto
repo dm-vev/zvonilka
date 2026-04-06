@@ -213,6 +213,49 @@ message CallStatsSnapshot {
   google.protobuf.Timestamp observed_at = 2;
 }
 
+message CallRuntimeState {
+  string call_id = 1;
+  string conversation_id = 2;
+  string session_id = 3;
+  string node_id = 4;
+  string runtime_endpoint = 5;
+  bool active = 6;
+  bool healthy = 7;
+  repeated string configured_replica_node_ids = 8;
+  repeated string healthy_migration_target_node_ids = 9;
+  google.protobuf.Timestamp observed_at = 10;
+}
+
+message CallSessionRelayTrack {
+  string source_user_id = 1;
+  string source_device_id = 2;
+  string track_id = 3;
+  string stream_id = 4;
+  string kind = 5;
+  bool screen_share = 6;
+  string codec_mime_type = 7;
+  uint32 codec_clock_rate = 8;
+  uint32 codec_channels = 9;
+}
+
+message CallSessionSnapshotParticipant {
+  string user_id = 1;
+  string device_id = 2;
+  bool with_video = 3;
+  CallMediaState media_state = 4;
+  CallTransportStats transport_stats = 5;
+  repeated CallSessionRelayTrack relay_tracks = 6;
+}
+
+message CallSessionSnapshot {
+  string call_id = 1;
+  string conversation_id = 2;
+  string session_id = 3;
+  string node_id = 4;
+  google.protobuf.Timestamp observed_at = 5;
+  repeated CallSessionSnapshotParticipant participants = 6;
+}
+
 message Call {
   string call_id = 1;
   string conversation_id = 2;

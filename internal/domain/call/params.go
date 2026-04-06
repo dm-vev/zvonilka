@@ -60,6 +60,13 @@ type HandoffParams struct {
 	ToDeviceID   string
 }
 
+// MigrateParams describes one explicit active-session migration request.
+type MigrateParams struct {
+	CallID    string
+	AccountID string
+	DeviceID  string
+}
+
 // PublishDescriptionParams describes one SDP publication for a joined participant.
 type PublishDescriptionParams struct {
 	CallID      string

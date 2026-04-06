@@ -545,6 +545,137 @@ func TestGetCallDiagnosticsRPC(t *testing.T) {
 	}
 }
 
+func TestCallRuntimeStateAndSnapshotRPC(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	owner, ownerCtx := fixture.mustCreateUserAndLogin(t, "call-runtime-owner", "call-runtime-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "call-runtime-peer", "call-runtime-peer@example.com")
+
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	started, err := fixture.api.StartCall(ownerCtx, &callv1.StartCallRequest{
+		ConversationId: created.Conversation.ConversationId,
+		WithVideo:      true,
+	})
+	if err != nil {
+		t.Fatalf("start call: %v", err)
+	}
+	if _, err := fixture.api.AcceptCall(peerCtx, &callv1.AcceptCallRequest{CallId: started.Call.CallId}); err != nil {
+		t.Fatalf("accept call: %v", err)
+	}
+	joined, err := fixture.api.JoinCall(peerCtx, &callv1.JoinCallRequest{
+		CallId:    started.Call.CallId,
+		WithVideo: true,
+	})
+	if err != nil {
+		t.Fatalf("join call: %v", err)
+	}
+
+	runtimeState, err := fixture.api.GetCallRuntimeState(ownerCtx, &callv1.GetCallRuntimeStateRequest{
+		CallId: started.Call.CallId,
+	})
+	if err != nil {
+		t.Fatalf("get call runtime state: %v", err)
+	}
+	if runtimeState.Runtime == nil || !runtimeState.Runtime.Active || !runtimeState.Runtime.Healthy {
+		t.Fatalf("unexpected runtime state: %+v", runtimeState.Runtime)
+	}
+	if runtimeState.Runtime.SessionId != joined.Transport.SessionId {
+		t.Fatalf("unexpected runtime session id: %+v", runtimeState.Runtime)
+	}
+	if runtimeState.Runtime.NodeId == "" || runtimeState.Runtime.RuntimeEndpoint == "" {
+		t.Fatalf("expected runtime placement details: %+v", runtimeState.Runtime)
+	}
+	if len(runtimeState.Runtime.ConfiguredReplicaNodeIds) == 0 {
+		t.Fatalf("expected configured replica nodes: %+v", runtimeState.Runtime)
+	}
+
+	snapshot, err := fixture.api.GetCallSessionSnapshot(ownerCtx, &callv1.GetCallSessionSnapshotRequest{
+		CallId: started.Call.CallId,
+	})
+	if err != nil {
+		t.Fatalf("get call session snapshot: %v", err)
+	}
+	if snapshot.Snapshot == nil || snapshot.Snapshot.SessionId != joined.Transport.SessionId {
+		t.Fatalf("unexpected runtime snapshot: %+v", snapshot.Snapshot)
+	}
+	if snapshot.Snapshot.NodeId == "" || len(snapshot.Snapshot.Participants) == 0 {
+		t.Fatalf("expected snapshot participants and node: %+v", snapshot.Snapshot)
+	}
+	if owner.ID == "" {
+		t.Fatal("expected owner account")
+	}
+}
+
+func TestMigrateCallSessionRPC(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	_, ownerCtx := fixture.mustCreateUserAndLogin(t, "call-migrate-owner", "call-migrate-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "call-migrate-peer", "call-migrate-peer@example.com")
+
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	started, err := fixture.api.StartCall(ownerCtx, &callv1.StartCallRequest{
+		ConversationId: created.Conversation.ConversationId,
+		WithVideo:      true,
+	})
+	if err != nil {
+		t.Fatalf("start call: %v", err)
+	}
+	if _, err := fixture.api.AcceptCall(peerCtx, &callv1.AcceptCallRequest{CallId: started.Call.CallId}); err != nil {
+		t.Fatalf("accept call: %v", err)
+	}
+	joined, err := fixture.api.JoinCall(peerCtx, &callv1.JoinCallRequest{
+		CallId:    started.Call.CallId,
+		WithVideo: true,
+	})
+	if err != nil {
+		t.Fatalf("join call: %v", err)
+	}
+
+	before, err := fixture.api.GetCallRuntimeState(ownerCtx, &callv1.GetCallRuntimeStateRequest{
+		CallId: started.Call.CallId,
+	})
+	if err != nil {
+		t.Fatalf("get call runtime state before migration: %v", err)
+	}
+	if before.GetRuntime() == nil || len(before.GetRuntime().GetHealthyMigrationTargetNodeIds()) == 0 {
+		t.Fatalf("expected healthy migration targets before migration: %+v", before.GetRuntime())
+	}
+
+	migrated, err := fixture.api.MigrateCallSession(ownerCtx, &callv1.MigrateCallSessionRequest{
+		CallId: started.Call.CallId,
+	})
+	if err != nil {
+		t.Fatalf("migrate call session: %v", err)
+	}
+	if migrated.GetCall() == nil || migrated.GetRuntime() == nil {
+		t.Fatalf("expected migrated call and runtime: %+v", migrated)
+	}
+	if migrated.GetRuntime().GetSessionId() == joined.Transport.SessionId {
+		t.Fatalf("expected migrated session id to change: before=%s after=%s", joined.Transport.SessionId, migrated.GetRuntime().GetSessionId())
+	}
+	if migrated.GetRuntime().GetNodeId() == before.GetRuntime().GetNodeId() {
+		t.Fatalf("expected migrated node to change: before=%s after=%s", before.GetRuntime().GetNodeId(), migrated.GetRuntime().GetNodeId())
+	}
+}
+
 func TestSubscribeCallEventsStreamsNewEvents(t *testing.T) {
 	t.Parallel()
 

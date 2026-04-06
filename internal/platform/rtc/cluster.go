@@ -23,10 +23,11 @@ type Cluster struct {
 }
 
 type clusterNode struct {
-	id      string
-	runtime nodeRuntime
-	mu      sync.Mutex
-	health  nodeHealth
+	id       string
+	endpoint string
+	runtime  nodeRuntime
+	mu       sync.Mutex
+	health   nodeHealth
 }
 
 type nodeRuntime interface {
@@ -114,7 +115,7 @@ func (c *Cluster) MigrateSession(ctx context.Context, callRow domaincall.Call) (
 		return domaincall.RuntimeSession{}, err
 	}
 	if targetNode.id == sourceNode.id {
-		return c.EnsureSession(ctx, callRow)
+		return domaincall.RuntimeSession{}, domaincall.ErrConflict
 	}
 
 	var snapshot sessionSnapshot
@@ -220,6 +221,66 @@ func (c *Cluster) SessionStats(ctx context.Context, sessionID string) ([]domainc
 	return node.runtime.SessionStats(ctx, sessionID)
 }
 
+// SessionState returns the current stable runtime placement for one call.
+func (c *Cluster) SessionState(ctx context.Context, callRow domaincall.Call) (domaincall.RuntimeState, error) {
+	state := domaincall.RuntimeState{
+		CallID:         strings.TrimSpace(callRow.ID),
+		ConversationID: strings.TrimSpace(callRow.ConversationID),
+		SessionID:      strings.TrimSpace(callRow.ActiveSessionID),
+		Active:         callRow.State == domaincall.StateActive && strings.TrimSpace(callRow.ActiveSessionID) != "",
+		ObservedAt:     c.currentTime(),
+	}
+	if !state.Active {
+		return state, nil
+	}
+
+	node, err := c.nodeForSession(state.SessionID)
+	if err != nil {
+		return domaincall.RuntimeState{}, err
+	}
+
+	state.NodeID = node.id
+	state.RuntimeEndpoint = strings.TrimSpace(node.endpoint)
+	healthy, err := c.nodeHealthy(ctx, node)
+	if err == nil {
+		state.Healthy = healthy
+	}
+	state.ConfiguredReplicaNodeIDs = c.configuredReplicaNodeIDs(node.id)
+	state.HealthyMigrationTargetNodeIDs = c.healthyMigrationTargetNodeIDs(ctx, node.id)
+
+	return domaincall.CloneRuntimeState(state), nil
+}
+
+// SessionSnapshot returns one exported stable runtime snapshot for the active session.
+func (c *Cluster) SessionSnapshot(ctx context.Context, callRow domaincall.Call) (domaincall.RuntimeSnapshot, error) {
+	if c == nil {
+		return domaincall.RuntimeSnapshot{}, domaincall.ErrInvalidInput
+	}
+
+	sessionID := strings.TrimSpace(callRow.ActiveSessionID)
+	if callRow.State != domaincall.StateActive || sessionID == "" {
+		return domaincall.RuntimeSnapshot{}, domaincall.ErrConflict
+	}
+
+	node, err := c.nodeForSession(sessionID)
+	if err != nil {
+		return domaincall.RuntimeSnapshot{}, err
+	}
+	snapshot, err := node.runtime.ExportSessionSnapshot(ctx, sessionID)
+	if err != nil {
+		return domaincall.RuntimeSnapshot{}, err
+	}
+
+	return domaincall.CloneRuntimeSnapshot(domaincall.RuntimeSnapshot{
+		CallID:         snapshot.CallID,
+		ConversationID: snapshot.Conversation,
+		SessionID:      sessionID,
+		NodeID:         node.id,
+		ObservedAt:     c.currentTime(),
+		Participants:   runtimeSnapshotParticipants(snapshot.Participants),
+	}), nil
+}
+
 func (c *Cluster) LeaveSession(ctx context.Context, sessionID string, accountID string, deviceID string) error {
 	node, err := c.nodeForSession(sessionID)
 	if err != nil {
@@ -240,6 +301,14 @@ func (c *Cluster) CloseSession(ctx context.Context, sessionID string) error {
 	}
 
 	return node.runtime.CloseSession(ctx, sessionID)
+}
+
+func (c *Cluster) currentTime() time.Time {
+	if c == nil || c.now == nil {
+		return time.Now().UTC()
+	}
+
+	return c.now().UTC()
 }
 
 func (c *Cluster) nodeForCall(ctx context.Context, callRow domaincall.Call) (*clusterNode, error) {
@@ -441,8 +510,9 @@ func buildClusterNodes(cfg domaincall.RTCConfig, local *Manager) ([]*clusterNode
 		}
 		return []*clusterNode{
 			{
-				id:      id,
-				runtime: local,
+				id:       id,
+				endpoint: strings.TrimSpace(cfg.PublicEndpoint),
+				runtime:  local,
 			},
 		}, nil
 	}
@@ -470,8 +540,9 @@ func buildClusterNodes(cfg domaincall.RTCConfig, local *Manager) ([]*clusterNode
 			runtime = newConfiguredManager(node.Endpoint, cfg.CredentialTTL, cfg.CandidateHost, ranges[i][0], ranges[i][1])
 		}
 		result = append(result, &clusterNode{
-			id:      node.ID,
-			runtime: runtime,
+			id:       node.ID,
+			endpoint: strings.TrimSpace(node.Endpoint),
+			runtime:  runtime,
 		})
 	}
 
@@ -485,6 +556,88 @@ func newConfiguredManager(endpoint string, ttl time.Duration, host string, portM
 		WithCandidateHost(host),
 		WithUDPPortRange(portMin, portMax),
 	)
+}
+
+func (c *Cluster) configuredReplicaNodeIDs(primaryNodeID string) []string {
+	result := make([]string, 0, len(c.nodes))
+	for _, node := range c.nodes {
+		if node == nil || node.id == strings.TrimSpace(primaryNodeID) {
+			continue
+		}
+		result = append(result, node.id)
+	}
+	if len(result) == 0 {
+		return nil
+	}
+
+	return result
+}
+
+func (c *Cluster) healthyMigrationTargetNodeIDs(ctx context.Context, primaryNodeID string) []string {
+	result := make([]string, 0, len(c.nodes))
+	for _, node := range c.nodes {
+		if node == nil || node.id == strings.TrimSpace(primaryNodeID) {
+			continue
+		}
+		healthy, err := c.nodeHealthy(ctx, node)
+		if err != nil || !healthy {
+			continue
+		}
+		result = append(result, node.id)
+	}
+	if len(result) == 0 {
+		return nil
+	}
+
+	return result
+}
+
+func runtimeSnapshotParticipants(values []snapshotParticipant) []domaincall.RuntimeSnapshotParticipant {
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]domaincall.RuntimeSnapshotParticipant, 0, len(values))
+	for _, value := range values {
+		result = append(result, domaincall.RuntimeSnapshotParticipant{
+			AccountID: value.AccountID,
+			DeviceID:  value.DeviceID,
+			WithVideo: value.WithVideo,
+			Media: domaincall.MediaState{
+				AudioMuted:         value.Media.AudioMuted,
+				VideoMuted:         value.Media.VideoMuted,
+				CameraEnabled:      value.Media.CameraEnabled,
+				ScreenShareEnabled: value.Media.ScreenShareEnabled,
+			},
+			Transport: cloneTransportStats(value.Transport),
+			Relay:     runtimeRelayTracks(value.Relay),
+		})
+	}
+
+	return result
+}
+
+func runtimeRelayTracks(values []snapshotRelayTrack) []domaincall.RuntimeRelayTrack {
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]domaincall.RuntimeRelayTrack, 0, len(values))
+	for _, value := range values {
+		result = append(result, domaincall.RuntimeRelayTrack{
+			SourceAccountID: value.SourceAccountID,
+			SourceDeviceID:  value.SourceDeviceID,
+			TrackID:         value.TrackID,
+			StreamID:        value.StreamID,
+			Kind:            value.Kind,
+			ScreenShare:     value.ScreenShare,
+			CodecMimeType:   value.CodecMimeType,
+			CodecClockRate:  value.CodecClockRate,
+			CodecChannels:   value.CodecChannels,
+		})
+	}
+
+	return result
 }
 
 func (m *Manager) Close(context.Context) error {
