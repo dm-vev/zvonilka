@@ -19,29 +19,45 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	ConversationService_CreateConversation_FullMethodName = "/zvonilka.conversation.v1.ConversationService/CreateConversation"
-	ConversationService_GetConversation_FullMethodName    = "/zvonilka.conversation.v1.ConversationService/GetConversation"
-	ConversationService_ListConversations_FullMethodName  = "/zvonilka.conversation.v1.ConversationService/ListConversations"
-	ConversationService_UpdateConversation_FullMethodName = "/zvonilka.conversation.v1.ConversationService/UpdateConversation"
-	ConversationService_ListMembers_FullMethodName        = "/zvonilka.conversation.v1.ConversationService/ListMembers"
-	ConversationService_AddMembers_FullMethodName         = "/zvonilka.conversation.v1.ConversationService/AddMembers"
-	ConversationService_RemoveMembers_FullMethodName      = "/zvonilka.conversation.v1.ConversationService/RemoveMembers"
-	ConversationService_UpdateMemberRole_FullMethodName   = "/zvonilka.conversation.v1.ConversationService/UpdateMemberRole"
-	ConversationService_CreateInvite_FullMethodName       = "/zvonilka.conversation.v1.ConversationService/CreateInvite"
-	ConversationService_ListInvites_FullMethodName        = "/zvonilka.conversation.v1.ConversationService/ListInvites"
-	ConversationService_RevokeInvite_FullMethodName       = "/zvonilka.conversation.v1.ConversationService/RevokeInvite"
-	ConversationService_ListMessages_FullMethodName       = "/zvonilka.conversation.v1.ConversationService/ListMessages"
-	ConversationService_GetMessage_FullMethodName         = "/zvonilka.conversation.v1.ConversationService/GetMessage"
-	ConversationService_SendMessage_FullMethodName        = "/zvonilka.conversation.v1.ConversationService/SendMessage"
-	ConversationService_EditMessage_FullMethodName        = "/zvonilka.conversation.v1.ConversationService/EditMessage"
-	ConversationService_DeleteMessage_FullMethodName      = "/zvonilka.conversation.v1.ConversationService/DeleteMessage"
-	ConversationService_AddReaction_FullMethodName        = "/zvonilka.conversation.v1.ConversationService/AddReaction"
-	ConversationService_RemoveReaction_FullMethodName     = "/zvonilka.conversation.v1.ConversationService/RemoveReaction"
-	ConversationService_PinMessage_FullMethodName         = "/zvonilka.conversation.v1.ConversationService/PinMessage"
-	ConversationService_MarkRead_FullMethodName           = "/zvonilka.conversation.v1.ConversationService/MarkRead"
-	ConversationService_CreateThread_FullMethodName       = "/zvonilka.conversation.v1.ConversationService/CreateThread"
-	ConversationService_GetThread_FullMethodName          = "/zvonilka.conversation.v1.ConversationService/GetThread"
-	ConversationService_ListThreads_FullMethodName        = "/zvonilka.conversation.v1.ConversationService/ListThreads"
+	ConversationService_CreateConversation_FullMethodName         = "/zvonilka.conversation.v1.ConversationService/CreateConversation"
+	ConversationService_GetConversation_FullMethodName            = "/zvonilka.conversation.v1.ConversationService/GetConversation"
+	ConversationService_ListConversations_FullMethodName          = "/zvonilka.conversation.v1.ConversationService/ListConversations"
+	ConversationService_UpdateConversation_FullMethodName         = "/zvonilka.conversation.v1.ConversationService/UpdateConversation"
+	ConversationService_ListMembers_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/ListMembers"
+	ConversationService_AddMembers_FullMethodName                 = "/zvonilka.conversation.v1.ConversationService/AddMembers"
+	ConversationService_RemoveMembers_FullMethodName              = "/zvonilka.conversation.v1.ConversationService/RemoveMembers"
+	ConversationService_UpdateMemberRole_FullMethodName           = "/zvonilka.conversation.v1.ConversationService/UpdateMemberRole"
+	ConversationService_CreateInvite_FullMethodName               = "/zvonilka.conversation.v1.ConversationService/CreateInvite"
+	ConversationService_ListInvites_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/ListInvites"
+	ConversationService_RevokeInvite_FullMethodName               = "/zvonilka.conversation.v1.ConversationService/RevokeInvite"
+	ConversationService_ListMessages_FullMethodName               = "/zvonilka.conversation.v1.ConversationService/ListMessages"
+	ConversationService_GetMessage_FullMethodName                 = "/zvonilka.conversation.v1.ConversationService/GetMessage"
+	ConversationService_SendMessage_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/SendMessage"
+	ConversationService_EditMessage_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/EditMessage"
+	ConversationService_DeleteMessage_FullMethodName              = "/zvonilka.conversation.v1.ConversationService/DeleteMessage"
+	ConversationService_AddReaction_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/AddReaction"
+	ConversationService_RemoveReaction_FullMethodName             = "/zvonilka.conversation.v1.ConversationService/RemoveReaction"
+	ConversationService_PinMessage_FullMethodName                 = "/zvonilka.conversation.v1.ConversationService/PinMessage"
+	ConversationService_MarkRead_FullMethodName                   = "/zvonilka.conversation.v1.ConversationService/MarkRead"
+	ConversationService_CreateThread_FullMethodName               = "/zvonilka.conversation.v1.ConversationService/CreateThread"
+	ConversationService_GetThread_FullMethodName                  = "/zvonilka.conversation.v1.ConversationService/GetThread"
+	ConversationService_ListThreads_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/ListThreads"
+	ConversationService_RenameThread_FullMethodName               = "/zvonilka.conversation.v1.ConversationService/RenameThread"
+	ConversationService_ArchiveThread_FullMethodName              = "/zvonilka.conversation.v1.ConversationService/ArchiveThread"
+	ConversationService_CloseThread_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/CloseThread"
+	ConversationService_PinThread_FullMethodName                  = "/zvonilka.conversation.v1.ConversationService/PinThread"
+	ConversationService_GetModerationPolicy_FullMethodName        = "/zvonilka.conversation.v1.ConversationService/GetModerationPolicy"
+	ConversationService_GetModerationRateState_FullMethodName     = "/zvonilka.conversation.v1.ConversationService/GetModerationRateState"
+	ConversationService_CheckModerationWrite_FullMethodName       = "/zvonilka.conversation.v1.ConversationService/CheckModerationWrite"
+	ConversationService_SetModerationPolicy_FullMethodName        = "/zvonilka.conversation.v1.ConversationService/SetModerationPolicy"
+	ConversationService_ApplyModerationRestriction_FullMethodName = "/zvonilka.conversation.v1.ConversationService/ApplyModerationRestriction"
+	ConversationService_LiftModerationRestriction_FullMethodName  = "/zvonilka.conversation.v1.ConversationService/LiftModerationRestriction"
+	ConversationService_ListModerationRestrictions_FullMethodName = "/zvonilka.conversation.v1.ConversationService/ListModerationRestrictions"
+	ConversationService_SubmitModerationReport_FullMethodName     = "/zvonilka.conversation.v1.ConversationService/SubmitModerationReport"
+	ConversationService_GetModerationReport_FullMethodName        = "/zvonilka.conversation.v1.ConversationService/GetModerationReport"
+	ConversationService_ListModerationReports_FullMethodName      = "/zvonilka.conversation.v1.ConversationService/ListModerationReports"
+	ConversationService_ResolveModerationReport_FullMethodName    = "/zvonilka.conversation.v1.ConversationService/ResolveModerationReport"
+	ConversationService_ListModerationActions_FullMethodName      = "/zvonilka.conversation.v1.ConversationService/ListModerationActions"
 )
 
 // ConversationServiceClient is the client API for ConversationService service.
@@ -71,6 +87,22 @@ type ConversationServiceClient interface {
 	CreateThread(ctx context.Context, in *CreateThreadRequest, opts ...grpc.CallOption) (*CreateThreadResponse, error)
 	GetThread(ctx context.Context, in *GetThreadRequest, opts ...grpc.CallOption) (*GetThreadResponse, error)
 	ListThreads(ctx context.Context, in *ListThreadsRequest, opts ...grpc.CallOption) (*ListThreadsResponse, error)
+	RenameThread(ctx context.Context, in *RenameThreadRequest, opts ...grpc.CallOption) (*RenameThreadResponse, error)
+	ArchiveThread(ctx context.Context, in *ArchiveThreadRequest, opts ...grpc.CallOption) (*ArchiveThreadResponse, error)
+	CloseThread(ctx context.Context, in *CloseThreadRequest, opts ...grpc.CallOption) (*CloseThreadResponse, error)
+	PinThread(ctx context.Context, in *PinThreadRequest, opts ...grpc.CallOption) (*PinThreadResponse, error)
+	GetModerationPolicy(ctx context.Context, in *GetModerationPolicyRequest, opts ...grpc.CallOption) (*GetModerationPolicyResponse, error)
+	GetModerationRateState(ctx context.Context, in *GetModerationRateStateRequest, opts ...grpc.CallOption) (*GetModerationRateStateResponse, error)
+	CheckModerationWrite(ctx context.Context, in *CheckModerationWriteRequest, opts ...grpc.CallOption) (*CheckModerationWriteResponse, error)
+	SetModerationPolicy(ctx context.Context, in *SetModerationPolicyRequest, opts ...grpc.CallOption) (*SetModerationPolicyResponse, error)
+	ApplyModerationRestriction(ctx context.Context, in *ApplyModerationRestrictionRequest, opts ...grpc.CallOption) (*ApplyModerationRestrictionResponse, error)
+	LiftModerationRestriction(ctx context.Context, in *LiftModerationRestrictionRequest, opts ...grpc.CallOption) (*LiftModerationRestrictionResponse, error)
+	ListModerationRestrictions(ctx context.Context, in *ListModerationRestrictionsRequest, opts ...grpc.CallOption) (*ListModerationRestrictionsResponse, error)
+	SubmitModerationReport(ctx context.Context, in *SubmitModerationReportRequest, opts ...grpc.CallOption) (*SubmitModerationReportResponse, error)
+	GetModerationReport(ctx context.Context, in *GetModerationReportRequest, opts ...grpc.CallOption) (*GetModerationReportResponse, error)
+	ListModerationReports(ctx context.Context, in *ListModerationReportsRequest, opts ...grpc.CallOption) (*ListModerationReportsResponse, error)
+	ResolveModerationReport(ctx context.Context, in *ResolveModerationReportRequest, opts ...grpc.CallOption) (*ResolveModerationReportResponse, error)
+	ListModerationActions(ctx context.Context, in *ListModerationActionsRequest, opts ...grpc.CallOption) (*ListModerationActionsResponse, error)
 }
 
 type conversationServiceClient struct {
@@ -288,6 +320,150 @@ func (c *conversationServiceClient) ListThreads(ctx context.Context, in *ListThr
 	return out, nil
 }
 
+func (c *conversationServiceClient) RenameThread(ctx context.Context, in *RenameThreadRequest, opts ...grpc.CallOption) (*RenameThreadResponse, error) {
+	out := new(RenameThreadResponse)
+	err := c.cc.Invoke(ctx, ConversationService_RenameThread_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) ArchiveThread(ctx context.Context, in *ArchiveThreadRequest, opts ...grpc.CallOption) (*ArchiveThreadResponse, error) {
+	out := new(ArchiveThreadResponse)
+	err := c.cc.Invoke(ctx, ConversationService_ArchiveThread_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) CloseThread(ctx context.Context, in *CloseThreadRequest, opts ...grpc.CallOption) (*CloseThreadResponse, error) {
+	out := new(CloseThreadResponse)
+	err := c.cc.Invoke(ctx, ConversationService_CloseThread_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) PinThread(ctx context.Context, in *PinThreadRequest, opts ...grpc.CallOption) (*PinThreadResponse, error) {
+	out := new(PinThreadResponse)
+	err := c.cc.Invoke(ctx, ConversationService_PinThread_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) GetModerationPolicy(ctx context.Context, in *GetModerationPolicyRequest, opts ...grpc.CallOption) (*GetModerationPolicyResponse, error) {
+	out := new(GetModerationPolicyResponse)
+	err := c.cc.Invoke(ctx, ConversationService_GetModerationPolicy_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) GetModerationRateState(ctx context.Context, in *GetModerationRateStateRequest, opts ...grpc.CallOption) (*GetModerationRateStateResponse, error) {
+	out := new(GetModerationRateStateResponse)
+	err := c.cc.Invoke(ctx, ConversationService_GetModerationRateState_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) CheckModerationWrite(ctx context.Context, in *CheckModerationWriteRequest, opts ...grpc.CallOption) (*CheckModerationWriteResponse, error) {
+	out := new(CheckModerationWriteResponse)
+	err := c.cc.Invoke(ctx, ConversationService_CheckModerationWrite_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) SetModerationPolicy(ctx context.Context, in *SetModerationPolicyRequest, opts ...grpc.CallOption) (*SetModerationPolicyResponse, error) {
+	out := new(SetModerationPolicyResponse)
+	err := c.cc.Invoke(ctx, ConversationService_SetModerationPolicy_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) ApplyModerationRestriction(ctx context.Context, in *ApplyModerationRestrictionRequest, opts ...grpc.CallOption) (*ApplyModerationRestrictionResponse, error) {
+	out := new(ApplyModerationRestrictionResponse)
+	err := c.cc.Invoke(ctx, ConversationService_ApplyModerationRestriction_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) LiftModerationRestriction(ctx context.Context, in *LiftModerationRestrictionRequest, opts ...grpc.CallOption) (*LiftModerationRestrictionResponse, error) {
+	out := new(LiftModerationRestrictionResponse)
+	err := c.cc.Invoke(ctx, ConversationService_LiftModerationRestriction_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) ListModerationRestrictions(ctx context.Context, in *ListModerationRestrictionsRequest, opts ...grpc.CallOption) (*ListModerationRestrictionsResponse, error) {
+	out := new(ListModerationRestrictionsResponse)
+	err := c.cc.Invoke(ctx, ConversationService_ListModerationRestrictions_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) SubmitModerationReport(ctx context.Context, in *SubmitModerationReportRequest, opts ...grpc.CallOption) (*SubmitModerationReportResponse, error) {
+	out := new(SubmitModerationReportResponse)
+	err := c.cc.Invoke(ctx, ConversationService_SubmitModerationReport_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) GetModerationReport(ctx context.Context, in *GetModerationReportRequest, opts ...grpc.CallOption) (*GetModerationReportResponse, error) {
+	out := new(GetModerationReportResponse)
+	err := c.cc.Invoke(ctx, ConversationService_GetModerationReport_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) ListModerationReports(ctx context.Context, in *ListModerationReportsRequest, opts ...grpc.CallOption) (*ListModerationReportsResponse, error) {
+	out := new(ListModerationReportsResponse)
+	err := c.cc.Invoke(ctx, ConversationService_ListModerationReports_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) ResolveModerationReport(ctx context.Context, in *ResolveModerationReportRequest, opts ...grpc.CallOption) (*ResolveModerationReportResponse, error) {
+	out := new(ResolveModerationReportResponse)
+	err := c.cc.Invoke(ctx, ConversationService_ResolveModerationReport_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) ListModerationActions(ctx context.Context, in *ListModerationActionsRequest, opts ...grpc.CallOption) (*ListModerationActionsResponse, error) {
+	out := new(ListModerationActionsResponse)
+	err := c.cc.Invoke(ctx, ConversationService_ListModerationActions_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ConversationServiceServer is the server API for ConversationService service.
 // All implementations must embed UnimplementedConversationServiceServer
 // for forward compatibility
@@ -315,6 +491,22 @@ type ConversationServiceServer interface {
 	CreateThread(context.Context, *CreateThreadRequest) (*CreateThreadResponse, error)
 	GetThread(context.Context, *GetThreadRequest) (*GetThreadResponse, error)
 	ListThreads(context.Context, *ListThreadsRequest) (*ListThreadsResponse, error)
+	RenameThread(context.Context, *RenameThreadRequest) (*RenameThreadResponse, error)
+	ArchiveThread(context.Context, *ArchiveThreadRequest) (*ArchiveThreadResponse, error)
+	CloseThread(context.Context, *CloseThreadRequest) (*CloseThreadResponse, error)
+	PinThread(context.Context, *PinThreadRequest) (*PinThreadResponse, error)
+	GetModerationPolicy(context.Context, *GetModerationPolicyRequest) (*GetModerationPolicyResponse, error)
+	GetModerationRateState(context.Context, *GetModerationRateStateRequest) (*GetModerationRateStateResponse, error)
+	CheckModerationWrite(context.Context, *CheckModerationWriteRequest) (*CheckModerationWriteResponse, error)
+	SetModerationPolicy(context.Context, *SetModerationPolicyRequest) (*SetModerationPolicyResponse, error)
+	ApplyModerationRestriction(context.Context, *ApplyModerationRestrictionRequest) (*ApplyModerationRestrictionResponse, error)
+	LiftModerationRestriction(context.Context, *LiftModerationRestrictionRequest) (*LiftModerationRestrictionResponse, error)
+	ListModerationRestrictions(context.Context, *ListModerationRestrictionsRequest) (*ListModerationRestrictionsResponse, error)
+	SubmitModerationReport(context.Context, *SubmitModerationReportRequest) (*SubmitModerationReportResponse, error)
+	GetModerationReport(context.Context, *GetModerationReportRequest) (*GetModerationReportResponse, error)
+	ListModerationReports(context.Context, *ListModerationReportsRequest) (*ListModerationReportsResponse, error)
+	ResolveModerationReport(context.Context, *ResolveModerationReportRequest) (*ResolveModerationReportResponse, error)
+	ListModerationActions(context.Context, *ListModerationActionsRequest) (*ListModerationActionsResponse, error)
 	mustEmbedUnimplementedConversationServiceServer()
 }
 
@@ -390,6 +582,54 @@ func (UnimplementedConversationServiceServer) GetThread(context.Context, *GetThr
 }
 func (UnimplementedConversationServiceServer) ListThreads(context.Context, *ListThreadsRequest) (*ListThreadsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListThreads not implemented")
+}
+func (UnimplementedConversationServiceServer) RenameThread(context.Context, *RenameThreadRequest) (*RenameThreadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RenameThread not implemented")
+}
+func (UnimplementedConversationServiceServer) ArchiveThread(context.Context, *ArchiveThreadRequest) (*ArchiveThreadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ArchiveThread not implemented")
+}
+func (UnimplementedConversationServiceServer) CloseThread(context.Context, *CloseThreadRequest) (*CloseThreadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CloseThread not implemented")
+}
+func (UnimplementedConversationServiceServer) PinThread(context.Context, *PinThreadRequest) (*PinThreadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PinThread not implemented")
+}
+func (UnimplementedConversationServiceServer) GetModerationPolicy(context.Context, *GetModerationPolicyRequest) (*GetModerationPolicyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetModerationPolicy not implemented")
+}
+func (UnimplementedConversationServiceServer) GetModerationRateState(context.Context, *GetModerationRateStateRequest) (*GetModerationRateStateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetModerationRateState not implemented")
+}
+func (UnimplementedConversationServiceServer) CheckModerationWrite(context.Context, *CheckModerationWriteRequest) (*CheckModerationWriteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckModerationWrite not implemented")
+}
+func (UnimplementedConversationServiceServer) SetModerationPolicy(context.Context, *SetModerationPolicyRequest) (*SetModerationPolicyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetModerationPolicy not implemented")
+}
+func (UnimplementedConversationServiceServer) ApplyModerationRestriction(context.Context, *ApplyModerationRestrictionRequest) (*ApplyModerationRestrictionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ApplyModerationRestriction not implemented")
+}
+func (UnimplementedConversationServiceServer) LiftModerationRestriction(context.Context, *LiftModerationRestrictionRequest) (*LiftModerationRestrictionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method LiftModerationRestriction not implemented")
+}
+func (UnimplementedConversationServiceServer) ListModerationRestrictions(context.Context, *ListModerationRestrictionsRequest) (*ListModerationRestrictionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListModerationRestrictions not implemented")
+}
+func (UnimplementedConversationServiceServer) SubmitModerationReport(context.Context, *SubmitModerationReportRequest) (*SubmitModerationReportResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitModerationReport not implemented")
+}
+func (UnimplementedConversationServiceServer) GetModerationReport(context.Context, *GetModerationReportRequest) (*GetModerationReportResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetModerationReport not implemented")
+}
+func (UnimplementedConversationServiceServer) ListModerationReports(context.Context, *ListModerationReportsRequest) (*ListModerationReportsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListModerationReports not implemented")
+}
+func (UnimplementedConversationServiceServer) ResolveModerationReport(context.Context, *ResolveModerationReportRequest) (*ResolveModerationReportResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResolveModerationReport not implemented")
+}
+func (UnimplementedConversationServiceServer) ListModerationActions(context.Context, *ListModerationActionsRequest) (*ListModerationActionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListModerationActions not implemented")
 }
 func (UnimplementedConversationServiceServer) mustEmbedUnimplementedConversationServiceServer() {}
 
@@ -818,6 +1058,294 @@ func _ConversationService_ListThreads_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConversationService_RenameThread_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RenameThreadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).RenameThread(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_RenameThread_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).RenameThread(ctx, req.(*RenameThreadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_ArchiveThread_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ArchiveThreadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).ArchiveThread(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_ArchiveThread_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).ArchiveThread(ctx, req.(*ArchiveThreadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_CloseThread_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CloseThreadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).CloseThread(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_CloseThread_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).CloseThread(ctx, req.(*CloseThreadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_PinThread_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PinThreadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).PinThread(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_PinThread_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).PinThread(ctx, req.(*PinThreadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_GetModerationPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetModerationPolicyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).GetModerationPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_GetModerationPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).GetModerationPolicy(ctx, req.(*GetModerationPolicyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_GetModerationRateState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetModerationRateStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).GetModerationRateState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_GetModerationRateState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).GetModerationRateState(ctx, req.(*GetModerationRateStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_CheckModerationWrite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckModerationWriteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).CheckModerationWrite(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_CheckModerationWrite_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).CheckModerationWrite(ctx, req.(*CheckModerationWriteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_SetModerationPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetModerationPolicyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).SetModerationPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_SetModerationPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).SetModerationPolicy(ctx, req.(*SetModerationPolicyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_ApplyModerationRestriction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApplyModerationRestrictionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).ApplyModerationRestriction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_ApplyModerationRestriction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).ApplyModerationRestriction(ctx, req.(*ApplyModerationRestrictionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_LiftModerationRestriction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LiftModerationRestrictionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).LiftModerationRestriction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_LiftModerationRestriction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).LiftModerationRestriction(ctx, req.(*LiftModerationRestrictionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_ListModerationRestrictions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListModerationRestrictionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).ListModerationRestrictions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_ListModerationRestrictions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).ListModerationRestrictions(ctx, req.(*ListModerationRestrictionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_SubmitModerationReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubmitModerationReportRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).SubmitModerationReport(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_SubmitModerationReport_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).SubmitModerationReport(ctx, req.(*SubmitModerationReportRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_GetModerationReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetModerationReportRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).GetModerationReport(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_GetModerationReport_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).GetModerationReport(ctx, req.(*GetModerationReportRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_ListModerationReports_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListModerationReportsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).ListModerationReports(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_ListModerationReports_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).ListModerationReports(ctx, req.(*ListModerationReportsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_ResolveModerationReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveModerationReportRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).ResolveModerationReport(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_ResolveModerationReport_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).ResolveModerationReport(ctx, req.(*ResolveModerationReportRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_ListModerationActions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListModerationActionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).ListModerationActions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_ListModerationActions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).ListModerationActions(ctx, req.(*ListModerationActionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ConversationService_ServiceDesc is the grpc.ServiceDesc for ConversationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -916,6 +1444,70 @@ var ConversationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListThreads",
 			Handler:    _ConversationService_ListThreads_Handler,
+		},
+		{
+			MethodName: "RenameThread",
+			Handler:    _ConversationService_RenameThread_Handler,
+		},
+		{
+			MethodName: "ArchiveThread",
+			Handler:    _ConversationService_ArchiveThread_Handler,
+		},
+		{
+			MethodName: "CloseThread",
+			Handler:    _ConversationService_CloseThread_Handler,
+		},
+		{
+			MethodName: "PinThread",
+			Handler:    _ConversationService_PinThread_Handler,
+		},
+		{
+			MethodName: "GetModerationPolicy",
+			Handler:    _ConversationService_GetModerationPolicy_Handler,
+		},
+		{
+			MethodName: "GetModerationRateState",
+			Handler:    _ConversationService_GetModerationRateState_Handler,
+		},
+		{
+			MethodName: "CheckModerationWrite",
+			Handler:    _ConversationService_CheckModerationWrite_Handler,
+		},
+		{
+			MethodName: "SetModerationPolicy",
+			Handler:    _ConversationService_SetModerationPolicy_Handler,
+		},
+		{
+			MethodName: "ApplyModerationRestriction",
+			Handler:    _ConversationService_ApplyModerationRestriction_Handler,
+		},
+		{
+			MethodName: "LiftModerationRestriction",
+			Handler:    _ConversationService_LiftModerationRestriction_Handler,
+		},
+		{
+			MethodName: "ListModerationRestrictions",
+			Handler:    _ConversationService_ListModerationRestrictions_Handler,
+		},
+		{
+			MethodName: "SubmitModerationReport",
+			Handler:    _ConversationService_SubmitModerationReport_Handler,
+		},
+		{
+			MethodName: "GetModerationReport",
+			Handler:    _ConversationService_GetModerationReport_Handler,
+		},
+		{
+			MethodName: "ListModerationReports",
+			Handler:    _ConversationService_ListModerationReports_Handler,
+		},
+		{
+			MethodName: "ResolveModerationReport",
+			Handler:    _ConversationService_ResolveModerationReport_Handler,
+		},
+		{
+			MethodName: "ListModerationActions",
+			Handler:    _ConversationService_ListModerationActions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

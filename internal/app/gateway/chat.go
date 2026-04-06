@@ -852,8 +852,10 @@ func (a *api) ListThreads(
 	}
 
 	topics, err := a.conversation.ListTopics(ctx, domainconversation.ListTopicsParams{
-		ConversationID: req.GetConversationId(),
-		AccountID:      authContext.Account.ID,
+		ConversationID:  req.GetConversationId(),
+		AccountID:       authContext.Account.ID,
+		IncludeArchived: req.GetIncludeArchived(),
+		IncludeClosed:   req.GetIncludeClosed(),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -886,6 +888,540 @@ func (a *api) ListThreads(
 		Page: &commonv1.PageResponse{
 			NextPageToken: offsetToken("threads", end),
 			TotalSize:     uint64(len(topics)),
+		},
+	}, nil
+}
+
+// RenameThread renames one existing thread.
+func (a *api) RenameThread(
+	ctx context.Context,
+	req *conversationv1.RenameThreadRequest,
+) (*conversationv1.RenameThreadResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	topic, event, err := a.conversation.RenameTopic(ctx, domainconversation.RenameTopicParams{
+		ConversationID: req.GetConversationId(),
+		TopicID:        req.GetThreadId(),
+		ActorAccountID: authContext.Account.ID,
+		Title:          req.GetTitle(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishSyncEvent(event)
+
+	return &conversationv1.RenameThreadResponse{Thread: threadProto(topic)}, nil
+}
+
+// ArchiveThread updates the archived state of one thread.
+func (a *api) ArchiveThread(
+	ctx context.Context,
+	req *conversationv1.ArchiveThreadRequest,
+) (*conversationv1.ArchiveThreadResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	topic, event, err := a.conversation.ArchiveTopic(ctx, domainconversation.ArchiveTopicParams{
+		ConversationID: req.GetConversationId(),
+		TopicID:        req.GetThreadId(),
+		ActorAccountID: authContext.Account.ID,
+		Archived:       req.GetArchived(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishSyncEvent(event)
+
+	return &conversationv1.ArchiveThreadResponse{Thread: threadProto(topic)}, nil
+}
+
+// CloseThread updates the closed state of one thread.
+func (a *api) CloseThread(
+	ctx context.Context,
+	req *conversationv1.CloseThreadRequest,
+) (*conversationv1.CloseThreadResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	topic, event, err := a.conversation.CloseTopic(ctx, domainconversation.CloseTopicParams{
+		ConversationID: req.GetConversationId(),
+		TopicID:        req.GetThreadId(),
+		ActorAccountID: authContext.Account.ID,
+		Closed:         req.GetClosed(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishSyncEvent(event)
+
+	return &conversationv1.CloseThreadResponse{Thread: threadProto(topic)}, nil
+}
+
+// PinThread updates the pinned state of one thread.
+func (a *api) PinThread(
+	ctx context.Context,
+	req *conversationv1.PinThreadRequest,
+) (*conversationv1.PinThreadResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	topic, event, err := a.conversation.PinTopic(ctx, domainconversation.PinTopicParams{
+		ConversationID: req.GetConversationId(),
+		TopicID:        req.GetThreadId(),
+		ActorAccountID: authContext.Account.ID,
+		Pinned:         req.GetPinned(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishSyncEvent(event)
+
+	return &conversationv1.PinThreadResponse{Thread: threadProto(topic)}, nil
+}
+
+// GetModerationPolicy returns the effective moderation policy for one target.
+func (a *api) GetModerationPolicy(
+	ctx context.Context,
+	req *conversationv1.GetModerationPolicyRequest,
+) (*conversationv1.GetModerationPolicyResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	conversationRow, targetKind, targetID, err := a.requireModerationTarget(ctx, authContext.Account.ID, req.GetTarget())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	policy, err := a.effectiveModerationPolicy(ctx, conversationRow, targetKind, targetID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &conversationv1.GetModerationPolicyResponse{
+		Policy: moderationPolicyProto(policy),
+	}, nil
+}
+
+// GetModerationRateState returns the current slow-mode and anti-spam counters.
+func (a *api) GetModerationRateState(
+	ctx context.Context,
+	req *conversationv1.GetModerationRateStateRequest,
+) (*conversationv1.GetModerationRateStateResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	_, members, targetKind, targetID, err := a.moderationContext(ctx, authContext.Account.ID, req.GetTarget())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	subjectAccountID := moderationSubjectAccountID(authContext.Account.ID, req.GetUserId())
+	if !canInspectModerationAccount(members, authContext.Account.ID, subjectAccountID) {
+		return nil, grpcError(domainconversation.ErrForbidden)
+	}
+
+	state, err := a.conversation.ModerationRateStateByTargetAndAccount(ctx, targetKind, targetID, subjectAccountID)
+	if err != nil && !errors.Is(err, domainconversation.ErrNotFound) {
+		return nil, grpcError(err)
+	}
+	if errors.Is(err, domainconversation.ErrNotFound) {
+		state = domainconversation.ModerationRateState{
+			TargetKind: targetKind,
+			TargetID:   targetID,
+			AccountID:  subjectAccountID,
+		}
+	}
+
+	return &conversationv1.GetModerationRateStateResponse{
+		State: moderationRateStateProto(state),
+	}, nil
+}
+
+// CheckModerationWrite evaluates whether a target account may write right now.
+func (a *api) CheckModerationWrite(
+	ctx context.Context,
+	req *conversationv1.CheckModerationWriteRequest,
+) (*conversationv1.CheckModerationWriteResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	conversationRow, members, targetKind, targetID, err := a.moderationContext(ctx, authContext.Account.ID, req.GetTarget())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	subjectAccountID := moderationSubjectAccountID(authContext.Account.ID, req.GetUserId())
+	if !canInspectModerationAccount(members, authContext.Account.ID, subjectAccountID) {
+		return nil, grpcError(domainconversation.ErrForbidden)
+	}
+
+	subjectMember, ok := conversationMemberByAccount(members, subjectAccountID)
+	if !ok || !isConversationMemberActive(subjectMember) {
+		return &conversationv1.CheckModerationWriteResponse{
+			Decision: moderationWriteDecisionProto(domainconversation.ModerationDecision{}),
+		}, nil
+	}
+
+	policy, err := a.effectiveModerationPolicy(ctx, conversationRow, targetKind, targetID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	decision, err := a.conversation.CheckModerationWrite(ctx, domainconversation.CheckModerationWriteParams{
+		TargetKind:     targetKind,
+		TargetID:       targetID,
+		ActorAccountID: subjectAccountID,
+		ActorRole:      subjectMember.Role,
+		BasePolicy:     policy,
+	})
+	if err != nil {
+		if errors.Is(err, domainconversation.ErrForbidden) || errors.Is(err, domainconversation.ErrRateLimited) {
+			return &conversationv1.CheckModerationWriteResponse{
+				Decision: moderationWriteDecisionProto(decision),
+			}, nil
+		}
+
+		return nil, grpcError(err)
+	}
+
+	return &conversationv1.CheckModerationWriteResponse{
+		Decision: moderationWriteDecisionProto(decision),
+	}, nil
+}
+
+// SetModerationPolicy persists a moderation policy override.
+func (a *api) SetModerationPolicy(
+	ctx context.Context,
+	req *conversationv1.SetModerationPolicyRequest,
+) (*conversationv1.SetModerationPolicyResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	params, err := moderationPolicyParamsFromProto(req.GetPolicy(), authContext.Account.ID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	policy, err := a.conversation.SetModerationPolicy(ctx, params)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.notifySyncSubscribers()
+
+	return &conversationv1.SetModerationPolicyResponse{
+		Policy: moderationPolicyProto(policy),
+	}, nil
+}
+
+// ApplyModerationRestriction applies one active moderation restriction.
+func (a *api) ApplyModerationRestriction(
+	ctx context.Context,
+	req *conversationv1.ApplyModerationRestrictionRequest,
+) (*conversationv1.ApplyModerationRestrictionResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	targetKind, targetID, _, err := moderationTargetFromProto(req.GetTarget())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	restriction, err := a.conversation.ApplyModerationRestriction(ctx, domainconversation.ApplyModerationRestrictionParams{
+		TargetKind:      targetKind,
+		TargetID:        targetID,
+		ActorAccountID:  authContext.Account.ID,
+		TargetAccountID: req.GetUserId(),
+		State:           moderationRestrictionStateFromProto(req.GetState()),
+		Reason:          req.GetReason(),
+		Duration:        timeDuration(req.GetDuration()),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.notifySyncSubscribers()
+
+	return &conversationv1.ApplyModerationRestrictionResponse{
+		Restriction: moderationRestrictionProto(restriction),
+	}, nil
+}
+
+// LiftModerationRestriction removes one active moderation restriction.
+func (a *api) LiftModerationRestriction(
+	ctx context.Context,
+	req *conversationv1.LiftModerationRestrictionRequest,
+) (*conversationv1.LiftModerationRestrictionResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	targetKind, targetID, _, err := moderationTargetFromProto(req.GetTarget())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	if err := a.conversation.LiftModerationRestriction(ctx, domainconversation.LiftModerationRestrictionParams{
+		TargetKind:      targetKind,
+		TargetID:        targetID,
+		ActorAccountID:  authContext.Account.ID,
+		TargetAccountID: req.GetUserId(),
+		Reason:          req.GetReason(),
+	}); err != nil {
+		return nil, grpcError(err)
+	}
+	a.notifySyncSubscribers()
+
+	return &conversationv1.LiftModerationRestrictionResponse{}, nil
+}
+
+// ListModerationRestrictions lists active moderation restrictions for one target.
+func (a *api) ListModerationRestrictions(
+	ctx context.Context,
+	req *conversationv1.ListModerationRestrictionsRequest,
+) (*conversationv1.ListModerationRestrictionsResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	_, targetKind, targetID, err := a.requireModerationTarget(ctx, authContext.Account.ID, req.GetTarget())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	restrictions, err := a.conversation.ModerationRestrictionsByTarget(ctx, targetKind, targetID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	offset, err := decodeOffset(req.GetPage(), "moderation_restrictions")
+	if err != nil {
+		return nil, grpcError(domainconversation.ErrInvalidInput)
+	}
+	size := pageSize(req.GetPage())
+	end := offset + size
+	if end > len(restrictions) {
+		end = len(restrictions)
+	}
+
+	page := restrictions
+	if offset < len(restrictions) {
+		page = restrictions[offset:end]
+	} else {
+		page = nil
+	}
+
+	result := make([]*conversationv1.ModerationRestriction, 0, len(page))
+	for _, restriction := range page {
+		result = append(result, moderationRestrictionProto(restriction))
+	}
+
+	return &conversationv1.ListModerationRestrictionsResponse{
+		Restrictions: result,
+		Page: &commonv1.PageResponse{
+			NextPageToken: offsetToken("moderation_restrictions", end),
+			TotalSize:     uint64(len(restrictions)),
+		},
+	}, nil
+}
+
+// SubmitModerationReport creates one moderation report.
+func (a *api) SubmitModerationReport(
+	ctx context.Context,
+	req *conversationv1.SubmitModerationReportRequest,
+) (*conversationv1.SubmitModerationReportResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	targetKind, targetID, _, err := moderationTargetFromProto(req.GetTarget())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	report, err := a.conversation.SubmitModerationReport(ctx, domainconversation.SubmitModerationReportParams{
+		TargetKind:        targetKind,
+		TargetID:          targetID,
+		ReporterAccountID: authContext.Account.ID,
+		TargetAccountID:   req.GetTargetUserId(),
+		Reason:            req.GetReason(),
+		Details:           req.GetDetails(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &conversationv1.SubmitModerationReportResponse{
+		Report: moderationReportProto(report),
+	}, nil
+}
+
+// GetModerationReport returns one moderation report visible to moderators.
+func (a *api) GetModerationReport(
+	ctx context.Context,
+	req *conversationv1.GetModerationReportRequest,
+) (*conversationv1.GetModerationReportResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	report, err := a.conversation.ModerationReportByID(ctx, req.GetReportId())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	if _, _, _, err := a.requireModerationTarget(ctx, authContext.Account.ID, moderationTargetProto(report.TargetKind, report.TargetID)); err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &conversationv1.GetModerationReportResponse{
+		Report: moderationReportProto(report),
+	}, nil
+}
+
+// ListModerationReports lists moderation reports for one target.
+func (a *api) ListModerationReports(
+	ctx context.Context,
+	req *conversationv1.ListModerationReportsRequest,
+) (*conversationv1.ListModerationReportsResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	_, targetKind, targetID, err := a.requireModerationTarget(ctx, authContext.Account.ID, req.GetTarget())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	reports, err := a.conversation.ModerationReportsByTarget(ctx, targetKind, targetID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	offset, err := decodeOffset(req.GetPage(), "moderation_reports")
+	if err != nil {
+		return nil, grpcError(domainconversation.ErrInvalidInput)
+	}
+	size := pageSize(req.GetPage())
+	end := offset + size
+	if end > len(reports) {
+		end = len(reports)
+	}
+
+	page := reports
+	if offset < len(reports) {
+		page = reports[offset:end]
+	} else {
+		page = nil
+	}
+
+	result := make([]*conversationv1.ModerationReport, 0, len(page))
+	for _, report := range page {
+		result = append(result, moderationReportProto(report))
+	}
+
+	return &conversationv1.ListModerationReportsResponse{
+		Reports: result,
+		Page: &commonv1.PageResponse{
+			NextPageToken: offsetToken("moderation_reports", end),
+			TotalSize:     uint64(len(reports)),
+		},
+	}, nil
+}
+
+// ResolveModerationReport resolves or rejects one moderation report.
+func (a *api) ResolveModerationReport(
+	ctx context.Context,
+	req *conversationv1.ResolveModerationReportRequest,
+) (*conversationv1.ResolveModerationReportResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	report, err := a.conversation.ResolveModerationReport(ctx, domainconversation.ResolveModerationReportParams{
+		ReportID:          req.GetReportId(),
+		ResolverAccountID: authContext.Account.ID,
+		Resolved:          req.GetResolved(),
+		Resolution:        req.GetResolution(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &conversationv1.ResolveModerationReportResponse{
+		Report: moderationReportProto(report),
+	}, nil
+}
+
+// ListModerationActions lists moderation audit entries for one target.
+func (a *api) ListModerationActions(
+	ctx context.Context,
+	req *conversationv1.ListModerationActionsRequest,
+) (*conversationv1.ListModerationActionsResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	_, targetKind, targetID, err := a.requireModerationTarget(ctx, authContext.Account.ID, req.GetTarget())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	actions, err := a.conversation.ModerationActionsByTarget(ctx, targetKind, targetID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	offset, err := decodeOffset(req.GetPage(), "moderation_actions")
+	if err != nil {
+		return nil, grpcError(domainconversation.ErrInvalidInput)
+	}
+	size := pageSize(req.GetPage())
+	end := offset + size
+	if end > len(actions) {
+		end = len(actions)
+	}
+
+	page := actions
+	if offset < len(actions) {
+		page = actions[offset:end]
+	} else {
+		page = nil
+	}
+
+	result := make([]*conversationv1.ModerationAction, 0, len(page))
+	for _, action := range page {
+		result = append(result, moderationActionProto(action))
+	}
+
+	return &conversationv1.ListModerationActionsResponse{
+		Actions: result,
+		Page: &commonv1.PageResponse{
+			NextPageToken: offsetToken("moderation_actions", end),
+			TotalSize:     uint64(len(actions)),
 		},
 	}, nil
 }
@@ -1346,6 +1882,104 @@ func threadProto(topic domainconversation.ConversationTopic) *conversationv1.Thr
 		ReplyCount:     uint32(topic.MessageCount),
 		CreatedAt:      protoTime(topic.CreatedAt),
 		UpdatedAt:      protoTime(topic.UpdatedAt),
+		IsGeneral:      topic.IsGeneral,
+		Archived:       topic.Archived,
+		Pinned:         topic.Pinned,
+		Closed:         topic.Closed,
+		LastSequence:   topic.LastSequence,
+		LastMessageAt:  protoTime(topic.LastMessageAt),
+		ArchivedAt:     protoTime(topic.ArchivedAt),
+		ClosedAt:       protoTime(topic.ClosedAt),
+	}
+}
+
+func moderationPolicyProto(policy domainconversation.ModerationPolicy) *conversationv1.ModerationPolicy {
+	return &conversationv1.ModerationPolicy{
+		Target:                   moderationTargetProto(policy.TargetKind, policy.TargetID),
+		OnlyAdminsCanWrite:       policy.OnlyAdminsCanWrite,
+		OnlyAdminsCanAddMembers:  policy.OnlyAdminsCanAddMembers,
+		AllowReactions:           policy.AllowReactions,
+		AllowForwards:            policy.AllowForwards,
+		AllowThreads:             policy.AllowThreads,
+		RequireEncryptedMessages: policy.RequireEncryptedMessages,
+		RequireTrustedDevices:    policy.RequireTrustedDevices,
+		RequireJoinApproval:      policy.RequireJoinApproval,
+		PinnedMessagesOnlyAdmins: policy.PinnedMessagesOnlyAdmins,
+		SlowModeInterval:         protoDuration(policy.SlowModeInterval),
+		AntiSpamWindow:           protoDuration(policy.AntiSpamWindow),
+		AntiSpamBurstLimit:       uint32(policy.AntiSpamBurstLimit),
+		ShadowMode:               policy.ShadowMode,
+		CreatedAt:                protoTime(policy.CreatedAt),
+		UpdatedAt:                protoTime(policy.UpdatedAt),
+	}
+}
+
+func moderationRestrictionProto(
+	restriction domainconversation.ModerationRestriction,
+) *conversationv1.ModerationRestriction {
+	return &conversationv1.ModerationRestriction{
+		Target:          moderationTargetProto(restriction.TargetKind, restriction.TargetID),
+		UserId:          restriction.AccountID,
+		State:           moderationRestrictionStateToProto(restriction.State),
+		AppliedByUserId: restriction.AppliedByAccountID,
+		Reason:          restriction.Reason,
+		ExpiresAt:       protoTime(restriction.ExpiresAt),
+		CreatedAt:       protoTime(restriction.CreatedAt),
+		UpdatedAt:       protoTime(restriction.UpdatedAt),
+	}
+}
+
+func moderationReportProto(report domainconversation.ModerationReport) *conversationv1.ModerationReport {
+	return &conversationv1.ModerationReport{
+		ReportId:         report.ID,
+		Target:           moderationTargetProto(report.TargetKind, report.TargetID),
+		ReporterUserId:   report.ReporterAccountID,
+		TargetUserId:     report.TargetAccountID,
+		Reason:           report.Reason,
+		Details:          report.Details,
+		Status:           moderationReportStatusToProto(report.Status),
+		ReviewedByUserId: report.ReviewedByAccountID,
+		ReviewedAt:       protoTime(report.ReviewedAt),
+		Resolution:       report.Resolution,
+		CreatedAt:        protoTime(report.CreatedAt),
+		UpdatedAt:        protoTime(report.UpdatedAt),
+	}
+}
+
+func moderationActionProto(action domainconversation.ModerationAction) *conversationv1.ModerationAction {
+	return &conversationv1.ModerationAction{
+		ActionId:     action.ID,
+		Target:       moderationTargetProto(action.TargetKind, action.TargetID),
+		ActorUserId:  action.ActorAccountID,
+		TargetUserId: action.TargetAccountID,
+		ActionType:   moderationActionTypeToProto(action.Type),
+		Duration:     protoDuration(action.Duration),
+		Reason:       action.Reason,
+		Metadata:     action.Metadata,
+		CreatedAt:    protoTime(action.CreatedAt),
+	}
+}
+
+func moderationRateStateProto(
+	state domainconversation.ModerationRateState,
+) *conversationv1.ModerationRateState {
+	return &conversationv1.ModerationRateState{
+		Target:          moderationTargetProto(state.TargetKind, state.TargetID),
+		UserId:          state.AccountID,
+		LastWriteAt:     protoTime(state.LastWriteAt),
+		WindowStartedAt: protoTime(state.WindowStartedAt),
+		WindowCount:     state.WindowCount,
+		UpdatedAt:       protoTime(state.UpdatedAt),
+	}
+}
+
+func moderationWriteDecisionProto(
+	decision domainconversation.ModerationDecision,
+) *conversationv1.ModerationWriteDecision {
+	return &conversationv1.ModerationWriteDecision{
+		Allowed:      decision.Allowed,
+		ShadowHidden: decision.ShadowHidden,
+		RetryAfter:   protoDuration(decision.RetryAfter),
 	}
 }
 
@@ -1419,6 +2053,233 @@ func timeDuration(value interface{ AsDuration() time.Duration }) time.Duration {
 	}
 
 	return value.AsDuration()
+}
+
+func moderationTargetFromProto(
+	target *conversationv1.ModerationTarget,
+) (domainconversation.ModerationTargetKind, string, string, error) {
+	if target == nil {
+		return domainconversation.ModerationTargetKindUnspecified, "", "", domainconversation.ErrInvalidInput
+	}
+
+	targetKind := moderationTargetKindFromProto(target.GetKind())
+	conversationID := strings.TrimSpace(target.GetConversationId())
+	threadID := strings.TrimSpace(target.GetThreadId())
+
+	switch targetKind {
+	case domainconversation.ModerationTargetKindConversation, domainconversation.ModerationTargetKindChannel:
+		if conversationID == "" || threadID != "" {
+			return domainconversation.ModerationTargetKindUnspecified, "", "", domainconversation.ErrInvalidInput
+		}
+		return targetKind, conversationID, conversationID, nil
+	case domainconversation.ModerationTargetKindTopic:
+		if conversationID == "" || threadID == "" {
+			return domainconversation.ModerationTargetKindUnspecified, "", "", domainconversation.ErrInvalidInput
+		}
+		return targetKind, conversationID + gatewayModerationTargetSeparator + threadID, conversationID, nil
+	default:
+		return domainconversation.ModerationTargetKindUnspecified, "", "", domainconversation.ErrInvalidInput
+	}
+}
+
+func moderationPolicyParamsFromProto(
+	policy *conversationv1.ModerationPolicy,
+	actorAccountID string,
+) (domainconversation.SetModerationPolicyParams, error) {
+	if policy == nil {
+		return domainconversation.SetModerationPolicyParams{}, domainconversation.ErrInvalidInput
+	}
+
+	targetKind, targetID, _, err := moderationTargetFromProto(policy.GetTarget())
+	if err != nil {
+		return domainconversation.SetModerationPolicyParams{}, err
+	}
+
+	return domainconversation.SetModerationPolicyParams{
+		TargetKind:               targetKind,
+		TargetID:                 targetID,
+		ActorAccountID:           actorAccountID,
+		OnlyAdminsCanWrite:       policy.GetOnlyAdminsCanWrite(),
+		OnlyAdminsCanAddMembers:  policy.GetOnlyAdminsCanAddMembers(),
+		AllowReactions:           policy.GetAllowReactions(),
+		AllowForwards:            policy.GetAllowForwards(),
+		AllowThreads:             policy.GetAllowThreads(),
+		RequireEncryptedMessages: policy.GetRequireEncryptedMessages(),
+		RequireTrustedDevices:    policy.GetRequireTrustedDevices(),
+		RequireJoinApproval:      policy.GetRequireJoinApproval(),
+		PinnedMessagesOnlyAdmins: policy.GetPinnedMessagesOnlyAdmins(),
+		SlowModeInterval:         timeDuration(policy.GetSlowModeInterval()),
+		AntiSpamWindow:           timeDuration(policy.GetAntiSpamWindow()),
+		AntiSpamBurstLimit:       int(policy.GetAntiSpamBurstLimit()),
+		ShadowMode:               policy.GetShadowMode(),
+	}, nil
+}
+
+func (a *api) moderationContext(
+	ctx context.Context,
+	accountID string,
+	target *conversationv1.ModerationTarget,
+) (
+	domainconversation.Conversation,
+	[]domainconversation.ConversationMember,
+	domainconversation.ModerationTargetKind,
+	string,
+	error,
+) {
+	targetKind, targetID, conversationID, err := moderationTargetFromProto(target)
+	if err != nil {
+		return domainconversation.Conversation{}, nil, domainconversation.ModerationTargetKindUnspecified, "", err
+	}
+
+	conversationRow, members, err := a.conversation.GetConversation(ctx, domainconversation.GetConversationParams{
+		ConversationID: conversationID,
+		AccountID:      accountID,
+	})
+	if err != nil {
+		return domainconversation.Conversation{}, nil, domainconversation.ModerationTargetKindUnspecified, "", err
+	}
+
+	switch targetKind {
+	case domainconversation.ModerationTargetKindChannel:
+		if conversationRow.Kind != domainconversation.ConversationKindChannel {
+			return domainconversation.Conversation{}, nil, domainconversation.ModerationTargetKindUnspecified, "", domainconversation.ErrInvalidInput
+		}
+	case domainconversation.ModerationTargetKindTopic:
+		_, topicID := splitGatewayModerationTarget(targetID)
+		if _, err := a.conversation.GetTopic(ctx, domainconversation.GetTopicParams{
+			ConversationID: conversationID,
+			TopicID:        topicID,
+			AccountID:      accountID,
+		}); err != nil {
+			return domainconversation.Conversation{}, nil, domainconversation.ModerationTargetKindUnspecified, "", err
+		}
+	}
+
+	return conversationRow, members, targetKind, targetID, nil
+}
+
+func (a *api) requireModerationTarget(
+	ctx context.Context,
+	accountID string,
+	target *conversationv1.ModerationTarget,
+) (domainconversation.Conversation, domainconversation.ModerationTargetKind, string, error) {
+	conversationRow, members, targetKind, targetID, err := a.moderationContext(ctx, accountID, target)
+	if err != nil {
+		return domainconversation.Conversation{}, domainconversation.ModerationTargetKindUnspecified, "", err
+	}
+	if !isConversationModerator(members, accountID) {
+		return domainconversation.Conversation{}, domainconversation.ModerationTargetKindUnspecified, "", domainconversation.ErrForbidden
+	}
+
+	return conversationRow, targetKind, targetID, nil
+}
+
+func (a *api) effectiveModerationPolicy(
+	ctx context.Context,
+	conversationRow domainconversation.Conversation,
+	targetKind domainconversation.ModerationTargetKind,
+	targetID string,
+) (domainconversation.ModerationPolicy, error) {
+	policy, err := a.conversation.ModerationPolicyByTarget(ctx, targetKind, targetID)
+	if err == nil {
+		return policy, nil
+	}
+	if !errors.Is(err, domainconversation.ErrNotFound) {
+		return domainconversation.ModerationPolicy{}, err
+	}
+
+	if targetKind == domainconversation.ModerationTargetKindTopic {
+		inherited, inheritedErr := a.conversation.ModerationPolicyByTarget(
+			ctx,
+			domainconversation.ModerationTargetKindConversation,
+			conversationRow.ID,
+		)
+		if inheritedErr == nil {
+			inherited.TargetKind = targetKind
+			inherited.TargetID = targetID
+			return inherited, nil
+		}
+		if !errors.Is(inheritedErr, domainconversation.ErrNotFound) {
+			return domainconversation.ModerationPolicy{}, inheritedErr
+		}
+	}
+
+	return defaultModerationPolicy(conversationRow, targetKind, targetID), nil
+}
+
+func defaultModerationPolicy(
+	conversationRow domainconversation.Conversation,
+	targetKind domainconversation.ModerationTargetKind,
+	targetID string,
+) domainconversation.ModerationPolicy {
+	return domainconversation.ModerationPolicy{
+		TargetKind:               targetKind,
+		TargetID:                 targetID,
+		OnlyAdminsCanWrite:       conversationRow.Settings.OnlyAdminsCanWrite,
+		OnlyAdminsCanAddMembers:  conversationRow.Settings.OnlyAdminsCanAddMembers,
+		AllowReactions:           conversationRow.Settings.AllowReactions,
+		AllowForwards:            conversationRow.Settings.AllowForwards,
+		AllowThreads:             conversationRow.Settings.AllowThreads,
+		RequireEncryptedMessages: conversationRow.Settings.RequireEncryptedMessages,
+		RequireTrustedDevices:    conversationRow.Settings.RequireTrustedDevices,
+		RequireJoinApproval:      conversationRow.Settings.RequireJoinApproval,
+		PinnedMessagesOnlyAdmins: conversationRow.Settings.PinnedMessagesOnlyAdmins,
+		SlowModeInterval:         conversationRow.Settings.SlowModeInterval,
+		CreatedAt:                conversationRow.CreatedAt,
+		UpdatedAt:                conversationRow.UpdatedAt,
+	}
+}
+
+func isConversationModerator(members []domainconversation.ConversationMember, accountID string) bool {
+	for _, member := range members {
+		if member.AccountID != accountID || !isConversationMemberActive(member) {
+			continue
+		}
+		switch member.Role {
+		case domainconversation.MemberRoleOwner, domainconversation.MemberRoleAdmin:
+			return true
+		}
+	}
+
+	return false
+}
+
+func canInspectModerationAccount(
+	members []domainconversation.ConversationMember,
+	viewerAccountID string,
+	subjectAccountID string,
+) bool {
+	if viewerAccountID == subjectAccountID {
+		return true
+	}
+
+	return isConversationModerator(members, viewerAccountID)
+}
+
+func conversationMemberByAccount(
+	members []domainconversation.ConversationMember,
+	accountID string,
+) (domainconversation.ConversationMember, bool) {
+	for _, member := range members {
+		if member.AccountID == accountID {
+			return member, true
+		}
+	}
+
+	return domainconversation.ConversationMember{}, false
+}
+
+func isConversationMemberActive(member domainconversation.ConversationMember) bool {
+	return member.LeftAt.IsZero() && !member.Banned
+}
+
+func moderationSubjectAccountID(viewerAccountID string, requestedAccountID string) string {
+	requestedAccountID = strings.TrimSpace(requestedAccountID)
+	if requestedAccountID != "" {
+		return requestedAccountID
+	}
+
+	return viewerAccountID
 }
 
 func conversationUpdateParamsFromRequest(

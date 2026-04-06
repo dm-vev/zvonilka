@@ -3,6 +3,7 @@ syntax = "proto3";
 package zvonilka.conversation.v1;
 
 import "contracts/conversation/v1/messages.proto";
+import "contracts/conversation/v1/moderation.proto";
 import "contracts/conversation/v1/requests.proto";
 import "contracts/conversation/v1/threads.proto";
 
@@ -32,4 +33,20 @@ service ConversationService {
   rpc CreateThread(CreateThreadRequest) returns (CreateThreadResponse);
   rpc GetThread(GetThreadRequest) returns (GetThreadResponse);
   rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse);
+  rpc RenameThread(RenameThreadRequest) returns (RenameThreadResponse);
+  rpc ArchiveThread(ArchiveThreadRequest) returns (ArchiveThreadResponse);
+  rpc CloseThread(CloseThreadRequest) returns (CloseThreadResponse);
+  rpc PinThread(PinThreadRequest) returns (PinThreadResponse);
+  rpc GetModerationPolicy(GetModerationPolicyRequest) returns (GetModerationPolicyResponse);
+  rpc GetModerationRateState(GetModerationRateStateRequest) returns (GetModerationRateStateResponse);
+  rpc CheckModerationWrite(CheckModerationWriteRequest) returns (CheckModerationWriteResponse);
+  rpc SetModerationPolicy(SetModerationPolicyRequest) returns (SetModerationPolicyResponse);
+  rpc ApplyModerationRestriction(ApplyModerationRestrictionRequest) returns (ApplyModerationRestrictionResponse);
+  rpc LiftModerationRestriction(LiftModerationRestrictionRequest) returns (LiftModerationRestrictionResponse);
+  rpc ListModerationRestrictions(ListModerationRestrictionsRequest) returns (ListModerationRestrictionsResponse);
+  rpc SubmitModerationReport(SubmitModerationReportRequest) returns (SubmitModerationReportResponse);
+  rpc GetModerationReport(GetModerationReportRequest) returns (GetModerationReportResponse);
+  rpc ListModerationReports(ListModerationReportsRequest) returns (ListModerationReportsResponse);
+  rpc ResolveModerationReport(ResolveModerationReportRequest) returns (ResolveModerationReportResponse);
+  rpc ListModerationActions(ListModerationActionsRequest) returns (ListModerationActionsResponse);
 }

@@ -161,4 +161,12 @@ message Thread {
   uint32 reply_count = 5;
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
+  bool is_general = 8;
+  bool archived = 9;
+  bool pinned = 10;
+  bool closed = 11;
+  uint64 last_sequence = 12;
+  google.protobuf.Timestamp last_message_at = 13;
+  google.protobuf.Timestamp archived_at = 14;
+  google.protobuf.Timestamp closed_at = 15;
 }

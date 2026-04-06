@@ -352,6 +352,17 @@ func (s *Service) RegisterDevice(ctx context.Context, params RegisterDeviceParam
 			CreatedAt:  now,
 			LastSeenAt: now,
 		}
+		devices, loadErr := tx.DevicesByAccountID(ctx, account.ID)
+		if loadErr != nil {
+			return fmt.Errorf("list devices for account %s before registration: %w", account.ID, loadErr)
+		}
+		for _, existing := range devices {
+			if existing.Status != DeviceStatusActive {
+				continue
+			}
+			device.Status = DeviceStatusUnverified
+			break
+		}
 
 		savedDevice, loadErr = tx.SaveDevice(ctx, device)
 		if loadErr != nil {

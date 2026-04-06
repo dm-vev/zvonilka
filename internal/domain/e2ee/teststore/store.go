@@ -10,21 +10,23 @@ import (
 
 func NewMemoryStore() e2ee.Store {
 	return &memoryStore{
-		signed:      make(map[string]e2ee.SignedPreKey),
-		oneTime:     make(map[string][]e2ee.OneTimePreKey),
-		sessions:    make(map[string]e2ee.DirectSession),
-		groupSender: make(map[string]e2ee.GroupSenderKeyDistribution),
-		trusts:      make(map[string]e2ee.DeviceTrust),
+		signed:       make(map[string]e2ee.SignedPreKey),
+		oneTime:      make(map[string][]e2ee.OneTimePreKey),
+		sessions:     make(map[string]e2ee.DirectSession),
+		groupSender:  make(map[string]e2ee.GroupSenderKeyDistribution),
+		linkTransfer: make(map[string]e2ee.DeviceLinkTransfer),
+		trusts:       make(map[string]e2ee.DeviceTrust),
 	}
 }
 
 type memoryStore struct {
-	mu          sync.RWMutex
-	signed      map[string]e2ee.SignedPreKey
-	oneTime     map[string][]e2ee.OneTimePreKey
-	sessions    map[string]e2ee.DirectSession
-	groupSender map[string]e2ee.GroupSenderKeyDistribution
-	trusts      map[string]e2ee.DeviceTrust
+	mu           sync.RWMutex
+	signed       map[string]e2ee.SignedPreKey
+	oneTime      map[string][]e2ee.OneTimePreKey
+	sessions     map[string]e2ee.DirectSession
+	groupSender  map[string]e2ee.GroupSenderKeyDistribution
+	linkTransfer map[string]e2ee.DeviceLinkTransfer
+	trusts       map[string]e2ee.DeviceTrust
 }
 
 func (s *memoryStore) WithinTx(_ context.Context, fn func(e2ee.Store) error) error {
@@ -256,6 +258,39 @@ func (s *memoryStore) GroupSenderKeyDistributionsBySenderDevice(_ context.Contex
 	return result, nil
 }
 
+func (s *memoryStore) SaveDeviceLinkTransfer(_ context.Context, value e2ee.DeviceLinkTransfer) (e2ee.DeviceLinkTransfer, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.linkTransfer[deviceLinkKey(value.AccountID, value.TargetDeviceID)] = cloneDeviceLinkTransfer(value)
+	return cloneDeviceLinkTransfer(value), nil
+}
+
+func (s *memoryStore) DeviceLinkTransferByTargetDevice(_ context.Context, accountID string, deviceID string) (e2ee.DeviceLinkTransfer, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	value, ok := s.linkTransfer[deviceLinkKey(accountID, deviceID)]
+	if !ok {
+		return e2ee.DeviceLinkTransfer{}, e2ee.ErrNotFound
+	}
+	return cloneDeviceLinkTransfer(value), nil
+}
+
+func (s *memoryStore) DeleteDeviceLinkTransfer(_ context.Context, transferID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for key, value := range s.linkTransfer {
+		if value.ID != transferID {
+			continue
+		}
+		delete(s.linkTransfer, key)
+		return nil
+	}
+	return e2ee.ErrNotFound
+}
+
 func (s *memoryStore) SaveDeviceTrust(_ context.Context, value e2ee.DeviceTrust) (e2ee.DeviceTrust, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -328,22 +363,34 @@ func clonePublicKey(value e2ee.PublicKey) e2ee.PublicKey {
 }
 
 func cloneGroupSenderKeyDistribution(value e2ee.GroupSenderKeyDistribution) e2ee.GroupSenderKeyDistribution {
-	value.Payload = e2ee.SenderKeyPayload{
-		Algorithm:  value.Payload.Algorithm,
-		Nonce:      append([]byte(nil), value.Payload.Nonce...),
-		Ciphertext: append([]byte(nil), value.Payload.Ciphertext...),
-	}
-	if len(value.Payload.Metadata) > 0 {
-		value.Payload.Metadata = make(map[string]string, len(value.Payload.Metadata))
-		for key, item := range value.Payload.Metadata {
-			value.Payload.Metadata[key] = item
-		}
-	}
+	value.Payload = cloneSenderKeyPayload(value.Payload)
 	return value
 }
 
 func cloneDeviceTrust(value e2ee.DeviceTrust) e2ee.DeviceTrust {
 	return value
+}
+
+func cloneDeviceLinkTransfer(value e2ee.DeviceLinkTransfer) e2ee.DeviceLinkTransfer {
+	value.Payload = cloneSenderKeyPayload(value.Payload)
+	return value
+}
+
+func cloneSenderKeyPayload(value e2ee.SenderKeyPayload) e2ee.SenderKeyPayload {
+	value.Nonce = append([]byte(nil), value.Nonce...)
+	value.Ciphertext = append([]byte(nil), value.Ciphertext...)
+	value.AAD = append([]byte(nil), value.AAD...)
+	if len(value.Metadata) > 0 {
+		value.Metadata = make(map[string]string, len(value.Metadata))
+		for key, item := range value.Metadata {
+			value.Metadata[key] = item
+		}
+	}
+	return value
+}
+
+func deviceLinkKey(accountID string, deviceID string) string {
+	return accountID + "|" + deviceID
 }
 
 var _ e2ee.Store = (*memoryStore)(nil)

@@ -104,7 +104,7 @@ func TestCallHandoffRPC(t *testing.T) {
 
 	owner, ownerCtx := fixture.mustCreateUserAndLogin(t, "call-handoff-owner", "call-handoff-owner@example.com")
 	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "call-handoff-peer", "call-handoff-peer@example.com")
-	peerSecondCtx := fixture.mustLoginAccountOnNewDevice(t, peer, "peer-second-device")
+	peerSecondCtx := fixture.mustLoginAccountOnNewDevice(t, peerCtx, peer, "peer-second-device")
 
 	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
 		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_DIRECT,

@@ -19,3 +19,8 @@ Zvonilka is split into a Go control plane and Rust realtime edge services.
 - `gateway` is the client-facing event edge and sync entrypoint.
 - `botapi` is the external automation boundary.
 - `realtime-gateway`, `presence-service`, and `media-worker` are isolated Rust services reserved for high-frequency workloads.
+
+## Sync Semantics
+
+- `PullEvents` and `SubscribeEvents` exclude presence and moderation event classes by default.
+- Clients must set `include_presence` and `include_moderation` explicitly when those event classes are required.

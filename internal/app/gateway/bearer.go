@@ -11,6 +11,18 @@ import (
 )
 
 func (a *api) requireAuth(ctx context.Context) (identity.AuthContext, error) {
+	authContext, err := a.requireBootstrapAuth(ctx)
+	if err != nil {
+		return identity.AuthContext{}, err
+	}
+	if authContext.Device.Status == identity.DeviceStatusUnverified {
+		return identity.AuthContext{}, grpcError(identity.ErrForbidden)
+	}
+
+	return authContext, nil
+}
+
+func (a *api) requireBootstrapAuth(ctx context.Context) (identity.AuthContext, error) {
 	token, err := bearerToken(ctx)
 	if err != nil {
 		return identity.AuthContext{}, err

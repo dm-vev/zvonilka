@@ -6,6 +6,7 @@ import (
 
 	authv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/auth/v1"
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
+	domaine2ee "github.com/dm-vev/zvonilka/internal/domain/e2ee"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 )
 
@@ -223,6 +224,80 @@ func (a *api) RegisterDevice(
 		Device:  authDevice(device),
 		Session: authSession(session),
 	}, nil
+}
+
+// ApproveDeviceLink activates one pending linked device and queues its encrypted bootstrap bundle.
+func (a *api) ApproveDeviceLink(
+	ctx context.Context,
+	req *authv1.ApproveDeviceLinkRequest,
+) (*authv1.ApproveDeviceLinkResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	device, err := a.identity.ApproveDeviceLink(ctx, identity.ApproveDeviceLinkParams{
+		AccountID:        authContext.Account.ID,
+		ApproverDeviceID: authContext.Device.ID,
+		TargetDeviceID:   req.GetTargetDeviceId(),
+		IdempotencyKey:   req.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	if payload := encryptedPayloadFromProto(req.GetTransfer()); payload.Algorithm != "" || len(payload.Ciphertext) > 0 {
+		if a.e2ee == nil {
+			return nil, grpcError(domaine2ee.ErrForbidden)
+		}
+		if _, err := a.e2ee.QueueDeviceLinkTransfer(ctx, domaine2ee.QueueDeviceLinkTransferParams{
+			AccountID:      authContext.Account.ID,
+			SourceDeviceID: authContext.Device.ID,
+			TargetDeviceID: device.ID,
+			Payload:        payload,
+		}); err != nil {
+			return nil, grpcError(err)
+		}
+	}
+
+	return &authv1.ApproveDeviceLinkResponse{Device: authDevice(device)}, nil
+}
+
+// PullDeviceLinkTransfer returns the encrypted bootstrap bundle for the authenticated device.
+func (a *api) PullDeviceLinkTransfer(
+	ctx context.Context,
+	_ *authv1.PullDeviceLinkTransferRequest,
+) (*authv1.PullDeviceLinkTransferResponse, error) {
+	authContext, err := a.requireBootstrapAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &authv1.PullDeviceLinkTransferResponse{
+		Device:                 authDevice(authContext.Device),
+		AwaitingDeviceApproval: authContext.Device.Status == identity.DeviceStatusUnverified,
+	}
+	if response.AwaitingDeviceApproval {
+		return response, nil
+	}
+	if a.e2ee == nil {
+		return response, nil
+	}
+
+	transfer, err := a.e2ee.ConsumeDeviceLinkTransfer(ctx, domaine2ee.ConsumeDeviceLinkTransferParams{
+		AccountID: authContext.Account.ID,
+		DeviceID:  authContext.Device.ID,
+	})
+	if err != nil {
+		if err == domaine2ee.ErrNotFound {
+			return response, nil
+		}
+		return nil, grpcError(err)
+	}
+
+	response.Transfer = encryptedPayloadProto(transfer.Payload)
+	response.TransferAvailable = response.Transfer != nil
+	return response, nil
 }
 
 // RotateDeviceKey replaces the public key for one of the authenticated account's devices.

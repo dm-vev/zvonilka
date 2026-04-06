@@ -1202,6 +1202,7 @@ func trimMetadata(value map[string]string) map[string]string {
 }
 
 func validateSenderKeyPayload(value SenderKeyPayload) error {
+	value.KeyID = strings.TrimSpace(value.KeyID)
 	value.Algorithm = strings.TrimSpace(value.Algorithm)
 	if value.Algorithm == "" || len(value.Ciphertext) == 0 {
 		return ErrInvalidInput
@@ -1210,9 +1211,11 @@ func validateSenderKeyPayload(value SenderKeyPayload) error {
 }
 
 func normalizeSenderKeyPayload(value SenderKeyPayload) SenderKeyPayload {
+	value.KeyID = strings.TrimSpace(value.KeyID)
 	value.Algorithm = strings.TrimSpace(value.Algorithm)
 	value.Nonce = append([]byte(nil), value.Nonce...)
 	value.Ciphertext = append([]byte(nil), value.Ciphertext...)
+	value.AAD = append([]byte(nil), value.AAD...)
 	value.Metadata = trimMetadata(value.Metadata)
 	return value
 }

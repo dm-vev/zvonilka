@@ -20,7 +20,9 @@ message PullEventsRequest {
   uint64 from_sequence = 2;
   zvonilka.common.v1.PageRequest page = 3;
   repeated string conversation_ids = 4;
+  // Presence updates are excluded unless the client opts in explicitly.
   bool include_presence = 5;
+  // Moderation actions are excluded unless the client opts in explicitly.
   bool include_moderation = 6;
 }
 
@@ -45,7 +47,9 @@ message SubscribeEventsRequest {
   string device_id = 1;
   uint64 from_sequence = 2;
   repeated string conversation_ids = 3;
+  // Presence updates are excluded unless the client opts in explicitly.
   bool include_presence = 4;
+  // Moderation actions are excluded unless the client opts in explicitly.
   bool include_moderation = 5;
 }
 

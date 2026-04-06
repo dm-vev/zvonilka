@@ -116,6 +116,15 @@ type RegisterDeviceParams struct {
 	RequestedAt            time.Time
 }
 
+// ApproveDeviceLinkParams contains the payload for activating a pending linked device.
+type ApproveDeviceLinkParams struct {
+	AccountID        string
+	ApproverDeviceID string
+	TargetDeviceID   string
+	IdempotencyKey   string
+	RequestedAt      time.Time
+}
+
 // RotateDeviceKeyParams contains one device public-key rotation payload.
 type RotateDeviceKeyParams struct {
 	AccountID      string

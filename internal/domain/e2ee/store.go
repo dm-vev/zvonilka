@@ -33,6 +33,9 @@ type Store interface {
 	GroupSenderKeyDistributionsByRecipientDevice(ctx context.Context, conversationID string, accountID string, deviceID string) ([]GroupSenderKeyDistribution, error)
 	GroupSenderKeyDistributionsBySenderKey(ctx context.Context, conversationID string, senderAccountID string, senderDeviceID string, senderKeyID string) ([]GroupSenderKeyDistribution, error)
 	GroupSenderKeyDistributionsBySenderDevice(ctx context.Context, conversationID string, senderAccountID string, senderDeviceID string) ([]GroupSenderKeyDistribution, error)
+	SaveDeviceLinkTransfer(ctx context.Context, value DeviceLinkTransfer) (DeviceLinkTransfer, error)
+	DeviceLinkTransferByTargetDevice(ctx context.Context, accountID string, deviceID string) (DeviceLinkTransfer, error)
+	DeleteDeviceLinkTransfer(ctx context.Context, transferID string) error
 	SaveDeviceTrust(ctx context.Context, value DeviceTrust) (DeviceTrust, error)
 	DeviceTrustsByObserverDevice(ctx context.Context, observerAccountID string, observerDeviceID string, targetAccountID string) ([]DeviceTrust, error)
 }

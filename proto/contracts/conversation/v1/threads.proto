@@ -31,9 +31,55 @@ message GetThreadResponse {
 message ListThreadsRequest {
   string conversation_id = 1;
   zvonilka.common.v1.PageRequest page = 2;
+  bool include_archived = 3;
+  bool include_closed = 4;
 }
 
 message ListThreadsResponse {
   repeated Thread threads = 1;
   zvonilka.common.v1.PageResponse page = 2;
+}
+
+message RenameThreadRequest {
+  string conversation_id = 1;
+  string thread_id = 2;
+  string title = 3;
+  string idempotency_key = 4;
+}
+
+message RenameThreadResponse {
+  Thread thread = 1;
+}
+
+message ArchiveThreadRequest {
+  string conversation_id = 1;
+  string thread_id = 2;
+  bool archived = 3;
+  string idempotency_key = 4;
+}
+
+message ArchiveThreadResponse {
+  Thread thread = 1;
+}
+
+message CloseThreadRequest {
+  string conversation_id = 1;
+  string thread_id = 2;
+  bool closed = 3;
+  string idempotency_key = 4;
+}
+
+message CloseThreadResponse {
+  Thread thread = 1;
+}
+
+message PinThreadRequest {
+  string conversation_id = 1;
+  string thread_id = 2;
+  bool pinned = 3;
+  string idempotency_key = 4;
+}
+
+message PinThreadResponse {
+  Thread thread = 1;
 }

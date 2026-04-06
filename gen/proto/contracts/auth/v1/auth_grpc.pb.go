@@ -26,6 +26,8 @@ const (
 	AuthService_AuthenticateBot_FullMethodName          = "/zvonilka.auth.v1.AuthService/AuthenticateBot"
 	AuthService_RefreshSession_FullMethodName           = "/zvonilka.auth.v1.AuthService/RefreshSession"
 	AuthService_RegisterDevice_FullMethodName           = "/zvonilka.auth.v1.AuthService/RegisterDevice"
+	AuthService_ApproveDeviceLink_FullMethodName        = "/zvonilka.auth.v1.AuthService/ApproveDeviceLink"
+	AuthService_PullDeviceLinkTransfer_FullMethodName   = "/zvonilka.auth.v1.AuthService/PullDeviceLinkTransfer"
 	AuthService_RotateDeviceKey_FullMethodName          = "/zvonilka.auth.v1.AuthService/RotateDeviceKey"
 	AuthService_ListDevices_FullMethodName              = "/zvonilka.auth.v1.AuthService/ListDevices"
 	AuthService_ListSessions_FullMethodName             = "/zvonilka.auth.v1.AuthService/ListSessions"
@@ -46,6 +48,8 @@ type AuthServiceClient interface {
 	AuthenticateBot(ctx context.Context, in *AuthenticateBotRequest, opts ...grpc.CallOption) (*AuthenticateBotResponse, error)
 	RefreshSession(ctx context.Context, in *RefreshSessionRequest, opts ...grpc.CallOption) (*RefreshSessionResponse, error)
 	RegisterDevice(ctx context.Context, in *RegisterDeviceRequest, opts ...grpc.CallOption) (*RegisterDeviceResponse, error)
+	ApproveDeviceLink(ctx context.Context, in *ApproveDeviceLinkRequest, opts ...grpc.CallOption) (*ApproveDeviceLinkResponse, error)
+	PullDeviceLinkTransfer(ctx context.Context, in *PullDeviceLinkTransferRequest, opts ...grpc.CallOption) (*PullDeviceLinkTransferResponse, error)
 	RotateDeviceKey(ctx context.Context, in *RotateDeviceKeyRequest, opts ...grpc.CallOption) (*RotateDeviceKeyResponse, error)
 	ListDevices(ctx context.Context, in *ListDevicesRequest, opts ...grpc.CallOption) (*ListDevicesResponse, error)
 	ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error)
@@ -126,6 +130,24 @@ func (c *authServiceClient) RegisterDevice(ctx context.Context, in *RegisterDevi
 	return out, nil
 }
 
+func (c *authServiceClient) ApproveDeviceLink(ctx context.Context, in *ApproveDeviceLinkRequest, opts ...grpc.CallOption) (*ApproveDeviceLinkResponse, error) {
+	out := new(ApproveDeviceLinkResponse)
+	err := c.cc.Invoke(ctx, AuthService_ApproveDeviceLink_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) PullDeviceLinkTransfer(ctx context.Context, in *PullDeviceLinkTransferRequest, opts ...grpc.CallOption) (*PullDeviceLinkTransferResponse, error) {
+	out := new(PullDeviceLinkTransferResponse)
+	err := c.cc.Invoke(ctx, AuthService_PullDeviceLinkTransfer_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *authServiceClient) RotateDeviceKey(ctx context.Context, in *RotateDeviceKeyRequest, opts ...grpc.CallOption) (*RotateDeviceKeyResponse, error) {
 	out := new(RotateDeviceKeyResponse)
 	err := c.cc.Invoke(ctx, AuthService_RotateDeviceKey_FullMethodName, in, out, opts...)
@@ -200,6 +222,8 @@ type AuthServiceServer interface {
 	AuthenticateBot(context.Context, *AuthenticateBotRequest) (*AuthenticateBotResponse, error)
 	RefreshSession(context.Context, *RefreshSessionRequest) (*RefreshSessionResponse, error)
 	RegisterDevice(context.Context, *RegisterDeviceRequest) (*RegisterDeviceResponse, error)
+	ApproveDeviceLink(context.Context, *ApproveDeviceLinkRequest) (*ApproveDeviceLinkResponse, error)
+	PullDeviceLinkTransfer(context.Context, *PullDeviceLinkTransferRequest) (*PullDeviceLinkTransferResponse, error)
 	RotateDeviceKey(context.Context, *RotateDeviceKeyRequest) (*RotateDeviceKeyResponse, error)
 	ListDevices(context.Context, *ListDevicesRequest) (*ListDevicesResponse, error)
 	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
@@ -234,6 +258,12 @@ func (UnimplementedAuthServiceServer) RefreshSession(context.Context, *RefreshSe
 }
 func (UnimplementedAuthServiceServer) RegisterDevice(context.Context, *RegisterDeviceRequest) (*RegisterDeviceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RegisterDevice not implemented")
+}
+func (UnimplementedAuthServiceServer) ApproveDeviceLink(context.Context, *ApproveDeviceLinkRequest) (*ApproveDeviceLinkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ApproveDeviceLink not implemented")
+}
+func (UnimplementedAuthServiceServer) PullDeviceLinkTransfer(context.Context, *PullDeviceLinkTransferRequest) (*PullDeviceLinkTransferResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PullDeviceLinkTransfer not implemented")
 }
 func (UnimplementedAuthServiceServer) RotateDeviceKey(context.Context, *RotateDeviceKeyRequest) (*RotateDeviceKeyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RotateDeviceKey not implemented")
@@ -391,6 +421,42 @@ func _AuthService_RegisterDevice_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AuthServiceServer).RegisterDevice(ctx, req.(*RegisterDeviceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ApproveDeviceLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApproveDeviceLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ApproveDeviceLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ApproveDeviceLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ApproveDeviceLink(ctx, req.(*ApproveDeviceLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_PullDeviceLinkTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PullDeviceLinkTransferRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).PullDeviceLinkTransfer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_PullDeviceLinkTransfer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).PullDeviceLinkTransfer(ctx, req.(*PullDeviceLinkTransferRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -555,6 +621,14 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RegisterDevice",
 			Handler:    _AuthService_RegisterDevice_Handler,
+		},
+		{
+			MethodName: "ApproveDeviceLink",
+			Handler:    _AuthService_ApproveDeviceLink_Handler,
+		},
+		{
+			MethodName: "PullDeviceLinkTransfer",
+			Handler:    _AuthService_PullDeviceLinkTransfer_Handler,
 		},
 		{
 			MethodName: "RotateDeviceKey",

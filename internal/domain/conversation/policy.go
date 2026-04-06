@@ -218,6 +218,7 @@ func (s *Service) SetModerationPolicy(
 			AllowForwards:            params.AllowForwards,
 			AllowThreads:             allowThreads,
 			RequireEncryptedMessages: params.RequireEncryptedMessages,
+			RequireTrustedDevices:    params.RequireTrustedDevices,
 			RequireJoinApproval:      params.RequireJoinApproval,
 			PinnedMessagesOnlyAdmins: params.PinnedMessagesOnlyAdmins,
 			SlowModeInterval:         params.SlowModeInterval,

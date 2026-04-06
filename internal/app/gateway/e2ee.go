@@ -764,9 +764,11 @@ func senderKeyPayloadProto(value domaine2ee.SenderKeyPayload) *e2eev1.SenderKeyP
 		return nil
 	}
 	result := &e2eev1.SenderKeyPayload{
+		KeyId:      value.KeyID,
 		Algorithm:  value.Algorithm,
 		Nonce:      append([]byte(nil), value.Nonce...),
 		Ciphertext: append([]byte(nil), value.Ciphertext...),
+		Aad:        append([]byte(nil), value.AAD...),
 	}
 	if len(value.Metadata) > 0 {
 		result.Metadata = make(map[string]string, len(value.Metadata))
@@ -847,9 +849,11 @@ func senderKeyPayloadFromProto(value *e2eev1.SenderKeyPayload) domaine2ee.Sender
 		return domaine2ee.SenderKeyPayload{}
 	}
 	result := domaine2ee.SenderKeyPayload{
+		KeyID:      strings.TrimSpace(value.GetKeyId()),
 		Algorithm:  strings.TrimSpace(value.GetAlgorithm()),
 		Nonce:      append([]byte(nil), value.GetNonce()...),
 		Ciphertext: append([]byte(nil), value.GetCiphertext()...),
+		AAD:        append([]byte(nil), value.GetAad()...),
 	}
 	if len(value.GetMetadata()) > 0 {
 		result.Metadata = make(map[string]string, len(value.GetMetadata()))

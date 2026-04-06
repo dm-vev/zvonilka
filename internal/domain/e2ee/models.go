@@ -160,9 +160,11 @@ type DirectSession struct {
 }
 
 type SenderKeyPayload struct {
+	KeyID      string
 	Algorithm  string
 	Nonce      []byte
 	Ciphertext []byte
+	AAD        []byte
 	Metadata   map[string]string
 }
 
@@ -187,4 +189,13 @@ type GroupSenderKeyDistribution struct {
 	CreatedAt          time.Time
 	AcknowledgedAt     time.Time
 	ExpiresAt          time.Time
+}
+
+type DeviceLinkTransfer struct {
+	ID             string
+	AccountID      string
+	SourceDeviceID string
+	TargetDeviceID string
+	Payload        SenderKeyPayload
+	CreatedAt      time.Time
 }

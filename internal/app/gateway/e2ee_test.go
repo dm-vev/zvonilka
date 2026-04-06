@@ -1616,8 +1616,10 @@ func TestSubscribeEventsStreamsConversationE2EERequiredActionOverlay(t *testing.
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- api.SubscribeEvents(&syncv1.SubscribeEventsRequest{
-			FromSequence:    created.Conversation.LastSequence,
-			ConversationIds: []string{created.Conversation.ConversationId},
+			FromSequence:      created.Conversation.LastSequence,
+			ConversationIds:   []string{created.Conversation.ConversationId},
+			IncludePresence:   false,
+			IncludeModeration: false,
 		}, stream)
 	}()
 

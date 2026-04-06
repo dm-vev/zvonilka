@@ -98,6 +98,46 @@ func newTestAPI(t *testing.T) (*api, *recordingSender) {
 	}, sender
 }
 
+func mustLoginOnDevice(
+	t *testing.T,
+	api *api,
+	sender *recordingSender,
+	ctx context.Context,
+	username string,
+	deviceName string,
+	publicKey string,
+) (context.Context, *authv1.VerifyLoginCodeResponse) {
+	t.Helper()
+
+	begin, err := api.BeginLogin(ctx, &authv1.BeginLoginRequest{
+		Identifier:      &authv1.BeginLoginRequest_Username{Username: username},
+		DeliveryChannel: authv1.LoginDeliveryChannel_LOGIN_DELIVERY_CHANNEL_EMAIL,
+		DeviceName:      deviceName,
+		DevicePlatform:  commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+	})
+	if err != nil {
+		t.Fatalf("begin login for %s on %s: %v", username, deviceName, err)
+	}
+
+	verify, err := api.VerifyLoginCode(ctx, &authv1.VerifyLoginCodeRequest{
+		ChallengeId:    begin.ChallengeId,
+		Code:           sender.code(begin.Targets[0].DestinationMask),
+		DeviceName:     deviceName,
+		DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte(publicKey)},
+	})
+	if err != nil {
+		t.Fatalf("verify login for %s on %s: %v", username, deviceName, err)
+	}
+
+	authCtx := metadata.NewIncomingContext(ctx, metadata.Pairs(
+		"authorization",
+		"Bearer "+verify.Tokens.AccessToken,
+	))
+
+	return authCtx, verify
+}
+
 func TestGetMyProfileRejectsMissingBearer(t *testing.T) {
 	t.Parallel()
 
@@ -343,5 +383,178 @@ func TestPasswordRecoveryRPC(t *testing.T) {
 	}
 	if recovered.Tokens.AccessToken == "" || !recovered.RecoveryEnabled {
 		t.Fatalf("unexpected recovery response: %+v", recovered)
+	}
+}
+
+func TestApproveDeviceLinkFlowRPC(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	account, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "device-link-user",
+		DisplayName: "Device Link User",
+		Email:       "device-link@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	phoneCtx, phoneVerify := mustLoginOnDevice(
+		t,
+		api,
+		sender,
+		ctx,
+		account.Username,
+		"phone",
+		"phone-key",
+	)
+	if phoneVerify.Device.Status != commonv1.DeviceStatus_DEVICE_STATUS_ACTIVE {
+		t.Fatalf("expected first device active, got %s", phoneVerify.Device.Status)
+	}
+
+	desktopCtx, desktopVerify := mustLoginOnDevice(
+		t,
+		api,
+		sender,
+		ctx,
+		account.Username,
+		"desktop",
+		"desktop-key",
+	)
+	if desktopVerify.Device.Status != commonv1.DeviceStatus_DEVICE_STATUS_UNVERIFIED {
+		t.Fatalf("expected second device unverified, got %s", desktopVerify.Device.Status)
+	}
+
+	if _, err := api.GetMyProfile(desktopCtx, &usersv1.GetMyProfileRequest{}); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("expected permission denied for unverified device, got %v", err)
+	}
+
+	pending, err := api.PullDeviceLinkTransfer(desktopCtx, &authv1.PullDeviceLinkTransferRequest{})
+	if err != nil {
+		t.Fatalf("pull pending device link transfer: %v", err)
+	}
+	if !pending.AwaitingDeviceApproval || pending.TransferAvailable || pending.Transfer != nil {
+		t.Fatalf("unexpected pending response: %+v", pending)
+	}
+	if pending.Device == nil || pending.Device.Status != commonv1.DeviceStatus_DEVICE_STATUS_UNVERIFIED {
+		t.Fatalf("expected pending device status, got %+v", pending.Device)
+	}
+
+	approved, err := api.ApproveDeviceLink(phoneCtx, &authv1.ApproveDeviceLinkRequest{
+		TargetDeviceId: desktopVerify.Device.DeviceId,
+		Transfer: &commonv1.EncryptedPayload{
+			KeyId:      "bootstrap-key",
+			Algorithm:  "xchacha20poly1305",
+			Nonce:      []byte("bootstrap-nonce"),
+			Ciphertext: []byte("bootstrap-ciphertext"),
+			Aad:        []byte("bootstrap-aad"),
+			Metadata: map[string]string{
+				"kind": "history_transfer",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("approve device link: %v", err)
+	}
+	if approved.Device == nil || approved.Device.Status != commonv1.DeviceStatus_DEVICE_STATUS_ACTIVE {
+		t.Fatalf("expected approved device active, got %+v", approved.Device)
+	}
+
+	pulled, err := api.PullDeviceLinkTransfer(desktopCtx, &authv1.PullDeviceLinkTransferRequest{})
+	if err != nil {
+		t.Fatalf("pull approved device link transfer: %v", err)
+	}
+	if pulled.AwaitingDeviceApproval || !pulled.TransferAvailable || pulled.Transfer == nil {
+		t.Fatalf("unexpected pulled response: %+v", pulled)
+	}
+	if pulled.Device == nil || pulled.Device.Status != commonv1.DeviceStatus_DEVICE_STATUS_ACTIVE {
+		t.Fatalf("expected pulled device active, got %+v", pulled.Device)
+	}
+	if pulled.Transfer.GetKeyId() != "bootstrap-key" ||
+		string(pulled.Transfer.GetCiphertext()) != "bootstrap-ciphertext" ||
+		string(pulled.Transfer.GetAad()) != "bootstrap-aad" {
+		t.Fatalf("unexpected pulled transfer: %+v", pulled.Transfer)
+	}
+
+	profile, err := api.GetMyProfile(desktopCtx, &usersv1.GetMyProfileRequest{})
+	if err != nil {
+		t.Fatalf("get my profile after approval: %v", err)
+	}
+	if profile.Profile.UserId != account.ID {
+		t.Fatalf("expected profile for %s, got %s", account.ID, profile.Profile.UserId)
+	}
+
+	consumed, err := api.PullDeviceLinkTransfer(desktopCtx, &authv1.PullDeviceLinkTransferRequest{})
+	if err != nil {
+		t.Fatalf("pull consumed device link transfer: %v", err)
+	}
+	if consumed.AwaitingDeviceApproval || consumed.TransferAvailable || consumed.Transfer != nil {
+		t.Fatalf("expected consumed transfer to be empty, got %+v", consumed)
+	}
+}
+
+func TestRegisterDeviceCreatesPendingLinkedDeviceRPC(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestAPI(t)
+	ctx := context.Background()
+
+	account, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "register-device-user",
+		DisplayName: "Register Device User",
+		Email:       "register-device@example.com",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	phoneCtx, phoneVerify := mustLoginOnDevice(
+		t,
+		api,
+		sender,
+		ctx,
+		account.Username,
+		"phone",
+		"phone-key",
+	)
+	if phoneVerify.Device.Status != commonv1.DeviceStatus_DEVICE_STATUS_ACTIVE {
+		t.Fatalf("expected first device active, got %s", phoneVerify.Device.Status)
+	}
+
+	registered, err := api.RegisterDevice(phoneCtx, &authv1.RegisterDeviceRequest{
+		DeviceName:     "tablet",
+		DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_IOS,
+		DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte("tablet-key")},
+	})
+	if err != nil {
+		t.Fatalf("register device: %v", err)
+	}
+	if registered.Device == nil || registered.Device.Status != commonv1.DeviceStatus_DEVICE_STATUS_UNVERIFIED {
+		t.Fatalf("expected registered device unverified, got %+v", registered.Device)
+	}
+
+	devices, err := api.ListDevices(phoneCtx, &authv1.ListDevicesRequest{})
+	if err != nil {
+		t.Fatalf("list devices: %v", err)
+	}
+	if len(devices.Devices) != 2 {
+		t.Fatalf("expected two devices, got %+v", devices.Devices)
+	}
+
+	statusByName := make(map[string]commonv1.DeviceStatus, len(devices.Devices))
+	for _, device := range devices.Devices {
+		statusByName[device.DeviceName] = device.Status
+	}
+	if statusByName["phone"] != commonv1.DeviceStatus_DEVICE_STATUS_ACTIVE {
+		t.Fatalf("expected phone active, got %s", statusByName["phone"])
+	}
+	if statusByName["tablet"] != commonv1.DeviceStatus_DEVICE_STATUS_UNVERIFIED {
+		t.Fatalf("expected tablet unverified, got %s", statusByName["tablet"])
 	}
 }

@@ -149,6 +149,8 @@ message SenderKeyPayload {
   bytes nonce = 2;
   bytes ciphertext = 3;
   map<string, string> metadata = 4;
+  string key_id = 5;
+  bytes aad = 6;
 }
 
 enum GroupSenderKeyState {

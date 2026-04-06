@@ -155,3 +155,30 @@ func scanDeviceTrust(row rowScanner) (e2ee.DeviceTrust, error) {
 	}
 	return value, nil
 }
+
+func scanDeviceLinkTransfer(row rowScanner) (e2ee.DeviceLinkTransfer, error) {
+	var (
+		value    e2ee.DeviceLinkTransfer
+		metadata []byte
+		aad      []byte
+	)
+	err := row.Scan(
+		&value.ID,
+		&value.AccountID,
+		&value.SourceDeviceID,
+		&value.TargetDeviceID,
+		&value.Payload.KeyID,
+		&value.Payload.Algorithm,
+		&value.Payload.Nonce,
+		&value.Payload.Ciphertext,
+		&aad,
+		&metadata,
+		&value.CreatedAt,
+	)
+	if err != nil {
+		return e2ee.DeviceLinkTransfer{}, err
+	}
+	value.Payload.AAD = append([]byte(nil), aad...)
+	value.Payload.Metadata = unmarshalMetadata(metadata)
+	return value, nil
+}

@@ -188,3 +188,35 @@ func (s *Service) RecordModerationWrite(
 
 	return saved, nil
 }
+
+// ModerationRateStateByTargetAndAccount resolves one moderation rate state row.
+func (s *Service) ModerationRateStateByTargetAndAccount(
+	ctx context.Context,
+	targetKind ModerationTargetKind,
+	targetID string,
+	accountID string,
+) (ModerationRateState, error) {
+	if err := s.validateContext(ctx, "load moderation rate state"); err != nil {
+		return ModerationRateState{}, err
+	}
+
+	targetKind = ModerationTargetKind(strings.TrimSpace(string(targetKind)))
+	targetID = strings.TrimSpace(targetID)
+	accountID = strings.TrimSpace(accountID)
+	if targetKind == ModerationTargetKindUnspecified || targetID == "" || accountID == "" {
+		return ModerationRateState{}, ErrInvalidInput
+	}
+
+	state, err := s.store.ModerationRateStateByTargetAndAccount(ctx, targetKind, targetID, accountID)
+	if err != nil {
+		return ModerationRateState{}, fmt.Errorf(
+			"load moderation rate state for %s:%s and account %s: %w",
+			targetKind,
+			targetID,
+			accountID,
+			err,
+		)
+	}
+
+	return state, nil
+}

@@ -32,8 +32,10 @@ import (
 	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
 	usertest "github.com/dm-vev/zvonilka/internal/domain/user/teststore"
 	platformrtc "github.com/dm-vev/zvonilka/internal/platform/rtc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func TestCreateThreadAcceptsRootMessageID(t *testing.T) {
@@ -86,6 +88,427 @@ func TestCreateThreadAcceptsRootMessageID(t *testing.T) {
 
 	if loaded.Thread.ConversationId != created.Conversation.ConversationId || account.ID == "" {
 		t.Fatalf("unexpected loaded thread: %+v", loaded.Thread)
+	}
+}
+
+func TestThreadLifecycleRPC(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	_, authCtx := fixture.mustCreateUserAndLogin(t, "thread-lifecycle-owner", "thread-lifecycle-owner@example.com")
+	created, err := fixture.api.CreateConversation(authCtx, &conversationv1.CreateConversationRequest{
+		Kind:  commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title: "Thread Lifecycle",
+		Settings: &conversationv1.ConversationSettings{
+			AllowThreads: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	thread, err := fixture.api.CreateThread(authCtx, &conversationv1.CreateThreadRequest{
+		ConversationId: created.Conversation.ConversationId,
+		Title:          "Announcements",
+	})
+	if err != nil {
+		t.Fatalf("create thread: %v", err)
+	}
+
+	renamed, err := fixture.api.RenameThread(authCtx, &conversationv1.RenameThreadRequest{
+		ConversationId: created.Conversation.ConversationId,
+		ThreadId:       thread.Thread.ThreadId,
+		Title:          "Town Hall",
+	})
+	if err != nil {
+		t.Fatalf("rename thread: %v", err)
+	}
+	if renamed.Thread.Title != "Town Hall" {
+		t.Fatalf("expected renamed thread title, got %+v", renamed.Thread)
+	}
+
+	listed, err := fixture.api.ListThreads(authCtx, &conversationv1.ListThreadsRequest{
+		ConversationId: created.Conversation.ConversationId,
+	})
+	if err != nil {
+		t.Fatalf("list threads: %v", err)
+	}
+
+	found := false
+	for _, listedThread := range listed.Threads {
+		if listedThread.GetThreadId() != thread.Thread.ThreadId {
+			continue
+		}
+		found = true
+		if listedThread.GetTitle() != "Town Hall" {
+			t.Fatalf("unexpected listed thread: %+v", listedThread)
+		}
+	}
+	if !found {
+		t.Fatalf("thread %s missing from list response", thread.Thread.ThreadId)
+	}
+
+	archived, err := fixture.api.ArchiveThread(authCtx, &conversationv1.ArchiveThreadRequest{
+		ConversationId: created.Conversation.ConversationId,
+		ThreadId:       thread.Thread.ThreadId,
+		Archived:       true,
+	})
+	if err != nil {
+		t.Fatalf("archive thread: %v", err)
+	}
+	if !archived.Thread.Archived || archived.Thread.ArchivedAt == nil {
+		t.Fatalf("expected archived thread state, got %+v", archived.Thread)
+	}
+
+	closed, err := fixture.api.CloseThread(authCtx, &conversationv1.CloseThreadRequest{
+		ConversationId: created.Conversation.ConversationId,
+		ThreadId:       thread.Thread.ThreadId,
+		Closed:         true,
+	})
+	if err != nil {
+		t.Fatalf("close thread: %v", err)
+	}
+	if !closed.Thread.Closed || closed.Thread.ClosedAt == nil {
+		t.Fatalf("expected closed thread state, got %+v", closed.Thread)
+	}
+
+	pinned, err := fixture.api.PinThread(authCtx, &conversationv1.PinThreadRequest{
+		ConversationId: created.Conversation.ConversationId,
+		ThreadId:       thread.Thread.ThreadId,
+		Pinned:         true,
+	})
+	if err != nil {
+		t.Fatalf("pin thread: %v", err)
+	}
+	if !pinned.Thread.Pinned || pinned.Thread.LastSequence == 0 {
+		t.Fatalf("expected pinned thread with sequence, got %+v", pinned.Thread)
+	}
+
+	loaded, err := fixture.api.GetThread(authCtx, &conversationv1.GetThreadRequest{
+		ConversationId: created.Conversation.ConversationId,
+		ThreadId:       thread.Thread.ThreadId,
+	})
+	if err != nil {
+		t.Fatalf("get thread: %v", err)
+	}
+	if loaded.Thread.Title != "Town Hall" || !loaded.Thread.Archived || !loaded.Thread.Closed || !loaded.Thread.Pinned {
+		t.Fatalf("unexpected persisted thread state: %+v", loaded.Thread)
+	}
+
+	hidden, err := fixture.api.ListThreads(authCtx, &conversationv1.ListThreadsRequest{
+		ConversationId: created.Conversation.ConversationId,
+	})
+	if err != nil {
+		t.Fatalf("list threads after archive and close: %v", err)
+	}
+	for _, listedThread := range hidden.Threads {
+		if listedThread.GetThreadId() == thread.Thread.ThreadId {
+			t.Fatalf("archived and closed thread must be hidden by default: %+v", listedThread)
+		}
+	}
+
+	visible, err := fixture.api.ListThreads(authCtx, &conversationv1.ListThreadsRequest{
+		ConversationId:  created.Conversation.ConversationId,
+		IncludeArchived: true,
+		IncludeClosed:   true,
+	})
+	if err != nil {
+		t.Fatalf("list threads with archived and closed included: %v", err)
+	}
+
+	found = false
+	for _, listedThread := range visible.Threads {
+		if listedThread.GetThreadId() != thread.Thread.ThreadId {
+			continue
+		}
+		found = true
+		if !listedThread.GetArchived() || !listedThread.GetClosed() || !listedThread.GetPinned() {
+			t.Fatalf("unexpected listed archived thread: %+v", listedThread)
+		}
+	}
+	if !found {
+		t.Fatalf("thread %s missing from inclusive list response", thread.Thread.ThreadId)
+	}
+}
+
+func TestModerationRPCFlow(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	owner, ownerCtx := fixture.mustCreateUserAndLogin(t, "moderation-rpc-owner", "moderation-rpc-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "moderation-rpc-peer", "moderation-rpc-peer@example.com")
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Moderation RPC",
+		MemberUserIds: []string{peer.ID},
+		Settings: &conversationv1.ConversationSettings{
+			AllowThreads: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	thread, err := fixture.api.CreateThread(ownerCtx, &conversationv1.CreateThreadRequest{
+		ConversationId: created.Conversation.ConversationId,
+		Title:          "Reports",
+	})
+	if err != nil {
+		t.Fatalf("create thread: %v", err)
+	}
+
+	target := &conversationv1.ModerationTarget{
+		Kind:           conversationv1.ModerationTargetKind_MODERATION_TARGET_KIND_THREAD,
+		ConversationId: created.Conversation.ConversationId,
+		ThreadId:       thread.Thread.ThreadId,
+	}
+
+	setPolicy, err := fixture.api.SetModerationPolicy(ownerCtx, &conversationv1.SetModerationPolicyRequest{
+		Policy: &conversationv1.ModerationPolicy{
+			Target:                   target,
+			AllowThreads:             true,
+			AllowReactions:           false,
+			RequireEncryptedMessages: true,
+			RequireTrustedDevices:    true,
+			RequireJoinApproval:      true,
+			PinnedMessagesOnlyAdmins: true,
+			SlowModeInterval:         durationpb.New(10 * time.Second),
+			AntiSpamWindow:           durationpb.New(time.Minute),
+			AntiSpamBurstLimit:       3,
+			ShadowMode:               true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("set moderation policy: %v", err)
+	}
+	if setPolicy.Policy == nil || setPolicy.Policy.GetTarget().GetThreadId() != thread.Thread.ThreadId {
+		t.Fatalf("unexpected moderation policy response: %+v", setPolicy.Policy)
+	}
+	if setPolicy.Policy.GetAllowReactions() || !setPolicy.Policy.GetRequireTrustedDevices() || !setPolicy.Policy.GetShadowMode() {
+		t.Fatalf("unexpected moderation policy fields: %+v", setPolicy.Policy)
+	}
+
+	gotPolicy, err := fixture.api.GetModerationPolicy(ownerCtx, &conversationv1.GetModerationPolicyRequest{
+		Target: target,
+	})
+	if err != nil {
+		t.Fatalf("get moderation policy: %v", err)
+	}
+	if gotPolicy.Policy == nil || gotPolicy.Policy.GetTarget().GetConversationId() != created.Conversation.ConversationId {
+		t.Fatalf("unexpected moderation policy target: %+v", gotPolicy.Policy)
+	}
+	if gotPolicy.Policy.GetAntiSpamBurstLimit() != 3 || gotPolicy.Policy.GetSlowModeInterval().AsDuration() != 10*time.Second {
+		t.Fatalf("unexpected moderation policy timings: %+v", gotPolicy.Policy)
+	}
+
+	applied, err := fixture.api.ApplyModerationRestriction(ownerCtx, &conversationv1.ApplyModerationRestrictionRequest{
+		Target:   target,
+		UserId:   peer.ID,
+		State:    conversationv1.ModerationRestrictionState_MODERATION_RESTRICTION_STATE_MUTED,
+		Reason:   "slow mode abuse",
+		Duration: durationpb.New(2 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("apply moderation restriction: %v", err)
+	}
+	if applied.Restriction == nil || applied.Restriction.GetState() != conversationv1.ModerationRestrictionState_MODERATION_RESTRICTION_STATE_MUTED {
+		t.Fatalf("unexpected moderation restriction: %+v", applied.Restriction)
+	}
+
+	restrictions, err := fixture.api.ListModerationRestrictions(ownerCtx, &conversationv1.ListModerationRestrictionsRequest{
+		Target: target,
+	})
+	if err != nil {
+		t.Fatalf("list moderation restrictions: %v", err)
+	}
+	if len(restrictions.Restrictions) != 1 || restrictions.Restrictions[0].GetUserId() != peer.ID {
+		t.Fatalf("unexpected moderation restrictions: %+v", restrictions.Restrictions)
+	}
+
+	submitted, err := fixture.api.SubmitModerationReport(peerCtx, &conversationv1.SubmitModerationReportRequest{
+		Target:       target,
+		TargetUserId: owner.ID,
+		Reason:       "spam",
+		Details:      "too many announcements",
+	})
+	if err != nil {
+		t.Fatalf("submit moderation report: %v", err)
+	}
+	if submitted.Report == nil || submitted.Report.GetStatus() != conversationv1.ModerationReportStatus_MODERATION_REPORT_STATUS_PENDING {
+		t.Fatalf("unexpected moderation report: %+v", submitted.Report)
+	}
+
+	report, err := fixture.api.GetModerationReport(ownerCtx, &conversationv1.GetModerationReportRequest{
+		ReportId: submitted.Report.ReportId,
+	})
+	if err != nil {
+		t.Fatalf("get moderation report: %v", err)
+	}
+	if report.Report == nil || report.Report.GetReportId() != submitted.Report.ReportId {
+		t.Fatalf("unexpected moderation report lookup: %+v", report.Report)
+	}
+
+	reportList, err := fixture.api.ListModerationReports(ownerCtx, &conversationv1.ListModerationReportsRequest{
+		Target: target,
+	})
+	if err != nil {
+		t.Fatalf("list moderation reports: %v", err)
+	}
+	if len(reportList.Reports) != 1 || reportList.Reports[0].GetReportId() != submitted.Report.ReportId {
+		t.Fatalf("unexpected moderation report list: %+v", reportList.Reports)
+	}
+
+	resolved, err := fixture.api.ResolveModerationReport(ownerCtx, &conversationv1.ResolveModerationReportRequest{
+		ReportId:   submitted.Report.ReportId,
+		Resolved:   true,
+		Resolution: "reviewed",
+	})
+	if err != nil {
+		t.Fatalf("resolve moderation report: %v", err)
+	}
+	if resolved.Report == nil || resolved.Report.GetStatus() != conversationv1.ModerationReportStatus_MODERATION_REPORT_STATUS_RESOLVED {
+		t.Fatalf("unexpected resolved report: %+v", resolved.Report)
+	}
+
+	if _, err := fixture.api.LiftModerationRestriction(ownerCtx, &conversationv1.LiftModerationRestrictionRequest{
+		Target: target,
+		UserId: peer.ID,
+		Reason: "cooldown complete",
+	}); err != nil {
+		t.Fatalf("lift moderation restriction: %v", err)
+	}
+
+	afterLift, err := fixture.api.ListModerationRestrictions(ownerCtx, &conversationv1.ListModerationRestrictionsRequest{
+		Target: target,
+	})
+	if err != nil {
+		t.Fatalf("list moderation restrictions after lift: %v", err)
+	}
+	if len(afterLift.Restrictions) != 0 {
+		t.Fatalf("expected no active moderation restrictions, got %+v", afterLift.Restrictions)
+	}
+
+	actions, err := fixture.api.ListModerationActions(ownerCtx, &conversationv1.ListModerationActionsRequest{
+		Target: target,
+	})
+	if err != nil {
+		t.Fatalf("list moderation actions: %v", err)
+	}
+	if len(actions.Actions) < 4 {
+		t.Fatalf("expected moderation audit actions, got %+v", actions.Actions)
+	}
+
+	actionTypes := make(map[conversationv1.ModerationActionType]struct{}, len(actions.Actions))
+	for _, action := range actions.Actions {
+		actionTypes[action.GetActionType()] = struct{}{}
+	}
+	for _, expected := range []conversationv1.ModerationActionType{
+		conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_POLICY_SET,
+		conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_MUTE,
+		conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_REPORT_SET,
+		conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_REPORT_RESOLVE,
+		conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_UNMUTE,
+	} {
+		if _, ok := actionTypes[expected]; !ok {
+			t.Fatalf("expected moderation action %s in %+v", expected, actions.Actions)
+		}
+	}
+}
+
+func TestModerationRateStateAndCheckWriteRPC(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	_, ownerCtx := fixture.mustCreateUserAndLogin(t, "rate-state-owner", "rate-state-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "rate-state-peer", "rate-state-peer@example.com")
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Rate State",
+		MemberUserIds: []string{peer.ID},
+		Settings: &conversationv1.ConversationSettings{
+			AllowThreads: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	thread, err := fixture.api.CreateThread(ownerCtx, &conversationv1.CreateThreadRequest{
+		ConversationId: created.Conversation.ConversationId,
+		Title:          "Slow Mode",
+	})
+	if err != nil {
+		t.Fatalf("create thread: %v", err)
+	}
+
+	target := &conversationv1.ModerationTarget{
+		Kind:           conversationv1.ModerationTargetKind_MODERATION_TARGET_KIND_THREAD,
+		ConversationId: created.Conversation.ConversationId,
+		ThreadId:       thread.Thread.ThreadId,
+	}
+
+	if _, err := fixture.api.SetModerationPolicy(ownerCtx, &conversationv1.SetModerationPolicyRequest{
+		Policy: &conversationv1.ModerationPolicy{
+			Target:             target,
+			AllowThreads:       true,
+			SlowModeInterval:   durationpb.New(3 * time.Minute),
+			AntiSpamWindow:     durationpb.New(10 * time.Minute),
+			AntiSpamBurstLimit: 2,
+		},
+	}); err != nil {
+		t.Fatalf("set moderation policy: %v", err)
+	}
+
+	firstDraft := testMessageDraft("rate-state-1")
+	firstDraft.ThreadId = thread.Thread.ThreadId
+	if _, err := fixture.api.SendMessage(peerCtx, &conversationv1.SendMessageRequest{
+		ConversationId: created.Conversation.ConversationId,
+		Draft:          firstDraft,
+	}); err != nil {
+		t.Fatalf("send first thread message: %v", err)
+	}
+
+	state, err := fixture.api.GetModerationRateState(ownerCtx, &conversationv1.GetModerationRateStateRequest{
+		Target: target,
+		UserId: peer.ID,
+	})
+	if err != nil {
+		t.Fatalf("get moderation rate state: %v", err)
+	}
+	if state.State == nil || state.State.GetUserId() != peer.ID {
+		t.Fatalf("unexpected moderation rate state: %+v", state.State)
+	}
+	if state.State.GetTarget().GetThreadId() != thread.Thread.ThreadId || state.State.GetWindowCount() != 1 {
+		t.Fatalf("unexpected moderation rate state counters: %+v", state.State)
+	}
+	if state.State.GetLastWriteAt() == nil || state.State.GetUpdatedAt() == nil {
+		t.Fatalf("expected moderation rate timestamps, got %+v", state.State)
+	}
+
+	decision, err := fixture.api.CheckModerationWrite(peerCtx, &conversationv1.CheckModerationWriteRequest{
+		Target: target,
+	})
+	if err != nil {
+		t.Fatalf("check moderation write: %v", err)
+	}
+	if decision.Decision == nil || decision.Decision.GetAllowed() {
+		t.Fatalf("expected disallowed moderation decision, got %+v", decision.Decision)
+	}
+	if decision.Decision.GetRetryAfter().AsDuration() != 3*time.Minute {
+		t.Fatalf("unexpected retry after, got %+v", decision.Decision)
+	}
+
+	secondDraft := testMessageDraft("rate-state-2")
+	secondDraft.ThreadId = thread.Thread.ThreadId
+	_, err = fixture.api.SendMessage(peerCtx, &conversationv1.SendMessageRequest{
+		ConversationId: created.Conversation.ConversationId,
+		Draft:          secondDraft,
+	})
+	if status.Code(err) != codes.ResourceExhausted {
+		t.Fatalf("expected resource exhausted on second write, got %v", err)
 	}
 }
 
@@ -307,8 +730,10 @@ func TestSubscribeEventsWakesOnConversationChanges(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- fixture.api.SubscribeEvents(&syncv1.SubscribeEventsRequest{
-			FromSequence:    created.Conversation.LastSequence,
-			ConversationIds: []string{created.Conversation.ConversationId},
+			FromSequence:      created.Conversation.LastSequence,
+			ConversationIds:   []string{created.Conversation.ConversationId},
+			IncludePresence:   false,
+			IncludeModeration: false,
 		}, stream)
 	}()
 
@@ -501,8 +926,10 @@ func TestSubscribeEventsFiltersPresenceUntilRequested(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- fixture.api.SubscribeEvents(&syncv1.SubscribeEventsRequest{
-			FromSequence:    created.Conversation.LastSequence,
-			ConversationIds: []string{created.Conversation.ConversationId},
+			FromSequence:      created.Conversation.LastSequence,
+			ConversationIds:   []string{created.Conversation.ConversationId},
+			IncludePresence:   false,
+			IncludeModeration: false,
 		}, stream)
 	}()
 
@@ -534,9 +961,10 @@ func TestSubscribeEventsFiltersPresenceUntilRequested(t *testing.T) {
 	errCh = make(chan error, 1)
 	go func() {
 		errCh <- fixture.api.SubscribeEvents(&syncv1.SubscribeEventsRequest{
-			FromSequence:    created.Conversation.LastSequence,
-			ConversationIds: []string{created.Conversation.ConversationId},
-			IncludePresence: true,
+			FromSequence:      created.Conversation.LastSequence,
+			ConversationIds:   []string{created.Conversation.ConversationId},
+			IncludePresence:   true,
+			IncludeModeration: false,
 		}, includingStream)
 	}()
 
@@ -572,6 +1000,125 @@ func TestSubscribeEventsFiltersPresenceUntilRequested(t *testing.T) {
 	_ = owner
 }
 
+func TestSubscribeEventsFiltersModerationUntilRequested(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	owner, ownerCtx := fixture.mustCreateUserAndLogin(t, "subscribe-moderation-owner", "subscribe-moderation-owner@example.com")
+	peer, _ := fixture.mustCreateUserAndLogin(t, "subscribe-moderation-peer", "subscribe-moderation-peer@example.com")
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Subscribe Moderation",
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	stream := newTestSubscribeEventsStream(ownerCtx)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- fixture.api.SubscribeEvents(&syncv1.SubscribeEventsRequest{
+			FromSequence:      created.Conversation.LastSequence,
+			ConversationIds:   []string{created.Conversation.ConversationId},
+			IncludePresence:   false,
+			IncludeModeration: false,
+		}, stream)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+
+	if _, err := fixture.api.conversation.ApplyModerationRestriction(context.Background(), conversation.ApplyModerationRestrictionParams{
+		TargetKind:      conversation.ModerationTargetKindConversation,
+		TargetID:        created.Conversation.ConversationId,
+		ActorAccountID:  owner.ID,
+		TargetAccountID: peer.ID,
+		State:           conversation.ModerationRestrictionStateMuted,
+		CreatedAt:       fixture.now(),
+	}); err != nil {
+		t.Fatalf("apply moderation restriction: %v", err)
+	}
+
+	select {
+	case response := <-stream.responses:
+		t.Fatalf("expected moderation event to be filtered, got %+v", response)
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	stream.cancel()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("subscribe events returned error: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for filtered subscribe loop to stop")
+	}
+
+	afterMute, err := fixture.api.PullEvents(ownerCtx, &syncv1.PullEventsRequest{
+		FromSequence:      created.Conversation.LastSequence,
+		ConversationIds:   []string{created.Conversation.ConversationId},
+		IncludeModeration: true,
+	})
+	if err != nil {
+		t.Fatalf("pull moderation backlog: %v", err)
+	}
+	if len(afterMute.Events) != 1 {
+		t.Fatalf("expected one moderation backlog event, got %+v", afterMute.Events)
+	}
+
+	if err := fixture.api.conversation.LiftModerationRestriction(context.Background(), conversation.LiftModerationRestrictionParams{
+		TargetKind:      conversation.ModerationTargetKindConversation,
+		TargetID:        created.Conversation.ConversationId,
+		ActorAccountID:  owner.ID,
+		TargetAccountID: peer.ID,
+		Reason:          "resolved",
+		CreatedAt:       fixture.now().Add(time.Minute),
+	}); err != nil {
+		t.Fatalf("lift moderation restriction: %v", err)
+	}
+
+	includingStream := newTestSubscribeEventsStream(ownerCtx)
+	errCh = make(chan error, 1)
+	go func() {
+		errCh <- fixture.api.SubscribeEvents(&syncv1.SubscribeEventsRequest{
+			FromSequence:      afterMute.NextSequence,
+			ConversationIds:   []string{created.Conversation.ConversationId},
+			IncludePresence:   false,
+			IncludeModeration: true,
+		}, includingStream)
+	}()
+
+	select {
+	case response := <-includingStream.responses:
+		if response.GetEvent() == nil {
+			t.Fatal("expected sync event")
+		}
+		if response.GetEvent().GetEventType() != commonv1.EventType_EVENT_TYPE_ADMIN_ACTION_RECORDED {
+			t.Fatalf("expected admin action event, got %s", response.GetEvent().GetEventType())
+		}
+		if response.GetEvent().GetPayloadType() != "moderation_action" {
+			t.Fatalf("expected moderation payload type, got %s", response.GetEvent().GetPayloadType())
+		}
+		if response.GetEvent().GetMetadata()["action_type"] != string(conversation.ModerationActionTypeUnmute) {
+			t.Fatalf("expected unmute action metadata, got %+v", response.GetEvent().GetMetadata())
+		}
+		includingStream.cancel()
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("timed out waiting for included moderation event")
+	}
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("subscribe events returned error: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for subscribe loop to stop")
+	}
+}
+
 func TestGetMessageDoesNotWakeSubscribeEvents(t *testing.T) {
 	t.Parallel()
 
@@ -597,8 +1144,10 @@ func TestGetMessageDoesNotWakeSubscribeEvents(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- fixture.api.SubscribeEvents(&syncv1.SubscribeEventsRequest{
-			FromSequence:    sent.Event.Sequence,
-			ConversationIds: []string{created.Conversation.ConversationId},
+			FromSequence:      sent.Event.Sequence,
+			ConversationIds:   []string{created.Conversation.ConversationId},
+			IncludePresence:   false,
+			IncludeModeration: false,
 		}, stream)
 	}()
 
@@ -787,6 +1336,7 @@ func (f *gatewayFeatureFixture) mustCreateUserAndLogin(
 
 func (f *gatewayFeatureFixture) mustLoginAccountOnNewDevice(
 	t *testing.T,
+	approverCtx context.Context,
 	account identity.Account,
 	deviceName string,
 ) context.Context {
@@ -813,10 +1363,17 @@ func (f *gatewayFeatureFixture) mustLoginAccountOnNewDevice(
 		t.Fatalf("verify login on new device: %v", err)
 	}
 
-	return metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+	authCtx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
 		"authorization",
 		"Bearer "+verify.Tokens.AccessToken,
 	))
+	if _, err := f.api.ApproveDeviceLink(approverCtx, &authv1.ApproveDeviceLinkRequest{
+		TargetDeviceId: verify.Device.DeviceId,
+	}); err != nil {
+		t.Fatalf("approve device link for %s: %v", deviceName, err)
+	}
+
+	return authCtx
 }
 
 func testMessageDraft(id string) *commonv1.MessageDraft {

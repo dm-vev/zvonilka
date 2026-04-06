@@ -15,6 +15,7 @@ import (
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
 	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 	domainconversation "github.com/dm-vev/zvonilka/internal/domain/conversation"
+	domaine2ee "github.com/dm-vev/zvonilka/internal/domain/e2ee"
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
 	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
 	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
@@ -39,6 +40,8 @@ func protoDuration(value time.Duration) *durationpb.Duration {
 
 	return durationpb.New(value)
 }
+
+const gatewayModerationTargetSeparator = "\x1f"
 
 func callStateToProto(state domaincall.State) callv1.CallState {
 	switch state {
@@ -566,6 +569,147 @@ func memberRoleFromProto(role commonv1.MemberRole) domainconversation.MemberRole
 	}
 }
 
+func moderationTargetKindFromProto(
+	kind conversationv1.ModerationTargetKind,
+) domainconversation.ModerationTargetKind {
+	switch kind {
+	case conversationv1.ModerationTargetKind_MODERATION_TARGET_KIND_CONVERSATION:
+		return domainconversation.ModerationTargetKindConversation
+	case conversationv1.ModerationTargetKind_MODERATION_TARGET_KIND_THREAD:
+		return domainconversation.ModerationTargetKindTopic
+	case conversationv1.ModerationTargetKind_MODERATION_TARGET_KIND_CHANNEL:
+		return domainconversation.ModerationTargetKindChannel
+	default:
+		return domainconversation.ModerationTargetKindUnspecified
+	}
+}
+
+func moderationTargetKindToProto(
+	kind domainconversation.ModerationTargetKind,
+) conversationv1.ModerationTargetKind {
+	switch kind {
+	case domainconversation.ModerationTargetKindConversation:
+		return conversationv1.ModerationTargetKind_MODERATION_TARGET_KIND_CONVERSATION
+	case domainconversation.ModerationTargetKindTopic:
+		return conversationv1.ModerationTargetKind_MODERATION_TARGET_KIND_THREAD
+	case domainconversation.ModerationTargetKindChannel:
+		return conversationv1.ModerationTargetKind_MODERATION_TARGET_KIND_CHANNEL
+	default:
+		return conversationv1.ModerationTargetKind_MODERATION_TARGET_KIND_UNSPECIFIED
+	}
+}
+
+func moderationRestrictionStateFromProto(
+	state conversationv1.ModerationRestrictionState,
+) domainconversation.ModerationRestrictionState {
+	switch state {
+	case conversationv1.ModerationRestrictionState_MODERATION_RESTRICTION_STATE_MUTED:
+		return domainconversation.ModerationRestrictionStateMuted
+	case conversationv1.ModerationRestrictionState_MODERATION_RESTRICTION_STATE_BANNED:
+		return domainconversation.ModerationRestrictionStateBanned
+	case conversationv1.ModerationRestrictionState_MODERATION_RESTRICTION_STATE_SHADOWED:
+		return domainconversation.ModerationRestrictionStateShadowed
+	default:
+		return domainconversation.ModerationRestrictionStateUnspecified
+	}
+}
+
+func moderationRestrictionStateToProto(
+	state domainconversation.ModerationRestrictionState,
+) conversationv1.ModerationRestrictionState {
+	switch state {
+	case domainconversation.ModerationRestrictionStateMuted:
+		return conversationv1.ModerationRestrictionState_MODERATION_RESTRICTION_STATE_MUTED
+	case domainconversation.ModerationRestrictionStateBanned:
+		return conversationv1.ModerationRestrictionState_MODERATION_RESTRICTION_STATE_BANNED
+	case domainconversation.ModerationRestrictionStateShadowed:
+		return conversationv1.ModerationRestrictionState_MODERATION_RESTRICTION_STATE_SHADOWED
+	default:
+		return conversationv1.ModerationRestrictionState_MODERATION_RESTRICTION_STATE_UNSPECIFIED
+	}
+}
+
+func moderationReportStatusToProto(
+	status domainconversation.ModerationReportStatus,
+) conversationv1.ModerationReportStatus {
+	switch status {
+	case domainconversation.ModerationReportStatusPending:
+		return conversationv1.ModerationReportStatus_MODERATION_REPORT_STATUS_PENDING
+	case domainconversation.ModerationReportStatusResolved:
+		return conversationv1.ModerationReportStatus_MODERATION_REPORT_STATUS_RESOLVED
+	case domainconversation.ModerationReportStatusRejected:
+		return conversationv1.ModerationReportStatus_MODERATION_REPORT_STATUS_REJECTED
+	default:
+		return conversationv1.ModerationReportStatus_MODERATION_REPORT_STATUS_UNSPECIFIED
+	}
+}
+
+func moderationActionTypeToProto(
+	actionType domainconversation.ModerationActionType,
+) conversationv1.ModerationActionType {
+	switch actionType {
+	case domainconversation.ModerationActionTypeBan:
+		return conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_BAN
+	case domainconversation.ModerationActionTypeKick:
+		return conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_KICK
+	case domainconversation.ModerationActionTypeMute:
+		return conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_MUTE
+	case domainconversation.ModerationActionTypeUnmute:
+		return conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_UNMUTE
+	case domainconversation.ModerationActionTypeShadowBan:
+		return conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_SHADOW_BAN
+	case domainconversation.ModerationActionTypeShadowUnban:
+		return conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_SHADOW_UNBAN
+	case domainconversation.ModerationActionTypePolicySet:
+		return conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_POLICY_SET
+	case domainconversation.ModerationActionTypeReportSet:
+		return conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_REPORT_SET
+	case domainconversation.ModerationActionTypeReportResolve:
+		return conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_REPORT_RESOLVE
+	case domainconversation.ModerationActionTypeReportReject:
+		return conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_REPORT_REJECT
+	case domainconversation.ModerationActionTypeSlowModeSet:
+		return conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_SLOW_MODE_SET
+	case domainconversation.ModerationActionTypeAntiSpamSet:
+		return conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_ANTI_SPAM_SET
+	default:
+		return conversationv1.ModerationActionType_MODERATION_ACTION_TYPE_UNSPECIFIED
+	}
+}
+
+func moderationTargetProto(
+	targetKind domainconversation.ModerationTargetKind,
+	targetID string,
+) *conversationv1.ModerationTarget {
+	targetID = strings.TrimSpace(targetID)
+	conversationID := targetID
+	threadID := ""
+
+	if targetKind == domainconversation.ModerationTargetKindTopic {
+		conversationID, threadID = splitGatewayModerationTarget(targetID)
+	}
+
+	return &conversationv1.ModerationTarget{
+		Kind:           moderationTargetKindToProto(targetKind),
+		ConversationId: conversationID,
+		ThreadId:       threadID,
+	}
+}
+
+func splitGatewayModerationTarget(targetID string) (string, string) {
+	targetID = strings.TrimSpace(targetID)
+	if targetID == "" {
+		return "", ""
+	}
+
+	conversationID, threadID, found := strings.Cut(targetID, gatewayModerationTargetSeparator)
+	if !found {
+		return targetID, ""
+	}
+
+	return conversationID, threadID
+}
+
 func messageKindFromProto(kind commonv1.MessageKind) domainconversation.MessageKind {
 	switch kind {
 	case commonv1.MessageKind_MESSAGE_KIND_TEXT:
@@ -1042,6 +1186,36 @@ func payloadFromProto(payload *commonv1.EncryptedPayload) domainconversation.Enc
 		Ciphertext: append([]byte(nil), payload.Ciphertext...),
 		AAD:        append([]byte(nil), payload.Aad...),
 		Metadata:   payload.Metadata,
+	}
+}
+
+func encryptedPayloadProto(payload domaine2ee.SenderKeyPayload) *commonv1.EncryptedPayload {
+	if strings.TrimSpace(payload.Algorithm) == "" && len(payload.Ciphertext) == 0 {
+		return nil
+	}
+
+	return &commonv1.EncryptedPayload{
+		KeyId:      payload.KeyID,
+		Algorithm:  payload.Algorithm,
+		Nonce:      append([]byte(nil), payload.Nonce...),
+		Ciphertext: append([]byte(nil), payload.Ciphertext...),
+		Aad:        append([]byte(nil), payload.AAD...),
+		Metadata:   cloneStringMap(payload.Metadata),
+	}
+}
+
+func encryptedPayloadFromProto(payload *commonv1.EncryptedPayload) domaine2ee.SenderKeyPayload {
+	if payload == nil {
+		return domaine2ee.SenderKeyPayload{}
+	}
+
+	return domaine2ee.SenderKeyPayload{
+		KeyID:      strings.TrimSpace(payload.GetKeyId()),
+		Algorithm:  strings.TrimSpace(payload.GetAlgorithm()),
+		Nonce:      append([]byte(nil), payload.GetNonce()...),
+		Ciphertext: append([]byte(nil), payload.GetCiphertext()...),
+		AAD:        append([]byte(nil), payload.GetAad()...),
+		Metadata:   cloneStringMap(payload.GetMetadata()),
 	}
 }
 

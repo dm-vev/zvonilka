@@ -14,6 +14,8 @@ service AuthService {
   rpc AuthenticateBot(AuthenticateBotRequest) returns (AuthenticateBotResponse);
   rpc RefreshSession(RefreshSessionRequest) returns (RefreshSessionResponse);
   rpc RegisterDevice(RegisterDeviceRequest) returns (RegisterDeviceResponse);
+  rpc ApproveDeviceLink(ApproveDeviceLinkRequest) returns (ApproveDeviceLinkResponse);
+  rpc PullDeviceLinkTransfer(PullDeviceLinkTransferRequest) returns (PullDeviceLinkTransferResponse);
   rpc RotateDeviceKey(RotateDeviceKeyRequest) returns (RotateDeviceKeyResponse);
   rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
   rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);

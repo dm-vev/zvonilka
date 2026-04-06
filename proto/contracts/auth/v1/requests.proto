@@ -128,6 +128,25 @@ message RegisterDeviceResponse {
   Session session = 2;
 }
 
+message ApproveDeviceLinkRequest {
+  string target_device_id = 1;
+  zvonilka.common.v1.EncryptedPayload transfer = 2;
+  string idempotency_key = 3;
+}
+
+message ApproveDeviceLinkResponse {
+  Device device = 1;
+}
+
+message PullDeviceLinkTransferRequest {}
+
+message PullDeviceLinkTransferResponse {
+  Device device = 1;
+  zvonilka.common.v1.EncryptedPayload transfer = 2;
+  bool awaiting_device_approval = 3;
+  bool transfer_available = 4;
+}
+
 message RotateDeviceKeyRequest {
   string device_id = 1;
   zvonilka.common.v1.PublicKeyBundle device_key = 2;

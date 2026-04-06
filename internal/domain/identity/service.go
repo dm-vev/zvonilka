@@ -245,6 +245,19 @@ func (s *Service) issueSession(
 		LastSeenAt: now,
 	}
 
+	devices, err := store.DevicesByAccountID(ctx, account.ID)
+	if err != nil {
+		err = fmt.Errorf("list devices for account %s before session issuance: %w", account.ID, err)
+		return
+	}
+	for _, existing := range devices {
+		if existing.Status != DeviceStatusActive {
+			continue
+		}
+		device.Status = DeviceStatusUnverified
+		break
+	}
+
 	savedDevice, saveErr := store.SaveDevice(ctx, device)
 	if saveErr != nil {
 		err = fmt.Errorf("save device for account %s: %w", account.ID, saveErr)

@@ -37,6 +37,8 @@ func grpcError(err error) error {
 		return status.Error(codes.FailedPrecondition, "login challenge expired")
 	case errors.Is(err, domainidentity.ErrExpiredJoinRequest):
 		return status.Error(codes.FailedPrecondition, "join request expired")
+	case errors.Is(err, domainconversation.ErrRateLimited):
+		return status.Error(codes.ResourceExhausted, "rate limited")
 	case errors.Is(err, domainidentity.ErrForbidden),
 		errors.Is(err, domaincall.ErrForbidden),
 		errors.Is(err, domainconversation.ErrForbidden),

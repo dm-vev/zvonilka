@@ -653,6 +653,81 @@ WHERE observer_account_id = $1 AND observer_device_id = $2
 	return result, nil
 }
 
+func (s *Store) SaveDeviceLinkTransfer(ctx context.Context, value e2ee.DeviceLinkTransfer) (e2ee.DeviceLinkTransfer, error) {
+	if err := s.requireContext(ctx); err != nil {
+		return e2ee.DeviceLinkTransfer{}, err
+	}
+	query := fmt.Sprintf(`
+INSERT INTO %s (
+	id, account_id, source_device_id, target_device_id, key_id, algorithm, nonce, ciphertext, aad, metadata, created_at, updated_at
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
+ON CONFLICT (account_id, target_device_id)
+DO UPDATE SET
+	id = EXCLUDED.id,
+	source_device_id = EXCLUDED.source_device_id,
+	key_id = EXCLUDED.key_id,
+	algorithm = EXCLUDED.algorithm,
+	nonce = EXCLUDED.nonce,
+	ciphertext = EXCLUDED.ciphertext,
+	aad = EXCLUDED.aad,
+	metadata = EXCLUDED.metadata,
+	created_at = EXCLUDED.created_at,
+	updated_at = NOW()
+RETURNING id, account_id, source_device_id, target_device_id, key_id, algorithm, nonce, ciphertext, aad, metadata, created_at
+`, s.table("e2ee_device_link_transfers"))
+	saved, err := scanDeviceLinkTransfer(s.conn().QueryRowContext(
+		ctx,
+		query,
+		value.ID,
+		value.AccountID,
+		value.SourceDeviceID,
+		value.TargetDeviceID,
+		nullString(value.Payload.KeyID),
+		value.Payload.Algorithm,
+		nullBytes(value.Payload.Nonce),
+		value.Payload.Ciphertext,
+		nullBytes(value.Payload.AAD),
+		marshalMetadata(value.Payload.Metadata),
+		nullTime(value.CreatedAt),
+	))
+	if err != nil {
+		return e2ee.DeviceLinkTransfer{}, mapConstraintError(err)
+	}
+	return saved, nil
+}
+
+func (s *Store) DeviceLinkTransferByTargetDevice(ctx context.Context, accountID string, deviceID string) (e2ee.DeviceLinkTransfer, error) {
+	query := fmt.Sprintf(`
+SELECT id, account_id, source_device_id, target_device_id, key_id, algorithm, nonce, ciphertext, aad, metadata, created_at
+FROM %s
+WHERE account_id = $1 AND target_device_id = $2
+`, s.table("e2ee_device_link_transfers"))
+	value, err := scanDeviceLinkTransfer(s.conn().QueryRowContext(ctx, query, accountID, deviceID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return e2ee.DeviceLinkTransfer{}, e2ee.ErrNotFound
+	}
+	if err != nil {
+		return e2ee.DeviceLinkTransfer{}, err
+	}
+	return value, nil
+}
+
+func (s *Store) DeleteDeviceLinkTransfer(ctx context.Context, transferID string) error {
+	query := fmt.Sprintf(`DELETE FROM %s WHERE id = $1`, s.table("e2ee_device_link_transfers"))
+	result, err := s.conn().ExecContext(ctx, query, transferID)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return e2ee.ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) conn() sqlConn {
 	if s.tx != nil {
 		return s.tx

@@ -121,6 +121,19 @@ type AcknowledgeGroupSenderKeyParams struct {
 	RecipientDeviceID  string
 }
 
+type QueueDeviceLinkTransferParams struct {
+	AccountID      string
+	SourceDeviceID string
+	TargetDeviceID string
+	Payload        SenderKeyPayload
+	RequestedAt    time.Time
+}
+
+type ConsumeDeviceLinkTransferParams struct {
+	AccountID string
+	DeviceID  string
+}
+
 type ValidateConversationPayloadParams struct {
 	ConversationID  string
 	SenderAccountID string
