@@ -170,6 +170,8 @@ func scanBundle(row rowScanner) (federation.Bundle, error) {
 		&bundle.PayloadType,
 		&bundle.Payload,
 		&bundle.Compression,
+		&bundle.IntegrityHash,
+		&bundle.AuthTag,
 		&bundle.State,
 		&bundle.CreatedAt,
 		&bundle.AvailableAt,
@@ -185,6 +187,49 @@ func scanBundle(row rowScanner) (federation.Bundle, error) {
 	bundle.AckedAt = scanTime(ackedAt)
 
 	return bundle, nil
+}
+
+func scanFragment(row rowScanner) (federation.BundleFragment, error) {
+	var (
+		fragment       federation.BundleFragment
+		leaseExpiresAt sql.NullTime
+		ackedAt        sql.NullTime
+	)
+
+	if err := row.Scan(
+		&fragment.ID,
+		&fragment.PeerID,
+		&fragment.LinkID,
+		&fragment.BundleID,
+		&fragment.DedupKey,
+		&fragment.Direction,
+		&fragment.CursorFrom,
+		&fragment.CursorTo,
+		&fragment.EventCount,
+		&fragment.PayloadType,
+		&fragment.Compression,
+		&fragment.IntegrityHash,
+		&fragment.AuthTag,
+		&fragment.FragmentIndex,
+		&fragment.FragmentCount,
+		&fragment.Payload,
+		&fragment.State,
+		&fragment.LeaseToken,
+		&leaseExpiresAt,
+		&fragment.AttemptCount,
+		&fragment.CreatedAt,
+		&fragment.AvailableAt,
+		&ackedAt,
+	); err != nil {
+		return federation.BundleFragment{}, err
+	}
+
+	fragment.CreatedAt = fragment.CreatedAt.UTC()
+	fragment.AvailableAt = fragment.AvailableAt.UTC()
+	fragment.LeaseExpiresAt = scanTime(leaseExpiresAt)
+	fragment.AckedAt = scanTime(ackedAt)
+
+	return fragment, nil
 }
 
 func scanCursor(row rowScanner) (federation.ReplicationCursor, error) {

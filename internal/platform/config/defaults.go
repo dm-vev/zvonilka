@@ -46,6 +46,18 @@ var serviceListenDefaults = map[string]listenDefaults{
 		http: ":8086",
 		grpc: ":9096",
 	},
+	"federationbridge": {
+		http: ":8087",
+		grpc: ":9097",
+	},
+	"federationmeshtastic": {
+		http: ":8088",
+		grpc: ":9098",
+	},
+	"federationmeshcore": {
+		http: ":8089",
+		grpc: ":9099",
+	},
 }
 
 const (
@@ -72,6 +84,8 @@ const (
 	defaultNotificationWebhookTimeout = 10 * time.Second
 	defaultFederationWorkerInterval   = 3 * time.Second
 	defaultFederationDialTimeout      = 5 * time.Second
+	defaultFederationBridgeInterval   = 3 * time.Second
+	defaultMeshtasticReceiveTimeout   = 3 * time.Second
 	defaultTranslationTimeout         = 10 * time.Second
 	defaultTranslationMaxTextBytes    = 16 << 10
 )
@@ -164,6 +178,20 @@ func defaultConfiguration(serviceName string) Configuration {
 			WorkerPollInterval: defaultFederationWorkerInterval,
 			WorkerBatchSize:    100,
 			DialTimeout:        defaultFederationDialTimeout,
+			BridgePollInterval: defaultFederationBridgeInterval,
+			BridgeBatchSize:    32,
+		},
+		Meshtastic: MeshtasticConfig{
+			HelperPython:     "python3",
+			HelperScriptPath: "scripts/meshtastic_bridge.py",
+			ReceiveTimeout:   defaultMeshtasticReceiveTimeout,
+			TextPrefix:       "zv1:",
+		},
+		MeshCore: MeshCoreConfig{
+			HelperPython:     "python3",
+			HelperScriptPath: "scripts/meshcore_bridge.py",
+			ReceiveTimeout:   defaultMeshtasticReceiveTimeout,
+			TextPrefix:       "zv1:",
 		},
 		Search: SearchConfig{
 			DefaultLimit:   searchDefaults.DefaultLimit,

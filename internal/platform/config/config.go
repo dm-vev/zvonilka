@@ -18,6 +18,8 @@ type Configuration struct {
 	Presence       PresenceConfig
 	Notification   NotificationConfig
 	Federation     FederationConfig
+	Meshtastic     MeshtasticConfig
+	MeshCore       MeshCoreConfig
 	Search         SearchConfig
 	Translation    TranslationConfig
 	Infrastructure InfrastructureConfig

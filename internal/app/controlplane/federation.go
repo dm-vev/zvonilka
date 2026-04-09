@@ -514,17 +514,19 @@ func (a *api) PushBundles(
 		}
 
 		params = append(params, domainfederation.SaveBundleParams{
-			PeerID:      peer.ID,
-			LinkID:      link.ID,
-			DedupKey:    bundle.GetDedupKey(),
-			CursorFrom:  bundle.GetCursorFrom(),
-			CursorTo:    bundle.GetCursorTo(),
-			EventCount:  int(bundle.GetEventCount()),
-			PayloadType: bundle.GetPayloadType(),
-			Payload:     append([]byte(nil), bundle.GetPayload()...),
-			Compression: compressionKindFromProto(bundle.GetCompression()),
-			AvailableAt: timestampValue(bundle.GetAvailableAt()),
-			ExpiresAt:   timestampValue(bundle.GetExpiresAt()),
+			PeerID:        peer.ID,
+			LinkID:        link.ID,
+			DedupKey:      bundle.GetDedupKey(),
+			CursorFrom:    bundle.GetCursorFrom(),
+			CursorTo:      bundle.GetCursorTo(),
+			EventCount:    int(bundle.GetEventCount()),
+			PayloadType:   bundle.GetPayloadType(),
+			Payload:       append([]byte(nil), bundle.GetPayload()...),
+			Compression:   compressionKindFromProto(bundle.GetCompression()),
+			IntegrityHash: bundle.GetIntegrityHash(),
+			AuthTag:       bundle.GetAuthTag(),
+			AvailableAt:   timestampValue(bundle.GetAvailableAt()),
+			ExpiresAt:     timestampValue(bundle.GetExpiresAt()),
 		})
 	}
 
@@ -702,22 +704,24 @@ func cursorProto(cursor domainfederation.ReplicationCursor) *federationv1.Replic
 
 func bundleProto(bundle domainfederation.Bundle) *federationv1.Bundle {
 	return &federationv1.Bundle{
-		BundleId:    bundle.ID,
-		PeerId:      bundle.PeerID,
-		LinkId:      bundle.LinkID,
-		DedupKey:    bundle.DedupKey,
-		Direction:   bundleDirectionProto(bundle.Direction),
-		CursorFrom:  bundle.CursorFrom,
-		CursorTo:    bundle.CursorTo,
-		EventCount:  uint32(maxInt(0, bundle.EventCount)),
-		PayloadType: bundle.PayloadType,
-		Payload:     append([]byte(nil), bundle.Payload...),
-		Compression: compressionKindProto(bundle.Compression),
-		State:       bundleStateProto(bundle.State),
-		CreatedAt:   timestamppb.New(bundle.CreatedAt),
-		AvailableAt: timestamppb.New(bundle.AvailableAt),
-		ExpiresAt:   timestampOrNil(bundle.ExpiresAt),
-		AckedAt:     timestampOrNil(bundle.AckedAt),
+		BundleId:      bundle.ID,
+		PeerId:        bundle.PeerID,
+		LinkId:        bundle.LinkID,
+		DedupKey:      bundle.DedupKey,
+		Direction:     bundleDirectionProto(bundle.Direction),
+		CursorFrom:    bundle.CursorFrom,
+		CursorTo:      bundle.CursorTo,
+		EventCount:    uint32(maxInt(0, bundle.EventCount)),
+		PayloadType:   bundle.PayloadType,
+		Payload:       append([]byte(nil), bundle.Payload...),
+		Compression:   compressionKindProto(bundle.Compression),
+		IntegrityHash: bundle.IntegrityHash,
+		AuthTag:       bundle.AuthTag,
+		State:         bundleStateProto(bundle.State),
+		CreatedAt:     timestamppb.New(bundle.CreatedAt),
+		AvailableAt:   timestamppb.New(bundle.AvailableAt),
+		ExpiresAt:     timestampOrNil(bundle.ExpiresAt),
+		AckedAt:       timestampOrNil(bundle.AckedAt),
 	}
 }
 

@@ -126,46 +126,79 @@ var file_contracts_federation_v1_federation_proto_rawDesc = []byte{
 	0x65, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x32, 0x2e, 0x7a, 0x76, 0x6f, 0x6e,
 	0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e,
 	0x76, 0x31, 0x2e, 0x41, 0x63, 0x6b, 0x6e, 0x6f, 0x77, 0x6c, 0x65, 0x64, 0x67, 0x65, 0x42, 0x75,
-	0x6e, 0x64, 0x6c, 0x65, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x42, 0x4b, 0x5a,
-	0x49, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6d, 0x2d, 0x76,
-	0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2f, 0x67, 0x65, 0x6e, 0x2f,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74, 0x73, 0x2f,
-	0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x76, 0x31, 0x3b, 0x66, 0x65,
-	0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x76, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x33,
+	0x6e, 0x64, 0x6c, 0x65, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x32, 0xb6, 0x03,
+	0x0a, 0x17, 0x46, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x42, 0x72, 0x69, 0x64,
+	0x67, 0x65, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x7e, 0x0a, 0x13, 0x50, 0x75, 0x6c,
+	0x6c, 0x42, 0x72, 0x69, 0x64, 0x67, 0x65, 0x46, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x73,
+	0x12, 0x32, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x66, 0x65, 0x64, 0x65,
+	0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x50, 0x75, 0x6c, 0x6c, 0x42, 0x72,
+	0x69, 0x64, 0x67, 0x65, 0x46, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x1a, 0x33, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e,
+	0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x50, 0x75,
+	0x6c, 0x6c, 0x42, 0x72, 0x69, 0x64, 0x67, 0x65, 0x46, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74,
+	0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x84, 0x01, 0x0a, 0x15, 0x53, 0x75,
+	0x62, 0x6d, 0x69, 0x74, 0x42, 0x72, 0x69, 0x64, 0x67, 0x65, 0x46, 0x72, 0x61, 0x67, 0x6d, 0x65,
+	0x6e, 0x74, 0x73, 0x12, 0x34, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x66,
+	0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x53, 0x75, 0x62,
+	0x6d, 0x69, 0x74, 0x42, 0x72, 0x69, 0x64, 0x67, 0x65, 0x46, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e,
+	0x74, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x35, 0x2e, 0x7a, 0x76, 0x6f, 0x6e,
+	0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e,
+	0x76, 0x31, 0x2e, 0x53, 0x75, 0x62, 0x6d, 0x69, 0x74, 0x42, 0x72, 0x69, 0x64, 0x67, 0x65, 0x46,
+	0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
+	0x12, 0x93, 0x01, 0x0a, 0x1a, 0x41, 0x63, 0x6b, 0x6e, 0x6f, 0x77, 0x6c, 0x65, 0x64, 0x67, 0x65,
+	0x42, 0x72, 0x69, 0x64, 0x67, 0x65, 0x46, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x12,
+	0x39, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x66, 0x65, 0x64, 0x65, 0x72,
+	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x41, 0x63, 0x6b, 0x6e, 0x6f, 0x77, 0x6c,
+	0x65, 0x64, 0x67, 0x65, 0x42, 0x72, 0x69, 0x64, 0x67, 0x65, 0x46, 0x72, 0x61, 0x67, 0x6d, 0x65,
+	0x6e, 0x74, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x3a, 0x2e, 0x7a, 0x76, 0x6f,
+	0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e,
+	0x2e, 0x76, 0x31, 0x2e, 0x41, 0x63, 0x6b, 0x6e, 0x6f, 0x77, 0x6c, 0x65, 0x64, 0x67, 0x65, 0x42,
+	0x72, 0x69, 0x64, 0x67, 0x65, 0x46, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x52, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x42, 0x4b, 0x5a, 0x49, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62,
+	0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6d, 0x2d, 0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e,
+	0x69, 0x6c, 0x6b, 0x61, 0x2f, 0x67, 0x65, 0x6e, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63,
+	0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74, 0x73, 0x2f, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x2f, 0x76, 0x31, 0x3b, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f,
+	0x6e, 0x76, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var file_contracts_federation_v1_federation_proto_goTypes = []interface{}{
-	(*CreatePeerRequest)(nil),            // 0: zvonilka.federation.v1.CreatePeerRequest
-	(*GetPeerRequest)(nil),               // 1: zvonilka.federation.v1.GetPeerRequest
-	(*ListPeersRequest)(nil),             // 2: zvonilka.federation.v1.ListPeersRequest
-	(*UpdatePeerRequest)(nil),            // 3: zvonilka.federation.v1.UpdatePeerRequest
-	(*CreateLinkRequest)(nil),            // 4: zvonilka.federation.v1.CreateLinkRequest
-	(*GetLinkRequest)(nil),               // 5: zvonilka.federation.v1.GetLinkRequest
-	(*ListLinksRequest)(nil),             // 6: zvonilka.federation.v1.ListLinksRequest
-	(*UpdateLinkRequest)(nil),            // 7: zvonilka.federation.v1.UpdateLinkRequest
-	(*PauseLinkRequest)(nil),             // 8: zvonilka.federation.v1.PauseLinkRequest
-	(*ResumeLinkRequest)(nil),            // 9: zvonilka.federation.v1.ResumeLinkRequest
-	(*DeleteLinkRequest)(nil),            // 10: zvonilka.federation.v1.DeleteLinkRequest
-	(*GetReplicationCursorRequest)(nil),  // 11: zvonilka.federation.v1.GetReplicationCursorRequest
-	(*PushBundlesRequest)(nil),           // 12: zvonilka.federation.v1.PushBundlesRequest
-	(*PullBundlesRequest)(nil),           // 13: zvonilka.federation.v1.PullBundlesRequest
-	(*AcknowledgeBundlesRequest)(nil),    // 14: zvonilka.federation.v1.AcknowledgeBundlesRequest
-	(*CreatePeerResponse)(nil),           // 15: zvonilka.federation.v1.CreatePeerResponse
-	(*GetPeerResponse)(nil),              // 16: zvonilka.federation.v1.GetPeerResponse
-	(*ListPeersResponse)(nil),            // 17: zvonilka.federation.v1.ListPeersResponse
-	(*UpdatePeerResponse)(nil),           // 18: zvonilka.federation.v1.UpdatePeerResponse
-	(*CreateLinkResponse)(nil),           // 19: zvonilka.federation.v1.CreateLinkResponse
-	(*GetLinkResponse)(nil),              // 20: zvonilka.federation.v1.GetLinkResponse
-	(*ListLinksResponse)(nil),            // 21: zvonilka.federation.v1.ListLinksResponse
-	(*UpdateLinkResponse)(nil),           // 22: zvonilka.federation.v1.UpdateLinkResponse
-	(*PauseLinkResponse)(nil),            // 23: zvonilka.federation.v1.PauseLinkResponse
-	(*ResumeLinkResponse)(nil),           // 24: zvonilka.federation.v1.ResumeLinkResponse
-	(*DeleteLinkResponse)(nil),           // 25: zvonilka.federation.v1.DeleteLinkResponse
-	(*GetReplicationCursorResponse)(nil), // 26: zvonilka.federation.v1.GetReplicationCursorResponse
-	(*PushBundlesResponse)(nil),          // 27: zvonilka.federation.v1.PushBundlesResponse
-	(*PullBundlesResponse)(nil),          // 28: zvonilka.federation.v1.PullBundlesResponse
-	(*AcknowledgeBundlesResponse)(nil),   // 29: zvonilka.federation.v1.AcknowledgeBundlesResponse
+	(*CreatePeerRequest)(nil),                  // 0: zvonilka.federation.v1.CreatePeerRequest
+	(*GetPeerRequest)(nil),                     // 1: zvonilka.federation.v1.GetPeerRequest
+	(*ListPeersRequest)(nil),                   // 2: zvonilka.federation.v1.ListPeersRequest
+	(*UpdatePeerRequest)(nil),                  // 3: zvonilka.federation.v1.UpdatePeerRequest
+	(*CreateLinkRequest)(nil),                  // 4: zvonilka.federation.v1.CreateLinkRequest
+	(*GetLinkRequest)(nil),                     // 5: zvonilka.federation.v1.GetLinkRequest
+	(*ListLinksRequest)(nil),                   // 6: zvonilka.federation.v1.ListLinksRequest
+	(*UpdateLinkRequest)(nil),                  // 7: zvonilka.federation.v1.UpdateLinkRequest
+	(*PauseLinkRequest)(nil),                   // 8: zvonilka.federation.v1.PauseLinkRequest
+	(*ResumeLinkRequest)(nil),                  // 9: zvonilka.federation.v1.ResumeLinkRequest
+	(*DeleteLinkRequest)(nil),                  // 10: zvonilka.federation.v1.DeleteLinkRequest
+	(*GetReplicationCursorRequest)(nil),        // 11: zvonilka.federation.v1.GetReplicationCursorRequest
+	(*PushBundlesRequest)(nil),                 // 12: zvonilka.federation.v1.PushBundlesRequest
+	(*PullBundlesRequest)(nil),                 // 13: zvonilka.federation.v1.PullBundlesRequest
+	(*AcknowledgeBundlesRequest)(nil),          // 14: zvonilka.federation.v1.AcknowledgeBundlesRequest
+	(*PullBridgeFragmentsRequest)(nil),         // 15: zvonilka.federation.v1.PullBridgeFragmentsRequest
+	(*SubmitBridgeFragmentsRequest)(nil),       // 16: zvonilka.federation.v1.SubmitBridgeFragmentsRequest
+	(*AcknowledgeBridgeFragmentsRequest)(nil),  // 17: zvonilka.federation.v1.AcknowledgeBridgeFragmentsRequest
+	(*CreatePeerResponse)(nil),                 // 18: zvonilka.federation.v1.CreatePeerResponse
+	(*GetPeerResponse)(nil),                    // 19: zvonilka.federation.v1.GetPeerResponse
+	(*ListPeersResponse)(nil),                  // 20: zvonilka.federation.v1.ListPeersResponse
+	(*UpdatePeerResponse)(nil),                 // 21: zvonilka.federation.v1.UpdatePeerResponse
+	(*CreateLinkResponse)(nil),                 // 22: zvonilka.federation.v1.CreateLinkResponse
+	(*GetLinkResponse)(nil),                    // 23: zvonilka.federation.v1.GetLinkResponse
+	(*ListLinksResponse)(nil),                  // 24: zvonilka.federation.v1.ListLinksResponse
+	(*UpdateLinkResponse)(nil),                 // 25: zvonilka.federation.v1.UpdateLinkResponse
+	(*PauseLinkResponse)(nil),                  // 26: zvonilka.federation.v1.PauseLinkResponse
+	(*ResumeLinkResponse)(nil),                 // 27: zvonilka.federation.v1.ResumeLinkResponse
+	(*DeleteLinkResponse)(nil),                 // 28: zvonilka.federation.v1.DeleteLinkResponse
+	(*GetReplicationCursorResponse)(nil),       // 29: zvonilka.federation.v1.GetReplicationCursorResponse
+	(*PushBundlesResponse)(nil),                // 30: zvonilka.federation.v1.PushBundlesResponse
+	(*PullBundlesResponse)(nil),                // 31: zvonilka.federation.v1.PullBundlesResponse
+	(*AcknowledgeBundlesResponse)(nil),         // 32: zvonilka.federation.v1.AcknowledgeBundlesResponse
+	(*PullBridgeFragmentsResponse)(nil),        // 33: zvonilka.federation.v1.PullBridgeFragmentsResponse
+	(*SubmitBridgeFragmentsResponse)(nil),      // 34: zvonilka.federation.v1.SubmitBridgeFragmentsResponse
+	(*AcknowledgeBridgeFragmentsResponse)(nil), // 35: zvonilka.federation.v1.AcknowledgeBridgeFragmentsResponse
 }
 var file_contracts_federation_v1_federation_proto_depIdxs = []int32{
 	0,  // 0: zvonilka.federation.v1.FederationService.CreatePeer:input_type -> zvonilka.federation.v1.CreatePeerRequest
@@ -183,23 +216,29 @@ var file_contracts_federation_v1_federation_proto_depIdxs = []int32{
 	12, // 12: zvonilka.federation.v1.FederationService.PushBundles:input_type -> zvonilka.federation.v1.PushBundlesRequest
 	13, // 13: zvonilka.federation.v1.FederationService.PullBundles:input_type -> zvonilka.federation.v1.PullBundlesRequest
 	14, // 14: zvonilka.federation.v1.FederationService.AcknowledgeBundles:input_type -> zvonilka.federation.v1.AcknowledgeBundlesRequest
-	15, // 15: zvonilka.federation.v1.FederationService.CreatePeer:output_type -> zvonilka.federation.v1.CreatePeerResponse
-	16, // 16: zvonilka.federation.v1.FederationService.GetPeer:output_type -> zvonilka.federation.v1.GetPeerResponse
-	17, // 17: zvonilka.federation.v1.FederationService.ListPeers:output_type -> zvonilka.federation.v1.ListPeersResponse
-	18, // 18: zvonilka.federation.v1.FederationService.UpdatePeer:output_type -> zvonilka.federation.v1.UpdatePeerResponse
-	19, // 19: zvonilka.federation.v1.FederationService.CreateLink:output_type -> zvonilka.federation.v1.CreateLinkResponse
-	20, // 20: zvonilka.federation.v1.FederationService.GetLink:output_type -> zvonilka.federation.v1.GetLinkResponse
-	21, // 21: zvonilka.federation.v1.FederationService.ListLinks:output_type -> zvonilka.federation.v1.ListLinksResponse
-	22, // 22: zvonilka.federation.v1.FederationService.UpdateLink:output_type -> zvonilka.federation.v1.UpdateLinkResponse
-	23, // 23: zvonilka.federation.v1.FederationService.PauseLink:output_type -> zvonilka.federation.v1.PauseLinkResponse
-	24, // 24: zvonilka.federation.v1.FederationService.ResumeLink:output_type -> zvonilka.federation.v1.ResumeLinkResponse
-	25, // 25: zvonilka.federation.v1.FederationService.DeleteLink:output_type -> zvonilka.federation.v1.DeleteLinkResponse
-	26, // 26: zvonilka.federation.v1.FederationService.GetReplicationCursor:output_type -> zvonilka.federation.v1.GetReplicationCursorResponse
-	27, // 27: zvonilka.federation.v1.FederationService.PushBundles:output_type -> zvonilka.federation.v1.PushBundlesResponse
-	28, // 28: zvonilka.federation.v1.FederationService.PullBundles:output_type -> zvonilka.federation.v1.PullBundlesResponse
-	29, // 29: zvonilka.federation.v1.FederationService.AcknowledgeBundles:output_type -> zvonilka.federation.v1.AcknowledgeBundlesResponse
-	15, // [15:30] is the sub-list for method output_type
-	0,  // [0:15] is the sub-list for method input_type
+	15, // 15: zvonilka.federation.v1.FederationBridgeService.PullBridgeFragments:input_type -> zvonilka.federation.v1.PullBridgeFragmentsRequest
+	16, // 16: zvonilka.federation.v1.FederationBridgeService.SubmitBridgeFragments:input_type -> zvonilka.federation.v1.SubmitBridgeFragmentsRequest
+	17, // 17: zvonilka.federation.v1.FederationBridgeService.AcknowledgeBridgeFragments:input_type -> zvonilka.federation.v1.AcknowledgeBridgeFragmentsRequest
+	18, // 18: zvonilka.federation.v1.FederationService.CreatePeer:output_type -> zvonilka.federation.v1.CreatePeerResponse
+	19, // 19: zvonilka.federation.v1.FederationService.GetPeer:output_type -> zvonilka.federation.v1.GetPeerResponse
+	20, // 20: zvonilka.federation.v1.FederationService.ListPeers:output_type -> zvonilka.federation.v1.ListPeersResponse
+	21, // 21: zvonilka.federation.v1.FederationService.UpdatePeer:output_type -> zvonilka.federation.v1.UpdatePeerResponse
+	22, // 22: zvonilka.federation.v1.FederationService.CreateLink:output_type -> zvonilka.federation.v1.CreateLinkResponse
+	23, // 23: zvonilka.federation.v1.FederationService.GetLink:output_type -> zvonilka.federation.v1.GetLinkResponse
+	24, // 24: zvonilka.federation.v1.FederationService.ListLinks:output_type -> zvonilka.federation.v1.ListLinksResponse
+	25, // 25: zvonilka.federation.v1.FederationService.UpdateLink:output_type -> zvonilka.federation.v1.UpdateLinkResponse
+	26, // 26: zvonilka.federation.v1.FederationService.PauseLink:output_type -> zvonilka.federation.v1.PauseLinkResponse
+	27, // 27: zvonilka.federation.v1.FederationService.ResumeLink:output_type -> zvonilka.federation.v1.ResumeLinkResponse
+	28, // 28: zvonilka.federation.v1.FederationService.DeleteLink:output_type -> zvonilka.federation.v1.DeleteLinkResponse
+	29, // 29: zvonilka.federation.v1.FederationService.GetReplicationCursor:output_type -> zvonilka.federation.v1.GetReplicationCursorResponse
+	30, // 30: zvonilka.federation.v1.FederationService.PushBundles:output_type -> zvonilka.federation.v1.PushBundlesResponse
+	31, // 31: zvonilka.federation.v1.FederationService.PullBundles:output_type -> zvonilka.federation.v1.PullBundlesResponse
+	32, // 32: zvonilka.federation.v1.FederationService.AcknowledgeBundles:output_type -> zvonilka.federation.v1.AcknowledgeBundlesResponse
+	33, // 33: zvonilka.federation.v1.FederationBridgeService.PullBridgeFragments:output_type -> zvonilka.federation.v1.PullBridgeFragmentsResponse
+	34, // 34: zvonilka.federation.v1.FederationBridgeService.SubmitBridgeFragments:output_type -> zvonilka.federation.v1.SubmitBridgeFragmentsResponse
+	35, // 35: zvonilka.federation.v1.FederationBridgeService.AcknowledgeBridgeFragments:output_type -> zvonilka.federation.v1.AcknowledgeBridgeFragmentsResponse
+	18, // [18:36] is the sub-list for method output_type
+	0,  // [0:18] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name
@@ -219,7 +258,7 @@ func file_contracts_federation_v1_federation_proto_init() {
 			NumEnums:      0,
 			NumMessages:   0,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_contracts_federation_v1_federation_proto_goTypes,
 		DependencyIndexes: file_contracts_federation_v1_federation_proto_depIdxs,

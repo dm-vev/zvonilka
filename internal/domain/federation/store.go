@@ -1,6 +1,9 @@
 package federation
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Store persists federation state.
 type Store interface {
@@ -17,6 +20,7 @@ type Store interface {
 	Links(ctx context.Context, peerID string, state LinkState) ([]Link, error)
 
 	SaveBundle(ctx context.Context, bundle Bundle) (Bundle, error)
+	BundleByDedupKey(ctx context.Context, dedupKey string) (Bundle, error)
 	BundlesAfter(
 		ctx context.Context,
 		peerID string,
@@ -26,6 +30,20 @@ type Store interface {
 		limit int,
 	) ([]Bundle, error)
 	AcknowledgeBundles(ctx context.Context, params AcknowledgeBundlesParams) ([]Bundle, error)
+
+	SaveFragment(ctx context.Context, fragment BundleFragment) (BundleFragment, error)
+	ClaimFragments(ctx context.Context, params ClaimFragmentsParams) ([]BundleFragment, error)
+	HasClaimableFragments(ctx context.Context, peerID string, linkID string, claimedAt time.Time) (bool, error)
+	Fragments(
+		ctx context.Context,
+		peerID string,
+		linkID string,
+		direction BundleDirection,
+		state FragmentState,
+		limit int,
+	) ([]BundleFragment, error)
+	FragmentsByBundle(ctx context.Context, bundleID string, direction BundleDirection) ([]BundleFragment, error)
+	AcknowledgeFragments(ctx context.Context, params AcknowledgeFragmentsParams) ([]BundleFragment, error)
 
 	SaveCursor(ctx context.Context, cursor ReplicationCursor) (ReplicationCursor, error)
 	CursorByPeerAndLink(ctx context.Context, peerID string, linkID string) (ReplicationCursor, error)

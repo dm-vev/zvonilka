@@ -168,8 +168,22 @@ func TestFederationServiceBundleReplicationFlow(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, pulled.GetBundles(), 1)
 	require.Equal(t, outbound.ID, pulled.GetBundles()[0].GetBundleId())
+	require.NotEmpty(t, pulled.GetBundles()[0].GetIntegrityHash())
+	require.NotEmpty(t, pulled.GetBundles()[0].GetAuthTag())
 	require.Equal(t, uint64(3), pulled.GetNextCursor())
 	require.False(t, pulled.GetHasMore())
+
+	signedInbound, err := api.federation.SignBundle(context.Background(), createdPeer.GetPeer().GetPeerId(), createdLink.GetLink().GetLinkId(), domainfederation.Bundle{
+		ID:          "remote-bundle-1",
+		DedupKey:    "inbound-1",
+		CursorFrom:  10,
+		CursorTo:    11,
+		EventCount:  1,
+		PayloadType: "bundle",
+		Payload:     []byte("hello local"),
+		Compression: domainfederation.CompressionKindNone,
+	})
+	require.NoError(t, err)
 
 	acked, err := api.AcknowledgeBundles(peerCtx, &federationv1.AcknowledgeBundlesRequest{
 		ServerName: createdPeer.GetPeer().GetServerName(),
@@ -186,12 +200,14 @@ func TestFederationServiceBundleReplicationFlow(t *testing.T) {
 		LinkName:   createdLink.GetLink().GetName(),
 		Bundles: []*federationv1.Bundle{
 			{
-				DedupKey:    "inbound-1",
-				CursorFrom:  10,
-				CursorTo:    11,
-				EventCount:  1,
-				PayloadType: "bundle",
-				Payload:     []byte("hello local"),
+				DedupKey:      "inbound-1",
+				CursorFrom:    10,
+				CursorTo:      11,
+				EventCount:    1,
+				PayloadType:   "bundle",
+				Payload:       []byte("hello local"),
+				IntegrityHash: signedInbound.IntegrityHash,
+				AuthTag:       signedInbound.AuthTag,
 			},
 		},
 	})

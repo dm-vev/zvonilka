@@ -213,6 +213,8 @@ func TestWorkerReplicatesOutboundAndInboundBundles(t *testing.T) {
 			Compression: federation.CompressionKindNone,
 		}},
 	}
+	remoteClient.pull[0], err = service.SignBundle(context.Background(), peer.ID, link.ID, remoteClient.pull[0])
+	require.NoError(t, err)
 
 	worker, err := federation.NewWorker(
 		service,
@@ -312,4 +314,131 @@ func TestWorkerReplicatesOutboundAndInboundBundles(t *testing.T) {
 	require.Len(t, appliedEvents, 4)
 	require.Equal(t, "fedevt:beta.example:remote-evt-1", appliedEvents[0].EventID)
 	require.Equal(t, remoteConversationID, appliedEvents[0].ConversationID)
+}
+
+func TestWorkerProcessesBridgeLinksWithoutDirectClientDial(t *testing.T) {
+	t.Parallel()
+
+	federationStore := federationtest.NewMemoryStore()
+	service, err := federation.NewService(federationStore, federation.WithNow(func() time.Time {
+		return time.Date(2026, time.April, 9, 12, 0, 0, 0, time.UTC)
+	}))
+	require.NoError(t, err)
+
+	peer, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
+		ServerName:   "mesh.example",
+		BaseURL:      "bridge://mesh.example",
+		Trusted:      true,
+		SharedSecret: "mesh-secret",
+		Capabilities: []federation.Capability{federation.CapabilityEventReplication},
+	})
+	require.NoError(t, err)
+
+	link, err := service.CreateLink(context.Background(), federation.CreateLinkParams{
+		PeerID:                   peer.ID,
+		Name:                     "mesh",
+		Endpoint:                 "bridge://meshtastic.local",
+		TransportKind:            federation.TransportKindMeshtastic,
+		DeliveryClass:            federation.DeliveryClassUltraConstrained,
+		DiscoveryMode:            federation.DiscoveryModeBridgeAnnounced,
+		MediaPolicy:              federation.MediaPolicyDisabled,
+		MaxBundleBytes:           1024,
+		MaxFragmentBytes:         128,
+		AllowedConversationKinds: []federation.ConversationKind{federation.ConversationKindGroup},
+	})
+	require.NoError(t, err)
+
+	conversations := conversationtest.NewMemoryStore()
+	identities := identitytest.NewMemoryStore()
+
+	_, err = conversations.SaveConversation(context.Background(), conversation.Conversation{
+		ID:   "conv-bridge-1",
+		Kind: conversation.ConversationKindGroup,
+	})
+	require.NoError(t, err)
+	_, err = conversations.SaveEvent(context.Background(), conversation.EventEnvelope{
+		EventID:        "evt-bridge-1",
+		EventType:      conversation.EventTypeConversationUpdated,
+		ConversationID: "conv-bridge-1",
+		ActorAccountID: "actor-1",
+	})
+	require.NoError(t, err)
+
+	remotePayload, err := json.Marshal([]conversation.EventEnvelope{
+		{
+			EventID:        "remote-bridge-evt-1",
+			EventType:      conversation.EventTypeConversationCreated,
+			ConversationID: "remote-bridge-conv-1",
+			ActorAccountID: "remote-owner",
+			ActorDeviceID:  "remote-device-1",
+			Metadata: map[string]string{
+				"kind":  string(conversation.ConversationKindGroup),
+				"title": "Mesh Room",
+			},
+			CreatedAt: time.Date(2026, time.April, 9, 12, 5, 0, 0, time.UTC),
+		},
+	})
+	require.NoError(t, err)
+
+	signedInbound, err := service.SignBundle(context.Background(), peer.ID, link.ID, federation.Bundle{
+		ID:          "bridge-inbound-bundle-1",
+		DedupKey:    "bridge-inbound-1",
+		CursorFrom:  10,
+		CursorTo:    10,
+		EventCount:  1,
+		PayloadType: "conversation.events.v1",
+		Payload:     remotePayload,
+		Compression: federation.CompressionKindNone,
+	})
+	require.NoError(t, err)
+
+	_, err = service.AcceptInboundBundle(context.Background(), federation.SaveBundleParams{
+		PeerID:        peer.ID,
+		LinkID:        link.ID,
+		DedupKey:      "bridge-inbound-1",
+		CursorFrom:    10,
+		CursorTo:      10,
+		EventCount:    1,
+		PayloadType:   "conversation.events.v1",
+		Payload:       remotePayload,
+		Compression:   federation.CompressionKindNone,
+		IntegrityHash: signedInbound.IntegrityHash,
+		AuthTag:       signedInbound.AuthTag,
+	})
+	require.NoError(t, err)
+
+	worker, err := federation.NewWorker(
+		service,
+		identities,
+		conversations,
+		func(context.Context, federation.Peer, federation.Link) (federation.ReplicationClient, error) {
+			t.Fatal("bridge link should not construct direct replication client")
+			return nil, nil
+		},
+		federation.WorkerSettings{
+			LocalServerName: "alpha.example",
+			PollInterval:    time.Second,
+			BatchSize:       10,
+		},
+	)
+	require.NoError(t, err)
+
+	err = worker.ProcessOnceForTests(context.Background())
+	require.NoError(t, err)
+
+	cursor, err := service.ReplicationCursorByPeerAndLink(context.Background(), peer.ID, link.ID)
+	require.NoError(t, err)
+	require.Equal(t, uint64(10), cursor.LastReceivedCursor)
+	require.Equal(t, uint64(10), cursor.LastInboundCursor)
+	require.Equal(t, uint64(1), cursor.LastOutboundCursor)
+	require.Equal(t, uint64(0), cursor.LastAckedCursor)
+
+	outbound, err := service.BundlesAfter(context.Background(), peer.ID, link.ID, federation.BundleDirectionOutbound, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, outbound, 1)
+	require.Equal(t, federation.BundleStateQueued, outbound[0].State)
+
+	remoteConversation, err := conversations.ConversationByID(context.Background(), "fedconv:mesh.example:remote-bridge-conv-1")
+	require.NoError(t, err)
+	require.Equal(t, "Mesh Room", remoteConversation.Title)
 }

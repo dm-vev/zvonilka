@@ -83,17 +83,19 @@ func (c *grpcReplicationClient) PushBundles(
 	reqBundles := make([]*federationv1.Bundle, 0, len(bundles))
 	for _, bundle := range bundles {
 		reqBundles = append(reqBundles, &federationv1.Bundle{
-			BundleId:    bundle.ID,
-			DedupKey:    bundle.DedupKey,
-			Direction:   federationv1.BundleDirection_BUNDLE_DIRECTION_OUTBOUND,
-			CursorFrom:  bundle.CursorFrom,
-			CursorTo:    bundle.CursorTo,
-			EventCount:  uint32(maxInt(0, bundle.EventCount)),
-			PayloadType: bundle.PayloadType,
-			Payload:     append([]byte(nil), bundle.Payload...),
-			Compression: compressionKindProto(bundle.Compression),
-			AvailableAt: timestampOrNil(bundle.AvailableAt),
-			ExpiresAt:   timestampOrNil(bundle.ExpiresAt),
+			BundleId:      bundle.ID,
+			DedupKey:      bundle.DedupKey,
+			Direction:     federationv1.BundleDirection_BUNDLE_DIRECTION_OUTBOUND,
+			CursorFrom:    bundle.CursorFrom,
+			CursorTo:      bundle.CursorTo,
+			EventCount:    uint32(maxInt(0, bundle.EventCount)),
+			PayloadType:   bundle.PayloadType,
+			Payload:       append([]byte(nil), bundle.Payload...),
+			Compression:   compressionKindProto(bundle.Compression),
+			IntegrityHash: bundle.IntegrityHash,
+			AuthTag:       bundle.AuthTag,
+			AvailableAt:   timestampOrNil(bundle.AvailableAt),
+			ExpiresAt:     timestampOrNil(bundle.ExpiresAt),
 		})
 	}
 
@@ -139,20 +141,22 @@ func (c *grpcReplicationClient) PullBundles(
 		}
 
 		bundles = append(bundles, federation.Bundle{
-			ID:          bundle.GetBundleId(),
-			DedupKey:    bundle.GetDedupKey(),
-			Direction:   bundleDirectionFromProto(bundle.GetDirection()),
-			CursorFrom:  bundle.GetCursorFrom(),
-			CursorTo:    bundle.GetCursorTo(),
-			EventCount:  int(bundle.GetEventCount()),
-			PayloadType: bundle.GetPayloadType(),
-			Payload:     append([]byte(nil), bundle.GetPayload()...),
-			Compression: compressionKindFromProto(bundle.GetCompression()),
-			State:       bundleStateFromProto(bundle.GetState()),
-			CreatedAt:   timestampValue(bundle.GetCreatedAt()),
-			AvailableAt: timestampValue(bundle.GetAvailableAt()),
-			ExpiresAt:   timestampValue(bundle.GetExpiresAt()),
-			AckedAt:     timestampValue(bundle.GetAckedAt()),
+			ID:            bundle.GetBundleId(),
+			DedupKey:      bundle.GetDedupKey(),
+			Direction:     bundleDirectionFromProto(bundle.GetDirection()),
+			CursorFrom:    bundle.GetCursorFrom(),
+			CursorTo:      bundle.GetCursorTo(),
+			EventCount:    int(bundle.GetEventCount()),
+			PayloadType:   bundle.GetPayloadType(),
+			Payload:       append([]byte(nil), bundle.GetPayload()...),
+			Compression:   compressionKindFromProto(bundle.GetCompression()),
+			IntegrityHash: bundle.GetIntegrityHash(),
+			AuthTag:       bundle.GetAuthTag(),
+			State:         bundleStateFromProto(bundle.GetState()),
+			CreatedAt:     timestampValue(bundle.GetCreatedAt()),
+			AvailableAt:   timestampValue(bundle.GetAvailableAt()),
+			ExpiresAt:     timestampValue(bundle.GetExpiresAt()),
+			AckedAt:       timestampValue(bundle.GetAckedAt()),
 		})
 	}
 

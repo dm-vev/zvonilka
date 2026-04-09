@@ -171,3 +171,41 @@ message AcknowledgeBundlesResponse {
   repeated string acknowledged_bundle_ids = 1;
   ReplicationCursor cursor = 2;
 }
+
+message PullBridgeFragmentsRequest {
+  string peer_server_name = 1;
+  string link_name = 2;
+  uint32 limit = 3;
+}
+
+message PullBridgeFragmentsResponse {
+  repeated BundleFragment fragments = 1;
+  bool has_more = 2;
+  ReplicationCursor cursor = 3;
+  Link link = 4;
+  string lease_token = 5;
+}
+
+message SubmitBridgeFragmentsRequest {
+  string peer_server_name = 1;
+  string link_name = 2;
+  repeated BundleFragment fragments = 3;
+}
+
+message SubmitBridgeFragmentsResponse {
+  repeated string accepted_fragment_ids = 1;
+  repeated string assembled_bundle_ids = 2;
+  ReplicationCursor cursor = 3;
+}
+
+message AcknowledgeBridgeFragmentsRequest {
+  string peer_server_name = 1;
+  string link_name = 2;
+  repeated string fragment_ids = 3;
+  string lease_token = 4;
+}
+
+message AcknowledgeBridgeFragmentsResponse {
+  repeated string acknowledged_fragment_ids = 1;
+  ReplicationCursor cursor = 2;
+}

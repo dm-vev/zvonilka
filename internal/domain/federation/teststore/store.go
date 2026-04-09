@@ -1,6 +1,7 @@
 package teststore
 
 import (
+	"bytes"
 	"context"
 	"sort"
 	"sync"
@@ -12,26 +13,30 @@ import (
 // NewMemoryStore builds a concurrency-safe in-memory federation store for tests.
 func NewMemoryStore() federation.Store {
 	return &memoryStore{
-		peersByID:         make(map[string]federation.Peer),
-		peerIDsByServer:   make(map[string]string),
-		linksByID:         make(map[string]federation.Link),
-		linkIDsByPeerName: make(map[string]string),
-		bundlesByID:       make(map[string]federation.Bundle),
-		bundleIDsByDedup:  make(map[string]string),
-		cursorsByKey:      make(map[string]federation.ReplicationCursor),
+		peersByID:          make(map[string]federation.Peer),
+		peerIDsByServer:    make(map[string]string),
+		linksByID:          make(map[string]federation.Link),
+		linkIDsByPeerName:  make(map[string]string),
+		bundlesByID:        make(map[string]federation.Bundle),
+		bundleIDsByDedup:   make(map[string]string),
+		fragmentsByID:      make(map[string]federation.BundleFragment),
+		fragmentIDsByDedup: make(map[string]string),
+		cursorsByKey:       make(map[string]federation.ReplicationCursor),
 	}
 }
 
 type memoryStore struct {
 	mu sync.RWMutex
 
-	peersByID         map[string]federation.Peer
-	peerIDsByServer   map[string]string
-	linksByID         map[string]federation.Link
-	linkIDsByPeerName map[string]string
-	bundlesByID       map[string]federation.Bundle
-	bundleIDsByDedup  map[string]string
-	cursorsByKey      map[string]federation.ReplicationCursor
+	peersByID          map[string]federation.Peer
+	peerIDsByServer    map[string]string
+	linksByID          map[string]federation.Link
+	linkIDsByPeerName  map[string]string
+	bundlesByID        map[string]federation.Bundle
+	bundleIDsByDedup   map[string]string
+	fragmentsByID      map[string]federation.BundleFragment
+	fragmentIDsByDedup map[string]string
+	cursorsByKey       map[string]federation.ReplicationCursor
 }
 
 type txStore struct {
@@ -233,7 +238,19 @@ func (s *memoryStore) SaveBundle(_ context.Context, bundle federation.Bundle) (f
 		if !ok {
 			delete(s.bundleIDsByDedup, bundle.DedupKey)
 		} else {
-			if existing.PeerID != bundle.PeerID || existing.LinkID != bundle.LinkID || existing.Direction != bundle.Direction {
+			if existing.PeerID != bundle.PeerID ||
+				existing.LinkID != bundle.LinkID ||
+				existing.Direction != bundle.Direction {
+				return federation.Bundle{}, federation.ErrConflict
+			}
+			if existing.CursorFrom != bundle.CursorFrom ||
+				existing.CursorTo != bundle.CursorTo ||
+				existing.EventCount != bundle.EventCount ||
+				existing.PayloadType != bundle.PayloadType ||
+				existing.Compression != bundle.Compression ||
+				existing.IntegrityHash != bundle.IntegrityHash ||
+				existing.AuthTag != bundle.AuthTag ||
+				!bytes.Equal(existing.Payload, bundle.Payload) {
 				return federation.Bundle{}, federation.ErrConflict
 			}
 			return cloneBundle(existing), nil
@@ -242,6 +259,22 @@ func (s *memoryStore) SaveBundle(_ context.Context, bundle federation.Bundle) (f
 
 	s.bundlesByID[bundle.ID] = cloneBundle(bundle)
 	s.bundleIDsByDedup[bundle.DedupKey] = bundle.ID
+
+	return cloneBundle(bundle), nil
+}
+
+func (s *memoryStore) BundleByDedupKey(_ context.Context, dedupKey string) (federation.Bundle, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	bundleID, ok := s.bundleIDsByDedup[dedupKey]
+	if !ok {
+		return federation.Bundle{}, federation.ErrNotFound
+	}
+	bundle, ok := s.bundlesByID[bundleID]
+	if !ok {
+		return federation.Bundle{}, federation.ErrNotFound
+	}
 
 	return cloneBundle(bundle), nil
 }
@@ -325,6 +358,303 @@ func (s *memoryStore) AcknowledgeBundles(
 	return updated, nil
 }
 
+func (s *memoryStore) SaveFragment(
+	_ context.Context,
+	fragment federation.BundleFragment,
+) (federation.BundleFragment, error) {
+	fragment, err := federation.NormalizeBundleFragment(fragment, nowUTC())
+	if err != nil {
+		return federation.BundleFragment{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	link, ok := s.linksByID[fragment.LinkID]
+	if !ok {
+		return federation.BundleFragment{}, federation.ErrNotFound
+	}
+	if link.PeerID != fragment.PeerID {
+		return federation.BundleFragment{}, federation.ErrConflict
+	}
+
+	if existingID, ok := s.fragmentIDsByDedup[fragment.DedupKey]; ok {
+		existing, ok := s.fragmentsByID[existingID]
+		if !ok {
+			delete(s.fragmentIDsByDedup, fragment.DedupKey)
+		} else {
+			if existing.PeerID != fragment.PeerID ||
+				existing.LinkID != fragment.LinkID ||
+				existing.BundleID != fragment.BundleID ||
+				existing.Direction != fragment.Direction {
+				return federation.BundleFragment{}, federation.ErrConflict
+			}
+			if existing.CursorFrom != fragment.CursorFrom ||
+				existing.CursorTo != fragment.CursorTo ||
+				existing.EventCount != fragment.EventCount ||
+				existing.PayloadType != fragment.PayloadType ||
+				existing.Compression != fragment.Compression ||
+				existing.IntegrityHash != fragment.IntegrityHash ||
+				existing.AuthTag != fragment.AuthTag ||
+				existing.FragmentIndex != fragment.FragmentIndex ||
+				existing.FragmentCount != fragment.FragmentCount ||
+				!bytes.Equal(existing.Payload, fragment.Payload) {
+				return federation.BundleFragment{}, federation.ErrConflict
+			}
+			if existing.Direction == federation.BundleDirectionInbound &&
+				(existing.State == federation.FragmentStateAssembled || existing.State == federation.FragmentStateFailed) {
+				return cloneFragment(existing), nil
+			}
+
+			if existing.State != fragment.State ||
+				!existing.AckedAt.Equal(fragment.AckedAt) ||
+				existing.LeaseToken != fragment.LeaseToken ||
+				!existing.LeaseExpiresAt.Equal(fragment.LeaseExpiresAt) ||
+				existing.AttemptCount != fragment.AttemptCount {
+				existing.State = fragment.State
+				existing.LeaseToken = fragment.LeaseToken
+				existing.LeaseExpiresAt = fragment.LeaseExpiresAt
+				existing.AttemptCount = fragment.AttemptCount
+				existing.AvailableAt = fragment.AvailableAt
+				existing.AckedAt = fragment.AckedAt
+				s.fragmentsByID[existingID] = cloneFragment(existing)
+				s.fragmentIDsByDedup[fragment.DedupKey] = existingID
+				return cloneFragment(existing), nil
+			}
+
+			return cloneFragment(existing), nil
+		}
+	}
+
+	s.fragmentsByID[fragment.ID] = cloneFragment(fragment)
+	s.fragmentIDsByDedup[fragment.DedupKey] = fragment.ID
+
+	return cloneFragment(fragment), nil
+}
+
+func (s *memoryStore) ClaimFragments(
+	_ context.Context,
+	params federation.ClaimFragmentsParams,
+) ([]federation.BundleFragment, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if params.Limit <= 0 {
+		return nil, nil
+	}
+	if params.PeerID == "" || params.LinkID == "" || params.LeaseToken == "" || params.LeaseExpiresAt.IsZero() {
+		return nil, federation.ErrInvalidInput
+	}
+	if params.ClaimedAt.IsZero() {
+		params.ClaimedAt = nowUTC()
+	}
+
+	fragments := make([]federation.BundleFragment, 0, len(s.fragmentsByID))
+	for _, fragment := range s.fragmentsByID {
+		if fragment.PeerID != params.PeerID || fragment.LinkID != params.LinkID {
+			continue
+		}
+		if fragment.Direction != federation.BundleDirectionOutbound {
+			continue
+		}
+		switch fragment.State {
+		case federation.FragmentStateQueued:
+			if fragment.AvailableAt.After(params.ClaimedAt) {
+				continue
+			}
+		case federation.FragmentStateClaimed:
+			if fragment.LeaseExpiresAt.IsZero() || fragment.LeaseExpiresAt.After(params.ClaimedAt) {
+				continue
+			}
+		default:
+			continue
+		}
+
+		fragments = append(fragments, cloneFragment(fragment))
+	}
+
+	sort.Slice(fragments, func(i, j int) bool {
+		if fragments[i].AvailableAt.Equal(fragments[j].AvailableAt) {
+			if fragments[i].CursorTo == fragments[j].CursorTo {
+				if fragments[i].BundleID == fragments[j].BundleID {
+					return fragments[i].FragmentIndex < fragments[j].FragmentIndex
+				}
+				return fragments[i].BundleID < fragments[j].BundleID
+			}
+			return fragments[i].CursorTo < fragments[j].CursorTo
+		}
+		return fragments[i].AvailableAt.Before(fragments[j].AvailableAt)
+	})
+	if len(fragments) > params.Limit {
+		fragments = fragments[:params.Limit]
+	}
+
+	for idx, fragment := range fragments {
+		fragment.State = federation.FragmentStateClaimed
+		fragment.LeaseToken = params.LeaseToken
+		fragment.LeaseExpiresAt = params.LeaseExpiresAt.UTC()
+		fragment.AttemptCount++
+		s.fragmentsByID[fragment.ID] = cloneFragment(fragment)
+		fragments[idx] = cloneFragment(fragment)
+	}
+
+	return fragments, nil
+}
+
+func (s *memoryStore) HasClaimableFragments(
+	_ context.Context,
+	peerID string,
+	linkID string,
+	claimedAt time.Time,
+) (bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if claimedAt.IsZero() {
+		claimedAt = nowUTC()
+	}
+	for _, fragment := range s.fragmentsByID {
+		if fragment.PeerID != peerID || fragment.LinkID != linkID {
+			continue
+		}
+		if fragment.Direction != federation.BundleDirectionOutbound {
+			continue
+		}
+		switch fragment.State {
+		case federation.FragmentStateQueued:
+			if !fragment.AvailableAt.After(claimedAt) {
+				return true, nil
+			}
+		case federation.FragmentStateClaimed:
+			if !fragment.LeaseExpiresAt.IsZero() && !fragment.LeaseExpiresAt.After(claimedAt) {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+func (s *memoryStore) Fragments(
+	_ context.Context,
+	peerID string,
+	linkID string,
+	direction federation.BundleDirection,
+	state federation.FragmentState,
+	limit int,
+) ([]federation.BundleFragment, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if limit <= 0 {
+		return nil, nil
+	}
+
+	fragments := make([]federation.BundleFragment, 0, len(s.fragmentsByID))
+	for _, fragment := range s.fragmentsByID {
+		if fragment.PeerID != peerID || fragment.LinkID != linkID || fragment.Direction != direction {
+			continue
+		}
+		if state != federation.FragmentStateUnspecified && fragment.State != state {
+			continue
+		}
+		fragments = append(fragments, cloneFragment(fragment))
+	}
+
+	sort.Slice(fragments, func(i, j int) bool {
+		if fragments[i].AvailableAt.Equal(fragments[j].AvailableAt) {
+			if fragments[i].CursorTo == fragments[j].CursorTo {
+				if fragments[i].BundleID == fragments[j].BundleID {
+					return fragments[i].FragmentIndex < fragments[j].FragmentIndex
+				}
+				return fragments[i].BundleID < fragments[j].BundleID
+			}
+			return fragments[i].CursorTo < fragments[j].CursorTo
+		}
+		return fragments[i].AvailableAt.Before(fragments[j].AvailableAt)
+	})
+
+	if len(fragments) > limit {
+		fragments = fragments[:limit]
+	}
+
+	return fragments, nil
+}
+
+func (s *memoryStore) FragmentsByBundle(
+	_ context.Context,
+	bundleID string,
+	direction federation.BundleDirection,
+) ([]federation.BundleFragment, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	fragments := make([]federation.BundleFragment, 0)
+	for _, fragment := range s.fragmentsByID {
+		if fragment.BundleID != bundleID || fragment.Direction != direction {
+			continue
+		}
+		fragments = append(fragments, cloneFragment(fragment))
+	}
+
+	sort.Slice(fragments, func(i, j int) bool {
+		if fragments[i].FragmentIndex == fragments[j].FragmentIndex {
+			return fragments[i].ID < fragments[j].ID
+		}
+		return fragments[i].FragmentIndex < fragments[j].FragmentIndex
+	})
+
+	return fragments, nil
+}
+
+func (s *memoryStore) AcknowledgeFragments(
+	_ context.Context,
+	params federation.AcknowledgeFragmentsParams,
+) ([]federation.BundleFragment, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	updated := make([]federation.BundleFragment, 0)
+	selected := make(map[string]struct{}, len(params.FragmentIDs))
+	for _, fragmentID := range params.FragmentIDs {
+		if fragmentID == "" {
+			continue
+		}
+		selected[fragmentID] = struct{}{}
+	}
+
+	for fragmentID, fragment := range s.fragmentsByID {
+		if fragment.PeerID != params.PeerID || fragment.LinkID != params.LinkID {
+			continue
+		}
+		if fragment.Direction != federation.BundleDirectionOutbound {
+			continue
+		}
+		if fragment.State != federation.FragmentStateClaimed || fragment.LeaseToken != params.LeaseToken {
+			continue
+		}
+		if _, ok := selected[fragmentID]; !ok {
+			continue
+		}
+
+		fragment.State = federation.FragmentStateAcknowledged
+		fragment.LeaseToken = ""
+		fragment.LeaseExpiresAt = time.Time{}
+		fragment.AckedAt = params.AcknowledgedAt.UTC()
+		s.fragmentsByID[fragmentID] = cloneFragment(fragment)
+		updated = append(updated, cloneFragment(fragment))
+	}
+
+	sort.Slice(updated, func(i, j int) bool {
+		if updated[i].BundleID == updated[j].BundleID {
+			return updated[i].FragmentIndex < updated[j].FragmentIndex
+		}
+		return updated[i].BundleID < updated[j].BundleID
+	})
+
+	return updated, nil
+}
+
 func (s *memoryStore) SaveCursor(
 	_ context.Context,
 	cursor federation.ReplicationCursor,
@@ -359,13 +689,15 @@ func (s *memoryStore) CursorByPeerAndLink(
 
 func (s *memoryStore) cloneLocked() *memoryStore {
 	clone := &memoryStore{
-		peersByID:         make(map[string]federation.Peer, len(s.peersByID)),
-		peerIDsByServer:   make(map[string]string, len(s.peerIDsByServer)),
-		linksByID:         make(map[string]federation.Link, len(s.linksByID)),
-		linkIDsByPeerName: make(map[string]string, len(s.linkIDsByPeerName)),
-		bundlesByID:       make(map[string]federation.Bundle, len(s.bundlesByID)),
-		bundleIDsByDedup:  make(map[string]string, len(s.bundleIDsByDedup)),
-		cursorsByKey:      make(map[string]federation.ReplicationCursor, len(s.cursorsByKey)),
+		peersByID:          make(map[string]federation.Peer, len(s.peersByID)),
+		peerIDsByServer:    make(map[string]string, len(s.peerIDsByServer)),
+		linksByID:          make(map[string]federation.Link, len(s.linksByID)),
+		linkIDsByPeerName:  make(map[string]string, len(s.linkIDsByPeerName)),
+		bundlesByID:        make(map[string]federation.Bundle, len(s.bundlesByID)),
+		bundleIDsByDedup:   make(map[string]string, len(s.bundleIDsByDedup)),
+		fragmentsByID:      make(map[string]federation.BundleFragment, len(s.fragmentsByID)),
+		fragmentIDsByDedup: make(map[string]string, len(s.fragmentIDsByDedup)),
+		cursorsByKey:       make(map[string]federation.ReplicationCursor, len(s.cursorsByKey)),
 	}
 
 	for key, value := range s.peersByID {
@@ -386,6 +718,12 @@ func (s *memoryStore) cloneLocked() *memoryStore {
 	for key, value := range s.bundleIDsByDedup {
 		clone.bundleIDsByDedup[key] = value
 	}
+	for key, value := range s.fragmentsByID {
+		clone.fragmentsByID[key] = cloneFragment(value)
+	}
+	for key, value := range s.fragmentIDsByDedup {
+		clone.fragmentIDsByDedup[key] = value
+	}
 	for key, value := range s.cursorsByKey {
 		clone.cursorsByKey[key] = cloneCursor(value)
 	}
@@ -400,6 +738,8 @@ func (s *memoryStore) replaceLocked(snapshot *memoryStore) {
 	s.linkIDsByPeerName = snapshot.linkIDsByPeerName
 	s.bundlesByID = snapshot.bundlesByID
 	s.bundleIDsByDedup = snapshot.bundleIDsByDedup
+	s.fragmentsByID = snapshot.fragmentsByID
+	s.fragmentIDsByDedup = snapshot.fragmentIDsByDedup
 	s.cursorsByKey = snapshot.cursorsByKey
 }
 
@@ -428,6 +768,11 @@ func cloneLink(link federation.Link) federation.Link {
 func cloneBundle(bundle federation.Bundle) federation.Bundle {
 	bundle.Payload = append([]byte(nil), bundle.Payload...)
 	return bundle
+}
+
+func cloneFragment(fragment federation.BundleFragment) federation.BundleFragment {
+	fragment.Payload = append([]byte(nil), fragment.Payload...)
+	return fragment
 }
 
 func cloneCursor(cursor federation.ReplicationCursor) federation.ReplicationCursor {

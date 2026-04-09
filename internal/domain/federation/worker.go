@@ -190,6 +190,14 @@ func (w *Worker) processOnce(ctx context.Context) error {
 }
 
 func (w *Worker) processPeerLink(ctx context.Context, peer Peer, link Link) error {
+	if isBridgeTransport(link.TransportKind) {
+		if err := w.processBridgeLink(ctx, peer, link); err != nil {
+			_ = w.service.markLinkFailed(ctx, link.ID, err)
+			return err
+		}
+		return nil
+	}
+
 	if _, err := w.applyPendingInboundBundles(ctx, peer, link); err != nil {
 		_ = w.service.markLinkFailed(ctx, link.ID, err)
 		return err
@@ -210,6 +218,40 @@ func (w *Worker) processPeerLink(ctx context.Context, peer Peer, link Link) erro
 		_ = w.service.markLinkFailed(ctx, link.ID, err)
 		return err
 	}
+	if err := w.service.markLinkHealthy(ctx, link.ID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (w *Worker) processBridgeLink(ctx context.Context, peer Peer, link Link) error {
+	if _, err := w.applyPendingInboundBundles(ctx, peer, link); err != nil {
+		return err
+	}
+
+	cursor, err := w.service.ReplicationCursorByPeerAndLink(ctx, peer.ID, link.ID)
+	if err != nil {
+		return err
+	}
+
+	pending, err := w.service.BundlesAfter(
+		ctx,
+		peer.ID,
+		link.ID,
+		BundleDirectionOutbound,
+		cursor.LastAckedCursor,
+		1,
+	)
+	if err != nil {
+		return err
+	}
+	if len(pending) == 0 {
+		if _, err := w.queuePendingOutboundEvents(ctx, peer, link, cursor.LastOutboundCursor); err != nil {
+			return err
+		}
+	}
+
 	if err := w.service.markLinkHealthy(ctx, link.ID); err != nil {
 		return err
 	}
@@ -300,17 +342,19 @@ func (w *Worker) pullInbound(ctx context.Context, client ReplicationClient, peer
 		}
 
 		params = append(params, SaveBundleParams{
-			PeerID:      peer.ID,
-			LinkID:      link.ID,
-			DedupKey:    dedupKey,
-			CursorFrom:  bundle.CursorFrom,
-			CursorTo:    bundle.CursorTo,
-			EventCount:  bundle.EventCount,
-			PayloadType: bundle.PayloadType,
-			Payload:     append([]byte(nil), bundle.Payload...),
-			Compression: bundle.Compression,
-			AvailableAt: bundle.AvailableAt,
-			ExpiresAt:   bundle.ExpiresAt,
+			PeerID:        peer.ID,
+			LinkID:        link.ID,
+			DedupKey:      dedupKey,
+			CursorFrom:    bundle.CursorFrom,
+			CursorTo:      bundle.CursorTo,
+			EventCount:    bundle.EventCount,
+			PayloadType:   bundle.PayloadType,
+			Payload:       append([]byte(nil), bundle.Payload...),
+			Compression:   bundle.Compression,
+			IntegrityHash: bundle.IntegrityHash,
+			AuthTag:       bundle.AuthTag,
+			AvailableAt:   bundle.AvailableAt,
+			ExpiresAt:     bundle.ExpiresAt,
 		})
 		if strings.TrimSpace(bundle.ID) != "" {
 			bundleIDs = append(bundleIDs, bundle.ID)

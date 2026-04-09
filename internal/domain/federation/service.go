@@ -12,8 +12,9 @@ import (
 
 // Service owns peer, link, bundle, and cursor lifecycle for federation.
 type Service struct {
-	store Store
-	now   func() time.Time
+	store                  Store
+	now                    func() time.Time
+	bridgeFragmentLeaseTTL time.Duration
 }
 
 // NewService constructs a federation service backed by the provided store.
@@ -23,8 +24,9 @@ func NewService(store Store, opts ...Option) (*Service, error) {
 	}
 
 	service := &Service{
-		store: store,
-		now:   func() time.Time { return time.Now().UTC() },
+		store:                  store,
+		now:                    func() time.Time { return time.Now().UTC() },
+		bridgeFragmentLeaseTTL: defaultBridgeFragmentLeaseTTL,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -506,31 +508,36 @@ func (s *Service) saveBundle(ctx context.Context, params SaveBundleParams, direc
 
 	now := s.currentTime()
 	bundle, err := (Bundle{
-		ID:          bundleID,
-		PeerID:      params.PeerID,
-		LinkID:      params.LinkID,
-		DedupKey:    params.DedupKey,
-		Direction:   direction,
-		CursorFrom:  params.CursorFrom,
-		CursorTo:    params.CursorTo,
-		EventCount:  params.EventCount,
-		PayloadType: params.PayloadType,
-		Payload:     append([]byte(nil), params.Payload...),
-		Compression: params.Compression,
-		AvailableAt: params.AvailableAt,
-		ExpiresAt:   params.ExpiresAt,
+		ID:            bundleID,
+		PeerID:        params.PeerID,
+		LinkID:        params.LinkID,
+		DedupKey:      params.DedupKey,
+		Direction:     direction,
+		CursorFrom:    params.CursorFrom,
+		CursorTo:      params.CursorTo,
+		EventCount:    params.EventCount,
+		PayloadType:   params.PayloadType,
+		Payload:       append([]byte(nil), params.Payload...),
+		Compression:   params.Compression,
+		IntegrityHash: params.IntegrityHash,
+		AuthTag:       params.AuthTag,
+		AvailableAt:   params.AvailableAt,
+		ExpiresAt:     params.ExpiresAt,
 	}).normalize(now)
 	if err != nil {
+		return Bundle{}, err
+	}
+	if direction == BundleDirectionOutbound {
+		bundle, err = s.SignBundle(ctx, params.PeerID, params.LinkID, bundle)
+		if err != nil {
+			return Bundle{}, err
+		}
+	} else if err := s.verifyBundle(ctx, params.PeerID, params.LinkID, bundle); err != nil {
 		return Bundle{}, err
 	}
 
 	var saved Bundle
 	err = s.store.WithinTx(ctx, func(store Store) error {
-		saveBundle, saveErr := store.SaveBundle(ctx, bundle)
-		if saveErr != nil {
-			return fmt.Errorf("save federation bundle %s: %w", bundle.ID, saveErr)
-		}
-
 		cursor, cursorErr := store.CursorByPeerAndLink(ctx, bundle.PeerID, bundle.LinkID)
 		if cursorErr != nil && !errors.Is(cursorErr, ErrNotFound) {
 			return fmt.Errorf("load federation cursor for %s/%s: %w", bundle.PeerID, bundle.LinkID, cursorErr)
@@ -540,6 +547,27 @@ func (s *Service) saveBundle(ctx context.Context, params SaveBundleParams, direc
 				PeerID: bundle.PeerID,
 				LinkID: bundle.LinkID,
 			}
+		}
+
+		if direction == BundleDirectionInbound && bundle.CursorTo <= cursor.LastReceivedCursor {
+			existing, existingErr := store.BundleByDedupKey(ctx, bundle.DedupKey)
+			switch {
+			case existingErr == nil:
+				if existing.PeerID != bundle.PeerID || existing.LinkID != bundle.LinkID || existing.Direction != bundle.Direction {
+					return ErrConflict
+				}
+				saved = existing
+				return nil
+			case errors.Is(existingErr, ErrNotFound):
+				return ErrConflict
+			default:
+				return fmt.Errorf("load federation bundle by dedup key %s: %w", bundle.DedupKey, existingErr)
+			}
+		}
+
+		saveBundle, saveErr := store.SaveBundle(ctx, bundle)
+		if saveErr != nil {
+			return fmt.Errorf("save federation bundle %s: %w", bundle.ID, saveErr)
 		}
 
 		if direction == BundleDirectionInbound && bundle.CursorTo > cursor.LastReceivedCursor {

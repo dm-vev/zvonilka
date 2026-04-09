@@ -17,6 +17,15 @@ func TestFromEnvUsesDistinctServiceDefaults(t *testing.T) {
 	t.Setenv("ZVONILKA_CALL_RECORDING_HOOK_URL", "http://127.0.0.1/recording")
 	t.Setenv("ZVONILKA_FEATURE_FEDERATION_ENABLED", "true")
 	t.Setenv("ZVONILKA_FEDERATION_LOCAL_SERVER_NAME", "alpha.example")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_SHARED_SECRET", "bridge-secret")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_ENDPOINT", "grpc://127.0.0.1:9097")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_PEER_SERVER_NAME", "mesh.example")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_LINK_NAME", "mesh")
+	t.Setenv("ZVONILKA_MESHTASTIC_INTERFACE_KIND", "serial")
+	t.Setenv("ZVONILKA_MESHTASTIC_DEVICE", "/dev/ttyUSB0")
+	t.Setenv("ZVONILKA_MESHCORE_INTERFACE_KIND", "serial")
+	t.Setenv("ZVONILKA_MESHCORE_DEVICE", "/dev/ttyUSB1")
+	t.Setenv("ZVONILKA_MESHCORE_DESTINATION", "peer-pubkey")
 
 	type expected struct {
 		http string
@@ -74,6 +83,27 @@ func TestFromEnvUsesDistinctServiceDefaults(t *testing.T) {
 			want: expected{
 				http: ":8086",
 				grpc: ":9096",
+			},
+		},
+		{
+			service: "federationbridge",
+			want: expected{
+				http: ":8087",
+				grpc: ":9097",
+			},
+		},
+		{
+			service: "federationmeshtastic",
+			want: expected{
+				http: ":8088",
+				grpc: ":9098",
+			},
+		},
+		{
+			service: "federationmeshcore",
+			want: expected{
+				http: ":8089",
+				grpc: ":9099",
 			},
 		},
 	}
@@ -224,6 +254,10 @@ func TestLoadAppliesFederationOverrides(t *testing.T) {
 
 	t.Setenv("ZVONILKA_FEATURE_FEDERATION_ENABLED", "true")
 	t.Setenv("ZVONILKA_FEDERATION_LOCAL_SERVER_NAME", "alpha.example")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_SHARED_SECRET", "bridge-secret")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_ENDPOINT", "grpc://127.0.0.1:9097")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_PEER_SERVER_NAME", "mesh.example")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_LINK_NAME", "mesh")
 	t.Setenv("ZVONILKA_FEDERATION_WORKER_POLL_INTERVAL", "1500ms")
 	t.Setenv("ZVONILKA_FEDERATION_WORKER_BATCH_SIZE", "25")
 	t.Setenv("ZVONILKA_FEDERATION_DIAL_TIMEOUT", "9s")
@@ -236,6 +270,18 @@ func TestLoadAppliesFederationOverrides(t *testing.T) {
 	if cfg.Federation.LocalServerName != "alpha.example" {
 		t.Fatalf("local server name: got %s", cfg.Federation.LocalServerName)
 	}
+	if cfg.Federation.BridgeSharedSecret != "bridge-secret" {
+		t.Fatalf("bridge shared secret: got %s", cfg.Federation.BridgeSharedSecret)
+	}
+	if cfg.Federation.BridgeEndpoint != "grpc://127.0.0.1:9097" {
+		t.Fatalf("bridge endpoint: got %s", cfg.Federation.BridgeEndpoint)
+	}
+	if cfg.Federation.BridgePeerServer != "mesh.example" {
+		t.Fatalf("bridge peer server: got %s", cfg.Federation.BridgePeerServer)
+	}
+	if cfg.Federation.BridgeLinkName != "mesh" {
+		t.Fatalf("bridge link name: got %s", cfg.Federation.BridgeLinkName)
+	}
 	if cfg.Federation.WorkerPollInterval != 1500*time.Millisecond {
 		t.Fatalf("worker poll interval: got %s, want 1500ms", cfg.Federation.WorkerPollInterval)
 	}
@@ -244,6 +290,153 @@ func TestLoadAppliesFederationOverrides(t *testing.T) {
 	}
 	if cfg.Federation.DialTimeout != 9*time.Second {
 		t.Fatalf("dial timeout: got %s, want 9s", cfg.Federation.DialTimeout)
+	}
+}
+
+func TestLoadRejectsFederationBridgeWithoutSharedSecret(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_FEATURE_FEDERATION_ENABLED", "true")
+
+	_, err := Load("federationbridge")
+	if err == nil {
+		t.Fatal("expected load to fail")
+	}
+	if !strings.Contains(err.Error(), "federation bridge shared secret is required for federationbridge") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadAppliesMeshtasticOverrides(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_FEATURE_FEDERATION_ENABLED", "true")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_SHARED_SECRET", "bridge-secret")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_ENDPOINT", "grpc://127.0.0.1:9097")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_POLL_INTERVAL", "2s")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_BATCH_SIZE", "12")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_PEER_SERVER_NAME", "mesh.example")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_LINK_NAME", "mesh")
+	t.Setenv("ZVONILKA_MESHTASTIC_INTERFACE_KIND", "serial")
+	t.Setenv("ZVONILKA_MESHTASTIC_DEVICE", "/dev/ttyUSB0")
+	t.Setenv("ZVONILKA_MESHTASTIC_HELPER_PYTHON", "/usr/bin/python3")
+	t.Setenv("ZVONILKA_MESHTASTIC_HELPER_SCRIPT_PATH", "/tmp/meshtastic_bridge.py")
+	t.Setenv("ZVONILKA_MESHTASTIC_RECEIVE_TIMEOUT", "4s")
+	t.Setenv("ZVONILKA_MESHTASTIC_TEXT_PREFIX", "mesh1:")
+
+	cfg, err := Load("federationmeshtastic")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.Federation.BridgePollInterval != 2*time.Second {
+		t.Fatalf("bridge poll interval: got %s, want 2s", cfg.Federation.BridgePollInterval)
+	}
+	if cfg.Federation.BridgeBatchSize != 12 {
+		t.Fatalf("bridge batch size: got %d, want 12", cfg.Federation.BridgeBatchSize)
+	}
+	if cfg.Meshtastic.InterfaceKind != "serial" {
+		t.Fatalf("meshtastic interface kind: got %s", cfg.Meshtastic.InterfaceKind)
+	}
+	if cfg.Meshtastic.Device != "/dev/ttyUSB0" {
+		t.Fatalf("meshtastic device: got %s", cfg.Meshtastic.Device)
+	}
+	if cfg.Meshtastic.HelperPython != "/usr/bin/python3" {
+		t.Fatalf("meshtastic helper python: got %s", cfg.Meshtastic.HelperPython)
+	}
+	if cfg.Meshtastic.HelperScriptPath != "/tmp/meshtastic_bridge.py" {
+		t.Fatalf("meshtastic helper script path: got %s", cfg.Meshtastic.HelperScriptPath)
+	}
+	if cfg.Meshtastic.ReceiveTimeout != 4*time.Second {
+		t.Fatalf("meshtastic receive timeout: got %s, want 4s", cfg.Meshtastic.ReceiveTimeout)
+	}
+	if cfg.Meshtastic.TextPrefix != "mesh1:" {
+		t.Fatalf("meshtastic text prefix: got %s", cfg.Meshtastic.TextPrefix)
+	}
+}
+
+func TestLoadRejectsMeshtasticBridgeWithoutDevice(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_FEATURE_FEDERATION_ENABLED", "true")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_SHARED_SECRET", "bridge-secret")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_ENDPOINT", "grpc://127.0.0.1:9097")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_PEER_SERVER_NAME", "mesh.example")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_LINK_NAME", "mesh")
+	t.Setenv("ZVONILKA_MESHTASTIC_INTERFACE_KIND", "serial")
+
+	_, err := Load("federationmeshtastic")
+	if err == nil {
+		t.Fatal("expected load to fail")
+	}
+	if !strings.Contains(err.Error(), "meshtastic device is required for federationmeshtastic") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadAppliesMeshCoreOverrides(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_FEATURE_FEDERATION_ENABLED", "true")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_SHARED_SECRET", "bridge-secret")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_ENDPOINT", "grpc://127.0.0.1:9097")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_POLL_INTERVAL", "2s")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_BATCH_SIZE", "12")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_PEER_SERVER_NAME", "mesh.example")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_LINK_NAME", "meshcore")
+	t.Setenv("ZVONILKA_MESHCORE_INTERFACE_KIND", "serial")
+	t.Setenv("ZVONILKA_MESHCORE_DEVICE", "/dev/ttyUSB1")
+	t.Setenv("ZVONILKA_MESHCORE_HELPER_PYTHON", "/usr/bin/python3")
+	t.Setenv("ZVONILKA_MESHCORE_HELPER_SCRIPT_PATH", "/tmp/meshcore_bridge.py")
+	t.Setenv("ZVONILKA_MESHCORE_RECEIVE_TIMEOUT", "4s")
+	t.Setenv("ZVONILKA_MESHCORE_TEXT_PREFIX", "mesh1:")
+	t.Setenv("ZVONILKA_MESHCORE_DESTINATION", "peer-pubkey")
+
+	cfg, err := Load("federationmeshcore")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.MeshCore.InterfaceKind != "serial" {
+		t.Fatalf("meshcore interface kind: got %s", cfg.MeshCore.InterfaceKind)
+	}
+	if cfg.MeshCore.Device != "/dev/ttyUSB1" {
+		t.Fatalf("meshcore device: got %s", cfg.MeshCore.Device)
+	}
+	if cfg.MeshCore.HelperPython != "/usr/bin/python3" {
+		t.Fatalf("meshcore helper python: got %s", cfg.MeshCore.HelperPython)
+	}
+	if cfg.MeshCore.HelperScriptPath != "/tmp/meshcore_bridge.py" {
+		t.Fatalf("meshcore helper script path: got %s", cfg.MeshCore.HelperScriptPath)
+	}
+	if cfg.MeshCore.ReceiveTimeout != 4*time.Second {
+		t.Fatalf("meshcore receive timeout: got %s, want 4s", cfg.MeshCore.ReceiveTimeout)
+	}
+	if cfg.MeshCore.TextPrefix != "mesh1:" {
+		t.Fatalf("meshcore text prefix: got %s", cfg.MeshCore.TextPrefix)
+	}
+	if cfg.MeshCore.Destination != "peer-pubkey" {
+		t.Fatalf("meshcore destination: got %s", cfg.MeshCore.Destination)
+	}
+}
+
+func TestLoadRejectsMeshCoreBridgeWithoutDestination(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_FEATURE_FEDERATION_ENABLED", "true")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_SHARED_SECRET", "bridge-secret")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_ENDPOINT", "grpc://127.0.0.1:9097")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_PEER_SERVER_NAME", "mesh.example")
+	t.Setenv("ZVONILKA_FEDERATION_BRIDGE_LINK_NAME", "meshcore")
+	t.Setenv("ZVONILKA_MESHCORE_INTERFACE_KIND", "serial")
+	t.Setenv("ZVONILKA_MESHCORE_DEVICE", "/dev/ttyUSB1")
+
+	_, err := Load("federationmeshcore")
+	if err == nil {
+		t.Fatal("expected load to fail")
+	}
+	if !strings.Contains(err.Error(), "meshcore destination is required for federationmeshcore") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -862,6 +1055,41 @@ func resetConfigEnv(t *testing.T) {
 		"ZVONILKA_NOTIFICATIONWORKER_HTTP_ADDR",
 		"ZVONILKA_NOTIFICATIONWORKER_GRPC_ADDR",
 		"ZVONILKA_NOTIFICATIONWORKER_SHUTDOWN_TIMEOUT",
+		"ZVONILKA_FEDERATIONBRIDGE_ENV",
+		"ZVONILKA_FEDERATIONBRIDGE_HTTP_ADDR",
+		"ZVONILKA_FEDERATIONBRIDGE_GRPC_ADDR",
+		"ZVONILKA_FEDERATIONBRIDGE_SHUTDOWN_TIMEOUT",
+		"ZVONILKA_FEDERATIONMESHTASTIC_ENV",
+		"ZVONILKA_FEDERATIONMESHTASTIC_HTTP_ADDR",
+		"ZVONILKA_FEDERATIONMESHTASTIC_GRPC_ADDR",
+		"ZVONILKA_FEDERATIONMESHTASTIC_SHUTDOWN_TIMEOUT",
+		"ZVONILKA_FEDERATIONMESHCORE_ENV",
+		"ZVONILKA_FEDERATIONMESHCORE_HTTP_ADDR",
+		"ZVONILKA_FEDERATIONMESHCORE_GRPC_ADDR",
+		"ZVONILKA_FEDERATIONMESHCORE_SHUTDOWN_TIMEOUT",
+		"ZVONILKA_FEDERATION_LOCAL_SERVER_NAME",
+		"ZVONILKA_FEDERATION_BRIDGE_SHARED_SECRET",
+		"ZVONILKA_FEDERATION_BRIDGE_ENDPOINT",
+		"ZVONILKA_FEDERATION_BRIDGE_POLL_INTERVAL",
+		"ZVONILKA_FEDERATION_BRIDGE_BATCH_SIZE",
+		"ZVONILKA_FEDERATION_BRIDGE_PEER_SERVER_NAME",
+		"ZVONILKA_FEDERATION_BRIDGE_LINK_NAME",
+		"ZVONILKA_FEDERATION_WORKER_POLL_INTERVAL",
+		"ZVONILKA_FEDERATION_WORKER_BATCH_SIZE",
+		"ZVONILKA_FEDERATION_DIAL_TIMEOUT",
+		"ZVONILKA_MESHTASTIC_INTERFACE_KIND",
+		"ZVONILKA_MESHTASTIC_DEVICE",
+		"ZVONILKA_MESHTASTIC_HELPER_PYTHON",
+		"ZVONILKA_MESHTASTIC_HELPER_SCRIPT_PATH",
+		"ZVONILKA_MESHTASTIC_RECEIVE_TIMEOUT",
+		"ZVONILKA_MESHTASTIC_TEXT_PREFIX",
+		"ZVONILKA_MESHCORE_INTERFACE_KIND",
+		"ZVONILKA_MESHCORE_DEVICE",
+		"ZVONILKA_MESHCORE_HELPER_PYTHON",
+		"ZVONILKA_MESHCORE_HELPER_SCRIPT_PATH",
+		"ZVONILKA_MESHCORE_RECEIVE_TIMEOUT",
+		"ZVONILKA_MESHCORE_TEXT_PREFIX",
+		"ZVONILKA_MESHCORE_DESTINATION",
 		"ZVONILKA_NOTIFICATION_WORKER_POLL_INTERVAL",
 		"ZVONILKA_NOTIFICATION_RETRY_INITIAL_BACKOFF",
 		"ZVONILKA_NOTIFICATION_RETRY_MAX_BACKOFF",

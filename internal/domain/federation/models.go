@@ -146,6 +146,20 @@ const (
 	CompressionKindGzip        CompressionKind = "gzip"
 )
 
+// FragmentState identifies the lifecycle of one durable bundle fragment.
+type FragmentState string
+
+// Fragment states supported by the federation domain.
+const (
+	FragmentStateUnspecified  FragmentState = ""
+	FragmentStateQueued       FragmentState = "queued"
+	FragmentStateClaimed      FragmentState = "claimed"
+	FragmentStateAccepted     FragmentState = "accepted"
+	FragmentStateAcknowledged FragmentState = "acknowledged"
+	FragmentStateAssembled    FragmentState = "assembled"
+	FragmentStateFailed       FragmentState = "failed"
+)
+
 // Peer stores one remote server federation identity.
 type Peer struct {
 	ID                      string
@@ -184,22 +198,51 @@ type Link struct {
 
 // Bundle stores one durable replication unit.
 type Bundle struct {
-	ID          string
-	PeerID      string
-	LinkID      string
-	DedupKey    string
-	Direction   BundleDirection
-	CursorFrom  uint64
-	CursorTo    uint64
-	EventCount  int
-	PayloadType string
-	Payload     []byte
-	Compression CompressionKind
-	State       BundleState
-	CreatedAt   time.Time
-	AvailableAt time.Time
-	ExpiresAt   time.Time
-	AckedAt     time.Time
+	ID            string
+	PeerID        string
+	LinkID        string
+	DedupKey      string
+	Direction     BundleDirection
+	CursorFrom    uint64
+	CursorTo      uint64
+	EventCount    int
+	PayloadType   string
+	Payload       []byte
+	Compression   CompressionKind
+	IntegrityHash string
+	AuthTag       string
+	State         BundleState
+	CreatedAt     time.Time
+	AvailableAt   time.Time
+	ExpiresAt     time.Time
+	AckedAt       time.Time
+}
+
+// BundleFragment stores one durable transport fragment for a constrained link.
+type BundleFragment struct {
+	ID             string
+	PeerID         string
+	LinkID         string
+	BundleID       string
+	DedupKey       string
+	Direction      BundleDirection
+	CursorFrom     uint64
+	CursorTo       uint64
+	EventCount     int
+	PayloadType    string
+	Compression    CompressionKind
+	IntegrityHash  string
+	AuthTag        string
+	FragmentIndex  int
+	FragmentCount  int
+	Payload        []byte
+	State          FragmentState
+	LeaseToken     string
+	LeaseExpiresAt time.Time
+	AttemptCount   int
+	CreatedAt      time.Time
+	AvailableAt    time.Time
+	AckedAt        time.Time
 }
 
 // ReplicationCursor stores the durable replication watermarks for one peer/link pair.
@@ -226,6 +269,11 @@ func NormalizeLink(link Link, now time.Time) (Link, error) {
 // NormalizeBundle validates and normalizes a bundle snapshot.
 func NormalizeBundle(bundle Bundle, now time.Time) (Bundle, error) {
 	return bundle.normalize(now)
+}
+
+// NormalizeBundleFragment validates and normalizes a fragment snapshot.
+func NormalizeBundleFragment(fragment BundleFragment, now time.Time) (BundleFragment, error) {
+	return fragment.normalize(now)
 }
 
 // NormalizeReplicationCursor validates and normalizes a cursor snapshot.
@@ -451,6 +499,8 @@ func (b Bundle) normalize(now time.Time) (Bundle, error) {
 	b.PeerID = strings.TrimSpace(b.PeerID)
 	b.LinkID = strings.TrimSpace(b.LinkID)
 	b.DedupKey = strings.TrimSpace(b.DedupKey)
+	b.IntegrityHash = strings.TrimSpace(strings.ToLower(b.IntegrityHash))
+	b.AuthTag = strings.TrimSpace(strings.ToLower(b.AuthTag))
 	b.PayloadType = strings.TrimSpace(strings.ToLower(b.PayloadType))
 	if b.ID == "" || b.PeerID == "" || b.LinkID == "" || b.DedupKey == "" {
 		return Bundle{}, ErrInvalidInput
@@ -503,6 +553,86 @@ func (b Bundle) normalize(now time.Time) (Bundle, error) {
 	b.AckedAt = b.AckedAt.UTC()
 
 	return b, nil
+}
+
+func (f BundleFragment) normalize(now time.Time) (BundleFragment, error) {
+	f.ID = strings.TrimSpace(f.ID)
+	f.PeerID = strings.TrimSpace(f.PeerID)
+	f.LinkID = strings.TrimSpace(f.LinkID)
+	f.BundleID = strings.TrimSpace(f.BundleID)
+	f.DedupKey = strings.TrimSpace(f.DedupKey)
+	f.LeaseToken = strings.TrimSpace(f.LeaseToken)
+	f.IntegrityHash = strings.TrimSpace(strings.ToLower(f.IntegrityHash))
+	f.AuthTag = strings.TrimSpace(strings.ToLower(f.AuthTag))
+	f.PayloadType = strings.TrimSpace(strings.ToLower(f.PayloadType))
+	if f.ID == "" || f.PeerID == "" || f.LinkID == "" || f.BundleID == "" || f.DedupKey == "" {
+		return BundleFragment{}, ErrInvalidInput
+	}
+
+	switch f.Direction {
+	case BundleDirectionInbound, BundleDirectionOutbound:
+	default:
+		return BundleFragment{}, ErrInvalidInput
+	}
+	if f.CursorTo < f.CursorFrom {
+		return BundleFragment{}, ErrInvalidInput
+	}
+	if f.EventCount < 0 {
+		return BundleFragment{}, ErrInvalidInput
+	}
+	if f.AttemptCount < 0 {
+		return BundleFragment{}, ErrInvalidInput
+	}
+	if f.FragmentCount <= 0 || f.FragmentIndex < 0 || f.FragmentIndex >= f.FragmentCount {
+		return BundleFragment{}, ErrInvalidInput
+	}
+	if f.IntegrityHash == "" || f.AuthTag == "" {
+		return BundleFragment{}, ErrInvalidInput
+	}
+
+	if f.Compression == CompressionKindUnspecified {
+		f.Compression = CompressionKindNone
+	}
+	switch f.Compression {
+	case CompressionKindNone, CompressionKindGzip:
+	default:
+		return BundleFragment{}, ErrInvalidInput
+	}
+
+	if f.State == FragmentStateUnspecified {
+		if f.Direction == BundleDirectionInbound {
+			f.State = FragmentStateAccepted
+		} else {
+			f.State = FragmentStateQueued
+		}
+	}
+	switch f.State {
+	case FragmentStateQueued, FragmentStateClaimed, FragmentStateAccepted, FragmentStateAcknowledged, FragmentStateAssembled, FragmentStateFailed:
+	default:
+		return BundleFragment{}, ErrInvalidInput
+	}
+	if f.State == FragmentStateClaimed {
+		if f.Direction != BundleDirectionOutbound || f.LeaseToken == "" || f.LeaseExpiresAt.IsZero() {
+			return BundleFragment{}, ErrInvalidInput
+		}
+	} else {
+		f.LeaseToken = ""
+		f.LeaseExpiresAt = time.Time{}
+	}
+
+	if f.CreatedAt.IsZero() {
+		f.CreatedAt = now.UTC()
+	}
+	if f.AvailableAt.IsZero() {
+		f.AvailableAt = f.CreatedAt
+	}
+
+	f.CreatedAt = f.CreatedAt.UTC()
+	f.AvailableAt = f.AvailableAt.UTC()
+	f.LeaseExpiresAt = f.LeaseExpiresAt.UTC()
+	f.AckedAt = f.AckedAt.UTC()
+
+	return f, nil
 }
 
 func (c ReplicationCursor) normalize(now time.Time) (ReplicationCursor, error) {

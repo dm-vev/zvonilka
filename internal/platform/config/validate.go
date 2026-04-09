@@ -226,12 +226,107 @@ func (c Configuration) Validate() error {
 	if c.Federation.DialTimeout <= 0 {
 		errs = append(errs, errors.New("federation dial timeout must be positive"))
 	}
+	if c.Federation.BridgePollInterval <= 0 {
+		errs = append(errs, errors.New("federation bridge poll interval must be positive"))
+	}
+	if c.Federation.BridgeBatchSize <= 0 {
+		errs = append(errs, errors.New("federation bridge batch size must be positive"))
+	}
 	if c.Service.Name == "federationworker" {
 		if !c.Features.FederationEnabled {
 			errs = append(errs, errors.New("federation feature flag must be enabled for federationworker"))
 		}
 		if strings.TrimSpace(c.Federation.LocalServerName) == "" {
 			errs = append(errs, errors.New("federation local server name is required for federationworker"))
+		}
+	}
+	if c.Service.Name == "federationbridge" {
+		if !c.Features.FederationEnabled {
+			errs = append(errs, errors.New("federation feature flag must be enabled for federationbridge"))
+		}
+		if strings.TrimSpace(c.Federation.BridgeSharedSecret) == "" {
+			errs = append(errs, errors.New("federation bridge shared secret is required for federationbridge"))
+		}
+	}
+	if c.Meshtastic.ReceiveTimeout <= 0 {
+		errs = append(errs, errors.New("meshtastic receive timeout must be positive"))
+	}
+	if c.Service.Name == "federationmeshtastic" {
+		if !c.Features.FederationEnabled {
+			errs = append(errs, errors.New("federation feature flag must be enabled for federationmeshtastic"))
+		}
+		if strings.TrimSpace(c.Federation.BridgeSharedSecret) == "" {
+			errs = append(errs, errors.New("federation bridge shared secret is required for federationmeshtastic"))
+		}
+		if strings.TrimSpace(c.Federation.BridgeEndpoint) == "" {
+			errs = append(errs, errors.New("federation bridge endpoint is required for federationmeshtastic"))
+		}
+		if strings.TrimSpace(c.Federation.BridgePeerServer) == "" {
+			errs = append(errs, errors.New("federation bridge peer server name is required for federationmeshtastic"))
+		}
+		if strings.TrimSpace(c.Federation.BridgeLinkName) == "" {
+			errs = append(errs, errors.New("federation bridge link name is required for federationmeshtastic"))
+		}
+		switch c.Meshtastic.InterfaceKind {
+		case "serial":
+		case "":
+			errs = append(errs, errors.New("meshtastic interface kind is required for federationmeshtastic"))
+		default:
+			errs = append(errs, errors.New("meshtastic interface kind must currently be serial"))
+		}
+		if strings.TrimSpace(c.Meshtastic.Device) == "" {
+			errs = append(errs, errors.New("meshtastic device is required for federationmeshtastic"))
+		}
+		if strings.TrimSpace(c.Meshtastic.HelperPython) == "" {
+			errs = append(errs, errors.New("meshtastic helper python is required for federationmeshtastic"))
+		}
+		if strings.TrimSpace(c.Meshtastic.HelperScriptPath) == "" {
+			errs = append(errs, errors.New("meshtastic helper script path is required for federationmeshtastic"))
+		}
+		if strings.TrimSpace(c.Meshtastic.TextPrefix) == "" {
+			errs = append(errs, errors.New("meshtastic text prefix is required for federationmeshtastic"))
+		}
+	}
+	if c.MeshCore.ReceiveTimeout <= 0 {
+		errs = append(errs, errors.New("meshcore receive timeout must be positive"))
+	}
+	if c.Service.Name == "federationmeshcore" {
+		if !c.Features.FederationEnabled {
+			errs = append(errs, errors.New("federation feature flag must be enabled for federationmeshcore"))
+		}
+		if strings.TrimSpace(c.Federation.BridgeSharedSecret) == "" {
+			errs = append(errs, errors.New("federation bridge shared secret is required for federationmeshcore"))
+		}
+		if strings.TrimSpace(c.Federation.BridgeEndpoint) == "" {
+			errs = append(errs, errors.New("federation bridge endpoint is required for federationmeshcore"))
+		}
+		if strings.TrimSpace(c.Federation.BridgePeerServer) == "" {
+			errs = append(errs, errors.New("federation bridge peer server name is required for federationmeshcore"))
+		}
+		if strings.TrimSpace(c.Federation.BridgeLinkName) == "" {
+			errs = append(errs, errors.New("federation bridge link name is required for federationmeshcore"))
+		}
+		switch c.MeshCore.InterfaceKind {
+		case "serial":
+		case "":
+			errs = append(errs, errors.New("meshcore interface kind is required for federationmeshcore"))
+		default:
+			errs = append(errs, errors.New("meshcore interface kind must currently be serial"))
+		}
+		if strings.TrimSpace(c.MeshCore.Device) == "" {
+			errs = append(errs, errors.New("meshcore device is required for federationmeshcore"))
+		}
+		if strings.TrimSpace(c.MeshCore.HelperPython) == "" {
+			errs = append(errs, errors.New("meshcore helper python is required for federationmeshcore"))
+		}
+		if strings.TrimSpace(c.MeshCore.HelperScriptPath) == "" {
+			errs = append(errs, errors.New("meshcore helper script path is required for federationmeshcore"))
+		}
+		if strings.TrimSpace(c.MeshCore.TextPrefix) == "" {
+			errs = append(errs, errors.New("meshcore text prefix is required for federationmeshcore"))
+		}
+		if strings.TrimSpace(c.MeshCore.Destination) == "" {
+			errs = append(errs, errors.New("meshcore destination is required for federationmeshcore"))
 		}
 	}
 	if c.Search.DefaultLimit <= 0 {
@@ -418,7 +513,7 @@ func validateLogFormat(format string) error {
 func validateServiceName(serviceName string) error {
 	serviceName = strings.ToLower(strings.TrimSpace(serviceName))
 	switch serviceName {
-	case "controlplane", "gateway", "botapi", "notificationworker", "callworker", "callhooks", "federationworker":
+	case "controlplane", "gateway", "botapi", "notificationworker", "callworker", "callhooks", "federationworker", "federationbridge", "federationmeshtastic", "federationmeshcore":
 		return nil
 	case "":
 		return errors.New("service name is required")

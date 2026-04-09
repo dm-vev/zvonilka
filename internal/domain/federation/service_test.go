@@ -71,19 +71,81 @@ func TestServicePeerLinkAndCursorLifecycle(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, federation.BundleDirectionOutbound, outbound.Direction)
+	require.NotEmpty(t, outbound.IntegrityHash)
+	require.NotEmpty(t, outbound.AuthTag)
 
-	inbound, err := service.AcceptInboundBundle(context.Background(), federation.SaveBundleParams{
-		PeerID:      peer.ID,
-		LinkID:      link.ID,
+	signedInbound, err := service.SignBundle(context.Background(), peer.ID, link.ID, federation.Bundle{
+		ID:          "remote-bundle-1",
 		DedupKey:    "in-1",
 		CursorFrom:  10,
 		CursorTo:    11,
 		EventCount:  1,
 		PayloadType: "bundle",
 		Payload:     []byte("inbound"),
+		Compression: federation.CompressionKindNone,
+	})
+	require.NoError(t, err)
+
+	inbound, err := service.AcceptInboundBundle(context.Background(), federation.SaveBundleParams{
+		PeerID:        peer.ID,
+		LinkID:        link.ID,
+		DedupKey:      "in-1",
+		CursorFrom:    10,
+		CursorTo:      11,
+		EventCount:    1,
+		PayloadType:   "bundle",
+		Payload:       []byte("inbound"),
+		Compression:   federation.CompressionKindNone,
+		IntegrityHash: signedInbound.IntegrityHash,
+		AuthTag:       signedInbound.AuthTag,
 	})
 	require.NoError(t, err)
 	require.Equal(t, federation.BundleDirectionInbound, inbound.Direction)
+
+	tamperedErr := func() error {
+		_, err := service.AcceptInboundBundle(context.Background(), federation.SaveBundleParams{
+			PeerID:        peer.ID,
+			LinkID:        link.ID,
+			DedupKey:      "in-tampered-1",
+			CursorFrom:    12,
+			CursorTo:      12,
+			EventCount:    1,
+			PayloadType:   "bundle",
+			Payload:       []byte("tampered"),
+			Compression:   federation.CompressionKindNone,
+			IntegrityHash: signedInbound.IntegrityHash,
+			AuthTag:       signedInbound.AuthTag,
+		})
+		return err
+	}()
+	require.ErrorIs(t, tamperedErr, federation.ErrUnauthorized)
+
+	signedStale, err := service.SignBundle(context.Background(), peer.ID, link.ID, federation.Bundle{
+		ID:          "remote-bundle-stale-1",
+		DedupKey:    "in-stale-1",
+		CursorFrom:  9,
+		CursorTo:    10,
+		EventCount:  1,
+		PayloadType: "bundle",
+		Payload:     []byte("stale"),
+		Compression: federation.CompressionKindNone,
+	})
+	require.NoError(t, err)
+
+	_, err = service.AcceptInboundBundle(context.Background(), federation.SaveBundleParams{
+		PeerID:        peer.ID,
+		LinkID:        link.ID,
+		DedupKey:      "in-stale-1",
+		CursorFrom:    9,
+		CursorTo:      10,
+		EventCount:    1,
+		PayloadType:   "bundle",
+		Payload:       []byte("stale"),
+		Compression:   federation.CompressionKindNone,
+		IntegrityHash: signedStale.IntegrityHash,
+		AuthTag:       signedStale.AuthTag,
+	})
+	require.ErrorIs(t, err, federation.ErrConflict)
 
 	cursor, err := service.ReplicationCursorByPeerAndLink(context.Background(), peer.ID, link.ID)
 	require.NoError(t, err)

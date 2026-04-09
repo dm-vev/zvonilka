@@ -73,6 +73,16 @@ enum CompressionKind {
   COMPRESSION_KIND_GZIP = 2;
 }
 
+enum FragmentState {
+  FRAGMENT_STATE_UNSPECIFIED = 0;
+  FRAGMENT_STATE_QUEUED = 1;
+  FRAGMENT_STATE_ACCEPTED = 2;
+  FRAGMENT_STATE_ACKNOWLEDGED = 3;
+  FRAGMENT_STATE_ASSEMBLED = 4;
+  FRAGMENT_STATE_FAILED = 5;
+  FRAGMENT_STATE_CLAIMED = 6;
+}
+
 message Peer {
   string peer_id = 1;
   string server_name = 2;
@@ -132,4 +142,31 @@ message Bundle {
   google.protobuf.Timestamp available_at = 14;
   google.protobuf.Timestamp expires_at = 15;
   google.protobuf.Timestamp acked_at = 16;
+  string integrity_hash = 17;
+  string auth_tag = 18;
+}
+
+message BundleFragment {
+  string fragment_id = 1;
+  string peer_id = 2;
+  string link_id = 3;
+  string bundle_id = 4;
+  string dedup_key = 5;
+  BundleDirection direction = 6;
+  uint64 cursor_from = 7;
+  uint64 cursor_to = 8;
+  uint32 event_count = 9;
+  string payload_type = 10;
+  CompressionKind compression = 11;
+  uint32 fragment_index = 12;
+  uint32 fragment_count = 13;
+  bytes payload = 14;
+  FragmentState state = 15;
+  google.protobuf.Timestamp created_at = 16;
+  google.protobuf.Timestamp available_at = 17;
+  google.protobuf.Timestamp acked_at = 18;
+  google.protobuf.Timestamp lease_expires_at = 19;
+  uint32 attempt_count = 20;
+  string integrity_hash = 21;
+  string auth_tag = 22;
 }

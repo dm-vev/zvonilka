@@ -1786,6 +1786,400 @@ func (x *AcknowledgeBundlesResponse) GetCursor() *ReplicationCursor {
 	return nil
 }
 
+type PullBridgeFragmentsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	PeerServerName string `protobuf:"bytes,1,opt,name=peer_server_name,json=peerServerName,proto3" json:"peer_server_name,omitempty"`
+	LinkName       string `protobuf:"bytes,2,opt,name=link_name,json=linkName,proto3" json:"link_name,omitempty"`
+	Limit          uint32 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+}
+
+func (x *PullBridgeFragmentsRequest) Reset() {
+	*x = PullBridgeFragmentsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_federation_v1_requests_proto_msgTypes[30]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PullBridgeFragmentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PullBridgeFragmentsRequest) ProtoMessage() {}
+
+func (x *PullBridgeFragmentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_federation_v1_requests_proto_msgTypes[30]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PullBridgeFragmentsRequest.ProtoReflect.Descriptor instead.
+func (*PullBridgeFragmentsRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_federation_v1_requests_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *PullBridgeFragmentsRequest) GetPeerServerName() string {
+	if x != nil {
+		return x.PeerServerName
+	}
+	return ""
+}
+
+func (x *PullBridgeFragmentsRequest) GetLinkName() string {
+	if x != nil {
+		return x.LinkName
+	}
+	return ""
+}
+
+func (x *PullBridgeFragmentsRequest) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type PullBridgeFragmentsResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Fragments  []*BundleFragment  `protobuf:"bytes,1,rep,name=fragments,proto3" json:"fragments,omitempty"`
+	HasMore    bool               `protobuf:"varint,2,opt,name=has_more,json=hasMore,proto3" json:"has_more,omitempty"`
+	Cursor     *ReplicationCursor `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	Link       *Link              `protobuf:"bytes,4,opt,name=link,proto3" json:"link,omitempty"`
+	LeaseToken string             `protobuf:"bytes,5,opt,name=lease_token,json=leaseToken,proto3" json:"lease_token,omitempty"`
+}
+
+func (x *PullBridgeFragmentsResponse) Reset() {
+	*x = PullBridgeFragmentsResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_federation_v1_requests_proto_msgTypes[31]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PullBridgeFragmentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PullBridgeFragmentsResponse) ProtoMessage() {}
+
+func (x *PullBridgeFragmentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_federation_v1_requests_proto_msgTypes[31]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PullBridgeFragmentsResponse.ProtoReflect.Descriptor instead.
+func (*PullBridgeFragmentsResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_federation_v1_requests_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *PullBridgeFragmentsResponse) GetFragments() []*BundleFragment {
+	if x != nil {
+		return x.Fragments
+	}
+	return nil
+}
+
+func (x *PullBridgeFragmentsResponse) GetHasMore() bool {
+	if x != nil {
+		return x.HasMore
+	}
+	return false
+}
+
+func (x *PullBridgeFragmentsResponse) GetCursor() *ReplicationCursor {
+	if x != nil {
+		return x.Cursor
+	}
+	return nil
+}
+
+func (x *PullBridgeFragmentsResponse) GetLink() *Link {
+	if x != nil {
+		return x.Link
+	}
+	return nil
+}
+
+func (x *PullBridgeFragmentsResponse) GetLeaseToken() string {
+	if x != nil {
+		return x.LeaseToken
+	}
+	return ""
+}
+
+type SubmitBridgeFragmentsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	PeerServerName string            `protobuf:"bytes,1,opt,name=peer_server_name,json=peerServerName,proto3" json:"peer_server_name,omitempty"`
+	LinkName       string            `protobuf:"bytes,2,opt,name=link_name,json=linkName,proto3" json:"link_name,omitempty"`
+	Fragments      []*BundleFragment `protobuf:"bytes,3,rep,name=fragments,proto3" json:"fragments,omitempty"`
+}
+
+func (x *SubmitBridgeFragmentsRequest) Reset() {
+	*x = SubmitBridgeFragmentsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_federation_v1_requests_proto_msgTypes[32]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *SubmitBridgeFragmentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubmitBridgeFragmentsRequest) ProtoMessage() {}
+
+func (x *SubmitBridgeFragmentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_federation_v1_requests_proto_msgTypes[32]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubmitBridgeFragmentsRequest.ProtoReflect.Descriptor instead.
+func (*SubmitBridgeFragmentsRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_federation_v1_requests_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *SubmitBridgeFragmentsRequest) GetPeerServerName() string {
+	if x != nil {
+		return x.PeerServerName
+	}
+	return ""
+}
+
+func (x *SubmitBridgeFragmentsRequest) GetLinkName() string {
+	if x != nil {
+		return x.LinkName
+	}
+	return ""
+}
+
+func (x *SubmitBridgeFragmentsRequest) GetFragments() []*BundleFragment {
+	if x != nil {
+		return x.Fragments
+	}
+	return nil
+}
+
+type SubmitBridgeFragmentsResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	AcceptedFragmentIds []string           `protobuf:"bytes,1,rep,name=accepted_fragment_ids,json=acceptedFragmentIds,proto3" json:"accepted_fragment_ids,omitempty"`
+	AssembledBundleIds  []string           `protobuf:"bytes,2,rep,name=assembled_bundle_ids,json=assembledBundleIds,proto3" json:"assembled_bundle_ids,omitempty"`
+	Cursor              *ReplicationCursor `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
+}
+
+func (x *SubmitBridgeFragmentsResponse) Reset() {
+	*x = SubmitBridgeFragmentsResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_federation_v1_requests_proto_msgTypes[33]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *SubmitBridgeFragmentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubmitBridgeFragmentsResponse) ProtoMessage() {}
+
+func (x *SubmitBridgeFragmentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_federation_v1_requests_proto_msgTypes[33]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubmitBridgeFragmentsResponse.ProtoReflect.Descriptor instead.
+func (*SubmitBridgeFragmentsResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_federation_v1_requests_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *SubmitBridgeFragmentsResponse) GetAcceptedFragmentIds() []string {
+	if x != nil {
+		return x.AcceptedFragmentIds
+	}
+	return nil
+}
+
+func (x *SubmitBridgeFragmentsResponse) GetAssembledBundleIds() []string {
+	if x != nil {
+		return x.AssembledBundleIds
+	}
+	return nil
+}
+
+func (x *SubmitBridgeFragmentsResponse) GetCursor() *ReplicationCursor {
+	if x != nil {
+		return x.Cursor
+	}
+	return nil
+}
+
+type AcknowledgeBridgeFragmentsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	PeerServerName string   `protobuf:"bytes,1,opt,name=peer_server_name,json=peerServerName,proto3" json:"peer_server_name,omitempty"`
+	LinkName       string   `protobuf:"bytes,2,opt,name=link_name,json=linkName,proto3" json:"link_name,omitempty"`
+	FragmentIds    []string `protobuf:"bytes,3,rep,name=fragment_ids,json=fragmentIds,proto3" json:"fragment_ids,omitempty"`
+	LeaseToken     string   `protobuf:"bytes,4,opt,name=lease_token,json=leaseToken,proto3" json:"lease_token,omitempty"`
+}
+
+func (x *AcknowledgeBridgeFragmentsRequest) Reset() {
+	*x = AcknowledgeBridgeFragmentsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_federation_v1_requests_proto_msgTypes[34]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *AcknowledgeBridgeFragmentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AcknowledgeBridgeFragmentsRequest) ProtoMessage() {}
+
+func (x *AcknowledgeBridgeFragmentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_federation_v1_requests_proto_msgTypes[34]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AcknowledgeBridgeFragmentsRequest.ProtoReflect.Descriptor instead.
+func (*AcknowledgeBridgeFragmentsRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_federation_v1_requests_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *AcknowledgeBridgeFragmentsRequest) GetPeerServerName() string {
+	if x != nil {
+		return x.PeerServerName
+	}
+	return ""
+}
+
+func (x *AcknowledgeBridgeFragmentsRequest) GetLinkName() string {
+	if x != nil {
+		return x.LinkName
+	}
+	return ""
+}
+
+func (x *AcknowledgeBridgeFragmentsRequest) GetFragmentIds() []string {
+	if x != nil {
+		return x.FragmentIds
+	}
+	return nil
+}
+
+func (x *AcknowledgeBridgeFragmentsRequest) GetLeaseToken() string {
+	if x != nil {
+		return x.LeaseToken
+	}
+	return ""
+}
+
+type AcknowledgeBridgeFragmentsResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	AcknowledgedFragmentIds []string           `protobuf:"bytes,1,rep,name=acknowledged_fragment_ids,json=acknowledgedFragmentIds,proto3" json:"acknowledged_fragment_ids,omitempty"`
+	Cursor                  *ReplicationCursor `protobuf:"bytes,2,opt,name=cursor,proto3" json:"cursor,omitempty"`
+}
+
+func (x *AcknowledgeBridgeFragmentsResponse) Reset() {
+	*x = AcknowledgeBridgeFragmentsResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_federation_v1_requests_proto_msgTypes[35]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *AcknowledgeBridgeFragmentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AcknowledgeBridgeFragmentsResponse) ProtoMessage() {}
+
+func (x *AcknowledgeBridgeFragmentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_federation_v1_requests_proto_msgTypes[35]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AcknowledgeBridgeFragmentsResponse.ProtoReflect.Descriptor instead.
+func (*AcknowledgeBridgeFragmentsResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_federation_v1_requests_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *AcknowledgeBridgeFragmentsResponse) GetAcknowledgedFragmentIds() []string {
+	if x != nil {
+		return x.AcknowledgedFragmentIds
+	}
+	return nil
+}
+
+func (x *AcknowledgeBridgeFragmentsResponse) GetCursor() *ReplicationCursor {
+	if x != nil {
+		return x.Cursor
+	}
+	return nil
+}
+
 var File_contracts_federation_v1_requests_proto protoreflect.FileDescriptor
 
 var file_contracts_federation_v1_requests_proto_rawDesc = []byte{
@@ -2047,13 +2441,83 @@ var file_contracts_federation_v1_requests_proto_rawDesc = []byte{
 	0x63, 0x75, 0x72, 0x73, 0x6f, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x29, 0x2e, 0x7a,
 	0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69,
 	0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x52, 0x65, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f,
-	0x6e, 0x43, 0x75, 0x72, 0x73, 0x6f, 0x72, 0x52, 0x06, 0x63, 0x75, 0x72, 0x73, 0x6f, 0x72, 0x42,
-	0x4b, 0x5a, 0x49, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6d,
-	0x2d, 0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2f, 0x67, 0x65,
-	0x6e, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74,
-	0x73, 0x2f, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x76, 0x31, 0x3b,
-	0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x76, 0x31, 0x62, 0x06, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x33,
+	0x6e, 0x43, 0x75, 0x72, 0x73, 0x6f, 0x72, 0x52, 0x06, 0x63, 0x75, 0x72, 0x73, 0x6f, 0x72, 0x22,
+	0x79, 0x0a, 0x1a, 0x50, 0x75, 0x6c, 0x6c, 0x42, 0x72, 0x69, 0x64, 0x67, 0x65, 0x46, 0x72, 0x61,
+	0x67, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x28, 0x0a,
+	0x10, 0x70, 0x65, 0x65, 0x72, 0x5f, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x5f, 0x6e, 0x61, 0x6d,
+	0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x70, 0x65, 0x65, 0x72, 0x53, 0x65, 0x72,
+	0x76, 0x65, 0x72, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1b, 0x0a, 0x09, 0x6c, 0x69, 0x6e, 0x6b, 0x5f,
+	0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x6c, 0x69, 0x6e, 0x6b,
+	0x4e, 0x61, 0x6d, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x6c, 0x69, 0x6d, 0x69, 0x74, 0x18, 0x03, 0x20,
+	0x01, 0x28, 0x0d, 0x52, 0x05, 0x6c, 0x69, 0x6d, 0x69, 0x74, 0x22, 0x94, 0x02, 0x0a, 0x1b, 0x50,
+	0x75, 0x6c, 0x6c, 0x42, 0x72, 0x69, 0x64, 0x67, 0x65, 0x46, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e,
+	0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x44, 0x0a, 0x09, 0x66, 0x72,
+	0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x26, 0x2e,
+	0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x42, 0x75, 0x6e, 0x64, 0x6c, 0x65, 0x46, 0x72, 0x61,
+	0x67, 0x6d, 0x65, 0x6e, 0x74, 0x52, 0x09, 0x66, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x73,
+	0x12, 0x19, 0x0a, 0x08, 0x68, 0x61, 0x73, 0x5f, 0x6d, 0x6f, 0x72, 0x65, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x08, 0x52, 0x07, 0x68, 0x61, 0x73, 0x4d, 0x6f, 0x72, 0x65, 0x12, 0x41, 0x0a, 0x06, 0x63,
+	0x75, 0x72, 0x73, 0x6f, 0x72, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x29, 0x2e, 0x7a, 0x76,
+	0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f,
+	0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x52, 0x65, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e,
+	0x43, 0x75, 0x72, 0x73, 0x6f, 0x72, 0x52, 0x06, 0x63, 0x75, 0x72, 0x73, 0x6f, 0x72, 0x12, 0x30,
+	0x0a, 0x04, 0x6c, 0x69, 0x6e, 0x6b, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1c, 0x2e, 0x7a,
+	0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69,
+	0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x4c, 0x69, 0x6e, 0x6b, 0x52, 0x04, 0x6c, 0x69, 0x6e, 0x6b,
+	0x12, 0x1f, 0x0a, 0x0b, 0x6c, 0x65, 0x61, 0x73, 0x65, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x18,
+	0x05, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x6c, 0x65, 0x61, 0x73, 0x65, 0x54, 0x6f, 0x6b, 0x65,
+	0x6e, 0x22, 0xab, 0x01, 0x0a, 0x1c, 0x53, 0x75, 0x62, 0x6d, 0x69, 0x74, 0x42, 0x72, 0x69, 0x64,
+	0x67, 0x65, 0x46, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x12, 0x28, 0x0a, 0x10, 0x70, 0x65, 0x65, 0x72, 0x5f, 0x73, 0x65, 0x72, 0x76, 0x65,
+	0x72, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x70, 0x65,
+	0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1b, 0x0a, 0x09,
+	0x6c, 0x69, 0x6e, 0x6b, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x08, 0x6c, 0x69, 0x6e, 0x6b, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x44, 0x0a, 0x09, 0x66, 0x72, 0x61,
+	0x67, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x26, 0x2e, 0x7a,
+	0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69,
+	0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x42, 0x75, 0x6e, 0x64, 0x6c, 0x65, 0x46, 0x72, 0x61, 0x67,
+	0x6d, 0x65, 0x6e, 0x74, 0x52, 0x09, 0x66, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x22,
+	0xc8, 0x01, 0x0a, 0x1d, 0x53, 0x75, 0x62, 0x6d, 0x69, 0x74, 0x42, 0x72, 0x69, 0x64, 0x67, 0x65,
+	0x46, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
+	0x65, 0x12, 0x32, 0x0a, 0x15, 0x61, 0x63, 0x63, 0x65, 0x70, 0x74, 0x65, 0x64, 0x5f, 0x66, 0x72,
+	0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x5f, 0x69, 0x64, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x09,
+	0x52, 0x13, 0x61, 0x63, 0x63, 0x65, 0x70, 0x74, 0x65, 0x64, 0x46, 0x72, 0x61, 0x67, 0x6d, 0x65,
+	0x6e, 0x74, 0x49, 0x64, 0x73, 0x12, 0x30, 0x0a, 0x14, 0x61, 0x73, 0x73, 0x65, 0x6d, 0x62, 0x6c,
+	0x65, 0x64, 0x5f, 0x62, 0x75, 0x6e, 0x64, 0x6c, 0x65, 0x5f, 0x69, 0x64, 0x73, 0x18, 0x02, 0x20,
+	0x03, 0x28, 0x09, 0x52, 0x12, 0x61, 0x73, 0x73, 0x65, 0x6d, 0x62, 0x6c, 0x65, 0x64, 0x42, 0x75,
+	0x6e, 0x64, 0x6c, 0x65, 0x49, 0x64, 0x73, 0x12, 0x41, 0x0a, 0x06, 0x63, 0x75, 0x72, 0x73, 0x6f,
+	0x72, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x29, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c,
+	0x6b, 0x61, 0x2e, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31,
+	0x2e, 0x52, 0x65, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x43, 0x75, 0x72, 0x73,
+	0x6f, 0x72, 0x52, 0x06, 0x63, 0x75, 0x72, 0x73, 0x6f, 0x72, 0x22, 0xae, 0x01, 0x0a, 0x21, 0x41,
+	0x63, 0x6b, 0x6e, 0x6f, 0x77, 0x6c, 0x65, 0x64, 0x67, 0x65, 0x42, 0x72, 0x69, 0x64, 0x67, 0x65,
+	0x46, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
+	0x12, 0x28, 0x0a, 0x10, 0x70, 0x65, 0x65, 0x72, 0x5f, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x5f,
+	0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x70, 0x65, 0x65, 0x72,
+	0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1b, 0x0a, 0x09, 0x6c, 0x69,
+	0x6e, 0x6b, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x6c,
+	0x69, 0x6e, 0x6b, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x21, 0x0a, 0x0c, 0x66, 0x72, 0x61, 0x67, 0x6d,
+	0x65, 0x6e, 0x74, 0x5f, 0x69, 0x64, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x09, 0x52, 0x0b, 0x66,
+	0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x49, 0x64, 0x73, 0x12, 0x1f, 0x0a, 0x0b, 0x6c, 0x65,
+	0x61, 0x73, 0x65, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x0a, 0x6c, 0x65, 0x61, 0x73, 0x65, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x22, 0xa3, 0x01, 0x0a, 0x22,
+	0x41, 0x63, 0x6b, 0x6e, 0x6f, 0x77, 0x6c, 0x65, 0x64, 0x67, 0x65, 0x42, 0x72, 0x69, 0x64, 0x67,
+	0x65, 0x46, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x12, 0x3a, 0x0a, 0x19, 0x61, 0x63, 0x6b, 0x6e, 0x6f, 0x77, 0x6c, 0x65, 0x64, 0x67,
+	0x65, 0x64, 0x5f, 0x66, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x5f, 0x69, 0x64, 0x73, 0x18,
+	0x01, 0x20, 0x03, 0x28, 0x09, 0x52, 0x17, 0x61, 0x63, 0x6b, 0x6e, 0x6f, 0x77, 0x6c, 0x65, 0x64,
+	0x67, 0x65, 0x64, 0x46, 0x72, 0x61, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x49, 0x64, 0x73, 0x12, 0x41,
+	0x0a, 0x06, 0x63, 0x75, 0x72, 0x73, 0x6f, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x29,
+	0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61,
+	0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x52, 0x65, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x43, 0x75, 0x72, 0x73, 0x6f, 0x72, 0x52, 0x06, 0x63, 0x75, 0x72, 0x73, 0x6f,
+	0x72, 0x42, 0x4b, 0x5a, 0x49, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f,
+	0x64, 0x6d, 0x2d, 0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2f,
+	0x67, 0x65, 0x6e, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61,
+	0x63, 0x74, 0x73, 0x2f, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x76,
+	0x31, 0x3b, 0x66, 0x65, 0x64, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x76, 0x31, 0x62, 0x06,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -2068,93 +2532,106 @@ func file_contracts_federation_v1_requests_proto_rawDescGZIP() []byte {
 	return file_contracts_federation_v1_requests_proto_rawDescData
 }
 
-var file_contracts_federation_v1_requests_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
+var file_contracts_federation_v1_requests_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_contracts_federation_v1_requests_proto_goTypes = []interface{}{
-	(*CreatePeerRequest)(nil),            // 0: zvonilka.federation.v1.CreatePeerRequest
-	(*CreatePeerResponse)(nil),           // 1: zvonilka.federation.v1.CreatePeerResponse
-	(*GetPeerRequest)(nil),               // 2: zvonilka.federation.v1.GetPeerRequest
-	(*GetPeerResponse)(nil),              // 3: zvonilka.federation.v1.GetPeerResponse
-	(*ListPeersRequest)(nil),             // 4: zvonilka.federation.v1.ListPeersRequest
-	(*ListPeersResponse)(nil),            // 5: zvonilka.federation.v1.ListPeersResponse
-	(*UpdatePeerRequest)(nil),            // 6: zvonilka.federation.v1.UpdatePeerRequest
-	(*UpdatePeerResponse)(nil),           // 7: zvonilka.federation.v1.UpdatePeerResponse
-	(*CreateLinkRequest)(nil),            // 8: zvonilka.federation.v1.CreateLinkRequest
-	(*CreateLinkResponse)(nil),           // 9: zvonilka.federation.v1.CreateLinkResponse
-	(*GetLinkRequest)(nil),               // 10: zvonilka.federation.v1.GetLinkRequest
-	(*GetLinkResponse)(nil),              // 11: zvonilka.federation.v1.GetLinkResponse
-	(*ListLinksRequest)(nil),             // 12: zvonilka.federation.v1.ListLinksRequest
-	(*ListLinksResponse)(nil),            // 13: zvonilka.federation.v1.ListLinksResponse
-	(*UpdateLinkRequest)(nil),            // 14: zvonilka.federation.v1.UpdateLinkRequest
-	(*UpdateLinkResponse)(nil),           // 15: zvonilka.federation.v1.UpdateLinkResponse
-	(*PauseLinkRequest)(nil),             // 16: zvonilka.federation.v1.PauseLinkRequest
-	(*PauseLinkResponse)(nil),            // 17: zvonilka.federation.v1.PauseLinkResponse
-	(*ResumeLinkRequest)(nil),            // 18: zvonilka.federation.v1.ResumeLinkRequest
-	(*ResumeLinkResponse)(nil),           // 19: zvonilka.federation.v1.ResumeLinkResponse
-	(*DeleteLinkRequest)(nil),            // 20: zvonilka.federation.v1.DeleteLinkRequest
-	(*DeleteLinkResponse)(nil),           // 21: zvonilka.federation.v1.DeleteLinkResponse
-	(*GetReplicationCursorRequest)(nil),  // 22: zvonilka.federation.v1.GetReplicationCursorRequest
-	(*GetReplicationCursorResponse)(nil), // 23: zvonilka.federation.v1.GetReplicationCursorResponse
-	(*PushBundlesRequest)(nil),           // 24: zvonilka.federation.v1.PushBundlesRequest
-	(*PushBundlesResponse)(nil),          // 25: zvonilka.federation.v1.PushBundlesResponse
-	(*PullBundlesRequest)(nil),           // 26: zvonilka.federation.v1.PullBundlesRequest
-	(*PullBundlesResponse)(nil),          // 27: zvonilka.federation.v1.PullBundlesResponse
-	(*AcknowledgeBundlesRequest)(nil),    // 28: zvonilka.federation.v1.AcknowledgeBundlesRequest
-	(*AcknowledgeBundlesResponse)(nil),   // 29: zvonilka.federation.v1.AcknowledgeBundlesResponse
-	(v1.FederationCapability)(0),         // 30: zvonilka.common.v1.FederationCapability
-	(*Peer)(nil),                         // 31: zvonilka.federation.v1.Peer
-	(*v1.PageRequest)(nil),               // 32: zvonilka.common.v1.PageRequest
-	(PeerState)(0),                       // 33: zvonilka.federation.v1.PeerState
-	(*v1.PageResponse)(nil),              // 34: zvonilka.common.v1.PageResponse
-	(*fieldmaskpb.FieldMask)(nil),        // 35: google.protobuf.FieldMask
-	(TransportKind)(0),                   // 36: zvonilka.federation.v1.TransportKind
-	(DeliveryClass)(0),                   // 37: zvonilka.federation.v1.DeliveryClass
-	(DiscoveryMode)(0),                   // 38: zvonilka.federation.v1.DiscoveryMode
-	(MediaPolicy)(0),                     // 39: zvonilka.federation.v1.MediaPolicy
-	(v1.ConversationKind)(0),             // 40: zvonilka.common.v1.ConversationKind
-	(*Link)(nil),                         // 41: zvonilka.federation.v1.Link
-	(LinkState)(0),                       // 42: zvonilka.federation.v1.LinkState
-	(*ReplicationCursor)(nil),            // 43: zvonilka.federation.v1.ReplicationCursor
-	(*Bundle)(nil),                       // 44: zvonilka.federation.v1.Bundle
+	(*CreatePeerRequest)(nil),                  // 0: zvonilka.federation.v1.CreatePeerRequest
+	(*CreatePeerResponse)(nil),                 // 1: zvonilka.federation.v1.CreatePeerResponse
+	(*GetPeerRequest)(nil),                     // 2: zvonilka.federation.v1.GetPeerRequest
+	(*GetPeerResponse)(nil),                    // 3: zvonilka.federation.v1.GetPeerResponse
+	(*ListPeersRequest)(nil),                   // 4: zvonilka.federation.v1.ListPeersRequest
+	(*ListPeersResponse)(nil),                  // 5: zvonilka.federation.v1.ListPeersResponse
+	(*UpdatePeerRequest)(nil),                  // 6: zvonilka.federation.v1.UpdatePeerRequest
+	(*UpdatePeerResponse)(nil),                 // 7: zvonilka.federation.v1.UpdatePeerResponse
+	(*CreateLinkRequest)(nil),                  // 8: zvonilka.federation.v1.CreateLinkRequest
+	(*CreateLinkResponse)(nil),                 // 9: zvonilka.federation.v1.CreateLinkResponse
+	(*GetLinkRequest)(nil),                     // 10: zvonilka.federation.v1.GetLinkRequest
+	(*GetLinkResponse)(nil),                    // 11: zvonilka.federation.v1.GetLinkResponse
+	(*ListLinksRequest)(nil),                   // 12: zvonilka.federation.v1.ListLinksRequest
+	(*ListLinksResponse)(nil),                  // 13: zvonilka.federation.v1.ListLinksResponse
+	(*UpdateLinkRequest)(nil),                  // 14: zvonilka.federation.v1.UpdateLinkRequest
+	(*UpdateLinkResponse)(nil),                 // 15: zvonilka.federation.v1.UpdateLinkResponse
+	(*PauseLinkRequest)(nil),                   // 16: zvonilka.federation.v1.PauseLinkRequest
+	(*PauseLinkResponse)(nil),                  // 17: zvonilka.federation.v1.PauseLinkResponse
+	(*ResumeLinkRequest)(nil),                  // 18: zvonilka.federation.v1.ResumeLinkRequest
+	(*ResumeLinkResponse)(nil),                 // 19: zvonilka.federation.v1.ResumeLinkResponse
+	(*DeleteLinkRequest)(nil),                  // 20: zvonilka.federation.v1.DeleteLinkRequest
+	(*DeleteLinkResponse)(nil),                 // 21: zvonilka.federation.v1.DeleteLinkResponse
+	(*GetReplicationCursorRequest)(nil),        // 22: zvonilka.federation.v1.GetReplicationCursorRequest
+	(*GetReplicationCursorResponse)(nil),       // 23: zvonilka.federation.v1.GetReplicationCursorResponse
+	(*PushBundlesRequest)(nil),                 // 24: zvonilka.federation.v1.PushBundlesRequest
+	(*PushBundlesResponse)(nil),                // 25: zvonilka.federation.v1.PushBundlesResponse
+	(*PullBundlesRequest)(nil),                 // 26: zvonilka.federation.v1.PullBundlesRequest
+	(*PullBundlesResponse)(nil),                // 27: zvonilka.federation.v1.PullBundlesResponse
+	(*AcknowledgeBundlesRequest)(nil),          // 28: zvonilka.federation.v1.AcknowledgeBundlesRequest
+	(*AcknowledgeBundlesResponse)(nil),         // 29: zvonilka.federation.v1.AcknowledgeBundlesResponse
+	(*PullBridgeFragmentsRequest)(nil),         // 30: zvonilka.federation.v1.PullBridgeFragmentsRequest
+	(*PullBridgeFragmentsResponse)(nil),        // 31: zvonilka.federation.v1.PullBridgeFragmentsResponse
+	(*SubmitBridgeFragmentsRequest)(nil),       // 32: zvonilka.federation.v1.SubmitBridgeFragmentsRequest
+	(*SubmitBridgeFragmentsResponse)(nil),      // 33: zvonilka.federation.v1.SubmitBridgeFragmentsResponse
+	(*AcknowledgeBridgeFragmentsRequest)(nil),  // 34: zvonilka.federation.v1.AcknowledgeBridgeFragmentsRequest
+	(*AcknowledgeBridgeFragmentsResponse)(nil), // 35: zvonilka.federation.v1.AcknowledgeBridgeFragmentsResponse
+	(v1.FederationCapability)(0),               // 36: zvonilka.common.v1.FederationCapability
+	(*Peer)(nil),                               // 37: zvonilka.federation.v1.Peer
+	(*v1.PageRequest)(nil),                     // 38: zvonilka.common.v1.PageRequest
+	(PeerState)(0),                             // 39: zvonilka.federation.v1.PeerState
+	(*v1.PageResponse)(nil),                    // 40: zvonilka.common.v1.PageResponse
+	(*fieldmaskpb.FieldMask)(nil),              // 41: google.protobuf.FieldMask
+	(TransportKind)(0),                         // 42: zvonilka.federation.v1.TransportKind
+	(DeliveryClass)(0),                         // 43: zvonilka.federation.v1.DeliveryClass
+	(DiscoveryMode)(0),                         // 44: zvonilka.federation.v1.DiscoveryMode
+	(MediaPolicy)(0),                           // 45: zvonilka.federation.v1.MediaPolicy
+	(v1.ConversationKind)(0),                   // 46: zvonilka.common.v1.ConversationKind
+	(*Link)(nil),                               // 47: zvonilka.federation.v1.Link
+	(LinkState)(0),                             // 48: zvonilka.federation.v1.LinkState
+	(*ReplicationCursor)(nil),                  // 49: zvonilka.federation.v1.ReplicationCursor
+	(*Bundle)(nil),                             // 50: zvonilka.federation.v1.Bundle
+	(*BundleFragment)(nil),                     // 51: zvonilka.federation.v1.BundleFragment
 }
 var file_contracts_federation_v1_requests_proto_depIdxs = []int32{
-	30, // 0: zvonilka.federation.v1.CreatePeerRequest.capabilities:type_name -> zvonilka.common.v1.FederationCapability
-	31, // 1: zvonilka.federation.v1.CreatePeerResponse.peer:type_name -> zvonilka.federation.v1.Peer
-	31, // 2: zvonilka.federation.v1.GetPeerResponse.peer:type_name -> zvonilka.federation.v1.Peer
-	32, // 3: zvonilka.federation.v1.ListPeersRequest.page:type_name -> zvonilka.common.v1.PageRequest
-	33, // 4: zvonilka.federation.v1.ListPeersRequest.state_filter:type_name -> zvonilka.federation.v1.PeerState
-	31, // 5: zvonilka.federation.v1.ListPeersResponse.peers:type_name -> zvonilka.federation.v1.Peer
-	34, // 6: zvonilka.federation.v1.ListPeersResponse.page:type_name -> zvonilka.common.v1.PageResponse
-	31, // 7: zvonilka.federation.v1.UpdatePeerRequest.peer:type_name -> zvonilka.federation.v1.Peer
-	35, // 8: zvonilka.federation.v1.UpdatePeerRequest.update_mask:type_name -> google.protobuf.FieldMask
-	31, // 9: zvonilka.federation.v1.UpdatePeerResponse.peer:type_name -> zvonilka.federation.v1.Peer
-	36, // 10: zvonilka.federation.v1.CreateLinkRequest.transport_kind:type_name -> zvonilka.federation.v1.TransportKind
-	37, // 11: zvonilka.federation.v1.CreateLinkRequest.delivery_class:type_name -> zvonilka.federation.v1.DeliveryClass
-	38, // 12: zvonilka.federation.v1.CreateLinkRequest.discovery_mode:type_name -> zvonilka.federation.v1.DiscoveryMode
-	39, // 13: zvonilka.federation.v1.CreateLinkRequest.media_policy:type_name -> zvonilka.federation.v1.MediaPolicy
-	40, // 14: zvonilka.federation.v1.CreateLinkRequest.allowed_conversation_kinds:type_name -> zvonilka.common.v1.ConversationKind
-	41, // 15: zvonilka.federation.v1.CreateLinkResponse.link:type_name -> zvonilka.federation.v1.Link
-	41, // 16: zvonilka.federation.v1.GetLinkResponse.link:type_name -> zvonilka.federation.v1.Link
-	32, // 17: zvonilka.federation.v1.ListLinksRequest.page:type_name -> zvonilka.common.v1.PageRequest
-	42, // 18: zvonilka.federation.v1.ListLinksRequest.state_filter:type_name -> zvonilka.federation.v1.LinkState
-	41, // 19: zvonilka.federation.v1.ListLinksResponse.links:type_name -> zvonilka.federation.v1.Link
-	34, // 20: zvonilka.federation.v1.ListLinksResponse.page:type_name -> zvonilka.common.v1.PageResponse
-	41, // 21: zvonilka.federation.v1.UpdateLinkRequest.link:type_name -> zvonilka.federation.v1.Link
-	35, // 22: zvonilka.federation.v1.UpdateLinkRequest.update_mask:type_name -> google.protobuf.FieldMask
-	41, // 23: zvonilka.federation.v1.UpdateLinkResponse.link:type_name -> zvonilka.federation.v1.Link
-	41, // 24: zvonilka.federation.v1.PauseLinkResponse.link:type_name -> zvonilka.federation.v1.Link
-	41, // 25: zvonilka.federation.v1.ResumeLinkResponse.link:type_name -> zvonilka.federation.v1.Link
-	41, // 26: zvonilka.federation.v1.DeleteLinkResponse.link:type_name -> zvonilka.federation.v1.Link
-	43, // 27: zvonilka.federation.v1.GetReplicationCursorResponse.cursor:type_name -> zvonilka.federation.v1.ReplicationCursor
-	44, // 28: zvonilka.federation.v1.PushBundlesRequest.bundles:type_name -> zvonilka.federation.v1.Bundle
-	43, // 29: zvonilka.federation.v1.PushBundlesResponse.cursor:type_name -> zvonilka.federation.v1.ReplicationCursor
-	44, // 30: zvonilka.federation.v1.PullBundlesResponse.bundles:type_name -> zvonilka.federation.v1.Bundle
-	43, // 31: zvonilka.federation.v1.PullBundlesResponse.cursor:type_name -> zvonilka.federation.v1.ReplicationCursor
-	43, // 32: zvonilka.federation.v1.AcknowledgeBundlesResponse.cursor:type_name -> zvonilka.federation.v1.ReplicationCursor
-	33, // [33:33] is the sub-list for method output_type
-	33, // [33:33] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	36, // 0: zvonilka.federation.v1.CreatePeerRequest.capabilities:type_name -> zvonilka.common.v1.FederationCapability
+	37, // 1: zvonilka.federation.v1.CreatePeerResponse.peer:type_name -> zvonilka.federation.v1.Peer
+	37, // 2: zvonilka.federation.v1.GetPeerResponse.peer:type_name -> zvonilka.federation.v1.Peer
+	38, // 3: zvonilka.federation.v1.ListPeersRequest.page:type_name -> zvonilka.common.v1.PageRequest
+	39, // 4: zvonilka.federation.v1.ListPeersRequest.state_filter:type_name -> zvonilka.federation.v1.PeerState
+	37, // 5: zvonilka.federation.v1.ListPeersResponse.peers:type_name -> zvonilka.federation.v1.Peer
+	40, // 6: zvonilka.federation.v1.ListPeersResponse.page:type_name -> zvonilka.common.v1.PageResponse
+	37, // 7: zvonilka.federation.v1.UpdatePeerRequest.peer:type_name -> zvonilka.federation.v1.Peer
+	41, // 8: zvonilka.federation.v1.UpdatePeerRequest.update_mask:type_name -> google.protobuf.FieldMask
+	37, // 9: zvonilka.federation.v1.UpdatePeerResponse.peer:type_name -> zvonilka.federation.v1.Peer
+	42, // 10: zvonilka.federation.v1.CreateLinkRequest.transport_kind:type_name -> zvonilka.federation.v1.TransportKind
+	43, // 11: zvonilka.federation.v1.CreateLinkRequest.delivery_class:type_name -> zvonilka.federation.v1.DeliveryClass
+	44, // 12: zvonilka.federation.v1.CreateLinkRequest.discovery_mode:type_name -> zvonilka.federation.v1.DiscoveryMode
+	45, // 13: zvonilka.federation.v1.CreateLinkRequest.media_policy:type_name -> zvonilka.federation.v1.MediaPolicy
+	46, // 14: zvonilka.federation.v1.CreateLinkRequest.allowed_conversation_kinds:type_name -> zvonilka.common.v1.ConversationKind
+	47, // 15: zvonilka.federation.v1.CreateLinkResponse.link:type_name -> zvonilka.federation.v1.Link
+	47, // 16: zvonilka.federation.v1.GetLinkResponse.link:type_name -> zvonilka.federation.v1.Link
+	38, // 17: zvonilka.federation.v1.ListLinksRequest.page:type_name -> zvonilka.common.v1.PageRequest
+	48, // 18: zvonilka.federation.v1.ListLinksRequest.state_filter:type_name -> zvonilka.federation.v1.LinkState
+	47, // 19: zvonilka.federation.v1.ListLinksResponse.links:type_name -> zvonilka.federation.v1.Link
+	40, // 20: zvonilka.federation.v1.ListLinksResponse.page:type_name -> zvonilka.common.v1.PageResponse
+	47, // 21: zvonilka.federation.v1.UpdateLinkRequest.link:type_name -> zvonilka.federation.v1.Link
+	41, // 22: zvonilka.federation.v1.UpdateLinkRequest.update_mask:type_name -> google.protobuf.FieldMask
+	47, // 23: zvonilka.federation.v1.UpdateLinkResponse.link:type_name -> zvonilka.federation.v1.Link
+	47, // 24: zvonilka.federation.v1.PauseLinkResponse.link:type_name -> zvonilka.federation.v1.Link
+	47, // 25: zvonilka.federation.v1.ResumeLinkResponse.link:type_name -> zvonilka.federation.v1.Link
+	47, // 26: zvonilka.federation.v1.DeleteLinkResponse.link:type_name -> zvonilka.federation.v1.Link
+	49, // 27: zvonilka.federation.v1.GetReplicationCursorResponse.cursor:type_name -> zvonilka.federation.v1.ReplicationCursor
+	50, // 28: zvonilka.federation.v1.PushBundlesRequest.bundles:type_name -> zvonilka.federation.v1.Bundle
+	49, // 29: zvonilka.federation.v1.PushBundlesResponse.cursor:type_name -> zvonilka.federation.v1.ReplicationCursor
+	50, // 30: zvonilka.federation.v1.PullBundlesResponse.bundles:type_name -> zvonilka.federation.v1.Bundle
+	49, // 31: zvonilka.federation.v1.PullBundlesResponse.cursor:type_name -> zvonilka.federation.v1.ReplicationCursor
+	49, // 32: zvonilka.federation.v1.AcknowledgeBundlesResponse.cursor:type_name -> zvonilka.federation.v1.ReplicationCursor
+	51, // 33: zvonilka.federation.v1.PullBridgeFragmentsResponse.fragments:type_name -> zvonilka.federation.v1.BundleFragment
+	49, // 34: zvonilka.federation.v1.PullBridgeFragmentsResponse.cursor:type_name -> zvonilka.federation.v1.ReplicationCursor
+	47, // 35: zvonilka.federation.v1.PullBridgeFragmentsResponse.link:type_name -> zvonilka.federation.v1.Link
+	51, // 36: zvonilka.federation.v1.SubmitBridgeFragmentsRequest.fragments:type_name -> zvonilka.federation.v1.BundleFragment
+	49, // 37: zvonilka.federation.v1.SubmitBridgeFragmentsResponse.cursor:type_name -> zvonilka.federation.v1.ReplicationCursor
+	49, // 38: zvonilka.federation.v1.AcknowledgeBridgeFragmentsResponse.cursor:type_name -> zvonilka.federation.v1.ReplicationCursor
+	39, // [39:39] is the sub-list for method output_type
+	39, // [39:39] is the sub-list for method input_type
+	39, // [39:39] is the sub-list for extension type_name
+	39, // [39:39] is the sub-list for extension extendee
+	0,  // [0:39] is the sub-list for field type_name
 }
 
 func init() { file_contracts_federation_v1_requests_proto_init() }
@@ -2524,6 +3001,78 @@ func file_contracts_federation_v1_requests_proto_init() {
 				return nil
 			}
 		}
+		file_contracts_federation_v1_requests_proto_msgTypes[30].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*PullBridgeFragmentsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_federation_v1_requests_proto_msgTypes[31].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*PullBridgeFragmentsResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_federation_v1_requests_proto_msgTypes[32].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*SubmitBridgeFragmentsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_federation_v1_requests_proto_msgTypes[33].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*SubmitBridgeFragmentsResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_federation_v1_requests_proto_msgTypes[34].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*AcknowledgeBridgeFragmentsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_federation_v1_requests_proto_msgTypes[35].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*AcknowledgeBridgeFragmentsResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	file_contracts_federation_v1_requests_proto_msgTypes[2].OneofWrappers = []interface{}{
 		(*GetPeerRequest_PeerId)(nil),
@@ -2535,7 +3084,7 @@ func file_contracts_federation_v1_requests_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_contracts_federation_v1_requests_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   30,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

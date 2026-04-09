@@ -379,6 +379,36 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Federation.LocalServerName = value
 	}
+	if value, ok, err := stringValueWithPresence(serviceName, "FEDERATION_BRIDGE_SHARED_SECRET", cfg.Federation.BridgeSharedSecret); err != nil {
+		return err
+	} else if ok {
+		cfg.Federation.BridgeSharedSecret = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "FEDERATION_BRIDGE_ENDPOINT", cfg.Federation.BridgeEndpoint); err != nil {
+		return err
+	} else if ok {
+		cfg.Federation.BridgeEndpoint = value
+	}
+	if value, ok, err := durationValue(serviceName, "FEDERATION_BRIDGE_POLL_INTERVAL", cfg.Federation.BridgePollInterval); err != nil {
+		return err
+	} else if ok {
+		cfg.Federation.BridgePollInterval = value
+	}
+	if value, ok, err := intValue(serviceName, "FEDERATION_BRIDGE_BATCH_SIZE", cfg.Federation.BridgeBatchSize); err != nil {
+		return err
+	} else if ok {
+		cfg.Federation.BridgeBatchSize = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "FEDERATION_BRIDGE_PEER_SERVER_NAME", cfg.Federation.BridgePeerServer); err != nil {
+		return err
+	} else if ok {
+		cfg.Federation.BridgePeerServer = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "FEDERATION_BRIDGE_LINK_NAME", cfg.Federation.BridgeLinkName); err != nil {
+		return err
+	} else if ok {
+		cfg.Federation.BridgeLinkName = value
+	}
 	if value, ok, err := durationValue(serviceName, "FEDERATION_WORKER_POLL_INTERVAL", cfg.Federation.WorkerPollInterval); err != nil {
 		return err
 	} else if ok {
@@ -393,6 +423,71 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 		return err
 	} else if ok {
 		cfg.Federation.DialTimeout = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "MESHTASTIC_INTERFACE_KIND", cfg.Meshtastic.InterfaceKind); err != nil {
+		return err
+	} else if ok {
+		cfg.Meshtastic.InterfaceKind = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "MESHTASTIC_DEVICE", cfg.Meshtastic.Device); err != nil {
+		return err
+	} else if ok {
+		cfg.Meshtastic.Device = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "MESHTASTIC_HELPER_PYTHON", cfg.Meshtastic.HelperPython); err != nil {
+		return err
+	} else if ok {
+		cfg.Meshtastic.HelperPython = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "MESHTASTIC_HELPER_SCRIPT_PATH", cfg.Meshtastic.HelperScriptPath); err != nil {
+		return err
+	} else if ok {
+		cfg.Meshtastic.HelperScriptPath = value
+	}
+	if value, ok, err := durationValue(serviceName, "MESHTASTIC_RECEIVE_TIMEOUT", cfg.Meshtastic.ReceiveTimeout); err != nil {
+		return err
+	} else if ok {
+		cfg.Meshtastic.ReceiveTimeout = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "MESHTASTIC_TEXT_PREFIX", cfg.Meshtastic.TextPrefix); err != nil {
+		return err
+	} else if ok {
+		cfg.Meshtastic.TextPrefix = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "MESHCORE_INTERFACE_KIND", cfg.MeshCore.InterfaceKind); err != nil {
+		return err
+	} else if ok {
+		cfg.MeshCore.InterfaceKind = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "MESHCORE_DEVICE", cfg.MeshCore.Device); err != nil {
+		return err
+	} else if ok {
+		cfg.MeshCore.Device = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "MESHCORE_HELPER_PYTHON", cfg.MeshCore.HelperPython); err != nil {
+		return err
+	} else if ok {
+		cfg.MeshCore.HelperPython = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "MESHCORE_HELPER_SCRIPT_PATH", cfg.MeshCore.HelperScriptPath); err != nil {
+		return err
+	} else if ok {
+		cfg.MeshCore.HelperScriptPath = value
+	}
+	if value, ok, err := durationValue(serviceName, "MESHCORE_RECEIVE_TIMEOUT", cfg.MeshCore.ReceiveTimeout); err != nil {
+		return err
+	} else if ok {
+		cfg.MeshCore.ReceiveTimeout = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "MESHCORE_TEXT_PREFIX", cfg.MeshCore.TextPrefix); err != nil {
+		return err
+	} else if ok {
+		cfg.MeshCore.TextPrefix = value
+	}
+	if value, ok, err := stringValueWithPresence(serviceName, "MESHCORE_DESTINATION", cfg.MeshCore.Destination); err != nil {
+		return err
+	} else if ok {
+		cfg.MeshCore.Destination = value
 	}
 	if value, ok, err := intValue(serviceName, "SEARCH_DEFAULT_LIMIT", cfg.Search.DefaultLimit); err != nil {
 		return err

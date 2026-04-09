@@ -23,3 +23,9 @@ service FederationService {
   rpc PullBundles(PullBundlesRequest) returns (PullBundlesResponse);
   rpc AcknowledgeBundles(AcknowledgeBundlesRequest) returns (AcknowledgeBundlesResponse);
 }
+
+service FederationBridgeService {
+  rpc PullBridgeFragments(PullBridgeFragmentsRequest) returns (PullBridgeFragmentsResponse);
+  rpc SubmitBridgeFragments(SubmitBridgeFragmentsRequest) returns (SubmitBridgeFragmentsResponse);
+  rpc AcknowledgeBridgeFragments(AcknowledgeBridgeFragmentsRequest) returns (AcknowledgeBridgeFragmentsResponse);
+}
