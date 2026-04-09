@@ -22,7 +22,7 @@ func TestServicePeerLinkAndCursorLifecycle(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	peer, sharedSecret, generated, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
+	peer, sharedSecret, generated, signingSecret, generatedSigningSecret, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
 		ServerName: "alpha.example",
 		BaseURL:    "https://alpha.example",
 		Trusted:    true,
@@ -34,8 +34,12 @@ func TestServicePeerLinkAndCursorLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, sharedSecret)
 	require.True(t, generated)
+	require.NotEmpty(t, signingSecret)
+	require.True(t, generatedSigningSecret)
 	require.Equal(t, federation.PeerStateActive, peer.State)
 	require.Equal(t, sharedSecret, peer.SharedSecret)
+	require.Equal(t, signingSecret, peer.SigningSecret)
+	require.NotEqual(t, peer.SharedSecret, peer.SigningSecret)
 
 	authenticated, err := service.AuthenticatePeerByServerName(context.Background(), peer.ServerName, sharedSecret)
 	require.NoError(t, err)
@@ -173,4 +177,101 @@ func TestServicePeerLinkAndCursorLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, bundles, 1)
 	require.Equal(t, federation.BundleStateAcknowledged, bundles[0].State)
+}
+
+func TestServiceRotatePeerSigningKeyKeepsPreviousBundlesVerifiable(t *testing.T) {
+	t.Parallel()
+
+	service, err := federation.NewService(
+		federationtest.NewMemoryStore(),
+		federation.WithNow(func() time.Time {
+			return time.Date(2026, time.April, 9, 12, 0, 0, 0, time.UTC)
+		}),
+	)
+	require.NoError(t, err)
+
+	peer, sharedSecret, _, signingSecret, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
+		ServerName: "alpha.example",
+		BaseURL:    "https://alpha.example",
+		Trusted:    true,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, sharedSecret)
+	require.NotEmpty(t, signingSecret)
+
+	link, err := service.CreateLink(context.Background(), federation.CreateLinkParams{
+		PeerID:           peer.ID,
+		Name:             "primary",
+		TransportKind:    federation.TransportKindHTTPS,
+		DeliveryClass:    federation.DeliveryClassRealtime,
+		DiscoveryMode:    federation.DiscoveryModeManual,
+		MediaPolicy:      federation.MediaPolicyReferenceProxy,
+		MaxBundleBytes:   4096,
+		MaxFragmentBytes: 1024,
+	})
+	require.NoError(t, err)
+
+	oldSigned, err := service.SignBundle(context.Background(), peer.ID, link.ID, federation.Bundle{
+		ID:          "remote-bundle-old",
+		DedupKey:    "in-old",
+		CursorFrom:  10,
+		CursorTo:    10,
+		EventCount:  1,
+		PayloadType: "bundle",
+		Payload:     []byte("before-rotation"),
+		Compression: federation.CompressionKindNone,
+	})
+	require.NoError(t, err)
+
+	rotatedPeer, rotatedSigningSecret, generated, err := service.RotatePeerSigningKey(
+		context.Background(),
+		peer.ID,
+		"",
+	)
+	require.NoError(t, err)
+	require.True(t, generated)
+	require.NotEqual(t, signingSecret, rotatedSigningSecret)
+	require.Equal(t, uint64(2), rotatedPeer.SigningKeyVersion)
+
+	newSigned, err := service.SignBundle(context.Background(), peer.ID, link.ID, federation.Bundle{
+		ID:          "remote-bundle-new",
+		DedupKey:    "in-new",
+		CursorFrom:  11,
+		CursorTo:    11,
+		EventCount:  1,
+		PayloadType: "bundle",
+		Payload:     []byte("after-rotation"),
+		Compression: federation.CompressionKindNone,
+	})
+	require.NoError(t, err)
+
+	_, err = service.AcceptInboundBundle(context.Background(), federation.SaveBundleParams{
+		PeerID:        peer.ID,
+		LinkID:        link.ID,
+		DedupKey:      "in-old",
+		CursorFrom:    10,
+		CursorTo:      10,
+		EventCount:    1,
+		PayloadType:   "bundle",
+		Payload:       []byte("before-rotation"),
+		Compression:   federation.CompressionKindNone,
+		IntegrityHash: oldSigned.IntegrityHash,
+		AuthTag:       oldSigned.AuthTag,
+	})
+	require.NoError(t, err)
+
+	_, err = service.AcceptInboundBundle(context.Background(), federation.SaveBundleParams{
+		PeerID:        peer.ID,
+		LinkID:        link.ID,
+		DedupKey:      "in-new",
+		CursorFrom:    11,
+		CursorTo:      11,
+		EventCount:    1,
+		PayloadType:   "bundle",
+		Payload:       []byte("after-rotation"),
+		Compression:   federation.CompressionKindNone,
+		IntegrityHash: newSigned.IntegrityHash,
+		AuthTag:       newSigned.AuthTag,
+	})
+	require.NoError(t, err)
 }

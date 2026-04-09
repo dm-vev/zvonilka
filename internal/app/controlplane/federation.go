@@ -32,21 +32,24 @@ func (a *api) CreatePeer(
 		return nil, err
 	}
 
-	peer, sharedSecret, generated, err := service.CreatePeer(ctx, domainfederation.CreatePeerParams{
-		ServerName:   req.GetServerName(),
-		BaseURL:      req.GetBaseUrl(),
-		Capabilities: capabilitiesFromProto(req.GetCapabilities()),
-		Trusted:      req.GetTrusted(),
-		SharedSecret: req.GetSharedSecret(),
+	peer, sharedSecret, generatedSharedSecret, signingSecret, generatedSigningSecret, err := service.CreatePeer(ctx, domainfederation.CreatePeerParams{
+		ServerName:    req.GetServerName(),
+		BaseURL:       req.GetBaseUrl(),
+		Capabilities:  capabilitiesFromProto(req.GetCapabilities()),
+		Trusted:       req.GetTrusted(),
+		SharedSecret:  req.GetSharedSecret(),
+		SigningSecret: req.GetSigningSecret(),
 	})
 	if err != nil {
 		return nil, grpcError(err)
 	}
 
 	return &federationv1.CreatePeerResponse{
-		Peer:                  peerProto(peer),
-		SharedSecret:          sharedSecret,
-		GeneratedSharedSecret: generated,
+		Peer:                   peerProto(peer),
+		SharedSecret:           sharedSecret,
+		GeneratedSharedSecret:  generatedSharedSecret,
+		SigningSecret:          signingSecret,
+		GeneratedSigningSecret: generatedSigningSecret,
 	}, nil
 }
 
@@ -191,6 +194,34 @@ func (a *api) UpdatePeer(
 	}
 
 	return &federationv1.UpdatePeerResponse{Peer: peerProto(peer)}, nil
+}
+
+// RotatePeerSigningKey rotates one peer signing key and returns the new secret.
+func (a *api) RotatePeerSigningKey(
+	ctx context.Context,
+	req *federationv1.RotatePeerSigningKeyRequest,
+) (*federationv1.RotatePeerSigningKeyResponse, error) {
+	service, err := a.requireFederationService()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := a.requireRoles(ctx, domainidentity.RoleOwner, domainidentity.RoleAdmin); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(req.GetPeerId()) == "" {
+		return nil, status.Error(codes.InvalidArgument, "peer_id is required")
+	}
+
+	peer, signingSecret, generated, err := service.RotatePeerSigningKey(ctx, req.GetPeerId(), req.GetSigningSecret())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &federationv1.RotatePeerSigningKeyResponse{
+		Peer:                   peerProto(peer),
+		SigningSecret:          signingSecret,
+		GeneratedSigningSecret: generated,
+	}, nil
 }
 
 // CreateLink persists one federation link for a peer.
@@ -666,6 +697,8 @@ func peerProto(peer domainfederation.Peer) *federationv1.Peer {
 		UpdatedAt:               timestamppb.New(peer.UpdatedAt),
 		LastSeenAt:              timestampOrNil(peer.LastSeenAt),
 		VerificationFingerprint: peer.VerificationFingerprint,
+		SigningFingerprint:      peer.SigningFingerprint,
+		SigningKeyVersion:       peer.SigningKeyVersion,
 	}
 }
 

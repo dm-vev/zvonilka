@@ -171,6 +171,10 @@ type Peer struct {
 	VerificationFingerprint string
 	SharedSecret            string
 	SharedSecretHash        string
+	SigningFingerprint      string
+	SigningSecret           string
+	PreviousSigningSecret   string
+	SigningKeyVersion       uint64
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
 	LastSeenAt              time.Time
@@ -358,11 +362,23 @@ func (p Peer) normalize(now time.Time) (Peer, error) {
 	p.VerificationFingerprint = strings.TrimSpace(strings.ToLower(p.VerificationFingerprint))
 	p.SharedSecret = strings.TrimSpace(p.SharedSecret)
 	p.SharedSecretHash = strings.TrimSpace(strings.ToLower(p.SharedSecretHash))
+	p.SigningFingerprint = strings.TrimSpace(strings.ToLower(p.SigningFingerprint))
+	p.SigningSecret = strings.TrimSpace(p.SigningSecret)
+	p.PreviousSigningSecret = strings.TrimSpace(p.PreviousSigningSecret)
 	if p.ID == "" || p.ServerName == "" {
 		return Peer{}, ErrInvalidInput
 	}
 	if p.SharedSecret == "" || p.SharedSecretHash == "" {
 		return Peer{}, ErrInvalidInput
+	}
+	if p.SigningSecret == "" {
+		p.SigningSecret = p.SharedSecret
+	}
+	if p.SigningFingerprint == "" {
+		p.SigningFingerprint = secretFingerprint(p.SigningSecret)
+	}
+	if p.SigningKeyVersion == 0 {
+		p.SigningKeyVersion = 1
 	}
 
 	p.Capabilities = normalizeCapabilities(p.Capabilities)

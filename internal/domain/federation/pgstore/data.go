@@ -15,7 +15,7 @@ import (
 const (
 	peerColumnList = `
 id, server_name, base_url, capabilities, trusted, state, verification_fingerprint, shared_secret, shared_secret_hash,
-created_at, updated_at, last_seen_at`
+signing_fingerprint, signing_secret, previous_signing_secret, signing_key_version, created_at, updated_at, last_seen_at`
 	linkColumnList = `
 id, peer_id, name, endpoint, transport_kind, delivery_class, discovery_mode, media_policy, state,
 max_bundle_bytes, max_fragment_bytes, allowed_conversation_kinds, created_at, updated_at, last_healthy_at, last_error`
@@ -48,9 +48,9 @@ func (s *Store) SavePeer(ctx context.Context, peer federation.Peer) (federation.
 	query := fmt.Sprintf(`
 INSERT INTO %s (
 	id, server_name, base_url, capabilities, trusted, state, verification_fingerprint, shared_secret, shared_secret_hash,
-	created_at, updated_at, last_seen_at
+	signing_fingerprint, signing_secret, previous_signing_secret, signing_key_version, created_at, updated_at, last_seen_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
 )
 ON CONFLICT (id) DO UPDATE SET
 	server_name = EXCLUDED.server_name,
@@ -61,6 +61,10 @@ ON CONFLICT (id) DO UPDATE SET
 	verification_fingerprint = EXCLUDED.verification_fingerprint,
 	shared_secret = EXCLUDED.shared_secret,
 	shared_secret_hash = EXCLUDED.shared_secret_hash,
+	signing_fingerprint = EXCLUDED.signing_fingerprint,
+	signing_secret = EXCLUDED.signing_secret,
+	previous_signing_secret = EXCLUDED.previous_signing_secret,
+	signing_key_version = EXCLUDED.signing_key_version,
 	created_at = EXCLUDED.created_at,
 	updated_at = EXCLUDED.updated_at,
 	last_seen_at = EXCLUDED.last_seen_at
@@ -79,6 +83,10 @@ RETURNING `+peerColumnList+`
 		peer.VerificationFingerprint,
 		peer.SharedSecret,
 		peer.SharedSecretHash,
+		peer.SigningFingerprint,
+		peer.SigningSecret,
+		peer.PreviousSigningSecret,
+		peer.SigningKeyVersion,
 		peer.CreatedAt.UTC(),
 		peer.UpdatedAt.UTC(),
 		nullTime(peer.LastSeenAt),

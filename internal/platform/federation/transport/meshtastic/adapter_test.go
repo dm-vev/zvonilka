@@ -41,7 +41,7 @@ func (r *stubRunner) CombinedOutput(ctx context.Context, name string, args ...st
 func TestEncodeAndDecodeTextEnvelope(t *testing.T) {
 	t.Parallel()
 
-	text, err := EncodeTextEnvelope("mesh.example", "mesh", &federationv1.BundleFragment{
+	fragment := &federationv1.BundleFragment{
 		BundleId:      "bundle-1",
 		DedupKey:      "bundle-1:frag:000000",
 		CursorFrom:    10,
@@ -54,7 +54,9 @@ func TestEncodeAndDecodeTextEnvelope(t *testing.T) {
 		FragmentIndex: 0,
 		FragmentCount: 2,
 		Payload:       []byte("payload"),
-	}, "zv1:")
+	}
+
+	text, err := EncodeTextEnvelope("mesh.example", "mesh", fragment, "zv1:")
 	require.NoError(t, err)
 	require.True(t, strings.HasPrefix(text, "zv1:"))
 
@@ -64,6 +66,37 @@ func TestEncodeAndDecodeTextEnvelope(t *testing.T) {
 	require.Equal(t, "mesh", received.LinkName)
 	require.Equal(t, "bundle-1", received.Fragment.GetBundleId())
 	require.Equal(t, []byte("payload"), received.Fragment.GetPayload())
+
+	legacyText, err := encodeLegacyTextEnvelope("mesh.example", "mesh", fragment, "zv1:")
+	require.NoError(t, err)
+	require.Less(t, len(text), len(legacyText))
+}
+
+func TestDecodeTextEnvelopeSupportsLegacyFormat(t *testing.T) {
+	t.Parallel()
+
+	text, err := encodeLegacyTextEnvelope("mesh.example", "mesh", &federationv1.BundleFragment{
+		BundleId:      "bundle-legacy",
+		DedupKey:      "bundle-legacy:frag:000000",
+		CursorFrom:    20,
+		CursorTo:      22,
+		EventCount:    1,
+		PayloadType:   "bundle",
+		Compression:   federationv1.CompressionKind_COMPRESSION_KIND_NONE,
+		IntegrityHash: "hash-legacy",
+		AuthTag:       "auth-legacy",
+		FragmentIndex: 0,
+		FragmentCount: 1,
+		Payload:       []byte("world"),
+	}, "zv1:")
+	require.NoError(t, err)
+
+	received, err := DecodeTextEnvelope(text, "zv1:")
+	require.NoError(t, err)
+	require.Equal(t, "mesh.example", received.PeerServerName)
+	require.Equal(t, "mesh", received.LinkName)
+	require.Equal(t, "bundle-legacy", received.Fragment.GetBundleId())
+	require.Equal(t, []byte("world"), received.Fragment.GetPayload())
 }
 
 func TestAdapterSendAndReceive(t *testing.T) {

@@ -25,7 +25,7 @@ func newTestBridgeAPI(t *testing.T) (*api, domainfederation.Peer, domainfederati
 	)
 	require.NoError(t, err)
 
-	peer, _, _, err := service.CreatePeer(context.Background(), domainfederation.CreatePeerParams{
+	peer, _, _, _, _, err := service.CreatePeer(context.Background(), domainfederation.CreatePeerParams{
 		ServerName:   "mesh.example",
 		BaseURL:      "bridge://mesh.example",
 		Trusted:      true,

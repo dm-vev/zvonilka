@@ -22,7 +22,7 @@ func TestServiceBridgeFragmentLifecycle(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	peer, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
+	peer, _, _, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
 		ServerName:   "mesh.example",
 		BaseURL:      "bridge://mesh.example",
 		Trusted:      true,
@@ -178,7 +178,7 @@ func TestServiceBridgeFragmentLeaseExpiryAndStaleAck(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	peer, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
+	peer, _, _, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
 		ServerName:   "mesh.example",
 		BaseURL:      "bridge://mesh.example",
 		Trusted:      true,
@@ -271,7 +271,7 @@ func TestServiceRejectsConflictingDuplicateInboundFragment(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	peer, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
+	peer, _, _, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
 		ServerName:   "mesh.example",
 		BaseURL:      "bridge://mesh.example",
 		Trusted:      true,
@@ -372,7 +372,7 @@ func TestServiceQuarantinesTamperedInboundFragments(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	peer, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
+	peer, _, _, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
 		ServerName:   "mesh.example",
 		BaseURL:      "bridge://mesh.example",
 		Trusted:      true,
@@ -499,7 +499,7 @@ func TestServiceKeepsInboundFragmentsAssembledOnDuplicateReplay(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	peer, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
+	peer, _, _, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
 		ServerName:   "mesh.example",
 		BaseURL:      "bridge://mesh.example",
 		Trusted:      true,

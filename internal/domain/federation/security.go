@@ -59,7 +59,7 @@ func (s *Service) peerAndLink(ctx context.Context, peerID string, linkID string)
 
 func signBundle(peer Peer, link Link, bundle Bundle) (Bundle, error) {
 	bundle.IntegrityHash = payloadIntegrityHash(bundle.Payload)
-	bundle.AuthTag = bundleAuthTag(peer, link, bundle, bundle.IntegrityHash)
+	bundle.AuthTag = bundleAuthTag(peer.SigningSecret, peer, link, bundle, bundle.IntegrityHash)
 	return bundle, nil
 }
 
@@ -69,8 +69,16 @@ func verifyBundle(peer Peer, link Link, bundle Bundle) error {
 		return ErrUnauthorized
 	}
 
-	expectedAuth := bundleAuthTag(peer, link, bundle, expectedIntegrity)
-	if subtle.ConstantTimeCompare([]byte(expectedAuth), []byte(strings.TrimSpace(strings.ToLower(bundle.AuthTag)))) != 1 {
+	expectedAuth := bundleAuthTag(peer.SigningSecret, peer, link, bundle, expectedIntegrity)
+	if subtle.ConstantTimeCompare([]byte(expectedAuth), []byte(strings.TrimSpace(strings.ToLower(bundle.AuthTag)))) == 1 {
+		return nil
+	}
+	if strings.TrimSpace(peer.PreviousSigningSecret) == "" {
+		return ErrUnauthorized
+	}
+
+	previousAuth := bundleAuthTag(peer.PreviousSigningSecret, peer, link, bundle, expectedIntegrity)
+	if subtle.ConstantTimeCompare([]byte(previousAuth), []byte(strings.TrimSpace(strings.ToLower(bundle.AuthTag)))) != 1 {
 		return ErrUnauthorized
 	}
 
@@ -82,8 +90,8 @@ func payloadIntegrityHash(payload []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func bundleAuthTag(peer Peer, link Link, bundle Bundle, integrityHash string) string {
-	mac := hmac.New(sha256.New, []byte(strings.TrimSpace(peer.SharedSecret)))
+func bundleAuthTag(secret string, peer Peer, link Link, bundle Bundle, integrityHash string) string {
+	mac := hmac.New(sha256.New, []byte(strings.TrimSpace(secret)))
 	writeSignedField(mac, strings.TrimSpace(strings.ToLower(peer.ServerName)))
 	writeSignedField(mac, strings.TrimSpace(strings.ToLower(link.Name)))
 	writeSignedField(mac, strconv.FormatUint(bundle.CursorFrom, 10))

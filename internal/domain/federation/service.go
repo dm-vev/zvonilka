@@ -37,33 +37,45 @@ func NewService(store Store, opts ...Option) (*Service, error) {
 	return service, nil
 }
 
-// CreatePeer persists a new federation peer and returns the onboarding secret.
-func (s *Service) CreatePeer(ctx context.Context, params CreatePeerParams) (Peer, string, bool, error) {
+// CreatePeer persists a new federation peer and returns the onboarding secrets.
+func (s *Service) CreatePeer(ctx context.Context, params CreatePeerParams) (Peer, string, bool, string, bool, error) {
 	if err := s.validateContext(ctx, "create federation peer"); err != nil {
-		return Peer{}, "", false, err
+		return Peer{}, "", false, "", false, err
 	}
 
 	params.ServerName = strings.TrimSpace(strings.ToLower(params.ServerName))
 	params.BaseURL = strings.TrimSpace(params.BaseURL)
 	params.SharedSecret = strings.TrimSpace(params.SharedSecret)
+	params.SigningSecret = strings.TrimSpace(params.SigningSecret)
 	if params.ServerName == "" {
-		return Peer{}, "", false, ErrInvalidInput
+		return Peer{}, "", false, "", false, ErrInvalidInput
 	}
 
 	sharedSecret := params.SharedSecret
-	generated := false
+	generatedSharedSecret := false
 	if sharedSecret == "" {
 		token, err := randomToken(24)
 		if err != nil {
-			return Peer{}, "", false, fmt.Errorf("generate federation shared secret: %w", err)
+			return Peer{}, "", false, "", false, fmt.Errorf("generate federation shared secret: %w", err)
 		}
 		sharedSecret = token
-		generated = true
+		generatedSharedSecret = true
+	}
+
+	signingSecret := params.SigningSecret
+	generatedSigningSecret := false
+	if signingSecret == "" {
+		token, err := randomToken(24)
+		if err != nil {
+			return Peer{}, "", false, "", false, fmt.Errorf("generate federation signing secret: %w", err)
+		}
+		signingSecret = token
+		generatedSigningSecret = true
 	}
 
 	peerID, err := newID("peer")
 	if err != nil {
-		return Peer{}, "", false, fmt.Errorf("generate federation peer id: %w", err)
+		return Peer{}, "", false, "", false, fmt.Errorf("generate federation peer id: %w", err)
 	}
 
 	peer, err := (Peer{
@@ -75,17 +87,20 @@ func (s *Service) CreatePeer(ctx context.Context, params CreatePeerParams) (Peer
 		VerificationFingerprint: secretFingerprint(sharedSecret),
 		SharedSecret:            sharedSecret,
 		SharedSecretHash:        secretHash(sharedSecret),
+		SigningFingerprint:      secretFingerprint(signingSecret),
+		SigningSecret:           signingSecret,
+		SigningKeyVersion:       1,
 	}).normalize(s.currentTime())
 	if err != nil {
-		return Peer{}, "", false, err
+		return Peer{}, "", false, "", false, err
 	}
 
 	saved, err := s.store.SavePeer(ctx, peer)
 	if err != nil {
-		return Peer{}, "", false, fmt.Errorf("save federation peer %s: %w", peer.ServerName, err)
+		return Peer{}, "", false, "", false, fmt.Errorf("save federation peer %s: %w", peer.ServerName, err)
 	}
 
-	return saved, sharedSecret, generated, nil
+	return saved, sharedSecret, generatedSharedSecret, signingSecret, generatedSigningSecret, nil
 }
 
 // PeerByID resolves one peer by ID.
@@ -188,6 +203,59 @@ func (s *Service) UpdatePeer(ctx context.Context, params UpdatePeerParams) (Peer
 	}
 
 	return saved, nil
+}
+
+// RotatePeerSigningKey rotates the peer-level bundle signing secret.
+func (s *Service) RotatePeerSigningKey(
+	ctx context.Context,
+	peerID string,
+	signingSecret string,
+) (Peer, string, bool, error) {
+	if err := s.validateContext(ctx, "rotate federation peer signing key"); err != nil {
+		return Peer{}, "", false, err
+	}
+
+	peerID = strings.TrimSpace(peerID)
+	signingSecret = strings.TrimSpace(signingSecret)
+	if peerID == "" {
+		return Peer{}, "", false, ErrInvalidInput
+	}
+
+	current, err := s.store.PeerByID(ctx, peerID)
+	if err != nil {
+		return Peer{}, "", false, fmt.Errorf("load federation peer %s before signing key rotation: %w", peerID, err)
+	}
+
+	generated := false
+	if signingSecret == "" {
+		token, tokenErr := randomToken(24)
+		if tokenErr != nil {
+			return Peer{}, "", false, fmt.Errorf("generate federation signing secret: %w", tokenErr)
+		}
+		signingSecret = token
+		generated = true
+	}
+	if subtle.ConstantTimeCompare([]byte(secretHash(current.SigningSecret)), []byte(secretHash(signingSecret))) == 1 {
+		return Peer{}, "", false, ErrConflict
+	}
+
+	current.PreviousSigningSecret = current.SigningSecret
+	current.SigningSecret = signingSecret
+	current.SigningFingerprint = secretFingerprint(signingSecret)
+	current.SigningKeyVersion++
+	current.UpdatedAt = s.currentTime()
+
+	current, err = current.normalize(current.UpdatedAt)
+	if err != nil {
+		return Peer{}, "", false, err
+	}
+
+	saved, err := s.store.SavePeer(ctx, current)
+	if err != nil {
+		return Peer{}, "", false, fmt.Errorf("save federation peer %s after signing key rotation: %w", current.ID, err)
+	}
+
+	return saved, signingSecret, generated, nil
 }
 
 // AuthenticatePeer validates the presented peer secret and returns the current peer snapshot.

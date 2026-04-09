@@ -23,6 +23,7 @@ const (
 	FederationService_GetPeer_FullMethodName              = "/zvonilka.federation.v1.FederationService/GetPeer"
 	FederationService_ListPeers_FullMethodName            = "/zvonilka.federation.v1.FederationService/ListPeers"
 	FederationService_UpdatePeer_FullMethodName           = "/zvonilka.federation.v1.FederationService/UpdatePeer"
+	FederationService_RotatePeerSigningKey_FullMethodName = "/zvonilka.federation.v1.FederationService/RotatePeerSigningKey"
 	FederationService_CreateLink_FullMethodName           = "/zvonilka.federation.v1.FederationService/CreateLink"
 	FederationService_GetLink_FullMethodName              = "/zvonilka.federation.v1.FederationService/GetLink"
 	FederationService_ListLinks_FullMethodName            = "/zvonilka.federation.v1.FederationService/ListLinks"
@@ -44,6 +45,7 @@ type FederationServiceClient interface {
 	GetPeer(ctx context.Context, in *GetPeerRequest, opts ...grpc.CallOption) (*GetPeerResponse, error)
 	ListPeers(ctx context.Context, in *ListPeersRequest, opts ...grpc.CallOption) (*ListPeersResponse, error)
 	UpdatePeer(ctx context.Context, in *UpdatePeerRequest, opts ...grpc.CallOption) (*UpdatePeerResponse, error)
+	RotatePeerSigningKey(ctx context.Context, in *RotatePeerSigningKeyRequest, opts ...grpc.CallOption) (*RotatePeerSigningKeyResponse, error)
 	CreateLink(ctx context.Context, in *CreateLinkRequest, opts ...grpc.CallOption) (*CreateLinkResponse, error)
 	GetLink(ctx context.Context, in *GetLinkRequest, opts ...grpc.CallOption) (*GetLinkResponse, error)
 	ListLinks(ctx context.Context, in *ListLinksRequest, opts ...grpc.CallOption) (*ListLinksResponse, error)
@@ -95,6 +97,15 @@ func (c *federationServiceClient) ListPeers(ctx context.Context, in *ListPeersRe
 func (c *federationServiceClient) UpdatePeer(ctx context.Context, in *UpdatePeerRequest, opts ...grpc.CallOption) (*UpdatePeerResponse, error) {
 	out := new(UpdatePeerResponse)
 	err := c.cc.Invoke(ctx, FederationService_UpdatePeer_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationServiceClient) RotatePeerSigningKey(ctx context.Context, in *RotatePeerSigningKeyRequest, opts ...grpc.CallOption) (*RotatePeerSigningKeyResponse, error) {
+	out := new(RotatePeerSigningKeyResponse)
+	err := c.cc.Invoke(ctx, FederationService_RotatePeerSigningKey_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -208,6 +219,7 @@ type FederationServiceServer interface {
 	GetPeer(context.Context, *GetPeerRequest) (*GetPeerResponse, error)
 	ListPeers(context.Context, *ListPeersRequest) (*ListPeersResponse, error)
 	UpdatePeer(context.Context, *UpdatePeerRequest) (*UpdatePeerResponse, error)
+	RotatePeerSigningKey(context.Context, *RotatePeerSigningKeyRequest) (*RotatePeerSigningKeyResponse, error)
 	CreateLink(context.Context, *CreateLinkRequest) (*CreateLinkResponse, error)
 	GetLink(context.Context, *GetLinkRequest) (*GetLinkResponse, error)
 	ListLinks(context.Context, *ListLinksRequest) (*ListLinksResponse, error)
@@ -237,6 +249,9 @@ func (UnimplementedFederationServiceServer) ListPeers(context.Context, *ListPeer
 }
 func (UnimplementedFederationServiceServer) UpdatePeer(context.Context, *UpdatePeerRequest) (*UpdatePeerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdatePeer not implemented")
+}
+func (UnimplementedFederationServiceServer) RotatePeerSigningKey(context.Context, *RotatePeerSigningKeyRequest) (*RotatePeerSigningKeyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RotatePeerSigningKey not implemented")
 }
 func (UnimplementedFederationServiceServer) CreateLink(context.Context, *CreateLinkRequest) (*CreateLinkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateLink not implemented")
@@ -352,6 +367,24 @@ func _FederationService_UpdatePeer_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(FederationServiceServer).UpdatePeer(ctx, req.(*UpdatePeerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FederationService_RotatePeerSigningKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RotatePeerSigningKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServiceServer).RotatePeerSigningKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FederationService_RotatePeerSigningKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServiceServer).RotatePeerSigningKey(ctx, req.(*RotatePeerSigningKeyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -576,6 +609,10 @@ var FederationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdatePeer",
 			Handler:    _FederationService_UpdatePeer_Handler,
+		},
+		{
+			MethodName: "RotatePeerSigningKey",
+			Handler:    _FederationService_RotatePeerSigningKey_Handler,
 		},
 		{
 			MethodName: "CreateLink",

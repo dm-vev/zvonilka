@@ -66,8 +66,11 @@ func TestFederationServicePeerAndLinkLifecycle(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotEmpty(t, createdPeer.GetSharedSecret())
+	require.NotEmpty(t, createdPeer.GetSigningSecret())
 	require.NotNil(t, createdPeer.GetPeer())
 	require.Equal(t, federationv1.PeerState_PEER_STATE_ACTIVE, createdPeer.GetPeer().GetState())
+	require.NotEmpty(t, createdPeer.GetPeer().GetSigningFingerprint())
+	require.Equal(t, uint64(1), createdPeer.GetPeer().GetSigningKeyVersion())
 
 	listedPeers, err := api.ListPeers(adminCtx, &federationv1.ListPeersRequest{})
 	require.NoError(t, err)
@@ -84,6 +87,7 @@ func TestFederationServicePeerAndLinkLifecycle(t *testing.T) {
 		MaxFragmentBytes: 1024,
 	})
 	require.NoError(t, err)
+	require.NotEmpty(t, createdPeer.GetSigningSecret())
 	require.NotNil(t, createdLink.GetLink())
 	require.Equal(t, createdPeer.GetPeer().GetPeerId(), createdLink.GetLink().GetPeerId())
 
@@ -271,4 +275,35 @@ func TestFederationServiceRejectsInvalidPeerSecret(t *testing.T) {
 	st, ok := status.FromError(err)
 	require.True(t, ok)
 	require.Equal(t, codes.Unauthenticated, st.Code())
+}
+
+func TestFederationServiceRotatesPeerSigningKey(t *testing.T) {
+	t.Parallel()
+
+	api, sender := newTestFederationAPI(t)
+	admin := mustCreateAccount(t, api, domainidentity.CreateAccountParams{
+		Username:    "rotate-admin",
+		DisplayName: "Rotate Admin",
+		Email:       "rotate-admin@example.com",
+		Roles:       []domainidentity.Role{domainidentity.RoleAdmin},
+		AccountKind: domainidentity.AccountKindUser,
+		CreatedBy:   "bootstrap",
+	})
+	adminCtx := mustLoginAccount(t, api, sender, admin.Username)
+
+	createdPeer, err := api.CreatePeer(adminCtx, &federationv1.CreatePeerRequest{
+		ServerName: "delta.example",
+		BaseUrl:    "https://delta.example",
+		Trusted:    true,
+	})
+	require.NoError(t, err)
+
+	rotated, err := api.RotatePeerSigningKey(adminCtx, &federationv1.RotatePeerSigningKeyRequest{
+		PeerId: createdPeer.GetPeer().GetPeerId(),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, rotated.GetSigningSecret())
+	require.NotEqual(t, createdPeer.GetSigningSecret(), rotated.GetSigningSecret())
+	require.Equal(t, uint64(2), rotated.GetPeer().GetSigningKeyVersion())
+	require.NotEqual(t, createdPeer.GetPeer().GetSigningFingerprint(), rotated.GetPeer().GetSigningFingerprint())
 }

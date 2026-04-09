@@ -4,11 +4,12 @@ import "time"
 
 // CreatePeerParams captures peer creation input.
 type CreatePeerParams struct {
-	ServerName   string
-	BaseURL      string
-	Capabilities []Capability
-	Trusted      bool
-	SharedSecret string
+	ServerName    string
+	BaseURL       string
+	Capabilities  []Capability
+	Trusted       bool
+	SharedSecret  string
+	SigningSecret string
 }
 
 // UpdatePeerParams captures mutable peer fields.

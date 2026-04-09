@@ -11,6 +11,7 @@ service FederationService {
   rpc GetPeer(GetPeerRequest) returns (GetPeerResponse);
   rpc ListPeers(ListPeersRequest) returns (ListPeersResponse);
   rpc UpdatePeer(UpdatePeerRequest) returns (UpdatePeerResponse);
+  rpc RotatePeerSigningKey(RotatePeerSigningKeyRequest) returns (RotatePeerSigningKeyResponse);
   rpc CreateLink(CreateLinkRequest) returns (CreateLinkResponse);
   rpc GetLink(GetLinkRequest) returns (GetLinkResponse);
   rpc ListLinks(ListLinksRequest) returns (ListLinksResponse);

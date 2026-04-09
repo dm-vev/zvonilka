@@ -94,6 +94,8 @@ message Peer {
   google.protobuf.Timestamp updated_at = 8;
   google.protobuf.Timestamp last_seen_at = 9;
   string verification_fingerprint = 10;
+  string signing_fingerprint = 11;
+  uint64 signing_key_version = 12;
 }
 
 message Link {

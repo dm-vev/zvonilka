@@ -96,7 +96,7 @@ func TestWorkerReplicatesOutboundAndInboundBundles(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	peer, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
+	peer, _, _, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
 		ServerName:   "beta.example",
 		BaseURL:      "https://beta.example",
 		Trusted:      true,
@@ -325,7 +325,7 @@ func TestWorkerProcessesBridgeLinksWithoutDirectClientDial(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	peer, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
+	peer, _, _, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
 		ServerName:   "mesh.example",
 		BaseURL:      "bridge://mesh.example",
 		Trusted:      true,

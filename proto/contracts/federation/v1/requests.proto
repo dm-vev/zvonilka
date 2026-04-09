@@ -16,12 +16,15 @@ message CreatePeerRequest {
   repeated zvonilka.common.v1.FederationCapability capabilities = 4;
   bool trusted = 5;
   string idempotency_key = 6;
+  string signing_secret = 7;
 }
 
 message CreatePeerResponse {
   Peer peer = 1;
   string shared_secret = 2;
   bool generated_shared_secret = 3;
+  string signing_secret = 4;
+  bool generated_signing_secret = 5;
 }
 
 message GetPeerRequest {
@@ -53,6 +56,18 @@ message UpdatePeerRequest {
 
 message UpdatePeerResponse {
   Peer peer = 1;
+}
+
+message RotatePeerSigningKeyRequest {
+  string peer_id = 1;
+  string signing_secret = 2;
+  string idempotency_key = 3;
+}
+
+message RotatePeerSigningKeyResponse {
+  Peer peer = 1;
+  string signing_secret = 2;
+  bool generated_signing_secret = 3;
 }
 
 message CreateLinkRequest {
