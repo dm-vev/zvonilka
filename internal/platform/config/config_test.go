@@ -15,6 +15,8 @@ import (
 func TestFromEnvUsesDistinctServiceDefaults(t *testing.T) {
 	resetConfigEnv(t)
 	t.Setenv("ZVONILKA_CALL_RECORDING_HOOK_URL", "http://127.0.0.1/recording")
+	t.Setenv("ZVONILKA_FEATURE_FEDERATION_ENABLED", "true")
+	t.Setenv("ZVONILKA_FEDERATION_LOCAL_SERVER_NAME", "alpha.example")
 
 	type expected struct {
 		http string
@@ -65,6 +67,13 @@ func TestFromEnvUsesDistinctServiceDefaults(t *testing.T) {
 			want: expected{
 				http: ":8085",
 				grpc: ":9095",
+			},
+		},
+		{
+			service: "federationworker",
+			want: expected{
+				http: ":8086",
+				grpc: ":9096",
 			},
 		},
 	}
@@ -207,6 +216,34 @@ func TestLoadAppliesNotificationOverrides(t *testing.T) {
 	}
 	if cfg.Notification.BatchSize != 42 {
 		t.Fatalf("batch size: got %d, want 42", cfg.Notification.BatchSize)
+	}
+}
+
+func TestLoadAppliesFederationOverrides(t *testing.T) {
+	resetConfigEnv(t)
+
+	t.Setenv("ZVONILKA_FEATURE_FEDERATION_ENABLED", "true")
+	t.Setenv("ZVONILKA_FEDERATION_LOCAL_SERVER_NAME", "alpha.example")
+	t.Setenv("ZVONILKA_FEDERATION_WORKER_POLL_INTERVAL", "1500ms")
+	t.Setenv("ZVONILKA_FEDERATION_WORKER_BATCH_SIZE", "25")
+	t.Setenv("ZVONILKA_FEDERATION_DIAL_TIMEOUT", "9s")
+
+	cfg, err := Load("federationworker")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.Federation.LocalServerName != "alpha.example" {
+		t.Fatalf("local server name: got %s", cfg.Federation.LocalServerName)
+	}
+	if cfg.Federation.WorkerPollInterval != 1500*time.Millisecond {
+		t.Fatalf("worker poll interval: got %s, want 1500ms", cfg.Federation.WorkerPollInterval)
+	}
+	if cfg.Federation.WorkerBatchSize != 25 {
+		t.Fatalf("worker batch size: got %d, want 25", cfg.Federation.WorkerBatchSize)
+	}
+	if cfg.Federation.DialTimeout != 9*time.Second {
+		t.Fatalf("dial timeout: got %s, want 9s", cfg.Federation.DialTimeout)
 	}
 }
 

@@ -23,6 +23,7 @@ func (c *Configuration) normalize() {
 	c.Call.RecordingHookURL = strings.TrimSpace(c.Call.RecordingHookURL)
 	c.Call.TranscriptionHookURL = strings.TrimSpace(c.Call.TranscriptionHookURL)
 	c.Call.HookSecret = strings.TrimSpace(c.Call.HookSecret)
+	c.Federation.LocalServerName = strings.TrimSpace(strings.ToLower(c.Federation.LocalServerName))
 	c.RTC.PublicEndpoint = strings.TrimSpace(c.RTC.PublicEndpoint)
 	c.RTC.CandidateHost = strings.TrimSpace(c.RTC.CandidateHost)
 	c.RTC.TURNSecret = strings.TrimSpace(c.RTC.TURNSecret)

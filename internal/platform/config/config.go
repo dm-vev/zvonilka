@@ -17,6 +17,7 @@ type Configuration struct {
 	Media          MediaConfig
 	Presence       PresenceConfig
 	Notification   NotificationConfig
+	Federation     FederationConfig
 	Search         SearchConfig
 	Translation    TranslationConfig
 	Infrastructure InfrastructureConfig

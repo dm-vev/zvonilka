@@ -42,6 +42,10 @@ var serviceListenDefaults = map[string]listenDefaults{
 		http: ":8085",
 		grpc: ":9095",
 	},
+	"federationworker": {
+		http: ":8086",
+		grpc: ":9096",
+	},
 }
 
 const (
@@ -66,6 +70,8 @@ const (
 	defaultRedisConnIdle              = 5 * time.Minute
 	defaultCallHookMaxBodyBytes       = 1 << 20
 	defaultNotificationWebhookTimeout = 10 * time.Second
+	defaultFederationWorkerInterval   = 3 * time.Second
+	defaultFederationDialTimeout      = 5 * time.Second
 	defaultTranslationTimeout         = 10 * time.Second
 	defaultTranslationMaxTextBytes    = 16 << 10
 )
@@ -153,6 +159,11 @@ func defaultConfiguration(serviceName string) Configuration {
 			DeliveryWebhookTimeout: defaultNotificationWebhookTimeout,
 			MaxAttempts:            notificationDefaults.MaxAttempts,
 			BatchSize:              notificationDefaults.BatchSize,
+		},
+		Federation: FederationConfig{
+			WorkerPollInterval: defaultFederationWorkerInterval,
+			WorkerBatchSize:    100,
+			DialTimeout:        defaultFederationDialTimeout,
 		},
 		Search: SearchConfig{
 			DefaultLimit:   searchDefaults.DefaultLimit,

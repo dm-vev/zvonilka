@@ -53,6 +53,9 @@ func (s *memoryStore) SaveEvent(ctx context.Context, event conversation.EventEnv
 			return conversation.EventEnvelope{}, err
 		}
 	}
+	if existing, ok := s.eventsByID[event.EventID]; ok {
+		return cloneEvent(existing), nil
+	}
 
 	s.nextSequence++
 	event.Sequence = s.nextSequence

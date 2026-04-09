@@ -6,7 +6,9 @@ import (
 	"time"
 
 	adminv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/admin/v1"
+	federationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/federation/v1"
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
+	"github.com/dm-vev/zvonilka/internal/domain/federation"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	"github.com/dm-vev/zvonilka/internal/domain/media"
 	"github.com/dm-vev/zvonilka/internal/domain/presence"
@@ -23,6 +25,7 @@ type app struct {
 	catalog        *domainstorage.Catalog
 	api            *api
 	conversation   *conversation.Service
+	federation     *federation.Service
 	identity       *identity.Service
 	media          *media.Service
 	presence       *presence.Service
@@ -31,9 +34,11 @@ type app struct {
 
 type api struct {
 	adminv1.UnimplementedAdminServiceServer
+	federationv1.UnimplementedFederationServiceServer
 
-	identity *identity.Service
-	presence *presence.Service
+	federation *federation.Service
+	identity   *identity.Service
+	presence   *presence.Service
 }
 
 func (a *app) registerGRPC(server *grpc.Server) {
@@ -42,6 +47,9 @@ func (a *app) registerGRPC(server *grpc.Server) {
 	}
 
 	adminv1.RegisterAdminServiceServer(server, a.api)
+	if a.federation != nil && a.api.federation != nil {
+		federationv1.RegisterFederationServiceServer(server, a.api)
+	}
 }
 
 func (a *app) close(ctx context.Context) error {
@@ -57,17 +65,23 @@ func (a *app) close(ctx context.Context) error {
 
 func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 	health := runtime.NewHealth(cfg.Service.Name, buildinfo.Version, buildinfo.Commit, buildinfo.Date)
-	storageCatalog, identityService, conversationService, mediaService, presenceService, err := buildAppStorage(ctx, cfg)
+	storageCatalog, identityService, conversationService, federationService, mediaService, presenceService, err := buildAppStorage(ctx, cfg)
 	if err != nil {
 		return nil, err
+	}
+
+	var apiFederation *federation.Service
+	if cfg.Features.FederationEnabled {
+		apiFederation = federationService
 	}
 
 	return &app{
 		health:         health,
 		handler:        http.NotFoundHandler(),
 		catalog:        storageCatalog,
-		api:            &api{identity: identityService, presence: presenceService},
+		api:            &api{federation: apiFederation, identity: identityService, presence: presenceService},
 		conversation:   conversationService,
+		federation:     apiFederation,
 		identity:       identityService,
 		media:          mediaService,
 		presence:       presenceService,

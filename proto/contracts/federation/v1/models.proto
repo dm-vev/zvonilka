@@ -15,23 +15,121 @@ enum PeerState {
   PEER_STATE_REVOKED = 4;
 }
 
+enum LinkState {
+  LINK_STATE_UNSPECIFIED = 0;
+  LINK_STATE_ACTIVE = 1;
+  LINK_STATE_PAUSED = 2;
+  LINK_STATE_DEGRADED = 3;
+  LINK_STATE_DELETED = 4;
+}
+
+enum TransportKind {
+  TRANSPORT_KIND_UNSPECIFIED = 0;
+  TRANSPORT_KIND_HTTPS = 1;
+  TRANSPORT_KIND_MESHTASTIC = 2;
+  TRANSPORT_KIND_MESHCORE = 3;
+  TRANSPORT_KIND_CUSTOM_DTN = 4;
+}
+
+enum DeliveryClass {
+  DELIVERY_CLASS_UNSPECIFIED = 0;
+  DELIVERY_CLASS_REALTIME = 1;
+  DELIVERY_CLASS_DELAY_TOLERANT = 2;
+  DELIVERY_CLASS_ULTRA_CONSTRAINED = 3;
+}
+
+enum DiscoveryMode {
+  DISCOVERY_MODE_UNSPECIFIED = 0;
+  DISCOVERY_MODE_MANUAL = 1;
+  DISCOVERY_MODE_DNS = 2;
+  DISCOVERY_MODE_WELL_KNOWN = 3;
+  DISCOVERY_MODE_BRIDGE_ANNOUNCED = 4;
+}
+
+enum MediaPolicy {
+  MEDIA_POLICY_UNSPECIFIED = 0;
+  MEDIA_POLICY_REFERENCE_PROXY = 1;
+  MEDIA_POLICY_BACKGROUND_REPLICATION = 2;
+  MEDIA_POLICY_DISABLED = 3;
+}
+
+enum BundleDirection {
+  BUNDLE_DIRECTION_UNSPECIFIED = 0;
+  BUNDLE_DIRECTION_INBOUND = 1;
+  BUNDLE_DIRECTION_OUTBOUND = 2;
+}
+
+enum BundleState {
+  BUNDLE_STATE_UNSPECIFIED = 0;
+  BUNDLE_STATE_QUEUED = 1;
+  BUNDLE_STATE_ACCEPTED = 2;
+  BUNDLE_STATE_ACKNOWLEDGED = 3;
+  BUNDLE_STATE_FAILED = 4;
+}
+
+enum CompressionKind {
+  COMPRESSION_KIND_UNSPECIFIED = 0;
+  COMPRESSION_KIND_NONE = 1;
+  COMPRESSION_KIND_GZIP = 2;
+}
+
 message Peer {
   string peer_id = 1;
   string server_name = 2;
   string base_url = 3;
   repeated zvonilka.common.v1.FederationCapability capabilities = 4;
   bool trusted = 5;
-  PeerState status = 6;
+  PeerState state = 6;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
   google.protobuf.Timestamp last_seen_at = 9;
   string verification_fingerprint = 10;
 }
 
-message ReplicationReceipt {
+message Link {
+  string link_id = 1;
+  string peer_id = 2;
+  string name = 3;
+  string endpoint = 4;
+  TransportKind transport_kind = 5;
+  DeliveryClass delivery_class = 6;
+  DiscoveryMode discovery_mode = 7;
+  MediaPolicy media_policy = 8;
+  LinkState state = 9;
+  uint32 max_bundle_bytes = 10;
+  uint32 max_fragment_bytes = 11;
+  repeated zvonilka.common.v1.ConversationKind allowed_conversation_kinds = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+  google.protobuf.Timestamp last_healthy_at = 15;
+  string last_error = 16;
+}
+
+message ReplicationCursor {
   string peer_id = 1;
-  uint64 last_sequence = 2;
-  repeated string acknowledged_event_ids = 3;
-  google.protobuf.Timestamp acknowledged_at = 4;
-  bool accepted = 5;
+  string link_id = 2;
+  uint64 last_received_cursor = 3;
+  uint64 last_inbound_cursor = 4;
+  uint64 last_outbound_cursor = 5;
+  uint64 last_acked_cursor = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message Bundle {
+  string bundle_id = 1;
+  string peer_id = 2;
+  string link_id = 3;
+  string dedup_key = 4;
+  BundleDirection direction = 5;
+  uint64 cursor_from = 6;
+  uint64 cursor_to = 7;
+  uint32 event_count = 8;
+  string payload_type = 9;
+  bytes payload = 10;
+  CompressionKind compression = 11;
+  BundleState state = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp available_at = 14;
+  google.protobuf.Timestamp expires_at = 15;
+  google.protobuf.Timestamp acked_at = 16;
 }

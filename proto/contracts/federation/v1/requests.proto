@@ -3,25 +3,25 @@ syntax = "proto3";
 package zvonilka.federation.v1;
 
 import "google/protobuf/field_mask.proto";
-import "google/protobuf/timestamp.proto";
 import "contracts/common/v1/messages.proto";
 import "contracts/common/v1/types.proto";
 import "contracts/federation/v1/models.proto";
 
 option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/federation/v1;federationv1";
 
-message RegisterPeerRequest {
+message CreatePeerRequest {
   string server_name = 1;
   string base_url = 2;
   string shared_secret = 3;
   repeated zvonilka.common.v1.FederationCapability capabilities = 4;
-  string idempotency_key = 5;
+  bool trusted = 5;
+  string idempotency_key = 6;
 }
 
-message RegisterPeerResponse {
+message CreatePeerResponse {
   Peer peer = 1;
-  string verification_token = 2;
-  google.protobuf.Timestamp expires_at = 3;
+  string shared_secret = 2;
+  bool generated_shared_secret = 3;
 }
 
 message GetPeerRequest {
@@ -37,7 +37,7 @@ message GetPeerResponse {
 
 message ListPeersRequest {
   zvonilka.common.v1.PageRequest page = 1;
-  PeerState status_filter = 2;
+  PeerState state_filter = 2;
 }
 
 message ListPeersResponse {
@@ -55,36 +55,119 @@ message UpdatePeerResponse {
   Peer peer = 1;
 }
 
-message PushEventsRequest {
+message CreateLinkRequest {
   string peer_id = 1;
-  repeated zvonilka.common.v1.EventEnvelope events = 2;
-  uint64 from_sequence = 3;
-  uint64 to_sequence = 4;
-  string idempotency_key = 5;
+  string name = 2;
+  string endpoint = 3;
+  TransportKind transport_kind = 4;
+  DeliveryClass delivery_class = 5;
+  DiscoveryMode discovery_mode = 6;
+  MediaPolicy media_policy = 7;
+  uint32 max_bundle_bytes = 8;
+  uint32 max_fragment_bytes = 9;
+  repeated zvonilka.common.v1.ConversationKind allowed_conversation_kinds = 10;
+  string idempotency_key = 11;
 }
 
-message PushEventsResponse {
-  ReplicationReceipt receipt = 1;
+message CreateLinkResponse {
+  Link link = 1;
 }
 
-message PullEventsRequest {
+message GetLinkRequest {
+  string link_id = 1;
+}
+
+message GetLinkResponse {
+  Link link = 1;
+}
+
+message ListLinksRequest {
+  zvonilka.common.v1.PageRequest page = 1;
+  string peer_id = 2;
+  LinkState state_filter = 3;
+}
+
+message ListLinksResponse {
+  repeated Link links = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message UpdateLinkRequest {
+  Link link = 1;
+  google.protobuf.FieldMask update_mask = 2;
+  string idempotency_key = 3;
+}
+
+message UpdateLinkResponse {
+  Link link = 1;
+}
+
+message PauseLinkRequest {
+  string link_id = 1;
+}
+
+message PauseLinkResponse {
+  Link link = 1;
+}
+
+message ResumeLinkRequest {
+  string link_id = 1;
+}
+
+message ResumeLinkResponse {
+  Link link = 1;
+}
+
+message DeleteLinkRequest {
+  string link_id = 1;
+}
+
+message DeleteLinkResponse {
+  Link link = 1;
+}
+
+message GetReplicationCursorRequest {
   string peer_id = 1;
-  uint64 from_sequence = 2;
-  zvonilka.common.v1.PageRequest page = 3;
+  string link_id = 2;
 }
 
-message PullEventsResponse {
-  repeated zvonilka.common.v1.EventEnvelope events = 1;
-  uint64 next_sequence = 2;
+message GetReplicationCursorResponse {
+  ReplicationCursor cursor = 1;
+}
+
+message PushBundlesRequest {
+  string server_name = 1;
+  string link_name = 2;
+  repeated Bundle bundles = 3;
+}
+
+message PushBundlesResponse {
+  repeated string accepted_bundle_ids = 1;
+  ReplicationCursor cursor = 2;
+}
+
+message PullBundlesRequest {
+  string server_name = 1;
+  string link_name = 2;
+  uint64 after_cursor = 3;
+  uint32 limit = 4;
+}
+
+message PullBundlesResponse {
+  repeated Bundle bundles = 1;
+  uint64 next_cursor = 2;
   bool has_more = 3;
+  ReplicationCursor cursor = 4;
 }
 
-message AcknowledgeReplicationRequest {
-  string peer_id = 1;
-  uint64 last_sequence = 2;
-  repeated string event_ids = 3;
+message AcknowledgeBundlesRequest {
+  string server_name = 1;
+  string link_name = 2;
+  uint64 up_to_cursor = 3;
+  repeated string bundle_ids = 4;
 }
 
-message AcknowledgeReplicationResponse {
-  ReplicationReceipt receipt = 1;
+message AcknowledgeBundlesResponse {
+  repeated string acknowledged_bundle_ids = 1;
+  ReplicationCursor cursor = 2;
 }

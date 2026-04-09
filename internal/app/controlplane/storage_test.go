@@ -57,7 +57,7 @@ func testStorageBindings() config.StorageConfig {
 func TestBuildAppStorageRejectsDisabledStorageStack(t *testing.T) {
 	t.Parallel()
 
-	_, _, _, _, _, err := buildAppStorage(context.Background(), config.Configuration{})
+	_, _, _, _, _, _, err := buildAppStorage(context.Background(), config.Configuration{})
 	if err == nil {
 		t.Fatal("expected disabled storage stack to fail")
 	}
@@ -89,7 +89,7 @@ func TestBuildAppStorageRejectsNilStorageBuilder(t *testing.T) {
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 	cfg.Search = testSearchConfig()
 
-	_, _, _, _, _, err := buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, _, err := buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected storage builder error")
 	}
@@ -120,7 +120,7 @@ func TestBuildAppStorageRejectsNilCatalog(t *testing.T) {
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 	cfg.Search = testSearchConfig()
 
-	_, _, _, _, _, err := buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, _, err := buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected catalog error")
 	}
@@ -186,7 +186,7 @@ func TestBuildAppStorageRejectsNilIdentityStore(t *testing.T) {
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 	cfg.Search = testSearchConfig()
 
-	_, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected identity store error")
 	}
@@ -257,7 +257,7 @@ func TestBuildAppStorageRejectsNilIdentityService(t *testing.T) {
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 	cfg.Search = testSearchConfig()
 
-	_, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected identity service error")
 	}
@@ -300,7 +300,7 @@ func TestBuildAppStorageRejectsMissingPrimaryProvider(t *testing.T) {
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 	cfg.Search = testSearchConfig()
 
-	_, _, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
 		t.Fatal("expected provider selection error")
 	}
@@ -348,7 +348,7 @@ func TestBuildAppStorageRejectsNonRelationalPrimaryProvider(t *testing.T) {
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 	cfg.Search = testSearchConfig()
 
-	_, _, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
 		t.Fatal("expected provider type error")
 	}
@@ -423,7 +423,7 @@ func TestBuildAppStorageJoinsCleanupErrorOnStartupFailure(t *testing.T) {
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 	cfg.Search = testSearchConfig()
 
-	_, _, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, _, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr == nil {
 		t.Fatal("expected startup error")
 	}
@@ -513,7 +513,7 @@ func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 	cfg.Search = testSearchConfig()
 
-	createdCatalog, service, conversationService, mediaService, presenceService, gotErr := buildAppStorage(context.Background(), cfg)
+	createdCatalog, service, conversationService, federationService, mediaService, presenceService, gotErr := buildAppStorage(context.Background(), cfg)
 	if gotErr != nil {
 		t.Fatalf("build app storage: %v", gotErr)
 	}
@@ -525,6 +525,9 @@ func TestBuildAppStorageUsesConfiguredPrimaryProvider(t *testing.T) {
 	}
 	if conversationService == nil {
 		t.Fatal("expected conversation service")
+	}
+	if federationService == nil {
+		t.Fatal("expected federation service")
 	}
 	if mediaService == nil {
 		t.Fatal("expected media service")
@@ -597,7 +600,7 @@ func TestBuildAppStorageRejectsNilPresenceStore(t *testing.T) {
 		Search:  testSearchConfig(),
 	}
 
-	_, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected presence store error")
 	}
@@ -665,7 +668,7 @@ func TestBuildAppStorageRejectsNilPresenceService(t *testing.T) {
 		Search:  testSearchConfig(),
 	}
 
-	_, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, _, err = buildAppStorage(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("expected presence service error")
 	}
@@ -766,7 +769,7 @@ func TestBuildAppStorageUsesConfiguredPresenceSettings(t *testing.T) {
 	cfg.Infrastructure.ObjectStore = testObjectStorageConfig()
 	cfg.Search = testSearchConfig()
 
-	_, _, _, _, presenceService, err := buildAppStorage(context.Background(), cfg)
+	_, _, _, _, _, presenceService, err := buildAppStorage(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("build app storage: %v", err)
 	}

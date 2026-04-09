@@ -19,26 +19,42 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	FederationService_RegisterPeer_FullMethodName           = "/zvonilka.federation.v1.FederationService/RegisterPeer"
-	FederationService_GetPeer_FullMethodName                = "/zvonilka.federation.v1.FederationService/GetPeer"
-	FederationService_ListPeers_FullMethodName              = "/zvonilka.federation.v1.FederationService/ListPeers"
-	FederationService_UpdatePeer_FullMethodName             = "/zvonilka.federation.v1.FederationService/UpdatePeer"
-	FederationService_PushEvents_FullMethodName             = "/zvonilka.federation.v1.FederationService/PushEvents"
-	FederationService_PullEvents_FullMethodName             = "/zvonilka.federation.v1.FederationService/PullEvents"
-	FederationService_AcknowledgeReplication_FullMethodName = "/zvonilka.federation.v1.FederationService/AcknowledgeReplication"
+	FederationService_CreatePeer_FullMethodName           = "/zvonilka.federation.v1.FederationService/CreatePeer"
+	FederationService_GetPeer_FullMethodName              = "/zvonilka.federation.v1.FederationService/GetPeer"
+	FederationService_ListPeers_FullMethodName            = "/zvonilka.federation.v1.FederationService/ListPeers"
+	FederationService_UpdatePeer_FullMethodName           = "/zvonilka.federation.v1.FederationService/UpdatePeer"
+	FederationService_CreateLink_FullMethodName           = "/zvonilka.federation.v1.FederationService/CreateLink"
+	FederationService_GetLink_FullMethodName              = "/zvonilka.federation.v1.FederationService/GetLink"
+	FederationService_ListLinks_FullMethodName            = "/zvonilka.federation.v1.FederationService/ListLinks"
+	FederationService_UpdateLink_FullMethodName           = "/zvonilka.federation.v1.FederationService/UpdateLink"
+	FederationService_PauseLink_FullMethodName            = "/zvonilka.federation.v1.FederationService/PauseLink"
+	FederationService_ResumeLink_FullMethodName           = "/zvonilka.federation.v1.FederationService/ResumeLink"
+	FederationService_DeleteLink_FullMethodName           = "/zvonilka.federation.v1.FederationService/DeleteLink"
+	FederationService_GetReplicationCursor_FullMethodName = "/zvonilka.federation.v1.FederationService/GetReplicationCursor"
+	FederationService_PushBundles_FullMethodName          = "/zvonilka.federation.v1.FederationService/PushBundles"
+	FederationService_PullBundles_FullMethodName          = "/zvonilka.federation.v1.FederationService/PullBundles"
+	FederationService_AcknowledgeBundles_FullMethodName   = "/zvonilka.federation.v1.FederationService/AcknowledgeBundles"
 )
 
 // FederationServiceClient is the client API for FederationService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type FederationServiceClient interface {
-	RegisterPeer(ctx context.Context, in *RegisterPeerRequest, opts ...grpc.CallOption) (*RegisterPeerResponse, error)
+	CreatePeer(ctx context.Context, in *CreatePeerRequest, opts ...grpc.CallOption) (*CreatePeerResponse, error)
 	GetPeer(ctx context.Context, in *GetPeerRequest, opts ...grpc.CallOption) (*GetPeerResponse, error)
 	ListPeers(ctx context.Context, in *ListPeersRequest, opts ...grpc.CallOption) (*ListPeersResponse, error)
 	UpdatePeer(ctx context.Context, in *UpdatePeerRequest, opts ...grpc.CallOption) (*UpdatePeerResponse, error)
-	PushEvents(ctx context.Context, in *PushEventsRequest, opts ...grpc.CallOption) (*PushEventsResponse, error)
-	PullEvents(ctx context.Context, in *PullEventsRequest, opts ...grpc.CallOption) (*PullEventsResponse, error)
-	AcknowledgeReplication(ctx context.Context, in *AcknowledgeReplicationRequest, opts ...grpc.CallOption) (*AcknowledgeReplicationResponse, error)
+	CreateLink(ctx context.Context, in *CreateLinkRequest, opts ...grpc.CallOption) (*CreateLinkResponse, error)
+	GetLink(ctx context.Context, in *GetLinkRequest, opts ...grpc.CallOption) (*GetLinkResponse, error)
+	ListLinks(ctx context.Context, in *ListLinksRequest, opts ...grpc.CallOption) (*ListLinksResponse, error)
+	UpdateLink(ctx context.Context, in *UpdateLinkRequest, opts ...grpc.CallOption) (*UpdateLinkResponse, error)
+	PauseLink(ctx context.Context, in *PauseLinkRequest, opts ...grpc.CallOption) (*PauseLinkResponse, error)
+	ResumeLink(ctx context.Context, in *ResumeLinkRequest, opts ...grpc.CallOption) (*ResumeLinkResponse, error)
+	DeleteLink(ctx context.Context, in *DeleteLinkRequest, opts ...grpc.CallOption) (*DeleteLinkResponse, error)
+	GetReplicationCursor(ctx context.Context, in *GetReplicationCursorRequest, opts ...grpc.CallOption) (*GetReplicationCursorResponse, error)
+	PushBundles(ctx context.Context, in *PushBundlesRequest, opts ...grpc.CallOption) (*PushBundlesResponse, error)
+	PullBundles(ctx context.Context, in *PullBundlesRequest, opts ...grpc.CallOption) (*PullBundlesResponse, error)
+	AcknowledgeBundles(ctx context.Context, in *AcknowledgeBundlesRequest, opts ...grpc.CallOption) (*AcknowledgeBundlesResponse, error)
 }
 
 type federationServiceClient struct {
@@ -49,9 +65,9 @@ func NewFederationServiceClient(cc grpc.ClientConnInterface) FederationServiceCl
 	return &federationServiceClient{cc}
 }
 
-func (c *federationServiceClient) RegisterPeer(ctx context.Context, in *RegisterPeerRequest, opts ...grpc.CallOption) (*RegisterPeerResponse, error) {
-	out := new(RegisterPeerResponse)
-	err := c.cc.Invoke(ctx, FederationService_RegisterPeer_FullMethodName, in, out, opts...)
+func (c *federationServiceClient) CreatePeer(ctx context.Context, in *CreatePeerRequest, opts ...grpc.CallOption) (*CreatePeerResponse, error) {
+	out := new(CreatePeerResponse)
+	err := c.cc.Invoke(ctx, FederationService_CreatePeer_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -85,27 +101,99 @@ func (c *federationServiceClient) UpdatePeer(ctx context.Context, in *UpdatePeer
 	return out, nil
 }
 
-func (c *federationServiceClient) PushEvents(ctx context.Context, in *PushEventsRequest, opts ...grpc.CallOption) (*PushEventsResponse, error) {
-	out := new(PushEventsResponse)
-	err := c.cc.Invoke(ctx, FederationService_PushEvents_FullMethodName, in, out, opts...)
+func (c *federationServiceClient) CreateLink(ctx context.Context, in *CreateLinkRequest, opts ...grpc.CallOption) (*CreateLinkResponse, error) {
+	out := new(CreateLinkResponse)
+	err := c.cc.Invoke(ctx, FederationService_CreateLink_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *federationServiceClient) PullEvents(ctx context.Context, in *PullEventsRequest, opts ...grpc.CallOption) (*PullEventsResponse, error) {
-	out := new(PullEventsResponse)
-	err := c.cc.Invoke(ctx, FederationService_PullEvents_FullMethodName, in, out, opts...)
+func (c *federationServiceClient) GetLink(ctx context.Context, in *GetLinkRequest, opts ...grpc.CallOption) (*GetLinkResponse, error) {
+	out := new(GetLinkResponse)
+	err := c.cc.Invoke(ctx, FederationService_GetLink_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *federationServiceClient) AcknowledgeReplication(ctx context.Context, in *AcknowledgeReplicationRequest, opts ...grpc.CallOption) (*AcknowledgeReplicationResponse, error) {
-	out := new(AcknowledgeReplicationResponse)
-	err := c.cc.Invoke(ctx, FederationService_AcknowledgeReplication_FullMethodName, in, out, opts...)
+func (c *federationServiceClient) ListLinks(ctx context.Context, in *ListLinksRequest, opts ...grpc.CallOption) (*ListLinksResponse, error) {
+	out := new(ListLinksResponse)
+	err := c.cc.Invoke(ctx, FederationService_ListLinks_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationServiceClient) UpdateLink(ctx context.Context, in *UpdateLinkRequest, opts ...grpc.CallOption) (*UpdateLinkResponse, error) {
+	out := new(UpdateLinkResponse)
+	err := c.cc.Invoke(ctx, FederationService_UpdateLink_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationServiceClient) PauseLink(ctx context.Context, in *PauseLinkRequest, opts ...grpc.CallOption) (*PauseLinkResponse, error) {
+	out := new(PauseLinkResponse)
+	err := c.cc.Invoke(ctx, FederationService_PauseLink_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationServiceClient) ResumeLink(ctx context.Context, in *ResumeLinkRequest, opts ...grpc.CallOption) (*ResumeLinkResponse, error) {
+	out := new(ResumeLinkResponse)
+	err := c.cc.Invoke(ctx, FederationService_ResumeLink_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationServiceClient) DeleteLink(ctx context.Context, in *DeleteLinkRequest, opts ...grpc.CallOption) (*DeleteLinkResponse, error) {
+	out := new(DeleteLinkResponse)
+	err := c.cc.Invoke(ctx, FederationService_DeleteLink_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationServiceClient) GetReplicationCursor(ctx context.Context, in *GetReplicationCursorRequest, opts ...grpc.CallOption) (*GetReplicationCursorResponse, error) {
+	out := new(GetReplicationCursorResponse)
+	err := c.cc.Invoke(ctx, FederationService_GetReplicationCursor_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationServiceClient) PushBundles(ctx context.Context, in *PushBundlesRequest, opts ...grpc.CallOption) (*PushBundlesResponse, error) {
+	out := new(PushBundlesResponse)
+	err := c.cc.Invoke(ctx, FederationService_PushBundles_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationServiceClient) PullBundles(ctx context.Context, in *PullBundlesRequest, opts ...grpc.CallOption) (*PullBundlesResponse, error) {
+	out := new(PullBundlesResponse)
+	err := c.cc.Invoke(ctx, FederationService_PullBundles_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *federationServiceClient) AcknowledgeBundles(ctx context.Context, in *AcknowledgeBundlesRequest, opts ...grpc.CallOption) (*AcknowledgeBundlesResponse, error) {
+	out := new(AcknowledgeBundlesResponse)
+	err := c.cc.Invoke(ctx, FederationService_AcknowledgeBundles_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -116,13 +204,21 @@ func (c *federationServiceClient) AcknowledgeReplication(ctx context.Context, in
 // All implementations must embed UnimplementedFederationServiceServer
 // for forward compatibility
 type FederationServiceServer interface {
-	RegisterPeer(context.Context, *RegisterPeerRequest) (*RegisterPeerResponse, error)
+	CreatePeer(context.Context, *CreatePeerRequest) (*CreatePeerResponse, error)
 	GetPeer(context.Context, *GetPeerRequest) (*GetPeerResponse, error)
 	ListPeers(context.Context, *ListPeersRequest) (*ListPeersResponse, error)
 	UpdatePeer(context.Context, *UpdatePeerRequest) (*UpdatePeerResponse, error)
-	PushEvents(context.Context, *PushEventsRequest) (*PushEventsResponse, error)
-	PullEvents(context.Context, *PullEventsRequest) (*PullEventsResponse, error)
-	AcknowledgeReplication(context.Context, *AcknowledgeReplicationRequest) (*AcknowledgeReplicationResponse, error)
+	CreateLink(context.Context, *CreateLinkRequest) (*CreateLinkResponse, error)
+	GetLink(context.Context, *GetLinkRequest) (*GetLinkResponse, error)
+	ListLinks(context.Context, *ListLinksRequest) (*ListLinksResponse, error)
+	UpdateLink(context.Context, *UpdateLinkRequest) (*UpdateLinkResponse, error)
+	PauseLink(context.Context, *PauseLinkRequest) (*PauseLinkResponse, error)
+	ResumeLink(context.Context, *ResumeLinkRequest) (*ResumeLinkResponse, error)
+	DeleteLink(context.Context, *DeleteLinkRequest) (*DeleteLinkResponse, error)
+	GetReplicationCursor(context.Context, *GetReplicationCursorRequest) (*GetReplicationCursorResponse, error)
+	PushBundles(context.Context, *PushBundlesRequest) (*PushBundlesResponse, error)
+	PullBundles(context.Context, *PullBundlesRequest) (*PullBundlesResponse, error)
+	AcknowledgeBundles(context.Context, *AcknowledgeBundlesRequest) (*AcknowledgeBundlesResponse, error)
 	mustEmbedUnimplementedFederationServiceServer()
 }
 
@@ -130,8 +226,8 @@ type FederationServiceServer interface {
 type UnimplementedFederationServiceServer struct {
 }
 
-func (UnimplementedFederationServiceServer) RegisterPeer(context.Context, *RegisterPeerRequest) (*RegisterPeerResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RegisterPeer not implemented")
+func (UnimplementedFederationServiceServer) CreatePeer(context.Context, *CreatePeerRequest) (*CreatePeerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreatePeer not implemented")
 }
 func (UnimplementedFederationServiceServer) GetPeer(context.Context, *GetPeerRequest) (*GetPeerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPeer not implemented")
@@ -142,14 +238,38 @@ func (UnimplementedFederationServiceServer) ListPeers(context.Context, *ListPeer
 func (UnimplementedFederationServiceServer) UpdatePeer(context.Context, *UpdatePeerRequest) (*UpdatePeerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdatePeer not implemented")
 }
-func (UnimplementedFederationServiceServer) PushEvents(context.Context, *PushEventsRequest) (*PushEventsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PushEvents not implemented")
+func (UnimplementedFederationServiceServer) CreateLink(context.Context, *CreateLinkRequest) (*CreateLinkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateLink not implemented")
 }
-func (UnimplementedFederationServiceServer) PullEvents(context.Context, *PullEventsRequest) (*PullEventsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PullEvents not implemented")
+func (UnimplementedFederationServiceServer) GetLink(context.Context, *GetLinkRequest) (*GetLinkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLink not implemented")
 }
-func (UnimplementedFederationServiceServer) AcknowledgeReplication(context.Context, *AcknowledgeReplicationRequest) (*AcknowledgeReplicationResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AcknowledgeReplication not implemented")
+func (UnimplementedFederationServiceServer) ListLinks(context.Context, *ListLinksRequest) (*ListLinksResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListLinks not implemented")
+}
+func (UnimplementedFederationServiceServer) UpdateLink(context.Context, *UpdateLinkRequest) (*UpdateLinkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateLink not implemented")
+}
+func (UnimplementedFederationServiceServer) PauseLink(context.Context, *PauseLinkRequest) (*PauseLinkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PauseLink not implemented")
+}
+func (UnimplementedFederationServiceServer) ResumeLink(context.Context, *ResumeLinkRequest) (*ResumeLinkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResumeLink not implemented")
+}
+func (UnimplementedFederationServiceServer) DeleteLink(context.Context, *DeleteLinkRequest) (*DeleteLinkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteLink not implemented")
+}
+func (UnimplementedFederationServiceServer) GetReplicationCursor(context.Context, *GetReplicationCursorRequest) (*GetReplicationCursorResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetReplicationCursor not implemented")
+}
+func (UnimplementedFederationServiceServer) PushBundles(context.Context, *PushBundlesRequest) (*PushBundlesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PushBundles not implemented")
+}
+func (UnimplementedFederationServiceServer) PullBundles(context.Context, *PullBundlesRequest) (*PullBundlesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PullBundles not implemented")
+}
+func (UnimplementedFederationServiceServer) AcknowledgeBundles(context.Context, *AcknowledgeBundlesRequest) (*AcknowledgeBundlesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AcknowledgeBundles not implemented")
 }
 func (UnimplementedFederationServiceServer) mustEmbedUnimplementedFederationServiceServer() {}
 
@@ -164,20 +284,20 @@ func RegisterFederationServiceServer(s grpc.ServiceRegistrar, srv FederationServ
 	s.RegisterService(&FederationService_ServiceDesc, srv)
 }
 
-func _FederationService_RegisterPeer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RegisterPeerRequest)
+func _FederationService_CreatePeer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePeerRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(FederationServiceServer).RegisterPeer(ctx, in)
+		return srv.(FederationServiceServer).CreatePeer(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: FederationService_RegisterPeer_FullMethodName,
+		FullMethod: FederationService_CreatePeer_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(FederationServiceServer).RegisterPeer(ctx, req.(*RegisterPeerRequest))
+		return srv.(FederationServiceServer).CreatePeer(ctx, req.(*CreatePeerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -236,56 +356,200 @@ func _FederationService_UpdatePeer_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
-func _FederationService_PushEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PushEventsRequest)
+func _FederationService_CreateLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateLinkRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(FederationServiceServer).PushEvents(ctx, in)
+		return srv.(FederationServiceServer).CreateLink(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: FederationService_PushEvents_FullMethodName,
+		FullMethod: FederationService_CreateLink_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(FederationServiceServer).PushEvents(ctx, req.(*PushEventsRequest))
+		return srv.(FederationServiceServer).CreateLink(ctx, req.(*CreateLinkRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _FederationService_PullEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PullEventsRequest)
+func _FederationService_GetLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLinkRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(FederationServiceServer).PullEvents(ctx, in)
+		return srv.(FederationServiceServer).GetLink(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: FederationService_PullEvents_FullMethodName,
+		FullMethod: FederationService_GetLink_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(FederationServiceServer).PullEvents(ctx, req.(*PullEventsRequest))
+		return srv.(FederationServiceServer).GetLink(ctx, req.(*GetLinkRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _FederationService_AcknowledgeReplication_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AcknowledgeReplicationRequest)
+func _FederationService_ListLinks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListLinksRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(FederationServiceServer).AcknowledgeReplication(ctx, in)
+		return srv.(FederationServiceServer).ListLinks(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: FederationService_AcknowledgeReplication_FullMethodName,
+		FullMethod: FederationService_ListLinks_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(FederationServiceServer).AcknowledgeReplication(ctx, req.(*AcknowledgeReplicationRequest))
+		return srv.(FederationServiceServer).ListLinks(ctx, req.(*ListLinksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FederationService_UpdateLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServiceServer).UpdateLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FederationService_UpdateLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServiceServer).UpdateLink(ctx, req.(*UpdateLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FederationService_PauseLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PauseLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServiceServer).PauseLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FederationService_PauseLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServiceServer).PauseLink(ctx, req.(*PauseLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FederationService_ResumeLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResumeLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServiceServer).ResumeLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FederationService_ResumeLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServiceServer).ResumeLink(ctx, req.(*ResumeLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FederationService_DeleteLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServiceServer).DeleteLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FederationService_DeleteLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServiceServer).DeleteLink(ctx, req.(*DeleteLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FederationService_GetReplicationCursor_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetReplicationCursorRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServiceServer).GetReplicationCursor(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FederationService_GetReplicationCursor_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServiceServer).GetReplicationCursor(ctx, req.(*GetReplicationCursorRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FederationService_PushBundles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PushBundlesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServiceServer).PushBundles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FederationService_PushBundles_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServiceServer).PushBundles(ctx, req.(*PushBundlesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FederationService_PullBundles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PullBundlesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServiceServer).PullBundles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FederationService_PullBundles_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServiceServer).PullBundles(ctx, req.(*PullBundlesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FederationService_AcknowledgeBundles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AcknowledgeBundlesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServiceServer).AcknowledgeBundles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FederationService_AcknowledgeBundles_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServiceServer).AcknowledgeBundles(ctx, req.(*AcknowledgeBundlesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -298,8 +562,8 @@ var FederationService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*FederationServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "RegisterPeer",
-			Handler:    _FederationService_RegisterPeer_Handler,
+			MethodName: "CreatePeer",
+			Handler:    _FederationService_CreatePeer_Handler,
 		},
 		{
 			MethodName: "GetPeer",
@@ -314,16 +578,48 @@ var FederationService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _FederationService_UpdatePeer_Handler,
 		},
 		{
-			MethodName: "PushEvents",
-			Handler:    _FederationService_PushEvents_Handler,
+			MethodName: "CreateLink",
+			Handler:    _FederationService_CreateLink_Handler,
 		},
 		{
-			MethodName: "PullEvents",
-			Handler:    _FederationService_PullEvents_Handler,
+			MethodName: "GetLink",
+			Handler:    _FederationService_GetLink_Handler,
 		},
 		{
-			MethodName: "AcknowledgeReplication",
-			Handler:    _FederationService_AcknowledgeReplication_Handler,
+			MethodName: "ListLinks",
+			Handler:    _FederationService_ListLinks_Handler,
+		},
+		{
+			MethodName: "UpdateLink",
+			Handler:    _FederationService_UpdateLink_Handler,
+		},
+		{
+			MethodName: "PauseLink",
+			Handler:    _FederationService_PauseLink_Handler,
+		},
+		{
+			MethodName: "ResumeLink",
+			Handler:    _FederationService_ResumeLink_Handler,
+		},
+		{
+			MethodName: "DeleteLink",
+			Handler:    _FederationService_DeleteLink_Handler,
+		},
+		{
+			MethodName: "GetReplicationCursor",
+			Handler:    _FederationService_GetReplicationCursor_Handler,
+		},
+		{
+			MethodName: "PushBundles",
+			Handler:    _FederationService_PushBundles_Handler,
+		},
+		{
+			MethodName: "PullBundles",
+			Handler:    _FederationService_PullBundles_Handler,
+		},
+		{
+			MethodName: "AcknowledgeBundles",
+			Handler:    _FederationService_AcknowledgeBundles_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

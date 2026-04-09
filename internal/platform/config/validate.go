@@ -217,6 +217,23 @@ func (c Configuration) Validate() error {
 	if c.Notification.BatchSize <= 0 {
 		errs = append(errs, errors.New("notification batch size must be positive"))
 	}
+	if c.Federation.WorkerPollInterval <= 0 {
+		errs = append(errs, errors.New("federation worker poll interval must be positive"))
+	}
+	if c.Federation.WorkerBatchSize <= 0 {
+		errs = append(errs, errors.New("federation worker batch size must be positive"))
+	}
+	if c.Federation.DialTimeout <= 0 {
+		errs = append(errs, errors.New("federation dial timeout must be positive"))
+	}
+	if c.Service.Name == "federationworker" {
+		if !c.Features.FederationEnabled {
+			errs = append(errs, errors.New("federation feature flag must be enabled for federationworker"))
+		}
+		if strings.TrimSpace(c.Federation.LocalServerName) == "" {
+			errs = append(errs, errors.New("federation local server name is required for federationworker"))
+		}
+	}
 	if c.Search.DefaultLimit <= 0 {
 		errs = append(errs, errors.New("search default limit must be positive"))
 	}
@@ -401,7 +418,7 @@ func validateLogFormat(format string) error {
 func validateServiceName(serviceName string) error {
 	serviceName = strings.ToLower(strings.TrimSpace(serviceName))
 	switch serviceName {
-	case "controlplane", "gateway", "botapi", "notificationworker", "callworker", "callhooks":
+	case "controlplane", "gateway", "botapi", "notificationworker", "callworker", "callhooks", "federationworker":
 		return nil
 	case "":
 		return errors.New("service name is required")

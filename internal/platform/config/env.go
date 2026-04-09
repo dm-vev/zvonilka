@@ -374,6 +374,26 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Notification.BatchSize = value
 	}
+	if value, ok, err := stringValueWithPresence(serviceName, "FEDERATION_LOCAL_SERVER_NAME", cfg.Federation.LocalServerName); err != nil {
+		return err
+	} else if ok {
+		cfg.Federation.LocalServerName = value
+	}
+	if value, ok, err := durationValue(serviceName, "FEDERATION_WORKER_POLL_INTERVAL", cfg.Federation.WorkerPollInterval); err != nil {
+		return err
+	} else if ok {
+		cfg.Federation.WorkerPollInterval = value
+	}
+	if value, ok, err := intValue(serviceName, "FEDERATION_WORKER_BATCH_SIZE", cfg.Federation.WorkerBatchSize); err != nil {
+		return err
+	} else if ok {
+		cfg.Federation.WorkerBatchSize = value
+	}
+	if value, ok, err := durationValue(serviceName, "FEDERATION_DIAL_TIMEOUT", cfg.Federation.DialTimeout); err != nil {
+		return err
+	} else if ok {
+		cfg.Federation.DialTimeout = value
+	}
 	if value, ok, err := intValue(serviceName, "SEARCH_DEFAULT_LIMIT", cfg.Search.DefaultLimit); err != nil {
 		return err
 	} else if ok {
