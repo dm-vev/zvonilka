@@ -83,6 +83,17 @@ enum FragmentState {
   FRAGMENT_STATE_CLAIMED = 6;
 }
 
+enum EventFamily {
+  EVENT_FAMILY_UNSPECIFIED = 0;
+  EVENT_FAMILY_CONVERSATION = 1;
+  EVENT_FAMILY_MEMBERSHIP = 2;
+  EVENT_FAMILY_MESSAGE = 3;
+  EVENT_FAMILY_RECEIPT = 4;
+  EVENT_FAMILY_TOPIC = 5;
+  EVENT_FAMILY_USER = 6;
+  EVENT_FAMILY_ADMIN_ACTION = 7;
+}
+
 message Peer {
   string peer_id = 1;
   string server_name = 2;
@@ -115,6 +126,7 @@ message Link {
   google.protobuf.Timestamp updated_at = 14;
   google.protobuf.Timestamp last_healthy_at = 15;
   string last_error = 16;
+  repeated EventFamily allowed_event_families = 17;
 }
 
 message ReplicationCursor {

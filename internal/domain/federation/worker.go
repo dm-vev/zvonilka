@@ -471,6 +471,9 @@ func (w *Worker) buildOutboundBundles(
 			originServer == strings.TrimSpace(strings.ToLower(peer.ServerName)) {
 			continue
 		}
+		if !eventFamilyAllowed(link.AllowedEventFamilies, event) {
+			continue
+		}
 		if event.ConversationID != "" && len(link.AllowedConversationKinds) > 0 {
 			conversationRow, err := w.conversations.ConversationByID(ctx, event.ConversationID)
 			if err != nil {
@@ -483,19 +486,7 @@ func (w *Worker) buildOutboundBundles(
 		filtered = append(filtered, event)
 	}
 	if len(filtered) == 0 {
-		last := events[len(events)-1]
-		payload, compression, err := marshalFederationEventBatch(nil, link.MaxBundleBytes)
-		if err != nil {
-			return nil, err
-		}
-		return []SaveBundleParams{{
-			CursorFrom:  firstSequence(events),
-			CursorTo:    last.Sequence,
-			EventCount:  0,
-			PayloadType: bundlePayloadTypeConversationEvents,
-			Payload:     payload,
-			Compression: compression,
-		}}, nil
+		return emptyFederationEventBatch(events, link.MaxBundleBytes)
 	}
 
 	params := make([]SaveBundleParams, 0, len(filtered))
@@ -504,6 +495,10 @@ func (w *Worker) buildOutboundBundles(
 		end := start + 1
 		payload, compression, err := marshalFederationEventBatch(filtered[start:end], link.MaxBundleBytes)
 		if err != nil {
+			if errors.Is(err, ErrConflict) && shouldSkipOversizedSingleEvent(link) {
+				start = end
+				continue
+			}
 			return nil, err
 		}
 
@@ -533,8 +528,28 @@ func (w *Worker) buildOutboundBundles(
 		})
 		start = end
 	}
+	if len(params) == 0 {
+		return emptyFederationEventBatch(events, link.MaxBundleBytes)
+	}
 
 	return params, nil
+}
+
+func emptyFederationEventBatch(events []conversation.EventEnvelope, maxBytes int) ([]SaveBundleParams, error) {
+	last := events[len(events)-1]
+	payload, compression, err := marshalFederationEventBatch(nil, maxBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return []SaveBundleParams{{
+		CursorFrom:  firstSequence(events),
+		CursorTo:    last.Sequence,
+		EventCount:  0,
+		PayloadType: bundlePayloadTypeConversationEvents,
+		Payload:     payload,
+		Compression: compression,
+	}}, nil
 }
 
 func marshalFederationEventBatch(
@@ -611,6 +626,61 @@ func conversationKindAllowed(
 	}
 
 	return false
+}
+
+func eventFamilyAllowed(allowed []EventFamily, event conversation.EventEnvelope) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+
+	family := eventFamilyForConversationEvent(event)
+	if family == EventFamilyUnspecified {
+		return false
+	}
+	for _, candidate := range allowed {
+		if candidate == family {
+			return true
+		}
+	}
+
+	return false
+}
+
+func eventFamilyForConversationEvent(event conversation.EventEnvelope) EventFamily {
+	switch event.EventType {
+	case conversation.EventTypeConversationCreated, conversation.EventTypeConversationUpdated:
+		return EventFamilyConversation
+	case conversation.EventTypeConversationMembers:
+		return EventFamilyMembership
+	case conversation.EventTypeMessageCreated,
+		conversation.EventTypeMessageEdited,
+		conversation.EventTypeMessageDeleted,
+		conversation.EventTypeMessagePinned,
+		conversation.EventTypeMessageReactionAdded,
+		conversation.EventTypeMessageReactionUpdated,
+		conversation.EventTypeMessageReactionRemoved:
+		return EventFamilyMessage
+	case conversation.EventTypeMessageDelivered,
+		conversation.EventTypeMessageRead,
+		conversation.EventTypeSyncAcknowledged:
+		return EventFamilyReceipt
+	case conversation.EventTypeTopicCreated,
+		conversation.EventTypeTopicUpdated,
+		conversation.EventTypeTopicArchived,
+		conversation.EventTypeTopicPinned,
+		conversation.EventTypeTopicClosed:
+		return EventFamilyTopic
+	case conversation.EventTypeUserUpdated:
+		return EventFamilyUser
+	case conversation.EventTypeAdminActionRecorded:
+		return EventFamilyAdminAction
+	default:
+		return EventFamilyUnspecified
+	}
+}
+
+func shouldSkipOversizedSingleEvent(link Link) bool {
+	return link.DeliveryClass == DeliveryClassUltraConstrained
 }
 
 func firstSequence(events []conversation.EventEnvelope) uint64 {

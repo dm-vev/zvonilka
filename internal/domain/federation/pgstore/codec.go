@@ -73,6 +73,28 @@ func decodeConversationKinds(raw string) ([]federation.ConversationKind, error) 
 	return values, nil
 }
 
+func encodeEventFamilies(values []federation.EventFamily) (string, error) {
+	raw, err := json.Marshal(values)
+	if err != nil {
+		return "", fmt.Errorf("encode federation event families: %w", err)
+	}
+
+	return string(raw), nil
+}
+
+func decodeEventFamilies(raw string) ([]federation.EventFamily, error) {
+	if raw == "" {
+		return nil, nil
+	}
+
+	var values []federation.EventFamily
+	if err := json.Unmarshal([]byte(raw), &values); err != nil {
+		return nil, fmt.Errorf("decode federation event families: %w", err)
+	}
+
+	return values, nil
+}
+
 func scanPeer(row rowScanner) (federation.Peer, error) {
 	var (
 		peer       federation.Peer
@@ -118,6 +140,7 @@ func scanLink(row rowScanner) (federation.Link, error) {
 	var (
 		link          federation.Link
 		rawKinds      string
+		rawFamilies   string
 		lastHealthyAt sql.NullTime
 	)
 
@@ -134,6 +157,7 @@ func scanLink(row rowScanner) (federation.Link, error) {
 		&link.MaxBundleBytes,
 		&link.MaxFragmentBytes,
 		&rawKinds,
+		&rawFamilies,
 		&link.CreatedAt,
 		&link.UpdatedAt,
 		&lastHealthyAt,
@@ -146,8 +170,13 @@ func scanLink(row rowScanner) (federation.Link, error) {
 	if err != nil {
 		return federation.Link{}, err
 	}
+	families, err := decodeEventFamilies(rawFamilies)
+	if err != nil {
+		return federation.Link{}, err
+	}
 
 	link.AllowedConversationKinds = kinds
+	link.AllowedEventFamilies = families
 	link.CreatedAt = link.CreatedAt.UTC()
 	link.UpdatedAt = link.UpdatedAt.UTC()
 	link.LastHealthyAt = scanTime(lastHealthyAt)

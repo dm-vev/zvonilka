@@ -160,6 +160,21 @@ const (
 	FragmentStateFailed       FragmentState = "failed"
 )
 
+// EventFamily identifies a coarse replication event class for one link.
+type EventFamily string
+
+// Event families supported by federation link policy.
+const (
+	EventFamilyUnspecified  EventFamily = ""
+	EventFamilyConversation EventFamily = "conversation"
+	EventFamilyMembership   EventFamily = "membership"
+	EventFamilyMessage      EventFamily = "message"
+	EventFamilyReceipt      EventFamily = "receipt"
+	EventFamilyTopic        EventFamily = "topic"
+	EventFamilyUser         EventFamily = "user"
+	EventFamilyAdminAction  EventFamily = "admin_action"
+)
+
 // Peer stores one remote server federation identity.
 type Peer struct {
 	ID                      string
@@ -194,6 +209,7 @@ type Link struct {
 	MaxBundleBytes           int
 	MaxFragmentBytes         int
 	AllowedConversationKinds []ConversationKind
+	AllowedEventFamilies     []EventFamily
 	CreatedAt                time.Time
 	UpdatedAt                time.Time
 	LastHealthyAt            time.Time
@@ -293,6 +309,29 @@ func defaultConversationKinds() []ConversationKind {
 	}
 }
 
+func defaultEventFamilies(deliveryClass DeliveryClass) []EventFamily {
+	switch deliveryClass {
+	case DeliveryClassUltraConstrained:
+		return []EventFamily{
+			EventFamilyConversation,
+			EventFamilyMembership,
+			EventFamilyMessage,
+			EventFamilyReceipt,
+			EventFamilyTopic,
+		}
+	default:
+		return []EventFamily{
+			EventFamilyConversation,
+			EventFamilyMembership,
+			EventFamilyMessage,
+			EventFamilyReceipt,
+			EventFamilyTopic,
+			EventFamilyUser,
+			EventFamilyAdminAction,
+		}
+	}
+}
+
 func normalizeCapabilities(values []Capability) []Capability {
 	if len(values) == 0 {
 		return nil
@@ -350,6 +389,44 @@ func normalizeConversationKinds(values []ConversationKind) []ConversationKind {
 
 	if len(normalized) == 0 {
 		return defaultConversationKinds()
+	}
+
+	return normalized
+}
+
+func normalizeEventFamilies(values []EventFamily, deliveryClass DeliveryClass) []EventFamily {
+	if len(values) == 0 {
+		return defaultEventFamilies(deliveryClass)
+	}
+
+	seen := make(map[EventFamily]struct{}, len(values))
+	normalized := make([]EventFamily, 0, len(values))
+	for _, value := range values {
+		value = EventFamily(strings.TrimSpace(strings.ToLower(string(value))))
+		switch value {
+		case EventFamilyConversation,
+			EventFamilyMembership,
+			EventFamilyMessage,
+			EventFamilyReceipt,
+			EventFamilyTopic,
+			EventFamilyUser,
+			EventFamilyAdminAction:
+		default:
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		normalized = append(normalized, value)
+	}
+
+	sort.Slice(normalized, func(i, j int) bool {
+		return normalized[i] < normalized[j]
+	})
+
+	if len(normalized) == 0 {
+		return defaultEventFamilies(deliveryClass)
 	}
 
 	return normalized
@@ -496,6 +573,7 @@ func (l Link) normalize(now time.Time) (Link, error) {
 	}
 
 	l.AllowedConversationKinds = normalizeConversationKinds(l.AllowedConversationKinds)
+	l.AllowedEventFamilies = normalizeEventFamilies(l.AllowedEventFamilies, l.DeliveryClass)
 	if l.CreatedAt.IsZero() {
 		l.CreatedAt = now.UTC()
 	}

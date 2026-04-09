@@ -248,6 +248,7 @@ func (a *api) CreateLink(
 		MaxBundleBytes:           int(req.GetMaxBundleBytes()),
 		MaxFragmentBytes:         int(req.GetMaxFragmentBytes()),
 		AllowedConversationKinds: conversationKindsFromProto(req.GetAllowedConversationKinds()),
+		AllowedEventFamilies:     eventFamiliesFromProto(req.GetAllowedEventFamilies()),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -370,6 +371,7 @@ func (a *api) UpdateLink(
 			"max_bundle_bytes",
 			"max_fragment_bytes",
 			"allowed_conversation_kinds",
+			"allowed_event_families",
 			"last_error",
 		}
 	}
@@ -405,6 +407,9 @@ func (a *api) UpdateLink(
 		case "allowed_conversation_kinds":
 			value := conversationKindsFromProto(req.GetLink().GetAllowedConversationKinds())
 			params.AllowedConversationKinds = &value
+		case "allowed_event_families":
+			value := eventFamiliesFromProto(req.GetLink().GetAllowedEventFamilies())
+			params.AllowedEventFamilies = &value
 		case "last_error":
 			value := req.GetLink().GetLastError()
 			params.LastError = &value
@@ -716,6 +721,7 @@ func linkProto(link domainfederation.Link) *federationv1.Link {
 		MaxBundleBytes:           uint32(maxInt(0, link.MaxBundleBytes)),
 		MaxFragmentBytes:         uint32(maxInt(0, link.MaxFragmentBytes)),
 		AllowedConversationKinds: conversationKindsProto(link.AllowedConversationKinds),
+		AllowedEventFamilies:     eventFamiliesProto(link.AllowedEventFamilies),
 		CreatedAt:                timestamppb.New(link.CreatedAt),
 		UpdatedAt:                timestamppb.New(link.UpdatedAt),
 		LastHealthyAt:            timestampOrNil(link.LastHealthyAt),
@@ -1004,6 +1010,58 @@ func conversationKindsProto(values []domainfederation.ConversationKind) []common
 			converted = append(converted, commonv1.ConversationKind_CONVERSATION_KIND_GROUP)
 		case domainfederation.ConversationKindChannel:
 			converted = append(converted, commonv1.ConversationKind_CONVERSATION_KIND_CHANNEL)
+		}
+	}
+
+	return converted
+}
+
+func eventFamiliesFromProto(values []federationv1.EventFamily) []domainfederation.EventFamily {
+	if len(values) == 0 {
+		return nil
+	}
+
+	converted := make([]domainfederation.EventFamily, 0, len(values))
+	for _, value := range values {
+		switch value {
+		case federationv1.EventFamily_EVENT_FAMILY_CONVERSATION:
+			converted = append(converted, domainfederation.EventFamilyConversation)
+		case federationv1.EventFamily_EVENT_FAMILY_MEMBERSHIP:
+			converted = append(converted, domainfederation.EventFamilyMembership)
+		case federationv1.EventFamily_EVENT_FAMILY_MESSAGE:
+			converted = append(converted, domainfederation.EventFamilyMessage)
+		case federationv1.EventFamily_EVENT_FAMILY_RECEIPT:
+			converted = append(converted, domainfederation.EventFamilyReceipt)
+		case federationv1.EventFamily_EVENT_FAMILY_TOPIC:
+			converted = append(converted, domainfederation.EventFamilyTopic)
+		case federationv1.EventFamily_EVENT_FAMILY_USER:
+			converted = append(converted, domainfederation.EventFamilyUser)
+		case federationv1.EventFamily_EVENT_FAMILY_ADMIN_ACTION:
+			converted = append(converted, domainfederation.EventFamilyAdminAction)
+		}
+	}
+
+	return converted
+}
+
+func eventFamiliesProto(values []domainfederation.EventFamily) []federationv1.EventFamily {
+	converted := make([]federationv1.EventFamily, 0, len(values))
+	for _, value := range values {
+		switch value {
+		case domainfederation.EventFamilyConversation:
+			converted = append(converted, federationv1.EventFamily_EVENT_FAMILY_CONVERSATION)
+		case domainfederation.EventFamilyMembership:
+			converted = append(converted, federationv1.EventFamily_EVENT_FAMILY_MEMBERSHIP)
+		case domainfederation.EventFamilyMessage:
+			converted = append(converted, federationv1.EventFamily_EVENT_FAMILY_MESSAGE)
+		case domainfederation.EventFamilyReceipt:
+			converted = append(converted, federationv1.EventFamily_EVENT_FAMILY_RECEIPT)
+		case domainfederation.EventFamilyTopic:
+			converted = append(converted, federationv1.EventFamily_EVENT_FAMILY_TOPIC)
+		case domainfederation.EventFamilyUser:
+			converted = append(converted, federationv1.EventFamily_EVENT_FAMILY_USER)
+		case domainfederation.EventFamilyAdminAction:
+			converted = append(converted, federationv1.EventFamily_EVENT_FAMILY_ADMIN_ACTION)
 		}
 	}
 

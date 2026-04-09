@@ -18,7 +18,7 @@ id, server_name, base_url, capabilities, trusted, state, verification_fingerprin
 signing_fingerprint, signing_secret, previous_signing_secret, signing_key_version, created_at, updated_at, last_seen_at`
 	linkColumnList = `
 id, peer_id, name, endpoint, transport_kind, delivery_class, discovery_mode, media_policy, state,
-max_bundle_bytes, max_fragment_bytes, allowed_conversation_kinds, created_at, updated_at, last_healthy_at, last_error`
+max_bundle_bytes, max_fragment_bytes, allowed_conversation_kinds, allowed_event_families, created_at, updated_at, last_healthy_at, last_error`
 	bundleColumnList = `
 id, peer_id, link_id, dedup_key, direction, cursor_from, cursor_to, event_count, payload_type, payload,
 compression, integrity_hash, auth_tag, state, created_at, available_at, expires_at, acked_at`
@@ -207,13 +207,17 @@ func (s *Store) SaveLink(ctx context.Context, link federation.Link) (federation.
 	if err != nil {
 		return federation.Link{}, err
 	}
+	rawFamilies, err := encodeEventFamilies(link.AllowedEventFamilies)
+	if err != nil {
+		return federation.Link{}, err
+	}
 
 	query := fmt.Sprintf(`
 INSERT INTO %s (
 	id, peer_id, name, endpoint, transport_kind, delivery_class, discovery_mode, media_policy, state,
-	max_bundle_bytes, max_fragment_bytes, allowed_conversation_kinds, created_at, updated_at, last_healthy_at, last_error
+	max_bundle_bytes, max_fragment_bytes, allowed_conversation_kinds, allowed_event_families, created_at, updated_at, last_healthy_at, last_error
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
 )
 ON CONFLICT (id) DO UPDATE SET
 	peer_id = EXCLUDED.peer_id,
@@ -227,6 +231,7 @@ ON CONFLICT (id) DO UPDATE SET
 	max_bundle_bytes = EXCLUDED.max_bundle_bytes,
 	max_fragment_bytes = EXCLUDED.max_fragment_bytes,
 	allowed_conversation_kinds = EXCLUDED.allowed_conversation_kinds,
+	allowed_event_families = EXCLUDED.allowed_event_families,
 	created_at = EXCLUDED.created_at,
 	updated_at = EXCLUDED.updated_at,
 	last_healthy_at = EXCLUDED.last_healthy_at,
@@ -249,6 +254,7 @@ RETURNING `+linkColumnList+`
 		link.MaxBundleBytes,
 		link.MaxFragmentBytes,
 		rawKinds,
+		rawFamilies,
 		link.CreatedAt.UTC(),
 		link.UpdatedAt.UTC(),
 		nullTime(link.LastHealthyAt),
