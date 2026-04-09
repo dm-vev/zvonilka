@@ -249,6 +249,7 @@ func (a *api) CreateLink(
 		MaxFragmentBytes:         int(req.GetMaxFragmentBytes()),
 		AllowedConversationKinds: conversationKindsFromProto(req.GetAllowedConversationKinds()),
 		AllowedEventFamilies:     eventFamiliesFromProto(req.GetAllowedEventFamilies()),
+		AllowedMessageKinds:      messageKindsFromProto(req.GetAllowedMessageKinds()),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -372,6 +373,7 @@ func (a *api) UpdateLink(
 			"max_fragment_bytes",
 			"allowed_conversation_kinds",
 			"allowed_event_families",
+			"allowed_message_kinds",
 			"last_error",
 		}
 	}
@@ -410,6 +412,9 @@ func (a *api) UpdateLink(
 		case "allowed_event_families":
 			value := eventFamiliesFromProto(req.GetLink().GetAllowedEventFamilies())
 			params.AllowedEventFamilies = &value
+		case "allowed_message_kinds":
+			value := messageKindsFromProto(req.GetLink().GetAllowedMessageKinds())
+			params.AllowedMessageKinds = &value
 		case "last_error":
 			value := req.GetLink().GetLastError()
 			params.LastError = &value
@@ -722,6 +727,7 @@ func linkProto(link domainfederation.Link) *federationv1.Link {
 		MaxFragmentBytes:         uint32(maxInt(0, link.MaxFragmentBytes)),
 		AllowedConversationKinds: conversationKindsProto(link.AllowedConversationKinds),
 		AllowedEventFamilies:     eventFamiliesProto(link.AllowedEventFamilies),
+		AllowedMessageKinds:      messageKindsProto(link.AllowedMessageKinds),
 		CreatedAt:                timestamppb.New(link.CreatedAt),
 		UpdatedAt:                timestamppb.New(link.UpdatedAt),
 		LastHealthyAt:            timestampOrNil(link.LastHealthyAt),
@@ -1062,6 +1068,62 @@ func eventFamiliesProto(values []domainfederation.EventFamily) []federationv1.Ev
 			converted = append(converted, federationv1.EventFamily_EVENT_FAMILY_USER)
 		case domainfederation.EventFamilyAdminAction:
 			converted = append(converted, federationv1.EventFamily_EVENT_FAMILY_ADMIN_ACTION)
+		}
+	}
+
+	return converted
+}
+
+func messageKindsFromProto(values []commonv1.MessageKind) []domainfederation.MessageKind {
+	if len(values) == 0 {
+		return nil
+	}
+
+	converted := make([]domainfederation.MessageKind, 0, len(values))
+	for _, value := range values {
+		switch value {
+		case commonv1.MessageKind_MESSAGE_KIND_TEXT:
+			converted = append(converted, domainfederation.MessageKindText)
+		case commonv1.MessageKind_MESSAGE_KIND_IMAGE:
+			converted = append(converted, domainfederation.MessageKindImage)
+		case commonv1.MessageKind_MESSAGE_KIND_VIDEO:
+			converted = append(converted, domainfederation.MessageKindVideo)
+		case commonv1.MessageKind_MESSAGE_KIND_DOCUMENT:
+			converted = append(converted, domainfederation.MessageKindDocument)
+		case commonv1.MessageKind_MESSAGE_KIND_VOICE:
+			converted = append(converted, domainfederation.MessageKindVoice)
+		case commonv1.MessageKind_MESSAGE_KIND_STICKER:
+			converted = append(converted, domainfederation.MessageKindSticker)
+		case commonv1.MessageKind_MESSAGE_KIND_GIF:
+			converted = append(converted, domainfederation.MessageKindGIF)
+		case commonv1.MessageKind_MESSAGE_KIND_SYSTEM:
+			converted = append(converted, domainfederation.MessageKindSystem)
+		}
+	}
+
+	return converted
+}
+
+func messageKindsProto(values []domainfederation.MessageKind) []commonv1.MessageKind {
+	converted := make([]commonv1.MessageKind, 0, len(values))
+	for _, value := range values {
+		switch value {
+		case domainfederation.MessageKindText:
+			converted = append(converted, commonv1.MessageKind_MESSAGE_KIND_TEXT)
+		case domainfederation.MessageKindImage:
+			converted = append(converted, commonv1.MessageKind_MESSAGE_KIND_IMAGE)
+		case domainfederation.MessageKindVideo:
+			converted = append(converted, commonv1.MessageKind_MESSAGE_KIND_VIDEO)
+		case domainfederation.MessageKindDocument:
+			converted = append(converted, commonv1.MessageKind_MESSAGE_KIND_DOCUMENT)
+		case domainfederation.MessageKindVoice:
+			converted = append(converted, commonv1.MessageKind_MESSAGE_KIND_VOICE)
+		case domainfederation.MessageKindSticker:
+			converted = append(converted, commonv1.MessageKind_MESSAGE_KIND_STICKER)
+		case domainfederation.MessageKindGIF:
+			converted = append(converted, commonv1.MessageKind_MESSAGE_KIND_GIF)
+		case domainfederation.MessageKindSystem:
+			converted = append(converted, commonv1.MessageKind_MESSAGE_KIND_SYSTEM)
 		}
 	}
 

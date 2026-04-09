@@ -83,6 +83,7 @@ message CreateLinkRequest {
   repeated zvonilka.common.v1.ConversationKind allowed_conversation_kinds = 10;
   string idempotency_key = 11;
   repeated EventFamily allowed_event_families = 12;
+  repeated zvonilka.common.v1.MessageKind allowed_message_kinds = 13;
 }
 
 message CreateLinkResponse {

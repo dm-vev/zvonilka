@@ -127,6 +127,7 @@ message Link {
   google.protobuf.Timestamp last_healthy_at = 15;
   string last_error = 16;
   repeated EventFamily allowed_event_families = 17;
+  repeated zvonilka.common.v1.MessageKind allowed_message_kinds = 18;
 }
 
 message ReplicationCursor {

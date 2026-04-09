@@ -44,6 +44,22 @@ const (
 	ConversationKindChannel     ConversationKind = "channel"
 )
 
+// MessageKind identifies which message payload families a link may carry.
+type MessageKind string
+
+// Message kinds supported by federation policy.
+const (
+	MessageKindUnspecified MessageKind = ""
+	MessageKindText        MessageKind = "text"
+	MessageKindImage       MessageKind = "image"
+	MessageKindVideo       MessageKind = "video"
+	MessageKindDocument    MessageKind = "document"
+	MessageKindVoice       MessageKind = "voice"
+	MessageKindSticker     MessageKind = "sticker"
+	MessageKindGIF         MessageKind = "gif"
+	MessageKindSystem      MessageKind = "system"
+)
+
 // PeerState identifies the trust and lifecycle state of a peer.
 type PeerState string
 
@@ -210,6 +226,7 @@ type Link struct {
 	MaxFragmentBytes         int
 	AllowedConversationKinds []ConversationKind
 	AllowedEventFamilies     []EventFamily
+	AllowedMessageKinds      []MessageKind
 	CreatedAt                time.Time
 	UpdatedAt                time.Time
 	LastHealthyAt            time.Time
@@ -332,6 +349,26 @@ func defaultEventFamilies(deliveryClass DeliveryClass) []EventFamily {
 	}
 }
 
+func defaultMessageKinds(deliveryClass DeliveryClass, mediaPolicy MediaPolicy) []MessageKind {
+	if deliveryClass == DeliveryClassUltraConstrained || mediaPolicy == MediaPolicyDisabled {
+		return []MessageKind{
+			MessageKindSystem,
+			MessageKindText,
+		}
+	}
+
+	return []MessageKind{
+		MessageKindDocument,
+		MessageKindGIF,
+		MessageKindImage,
+		MessageKindSticker,
+		MessageKindSystem,
+		MessageKindText,
+		MessageKindVideo,
+		MessageKindVoice,
+	}
+}
+
 func normalizeCapabilities(values []Capability) []Capability {
 	if len(values) == 0 {
 		return nil
@@ -427,6 +464,45 @@ func normalizeEventFamilies(values []EventFamily, deliveryClass DeliveryClass) [
 
 	if len(normalized) == 0 {
 		return defaultEventFamilies(deliveryClass)
+	}
+
+	return normalized
+}
+
+func normalizeMessageKinds(values []MessageKind, deliveryClass DeliveryClass, mediaPolicy MediaPolicy) []MessageKind {
+	if len(values) == 0 {
+		return defaultMessageKinds(deliveryClass, mediaPolicy)
+	}
+
+	seen := make(map[MessageKind]struct{}, len(values))
+	normalized := make([]MessageKind, 0, len(values))
+	for _, value := range values {
+		value = MessageKind(strings.TrimSpace(strings.ToLower(string(value))))
+		switch value {
+		case MessageKindText,
+			MessageKindImage,
+			MessageKindVideo,
+			MessageKindDocument,
+			MessageKindVoice,
+			MessageKindSticker,
+			MessageKindGIF,
+			MessageKindSystem:
+		default:
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		normalized = append(normalized, value)
+	}
+
+	sort.Slice(normalized, func(i, j int) bool {
+		return normalized[i] < normalized[j]
+	})
+
+	if len(normalized) == 0 {
+		return defaultMessageKinds(deliveryClass, mediaPolicy)
 	}
 
 	return normalized
@@ -574,6 +650,7 @@ func (l Link) normalize(now time.Time) (Link, error) {
 
 	l.AllowedConversationKinds = normalizeConversationKinds(l.AllowedConversationKinds)
 	l.AllowedEventFamilies = normalizeEventFamilies(l.AllowedEventFamilies, l.DeliveryClass)
+	l.AllowedMessageKinds = normalizeMessageKinds(l.AllowedMessageKinds, l.DeliveryClass, l.MediaPolicy)
 	if l.CreatedAt.IsZero() {
 		l.CreatedAt = now.UTC()
 	}

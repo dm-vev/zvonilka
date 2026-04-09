@@ -763,6 +763,7 @@ func clonePeer(peer federation.Peer) federation.Peer {
 func cloneLink(link federation.Link) federation.Link {
 	link.AllowedConversationKinds = append([]federation.ConversationKind(nil), link.AllowedConversationKinds...)
 	link.AllowedEventFamilies = append([]federation.EventFamily(nil), link.AllowedEventFamilies...)
+	link.AllowedMessageKinds = append([]federation.MessageKind(nil), link.AllowedMessageKinds...)
 	return link
 }
 

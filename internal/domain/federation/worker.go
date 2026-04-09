@@ -474,6 +474,9 @@ func (w *Worker) buildOutboundBundles(
 		if !eventFamilyAllowed(link.AllowedEventFamilies, event) {
 			continue
 		}
+		if !messageKindAllowed(link, event) {
+			continue
+		}
 		if event.ConversationID != "" && len(link.AllowedConversationKinds) > 0 {
 			conversationRow, err := w.conversations.ConversationByID(ctx, event.ConversationID)
 			if err != nil {
@@ -676,6 +679,45 @@ func eventFamilyForConversationEvent(event conversation.EventEnvelope) EventFami
 		return EventFamilyAdminAction
 	default:
 		return EventFamilyUnspecified
+	}
+}
+
+func messageKindAllowed(link Link, event conversation.EventEnvelope) bool {
+	switch event.EventType {
+	case conversation.EventTypeMessageCreated, conversation.EventTypeMessageEdited:
+	default:
+		return true
+	}
+	if len(link.AllowedMessageKinds) == 0 {
+		return true
+	}
+
+	kind := linkMessageKind(event.Metadata["message_kind"])
+	if kind == MessageKindUnspecified {
+		return link.DeliveryClass != DeliveryClassUltraConstrained && link.MediaPolicy != MediaPolicyDisabled
+	}
+	for _, candidate := range link.AllowedMessageKinds {
+		if candidate == kind {
+			return true
+		}
+	}
+
+	return false
+}
+
+func linkMessageKind(value string) MessageKind {
+	switch MessageKind(strings.TrimSpace(strings.ToLower(value))) {
+	case MessageKindText,
+		MessageKindImage,
+		MessageKindVideo,
+		MessageKindDocument,
+		MessageKindVoice,
+		MessageKindSticker,
+		MessageKindGIF,
+		MessageKindSystem:
+		return MessageKind(strings.TrimSpace(strings.ToLower(value)))
+	default:
+		return MessageKindUnspecified
 	}
 }
 

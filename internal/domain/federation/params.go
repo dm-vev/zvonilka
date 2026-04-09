@@ -35,6 +35,7 @@ type CreateLinkParams struct {
 	MaxFragmentBytes         int
 	AllowedConversationKinds []ConversationKind
 	AllowedEventFamilies     []EventFamily
+	AllowedMessageKinds      []MessageKind
 }
 
 // UpdateLinkParams captures mutable link fields.
@@ -51,6 +52,7 @@ type UpdateLinkParams struct {
 	MaxFragmentBytes         *int
 	AllowedConversationKinds *[]ConversationKind
 	AllowedEventFamilies     *[]EventFamily
+	AllowedMessageKinds      *[]MessageKind
 	LastHealthyAt            *time.Time
 	LastError                *string
 }

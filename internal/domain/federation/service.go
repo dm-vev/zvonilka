@@ -340,6 +340,7 @@ func (s *Service) CreateLink(ctx context.Context, params CreateLinkParams) (Link
 		MaxFragmentBytes:         params.MaxFragmentBytes,
 		AllowedConversationKinds: params.AllowedConversationKinds,
 		AllowedEventFamilies:     params.AllowedEventFamilies,
+		AllowedMessageKinds:      params.AllowedMessageKinds,
 	}).normalize(s.currentTime())
 	if err != nil {
 		return Link{}, err
@@ -458,6 +459,9 @@ func (s *Service) UpdateLink(ctx context.Context, params UpdateLinkParams) (Link
 	}
 	if params.AllowedEventFamilies != nil {
 		current.AllowedEventFamilies = *params.AllowedEventFamilies
+	}
+	if params.AllowedMessageKinds != nil {
+		current.AllowedMessageKinds = *params.AllowedMessageKinds
 	}
 	if params.LastHealthyAt != nil {
 		current.LastHealthyAt = params.LastHealthyAt.UTC()

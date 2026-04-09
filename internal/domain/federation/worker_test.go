@@ -606,7 +606,7 @@ func TestWorkerSkipsOversizedSingleEventOnUltraConstrainedLink(t *testing.T) {
 		},
 		Metadata: map[string]string{
 			"message_id":   "msg-big-1",
-			"message_kind": string(conversation.MessageKindDocument),
+			"message_kind": string(conversation.MessageKindText),
 		},
 	})
 	require.NoError(t, err)
@@ -651,6 +651,116 @@ func TestWorkerSkipsOversizedSingleEventOnUltraConstrainedLink(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	require.Equal(t, conversation.EventTypeConversationUpdated, events[0].EventType)
+}
+
+func TestWorkerFiltersNonTextMessageKindsOnUltraConstrainedLink(t *testing.T) {
+	t.Parallel()
+
+	federationStore := federationtest.NewMemoryStore()
+	service, err := federation.NewService(federationStore, federation.WithNow(func() time.Time {
+		return time.Date(2026, time.April, 9, 15, 0, 0, 0, time.UTC)
+	}))
+	require.NoError(t, err)
+
+	peer, _, _, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
+		ServerName:   "mesh-message-kind.example",
+		BaseURL:      "bridge://mesh-message-kind.example",
+		Trusted:      true,
+		SharedSecret: "mesh-message-kind-secret",
+		Capabilities: []federation.Capability{federation.CapabilityEventReplication},
+	})
+	require.NoError(t, err)
+
+	link, err := service.CreateLink(context.Background(), federation.CreateLinkParams{
+		PeerID:                   peer.ID,
+		Name:                     "mesh-message-kind",
+		Endpoint:                 "bridge://meshtastic.local",
+		TransportKind:            federation.TransportKindMeshtastic,
+		DeliveryClass:            federation.DeliveryClassUltraConstrained,
+		DiscoveryMode:            federation.DiscoveryModeBridgeAnnounced,
+		MediaPolicy:              federation.MediaPolicyDisabled,
+		MaxBundleBytes:           1024,
+		MaxFragmentBytes:         128,
+		AllowedConversationKinds: []federation.ConversationKind{federation.ConversationKindGroup},
+	})
+	require.NoError(t, err)
+
+	conversations := conversationtest.NewMemoryStore()
+	identities := identitytest.NewMemoryStore()
+
+	_, err = conversations.SaveConversation(context.Background(), conversation.Conversation{
+		ID:   "conv-message-kind-1",
+		Kind: conversation.ConversationKindGroup,
+	})
+	require.NoError(t, err)
+
+	_, err = conversations.SaveEvent(context.Background(), conversation.EventEnvelope{
+		EventID:        "evt-image-1",
+		EventType:      conversation.EventTypeMessageCreated,
+		ConversationID: "conv-message-kind-1",
+		ActorAccountID: "actor-1",
+		MessageID:      "msg-image-1",
+		PayloadType:    "message",
+		Payload: conversation.EncryptedPayload{
+			Ciphertext: []byte("mesh image message"),
+		},
+		Metadata: map[string]string{
+			"message_id":   "msg-image-1",
+			"message_kind": string(conversation.MessageKindImage),
+		},
+	})
+	require.NoError(t, err)
+	_, err = conversations.SaveEvent(context.Background(), conversation.EventEnvelope{
+		EventID:        "evt-text-1",
+		EventType:      conversation.EventTypeMessageCreated,
+		ConversationID: "conv-message-kind-1",
+		ActorAccountID: "actor-1",
+		MessageID:      "msg-text-1",
+		PayloadType:    "message",
+		Payload: conversation.EncryptedPayload{
+			Ciphertext: []byte("mesh text message"),
+		},
+		Metadata: map[string]string{
+			"message_id":   "msg-text-1",
+			"message_kind": string(conversation.MessageKindText),
+		},
+	})
+	require.NoError(t, err)
+
+	worker, err := federation.NewWorker(
+		service,
+		identities,
+		conversations,
+		func(context.Context, federation.Peer, federation.Link) (federation.ReplicationClient, error) {
+			t.Fatal("bridge link should not construct direct replication client")
+			return nil, nil
+		},
+		federation.WorkerSettings{
+			LocalServerName: "alpha.example",
+			PollInterval:    time.Second,
+			BatchSize:       10,
+		},
+	)
+	require.NoError(t, err)
+
+	err = worker.ProcessOnceForTests(context.Background())
+	require.NoError(t, err)
+
+	cursor, err := service.ReplicationCursorByPeerAndLink(context.Background(), peer.ID, link.ID)
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), cursor.LastOutboundCursor)
+
+	outbound, err := service.BundlesAfter(context.Background(), peer.ID, link.ID, federation.BundleDirectionOutbound, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, outbound, 1)
+	require.Equal(t, uint64(2), outbound[0].CursorFrom)
+	require.Equal(t, uint64(2), outbound[0].CursorTo)
+
+	events, err := decodeTestBundleEvents(outbound[0])
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	require.Equal(t, conversation.EventTypeMessageCreated, events[0].EventType)
+	require.Equal(t, "msg-text-1", events[0].MessageID)
 }
 
 func decodeTestBundleEvents(bundle federation.Bundle) ([]conversation.EventEnvelope, error) {
