@@ -20,6 +20,16 @@ type failingFirstSaveAccountStore struct {
 	failErr error
 }
 
+// WithinTx preserves the injected failure semantics inside transactional callbacks.
+func (s *failingFirstSaveAccountStore) WithinTx(ctx context.Context, fn func(identity.Store) error) error {
+	return s.Store.WithinTx(ctx, func(tx identity.Store) error {
+		return fn(&failingFirstSaveAccountTxStore{
+			Store:  tx,
+			parent: s,
+		})
+	})
+}
+
 // SaveAccount injects a one-shot failure before delegating to the wrapped store.
 func (s *failingFirstSaveAccountStore) SaveAccount(
 	ctx context.Context,
@@ -34,6 +44,31 @@ func (s *failingFirstSaveAccountStore) SaveAccount(
 			s.failErr = errors.New("forced create account failure")
 		}
 		return identity.Account{}, s.failErr
+	}
+
+	return s.Store.SaveAccount(ctx, account)
+}
+
+type failingFirstSaveAccountTxStore struct {
+	identity.Store
+
+	parent *failingFirstSaveAccountStore
+}
+
+// SaveAccount injects the same one-shot failure inside transactions.
+func (s *failingFirstSaveAccountTxStore) SaveAccount(
+	ctx context.Context,
+	account identity.Account,
+) (identity.Account, error) {
+	s.parent.mu.Lock()
+	defer s.parent.mu.Unlock()
+
+	if !s.parent.failed {
+		s.parent.failed = true
+		if s.parent.failErr == nil {
+			s.parent.failErr = errors.New("forced create account failure")
+		}
+		return identity.Account{}, s.parent.failErr
 	}
 
 	return s.Store.SaveAccount(ctx, account)

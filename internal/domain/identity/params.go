@@ -38,6 +38,7 @@ type CreateAccountParams struct {
 	DisplayName    string
 	Email          string
 	Phone          string
+	Password       string
 	Roles          []Role
 	Note           string
 	InviteCode     string
@@ -81,6 +82,21 @@ type VerifyLoginCodeParams struct {
 	PushToken              string
 	IdempotencyKey         string
 	RequestedAt            time.Time
+}
+
+// AuthenticatePasswordParams contains the password-auth payload.
+type AuthenticatePasswordParams struct {
+	Username       string
+	Email          string
+	Phone          string
+	Password       string
+	DeviceName     string
+	Platform       DevicePlatform
+	PublicKey      string
+	ClientVersion  string
+	Locale         string
+	IdempotencyKey string
+	RequestedAt    time.Time
 }
 
 // AuthenticateBotParams contains the bot token login payload.

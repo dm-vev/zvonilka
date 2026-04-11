@@ -33,14 +33,13 @@ func (s *Service) GetLoginOptions(ctx context.Context, params GetLoginOptionsPar
 	}
 
 	channels := s.loginChannels(ctx, account)
-	if len(channels) == 0 {
-		return LoginOptionsResult{}, ErrInvalidInput
+	if len(channels) > 0 {
+		result.Options = append(result.Options, LoginOption{
+			Factor:   LoginFactorCode,
+			Required: true,
+			Channels: channels,
+		})
 	}
-	result.Options = append(result.Options, LoginOption{
-		Factor:   LoginFactorCode,
-		Required: true,
-		Channels: channels,
-	})
 
 	if _, err := s.store.AccountCredentialByAccountID(ctx, account.ID, AccountCredentialKindRecovery); err == nil {
 		result.PasswordRecoveryEnabled = true
@@ -59,6 +58,10 @@ func (s *Service) GetLoginOptions(ctx context.Context, params GetLoginOptionsPar
 		})
 	} else if err != ErrNotFound {
 		return LoginOptionsResult{}, fmt.Errorf("load password credential for %s: %w", account.ID, err)
+	}
+
+	if len(result.Options) == 0 {
+		return LoginOptionsResult{}, ErrInvalidInput
 	}
 
 	return result, nil

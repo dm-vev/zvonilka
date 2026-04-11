@@ -174,6 +174,7 @@ func (a *api) CreateAccount(
 		DisplayName:    req.GetDisplayName(),
 		Email:          req.GetEmail(),
 		Phone:          req.GetPhone(),
+		Password:       req.GetPassword(),
 		Roles:          roles,
 		Note:           req.GetNote(),
 		InviteCode:     req.GetInviteCode(),

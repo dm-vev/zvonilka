@@ -605,3 +605,243 @@ func TestServiceKeepsInboundFragmentsAssembledOnDuplicateReplay(t *testing.T) {
 	require.Equal(t, federation.FragmentStateAssembled, fragments[0].State)
 	require.Equal(t, federation.FragmentStateAssembled, fragments[1].State)
 }
+
+func TestServiceRejectsStaleInboundFragmentReplay(t *testing.T) {
+	t.Parallel()
+
+	store := federationtest.NewMemoryStore()
+	service, err := federation.NewService(
+		store,
+		federation.WithNow(func() time.Time {
+			return time.Date(2026, time.April, 9, 12, 0, 0, 0, time.UTC)
+		}),
+	)
+	require.NoError(t, err)
+
+	peer, _, _, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
+		ServerName:   "mesh.example",
+		BaseURL:      "bridge://mesh.example",
+		Trusted:      true,
+		SharedSecret: "mesh-secret",
+		Capabilities: []federation.Capability{federation.CapabilityEventReplication},
+	})
+	require.NoError(t, err)
+
+	link, err := service.CreateLink(context.Background(), federation.CreateLinkParams{
+		PeerID:           peer.ID,
+		Name:             "mesh",
+		Endpoint:         "bridge://meshtastic.local",
+		TransportKind:    federation.TransportKindMeshtastic,
+		DeliveryClass:    federation.DeliveryClassUltraConstrained,
+		DiscoveryMode:    federation.DiscoveryModeBridgeAnnounced,
+		MediaPolicy:      federation.MediaPolicyDisabled,
+		MaxBundleBytes:   1024,
+		MaxFragmentBytes: 8,
+	})
+	require.NoError(t, err)
+
+	signedInbound, err := service.SignBundle(context.Background(), peer.ID, link.ID, federation.Bundle{
+		ID:          "remote-bundle-assembled",
+		DedupKey:    "remote-bundle-assembled",
+		CursorFrom:  20,
+		CursorTo:    21,
+		EventCount:  1,
+		PayloadType: "bundle",
+		Payload:     []byte("hello mesh"),
+		Compression: federation.CompressionKindNone,
+	})
+	require.NoError(t, err)
+
+	_, assembled, cursor, err := service.SubmitBridgeFragments(
+		context.Background(),
+		peer.ServerName,
+		link.Name,
+		[]federation.SaveFragmentParams{
+			{
+				BundleID:      "remote-bundle-assembled",
+				DedupKey:      "remote-bundle-assembled:frag:000000",
+				CursorFrom:    20,
+				CursorTo:      21,
+				EventCount:    1,
+				PayloadType:   "bundle",
+				Compression:   federation.CompressionKindNone,
+				IntegrityHash: signedInbound.IntegrityHash,
+				AuthTag:       signedInbound.AuthTag,
+				FragmentIndex: 0,
+				FragmentCount: 2,
+				Payload:       []byte("hello "),
+			},
+			{
+				BundleID:      "remote-bundle-assembled",
+				DedupKey:      "remote-bundle-assembled:frag:000001",
+				CursorFrom:    20,
+				CursorTo:      21,
+				EventCount:    1,
+				PayloadType:   "bundle",
+				Compression:   federation.CompressionKindNone,
+				IntegrityHash: signedInbound.IntegrityHash,
+				AuthTag:       signedInbound.AuthTag,
+				FragmentIndex: 1,
+				FragmentCount: 2,
+				Payload:       []byte("mesh"),
+			},
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, assembled, 1)
+	require.Equal(t, uint64(21), cursor.LastReceivedCursor)
+
+	staleSigned, err := service.SignBundle(context.Background(), peer.ID, link.ID, federation.Bundle{
+		ID:          "remote-bundle-stale",
+		DedupKey:    "remote-bundle-stale",
+		CursorFrom:  18,
+		CursorTo:    21,
+		EventCount:  1,
+		PayloadType: "bundle",
+		Payload:     []byte("stale"),
+		Compression: federation.CompressionKindNone,
+	})
+	require.NoError(t, err)
+
+	_, _, _, err = service.SubmitBridgeFragments(
+		context.Background(),
+		peer.ServerName,
+		link.Name,
+		[]federation.SaveFragmentParams{{
+			BundleID:      "remote-bundle-stale",
+			DedupKey:      "remote-bundle-stale:frag:000000",
+			CursorFrom:    18,
+			CursorTo:      21,
+			EventCount:    1,
+			PayloadType:   "bundle",
+			Compression:   federation.CompressionKindNone,
+			IntegrityHash: staleSigned.IntegrityHash,
+			AuthTag:       staleSigned.AuthTag,
+			FragmentIndex: 0,
+			FragmentCount: 1,
+			Payload:       []byte("stale"),
+		}},
+	)
+	require.ErrorIs(t, err, federation.ErrConflict)
+
+	fragments, err := store.FragmentsByBundle(context.Background(), "remote-bundle-stale", federation.BundleDirectionInbound)
+	require.NoError(t, err)
+	require.Empty(t, fragments)
+}
+
+func TestServiceQuarantinesInconsistentInboundFragmentMetadataBeforeAssembly(t *testing.T) {
+	t.Parallel()
+
+	store := federationtest.NewMemoryStore()
+	service, err := federation.NewService(
+		store,
+		federation.WithNow(func() time.Time {
+			return time.Date(2026, time.April, 9, 12, 0, 0, 0, time.UTC)
+		}),
+	)
+	require.NoError(t, err)
+
+	peer, _, _, _, _, err := service.CreatePeer(context.Background(), federation.CreatePeerParams{
+		ServerName:   "mesh.example",
+		BaseURL:      "bridge://mesh.example",
+		Trusted:      true,
+		SharedSecret: "mesh-secret",
+		Capabilities: []federation.Capability{federation.CapabilityEventReplication},
+	})
+	require.NoError(t, err)
+
+	link, err := service.CreateLink(context.Background(), federation.CreateLinkParams{
+		PeerID:           peer.ID,
+		Name:             "mesh",
+		Endpoint:         "bridge://meshtastic.local",
+		TransportKind:    federation.TransportKindMeshtastic,
+		DeliveryClass:    federation.DeliveryClassUltraConstrained,
+		DiscoveryMode:    federation.DiscoveryModeBridgeAnnounced,
+		MediaPolicy:      federation.MediaPolicyDisabled,
+		MaxBundleBytes:   1024,
+		MaxFragmentBytes: 8,
+	})
+	require.NoError(t, err)
+
+	signedFirst, err := service.SignBundle(context.Background(), peer.ID, link.ID, federation.Bundle{
+		ID:          "remote-bundle-early-mismatch",
+		DedupKey:    "remote-bundle-early-mismatch",
+		CursorFrom:  30,
+		CursorTo:    31,
+		EventCount:  1,
+		PayloadType: "bundle",
+		Payload:     []byte("hello mesh"),
+		Compression: federation.CompressionKindNone,
+	})
+	require.NoError(t, err)
+
+	accepted, assembled, _, err := service.SubmitBridgeFragments(
+		context.Background(),
+		peer.ServerName,
+		link.Name,
+		[]federation.SaveFragmentParams{{
+			BundleID:      "remote-bundle-early-mismatch",
+			DedupKey:      "remote-bundle-early-mismatch:frag:000000",
+			CursorFrom:    30,
+			CursorTo:      31,
+			EventCount:    1,
+			PayloadType:   "bundle",
+			Compression:   federation.CompressionKindNone,
+			IntegrityHash: signedFirst.IntegrityHash,
+			AuthTag:       signedFirst.AuthTag,
+			FragmentIndex: 0,
+			FragmentCount: 2,
+			Payload:       []byte("hello "),
+		}},
+	)
+	require.NoError(t, err)
+	require.Len(t, accepted, 1)
+	require.Empty(t, assembled)
+
+	signedSecond, err := service.SignBundle(context.Background(), peer.ID, link.ID, federation.Bundle{
+		ID:          "remote-bundle-early-mismatch",
+		DedupKey:    "remote-bundle-early-mismatch",
+		CursorFrom:  30,
+		CursorTo:    31,
+		EventCount:  1,
+		PayloadType: "bundle",
+		Payload:     []byte("tampered"),
+		Compression: federation.CompressionKindNone,
+	})
+	require.NoError(t, err)
+
+	_, _, _, err = service.SubmitBridgeFragments(
+		context.Background(),
+		peer.ServerName,
+		link.Name,
+		[]federation.SaveFragmentParams{{
+			BundleID:      "remote-bundle-early-mismatch",
+			DedupKey:      "remote-bundle-early-mismatch:frag:000001",
+			CursorFrom:    30,
+			CursorTo:      31,
+			EventCount:    1,
+			PayloadType:   "bundle",
+			Compression:   federation.CompressionKindNone,
+			IntegrityHash: signedSecond.IntegrityHash,
+			AuthTag:       signedSecond.AuthTag,
+			FragmentIndex: 1,
+			FragmentCount: 2,
+			Payload:       []byte("tampered"),
+		}},
+	)
+	require.ErrorIs(t, err, federation.ErrUnauthorized)
+
+	fragments, err := store.FragmentsByBundle(
+		context.Background(),
+		"remote-bundle-early-mismatch",
+		federation.BundleDirectionInbound,
+	)
+	require.NoError(t, err)
+	require.Len(t, fragments, 1)
+	require.Equal(t, federation.FragmentStateFailed, fragments[0].State)
+
+	savedLink, err := service.LinkByID(context.Background(), link.ID)
+	require.NoError(t, err)
+	require.Equal(t, federation.LinkStateDegraded, savedLink.State)
+	require.Contains(t, savedLink.LastError, federation.ErrUnauthorized.Error())
+}

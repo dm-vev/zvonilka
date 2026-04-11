@@ -212,6 +212,77 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 	return result, nil
 }
 
+// AuthenticatePassword logs a human account in with its stored password credential.
+func (s *Service) AuthenticatePassword(ctx context.Context, params AuthenticatePasswordParams) (LoginResult, error) {
+	if err := s.validateContext(ctx, "authenticate password"); err != nil {
+		return LoginResult{}, err
+	}
+
+	username, email, phone := s.normalizeAccountInput(params.Username, params.Email, params.Phone)
+	password := trimmed(params.Password)
+	if password == "" || params.PublicKey == "" {
+		return LoginResult{}, ErrInvalidInput
+	}
+
+	fingerprint := authenticatePasswordFingerprint(params)
+	if params.IdempotencyKey != "" {
+		if result, ok, err := s.idempotency.authenticatePasswordResult(
+			params.IdempotencyKey,
+			fingerprint,
+			s.currentTime(),
+		); err != nil {
+			return LoginResult{}, err
+		} else if ok {
+			return result, nil
+		}
+	}
+
+	var result LoginResult
+	err := s.store.WithinTx(ctx, func(tx Store) error {
+		account, err := s.lookupAccountByIdentifierInStore(ctx, tx, username, email, phone)
+		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				return ErrUnauthorized
+			}
+			return err
+		}
+		if account.Kind != AccountKindUser {
+			return ErrForbidden
+		}
+		if account.Status != AccountStatusActive {
+			return ErrForbidden
+		}
+
+		credential, err := tx.AccountCredentialByAccountID(ctx, account.ID, AccountCredentialKindPassword)
+		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				return ErrUnauthorized
+			}
+			return fmt.Errorf("load password credential for %s: %w", account.ID, err)
+		}
+		if credential.SecretHash != hashSecret(password) {
+			return ErrUnauthorized
+		}
+
+		result, err = s.issueSession(ctx, tx, account, params.DeviceName, params.Platform, params.PublicKey, "")
+		return err
+	})
+	if err != nil {
+		return LoginResult{}, err
+	}
+
+	if params.IdempotencyKey != "" {
+		s.idempotency.storeAuthenticatePasswordResult(
+			params.IdempotencyKey,
+			fingerprint,
+			result,
+			s.currentTime(),
+		)
+	}
+
+	return result, nil
+}
+
 // AuthenticateBot logs a bot account in using its issued bot token.
 //
 // Bot login reuses the same session issuance path as human login so the downstream

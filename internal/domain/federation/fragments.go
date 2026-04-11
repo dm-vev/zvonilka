@@ -316,8 +316,34 @@ func (s *Service) saveFragment(ctx context.Context, params SaveFragmentParams) (
 		if loadErr != nil {
 			return BundleFragment{}, fmt.Errorf("load inbound fragments for bundle %s before save: %w", fragment.BundleID, loadErr)
 		}
+		if containsFragmentDedupKey(existing, fragment.DedupKey) {
+			saved, saveErr := s.store.SaveFragment(ctx, fragment)
+			if saveErr != nil {
+				return BundleFragment{}, fmt.Errorf("save federation fragment %s: %w", fragment.BundleID, saveErr)
+			}
+
+			return saved, nil
+		}
 		if isInboundFragmentBundleTerminal(existing) && !containsFragmentDedupKey(existing, fragment.DedupKey) {
 			return BundleFragment{}, ErrConflict
+		}
+		cursor, cursorErr := s.ReplicationCursorByPeerAndLink(ctx, fragment.PeerID, fragment.LinkID)
+		if cursorErr != nil {
+			return BundleFragment{}, fmt.Errorf(
+				"load federation cursor for inbound fragment %s/%s: %w",
+				fragment.PeerID,
+				fragment.LinkID,
+				cursorErr,
+			)
+		}
+		if fragment.CursorTo <= cursor.LastReceivedCursor {
+			return BundleFragment{}, ErrConflict
+		}
+		if validateErr := validateInboundFragmentCandidate(existing, fragment); validateErr != nil {
+			if quarantineErr := s.quarantineInboundFragments(ctx, existing, validateErr); quarantineErr != nil {
+				return BundleFragment{}, quarantineErr
+			}
+			return BundleFragment{}, validateErr
 		}
 	}
 
@@ -327,6 +353,38 @@ func (s *Service) saveFragment(ctx context.Context, params SaveFragmentParams) (
 	}
 
 	return saved, nil
+}
+
+func validateInboundFragmentCandidate(existing []BundleFragment, candidate BundleFragment) error {
+	if len(existing) == 0 {
+		return nil
+	}
+
+	first := existing[0]
+	if candidate.FragmentCount != first.FragmentCount {
+		return ErrConflict
+	}
+	if candidate.PeerID != first.PeerID ||
+		candidate.LinkID != first.LinkID ||
+		candidate.BundleID != first.BundleID ||
+		candidate.Direction != first.Direction ||
+		candidate.CursorFrom != first.CursorFrom ||
+		candidate.CursorTo != first.CursorTo ||
+		candidate.EventCount != first.EventCount ||
+		candidate.PayloadType != first.PayloadType ||
+		candidate.Compression != first.Compression {
+		return ErrConflict
+	}
+	if candidate.IntegrityHash != first.IntegrityHash || candidate.AuthTag != first.AuthTag {
+		return ErrUnauthorized
+	}
+	for _, fragment := range existing {
+		if fragment.FragmentIndex == candidate.FragmentIndex {
+			return ErrConflict
+		}
+	}
+
+	return nil
 }
 
 func (s *Service) ensureOutboundFragments(ctx context.Context, link Link, bundle Bundle) ([]BundleFragment, error) {

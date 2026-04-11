@@ -53,6 +53,7 @@ message CreateAccountRequest {
   string invite_code = 7;
   string idempotency_key = 8;
   zvonilka.common.v1.AccountKind account_kind = 9;
+  string password = 10;
 }
 
 message CreateAccountResponse {

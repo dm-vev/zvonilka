@@ -99,6 +99,19 @@ func (s *Service) normalizeAccountInput(username, email, phone string) (string, 
 // The login flow accepts one of username, email, or phone. Supporting more than one at once
 // would make retry and idempotency semantics ambiguous, so the helper fails fast.
 func (s *Service) lookupAccountByIdentifier(ctx context.Context, username, email, phone string) (Account, error) {
+	return s.lookupAccountByIdentifierInStore(ctx, s.store, username, email, phone)
+}
+
+// lookupAccountByIdentifierInStore resolves exactly one normalized identifier against one store.
+func (s *Service) lookupAccountByIdentifierInStore(
+	ctx context.Context,
+	store Store,
+	username, email, phone string,
+) (Account, error) {
+	if store == nil {
+		return Account{}, ErrInvalidInput
+	}
+
 	count := 0
 	if username != "" {
 		count++
@@ -115,19 +128,19 @@ func (s *Service) lookupAccountByIdentifier(ctx context.Context, username, email
 
 	switch {
 	case username != "":
-		account, err := s.store.AccountByUsername(ctx, username)
+		account, err := store.AccountByUsername(ctx, username)
 		if err != nil {
 			return Account{}, fmt.Errorf("lookup account by username %q: %w", username, err)
 		}
 		return account, nil
 	case email != "":
-		account, err := s.store.AccountByEmail(ctx, email)
+		account, err := store.AccountByEmail(ctx, email)
 		if err != nil {
 			return Account{}, fmt.Errorf("lookup account by email %q: %w", email, err)
 		}
 		return account, nil
 	default:
-		account, err := s.store.AccountByPhone(ctx, phone)
+		account, err := store.AccountByPhone(ctx, phone)
 		if err != nil {
 			return Account{}, fmt.Errorf("lookup account by phone %q: %w", phone, err)
 		}

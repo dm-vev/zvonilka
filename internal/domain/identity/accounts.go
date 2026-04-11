@@ -152,6 +152,8 @@ func (s *Service) ApproveJoinRequest(ctx context.Context, params ApproveJoinRequ
 		return JoinRequest{}, Account{}, err
 	}
 
+	s.indexAccount(ctx, account)
+
 	if params.IdempotencyKey != "" {
 		s.idempotency.storeApproveJoinRequestResult(
 			params.IdempotencyKey,
@@ -240,10 +242,20 @@ func (s *Service) CreateAccount(ctx context.Context, params CreateAccountParams)
 		return Account{}, "", err
 	}
 
-	account, botToken, err := s.createAccount(ctx, s.store, params, false)
+	var (
+		account  Account
+		botToken string
+	)
+	err := s.store.WithinTx(ctx, func(tx Store) error {
+		var createErr error
+		account, botToken, createErr = s.createAccount(ctx, tx, params, false)
+		return createErr
+	})
 	if err != nil {
 		return Account{}, "", err
 	}
+
+	s.indexAccount(ctx, account)
 
 	if params.IdempotencyKey != "" {
 		s.idempotency.storeCreateAccountResult(
@@ -287,13 +299,17 @@ func (s *Service) createAccount(
 	// Canonicalize identifiers before validation so the store sees the same values that
 	// all lookup paths will use later.
 	username, email, phone := s.normalizeAccountInput(params.Username, params.Email, params.Phone)
+	password := trimmed(params.Password)
 	if username == "" {
 		return Account{}, "", ErrInvalidInput
 	}
 	if params.AccountKind == AccountKindUnspecified {
 		return Account{}, "", ErrInvalidInput
 	}
-	if params.AccountKind == AccountKindUser && email == "" && phone == "" {
+	if params.AccountKind == AccountKindUser && email == "" && phone == "" && password == "" {
+		return Account{}, "", ErrInvalidInput
+	}
+	if params.AccountKind == AccountKindBot && password != "" {
 		return Account{}, "", ErrInvalidInput
 	}
 
@@ -348,14 +364,24 @@ func (s *Service) createAccount(
 				return Account{}, "", ErrConflict
 			}
 
-			s.indexAccount(ctx, existingAccount)
 			return existingAccount, "", nil
 		}
 
 		return Account{}, "", fmt.Errorf("save account %s: %w", username, err)
 	}
 
-	s.indexAccount(ctx, savedAccount)
+	if params.AccountKind == AccountKindUser && password != "" {
+		if err := s.saveAccountCredential(
+			ctx,
+			store,
+			savedAccount.ID,
+			AccountCredentialKindPassword,
+			password,
+			now,
+		); err != nil {
+			return Account{}, "", err
+		}
+	}
 
 	return savedAccount, botToken, nil
 }

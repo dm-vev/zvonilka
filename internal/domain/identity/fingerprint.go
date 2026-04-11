@@ -92,6 +92,7 @@ func createAccountFingerprint(params CreateAccountParams) string {
 		username,
 		email,
 		phone,
+		hashSecret(trimmed(params.Password)),
 		trimmed(params.DisplayName),
 		rolesFingerprint(params.Roles),
 		trimmed(params.Note),
@@ -120,6 +121,23 @@ func rejectJoinRequestFingerprint(params RejectJoinRequestParams) string {
 		params.JoinRequestID,
 		trimmed(params.Reason),
 		trimmed(params.ReviewedBy),
+	)
+}
+
+// authenticatePasswordFingerprint captures the fields that define a password-auth attempt.
+func authenticatePasswordFingerprint(params AuthenticatePasswordParams) string {
+	username, email, phone := normalizeUsername(params.Username), normalizeEmail(params.Email), normalizePhone(params.Phone)
+	return idempotencyFingerprint(
+		"authenticate-password",
+		username,
+		email,
+		phone,
+		hashSecret(trimmed(params.Password)),
+		params.DeviceName,
+		string(params.Platform),
+		params.PublicKey,
+		params.ClientVersion,
+		params.Locale,
 	)
 }
 

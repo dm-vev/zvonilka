@@ -255,6 +255,26 @@ func TestAdminServiceCreateAccountPermissions(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, user.GetBotToken())
 	require.Equal(t, commonv1.AccountKind_ACCOUNT_KIND_USER, user.GetProfile().GetAccountKind())
+
+	passwordUser, err := api.CreateAccount(adminCtx, &adminv1.CreateAccountRequest{
+		Username:       "password-user",
+		DisplayName:    "Password User",
+		Password:       "manual-password",
+		IdempotencyKey: "create-password-user",
+	})
+	require.NoError(t, err)
+	require.Empty(t, passwordUser.GetBotToken())
+
+	login, err := api.identity.AuthenticatePassword(context.Background(), domainidentity.AuthenticatePasswordParams{
+		Username:   "password-user",
+		Password:   "manual-password",
+		DeviceName: "password-device",
+		Platform:   domainidentity.DevicePlatformDesktop,
+		PublicKey:  "password-user-public-key",
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, login.Session.ID)
+	require.NotEmpty(t, login.Device.ID)
 }
 
 func TestAppRegisterGRPCRegistersAdminService(t *testing.T) {

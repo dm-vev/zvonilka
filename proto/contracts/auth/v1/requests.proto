@@ -85,6 +85,27 @@ message VerifyLoginCodeResponse {
   bool recovery_enabled = 4;
 }
 
+message AuthenticatePasswordRequest {
+  string idempotency_key = 1;
+  oneof identifier {
+    string username = 2;
+    string email = 3;
+    string phone = 4;
+  }
+  string password = 5;
+  string device_name = 6;
+  zvonilka.common.v1.DevicePlatform device_platform = 7;
+  zvonilka.common.v1.PublicKeyBundle device_key = 8;
+  string client_version = 9;
+  string locale = 10;
+}
+
+message AuthenticatePasswordResponse {
+  zvonilka.common.v1.AuthTokens tokens = 1;
+  Session session = 2;
+  Device device = 3;
+}
+
 message AuthenticateBotRequest {
   string bot_token = 1;
   string device_name = 2;

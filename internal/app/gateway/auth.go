@@ -143,6 +143,41 @@ func (a *api) VerifyLoginCode(
 	}, nil
 }
 
+// AuthenticatePassword logs a human account in with a stored password credential.
+func (a *api) AuthenticatePassword(
+	ctx context.Context,
+	req *authv1.AuthenticatePasswordRequest,
+) (*authv1.AuthenticatePasswordResponse, error) {
+	params := identity.AuthenticatePasswordParams{
+		Password:       req.GetPassword(),
+		DeviceName:     req.GetDeviceName(),
+		Platform:       identityPlatformFromProto(req.GetDevicePlatform()),
+		PublicKey:      publicKeyFromProto(req.GetDeviceKey()),
+		ClientVersion:  req.GetClientVersion(),
+		Locale:         req.GetLocale(),
+		IdempotencyKey: req.GetIdempotencyKey(),
+	}
+	switch identifier := req.Identifier.(type) {
+	case *authv1.AuthenticatePasswordRequest_Username:
+		params.Username = identifier.Username
+	case *authv1.AuthenticatePasswordRequest_Email:
+		params.Email = identifier.Email
+	case *authv1.AuthenticatePasswordRequest_Phone:
+		params.Phone = identifier.Phone
+	}
+
+	result, err := a.identity.AuthenticatePassword(ctx, params)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &authv1.AuthenticatePasswordResponse{
+		Tokens:  authTokens(result),
+		Session: authSession(result.Session),
+		Device:  authDevice(result.Device),
+	}, nil
+}
+
 // AuthenticateBot logs a bot account in with its issued bot token.
 func (a *api) AuthenticateBot(
 	ctx context.Context,

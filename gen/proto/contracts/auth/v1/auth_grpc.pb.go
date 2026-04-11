@@ -23,6 +23,7 @@ const (
 	AuthService_SubmitJoinRequest_FullMethodName        = "/zvonilka.auth.v1.AuthService/SubmitJoinRequest"
 	AuthService_BeginLogin_FullMethodName               = "/zvonilka.auth.v1.AuthService/BeginLogin"
 	AuthService_VerifyLoginCode_FullMethodName          = "/zvonilka.auth.v1.AuthService/VerifyLoginCode"
+	AuthService_AuthenticatePassword_FullMethodName     = "/zvonilka.auth.v1.AuthService/AuthenticatePassword"
 	AuthService_AuthenticateBot_FullMethodName          = "/zvonilka.auth.v1.AuthService/AuthenticateBot"
 	AuthService_RefreshSession_FullMethodName           = "/zvonilka.auth.v1.AuthService/RefreshSession"
 	AuthService_RegisterDevice_FullMethodName           = "/zvonilka.auth.v1.AuthService/RegisterDevice"
@@ -45,6 +46,7 @@ type AuthServiceClient interface {
 	SubmitJoinRequest(ctx context.Context, in *SubmitJoinRequestRequest, opts ...grpc.CallOption) (*SubmitJoinRequestResponse, error)
 	BeginLogin(ctx context.Context, in *BeginLoginRequest, opts ...grpc.CallOption) (*BeginLoginResponse, error)
 	VerifyLoginCode(ctx context.Context, in *VerifyLoginCodeRequest, opts ...grpc.CallOption) (*VerifyLoginCodeResponse, error)
+	AuthenticatePassword(ctx context.Context, in *AuthenticatePasswordRequest, opts ...grpc.CallOption) (*AuthenticatePasswordResponse, error)
 	AuthenticateBot(ctx context.Context, in *AuthenticateBotRequest, opts ...grpc.CallOption) (*AuthenticateBotResponse, error)
 	RefreshSession(ctx context.Context, in *RefreshSessionRequest, opts ...grpc.CallOption) (*RefreshSessionResponse, error)
 	RegisterDevice(ctx context.Context, in *RegisterDeviceRequest, opts ...grpc.CallOption) (*RegisterDeviceResponse, error)
@@ -97,6 +99,15 @@ func (c *authServiceClient) BeginLogin(ctx context.Context, in *BeginLoginReques
 func (c *authServiceClient) VerifyLoginCode(ctx context.Context, in *VerifyLoginCodeRequest, opts ...grpc.CallOption) (*VerifyLoginCodeResponse, error) {
 	out := new(VerifyLoginCodeResponse)
 	err := c.cc.Invoke(ctx, AuthService_VerifyLoginCode_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) AuthenticatePassword(ctx context.Context, in *AuthenticatePasswordRequest, opts ...grpc.CallOption) (*AuthenticatePasswordResponse, error) {
+	out := new(AuthenticatePasswordResponse)
+	err := c.cc.Invoke(ctx, AuthService_AuthenticatePassword_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -219,6 +230,7 @@ type AuthServiceServer interface {
 	SubmitJoinRequest(context.Context, *SubmitJoinRequestRequest) (*SubmitJoinRequestResponse, error)
 	BeginLogin(context.Context, *BeginLoginRequest) (*BeginLoginResponse, error)
 	VerifyLoginCode(context.Context, *VerifyLoginCodeRequest) (*VerifyLoginCodeResponse, error)
+	AuthenticatePassword(context.Context, *AuthenticatePasswordRequest) (*AuthenticatePasswordResponse, error)
 	AuthenticateBot(context.Context, *AuthenticateBotRequest) (*AuthenticateBotResponse, error)
 	RefreshSession(context.Context, *RefreshSessionRequest) (*RefreshSessionResponse, error)
 	RegisterDevice(context.Context, *RegisterDeviceRequest) (*RegisterDeviceResponse, error)
@@ -249,6 +261,9 @@ func (UnimplementedAuthServiceServer) BeginLogin(context.Context, *BeginLoginReq
 }
 func (UnimplementedAuthServiceServer) VerifyLoginCode(context.Context, *VerifyLoginCodeRequest) (*VerifyLoginCodeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyLoginCode not implemented")
+}
+func (UnimplementedAuthServiceServer) AuthenticatePassword(context.Context, *AuthenticatePasswordRequest) (*AuthenticatePasswordResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AuthenticatePassword not implemented")
 }
 func (UnimplementedAuthServiceServer) AuthenticateBot(context.Context, *AuthenticateBotRequest) (*AuthenticateBotResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AuthenticateBot not implemented")
@@ -367,6 +382,24 @@ func _AuthService_VerifyLoginCode_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AuthServiceServer).VerifyLoginCode(ctx, req.(*VerifyLoginCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_AuthenticatePassword_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AuthenticatePasswordRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).AuthenticatePassword(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_AuthenticatePassword_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).AuthenticatePassword(ctx, req.(*AuthenticatePasswordRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -609,6 +642,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "VerifyLoginCode",
 			Handler:    _AuthService_VerifyLoginCode_Handler,
+		},
+		{
+			MethodName: "AuthenticatePassword",
+			Handler:    _AuthService_AuthenticatePassword_Handler,
 		},
 		{
 			MethodName: "AuthenticateBot",

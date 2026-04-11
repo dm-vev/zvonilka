@@ -217,6 +217,50 @@ func TestRefreshSessionRPC(t *testing.T) {
 	}
 }
 
+func TestAuthenticatePasswordRPC(t *testing.T) {
+	t.Parallel()
+
+	api, _ := newTestAPI(t)
+	ctx := context.Background()
+
+	account, _, err := api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "password-rpc-user",
+		DisplayName: "Password RPC User",
+		Password:    "rpc-password",
+		AccountKind: identity.AccountKindUser,
+		CreatedBy:   "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	login, err := api.AuthenticatePassword(ctx, &authv1.AuthenticatePasswordRequest{
+		Identifier:     &authv1.AuthenticatePasswordRequest_Username{Username: account.Username},
+		Password:       "rpc-password",
+		DeviceName:     "browser",
+		DevicePlatform: commonv1.DevicePlatform_DEVICE_PLATFORM_WEB,
+		DeviceKey:      &commonv1.PublicKeyBundle{PublicKey: []byte("password-rpc-public-key")},
+	})
+	if err != nil {
+		t.Fatalf("authenticate password: %v", err)
+	}
+	if login.GetSession().GetUserId() != account.ID {
+		t.Fatalf("expected session for %s, got %s", account.ID, login.GetSession().GetUserId())
+	}
+
+	authCtx := metadata.NewIncomingContext(ctx, metadata.Pairs(
+		"authorization",
+		"Bearer "+login.Tokens.AccessToken,
+	))
+	profile, err := api.GetMyProfile(authCtx, &usersv1.GetMyProfileRequest{})
+	if err != nil {
+		t.Fatalf("get my profile: %v", err)
+	}
+	if profile.Profile.UserId != account.ID {
+		t.Fatalf("expected profile for %s, got %s", account.ID, profile.Profile.UserId)
+	}
+}
+
 func TestGetLoginOptionsRPC(t *testing.T) {
 	t.Parallel()
 

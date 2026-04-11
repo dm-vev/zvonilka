@@ -164,33 +164,35 @@ func (b *idempotencyBucket[T]) expirationLen() int {
 
 // idempotencyCache groups the per-operation buckets so unrelated writes do not contend.
 type idempotencyCache struct {
-	submitJoinRequest  *idempotencyBucket[JoinRequest]
-	approveJoinRequest *idempotencyBucket[approveJoinRequestCacheResult]
-	rejectJoinRequest  *idempotencyBucket[JoinRequest]
-	createAccount      *idempotencyBucket[createAccountCacheResult]
-	beginLogin         *idempotencyBucket[beginLoginCacheResult]
-	verifyLogin        *idempotencyBucket[LoginResult]
-	authenticateBot    *idempotencyBucket[LoginResult]
-	refreshSession     *idempotencyBucket[LoginResult]
-	registerDevice     *idempotencyBucket[registerDeviceCacheResult]
-	revokeSession      *idempotencyBucket[Session]
-	revokeAllSessions  *idempotencyBucket[uint32]
+	submitJoinRequest    *idempotencyBucket[JoinRequest]
+	approveJoinRequest   *idempotencyBucket[approveJoinRequestCacheResult]
+	rejectJoinRequest    *idempotencyBucket[JoinRequest]
+	createAccount        *idempotencyBucket[createAccountCacheResult]
+	beginLogin           *idempotencyBucket[beginLoginCacheResult]
+	verifyLogin          *idempotencyBucket[LoginResult]
+	authenticatePassword *idempotencyBucket[LoginResult]
+	authenticateBot      *idempotencyBucket[LoginResult]
+	refreshSession       *idempotencyBucket[LoginResult]
+	registerDevice       *idempotencyBucket[registerDeviceCacheResult]
+	revokeSession        *idempotencyBucket[Session]
+	revokeAllSessions    *idempotencyBucket[uint32]
 }
 
 // newIdempotencyCache constructs the full cache set used by the service.
 func newIdempotencyCache() *idempotencyCache {
 	return &idempotencyCache{
-		submitJoinRequest:  newIdempotencyBucket[JoinRequest](),
-		approveJoinRequest: newIdempotencyBucket[approveJoinRequestCacheResult](),
-		rejectJoinRequest:  newIdempotencyBucket[JoinRequest](),
-		createAccount:      newIdempotencyBucket[createAccountCacheResult](),
-		beginLogin:         newIdempotencyBucket[beginLoginCacheResult](),
-		verifyLogin:        newIdempotencyBucket[LoginResult](),
-		authenticateBot:    newIdempotencyBucket[LoginResult](),
-		refreshSession:     newIdempotencyBucket[LoginResult](),
-		registerDevice:     newIdempotencyBucket[registerDeviceCacheResult](),
-		revokeSession:      newIdempotencyBucket[Session](),
-		revokeAllSessions:  newIdempotencyBucket[uint32](),
+		submitJoinRequest:    newIdempotencyBucket[JoinRequest](),
+		approveJoinRequest:   newIdempotencyBucket[approveJoinRequestCacheResult](),
+		rejectJoinRequest:    newIdempotencyBucket[JoinRequest](),
+		createAccount:        newIdempotencyBucket[createAccountCacheResult](),
+		beginLogin:           newIdempotencyBucket[beginLoginCacheResult](),
+		verifyLogin:          newIdempotencyBucket[LoginResult](),
+		authenticatePassword: newIdempotencyBucket[LoginResult](),
+		authenticateBot:      newIdempotencyBucket[LoginResult](),
+		refreshSession:       newIdempotencyBucket[LoginResult](),
+		registerDevice:       newIdempotencyBucket[registerDeviceCacheResult](),
+		revokeSession:        newIdempotencyBucket[Session](),
+		revokeAllSessions:    newIdempotencyBucket[uint32](),
 	}
 }
 
@@ -325,6 +327,25 @@ func (c *idempotencyCache) storeVerifyLoginResult(
 	now time.Time,
 ) {
 	c.verifyLogin.put(key, fingerprint, result, now)
+}
+
+// authenticatePasswordResult returns the cached password-auth outcome if the fingerprint still matches.
+func (c *idempotencyCache) authenticatePasswordResult(
+	key string,
+	fingerprint string,
+	now time.Time,
+) (LoginResult, bool, error) {
+	return c.authenticatePassword.get(key, fingerprint, now)
+}
+
+// storeAuthenticatePasswordResult caches a successful password authentication.
+func (c *idempotencyCache) storeAuthenticatePasswordResult(
+	key string,
+	fingerprint string,
+	result LoginResult,
+	now time.Time,
+) {
+	c.authenticatePassword.put(key, fingerprint, result, now)
 }
 
 // authenticateBotResult returns the cached bot-auth outcome if the fingerprint still matches.

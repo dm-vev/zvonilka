@@ -137,8 +137,20 @@ type failingSaveAccountTxStore struct {
 	parent *failingSaveAccountStore
 }
 
-// SaveAccount forwards account writes without injecting failure.
+// SaveAccount injects a failure on the configured call number inside a transaction.
 func (s *failingSaveAccountTxStore) SaveAccount(ctx context.Context, account identity.Account) (identity.Account, error) {
+	if s.parent.failErr == nil {
+		s.parent.failErr = errors.New("forced account save failure")
+	}
+	s.parent.calls++
+	failOnCall := s.parent.failOnCall
+	if failOnCall == 0 {
+		failOnCall = 2
+	}
+	if s.parent.calls == failOnCall {
+		return identity.Account{}, s.parent.failErr
+	}
+
 	return s.Store.SaveAccount(ctx, account)
 }
 
@@ -147,20 +159,8 @@ func (s *failingSaveAccountStore) LockAccount(ctx context.Context, accountID str
 	return s.Store.LockAccount(ctx, accountID)
 }
 
-// LockAccount injects a failure on the configured call number before delegating to the wrapped store.
+// LockAccount forwards account boundary calls inside a transaction.
 func (s *failingSaveAccountTxStore) LockAccount(ctx context.Context, accountID string) error {
-	if s.parent.failErr == nil {
-		s.parent.failErr = errors.New("forced account boundary failure")
-	}
-	s.parent.calls++
-	failOnCall := s.parent.failOnCall
-	if failOnCall == 0 {
-		failOnCall = 2
-	}
-	if s.parent.calls == failOnCall {
-		return s.parent.failErr
-	}
-
 	return s.Store.LockAccount(ctx, accountID)
 }
 
