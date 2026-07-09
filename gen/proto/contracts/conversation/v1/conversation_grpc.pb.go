@@ -37,9 +37,11 @@ const (
 	ConversationService_TranslateMessage_FullMethodName           = "/zvonilka.conversation.v1.ConversationService/TranslateMessage"
 	ConversationService_EditMessage_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/EditMessage"
 	ConversationService_DeleteMessage_FullMethodName              = "/zvonilka.conversation.v1.ConversationService/DeleteMessage"
+	ConversationService_ForwardMessage_FullMethodName             = "/zvonilka.conversation.v1.ConversationService/ForwardMessage"
 	ConversationService_AddReaction_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/AddReaction"
 	ConversationService_RemoveReaction_FullMethodName             = "/zvonilka.conversation.v1.ConversationService/RemoveReaction"
 	ConversationService_PinMessage_FullMethodName                 = "/zvonilka.conversation.v1.ConversationService/PinMessage"
+	ConversationService_UnpinMessage_FullMethodName               = "/zvonilka.conversation.v1.ConversationService/UnpinMessage"
 	ConversationService_MarkRead_FullMethodName                   = "/zvonilka.conversation.v1.ConversationService/MarkRead"
 	ConversationService_CreateThread_FullMethodName               = "/zvonilka.conversation.v1.ConversationService/CreateThread"
 	ConversationService_GetThread_FullMethodName                  = "/zvonilka.conversation.v1.ConversationService/GetThread"
@@ -84,9 +86,11 @@ type ConversationServiceClient interface {
 	TranslateMessage(ctx context.Context, in *TranslateMessageRequest, opts ...grpc.CallOption) (*TranslateMessageResponse, error)
 	EditMessage(ctx context.Context, in *EditMessageRequest, opts ...grpc.CallOption) (*EditMessageResponse, error)
 	DeleteMessage(ctx context.Context, in *DeleteMessageRequest, opts ...grpc.CallOption) (*DeleteMessageResponse, error)
+	ForwardMessage(ctx context.Context, in *ForwardMessageRequest, opts ...grpc.CallOption) (*ForwardMessageResponse, error)
 	AddReaction(ctx context.Context, in *AddReactionRequest, opts ...grpc.CallOption) (*AddReactionResponse, error)
 	RemoveReaction(ctx context.Context, in *RemoveReactionRequest, opts ...grpc.CallOption) (*RemoveReactionResponse, error)
 	PinMessage(ctx context.Context, in *PinMessageRequest, opts ...grpc.CallOption) (*PinMessageResponse, error)
+	UnpinMessage(ctx context.Context, in *UnpinMessageRequest, opts ...grpc.CallOption) (*UnpinMessageResponse, error)
 	MarkRead(ctx context.Context, in *MarkReadRequest, opts ...grpc.CallOption) (*MarkReadResponse, error)
 	CreateThread(ctx context.Context, in *CreateThreadRequest, opts ...grpc.CallOption) (*CreateThreadResponse, error)
 	GetThread(ctx context.Context, in *GetThreadRequest, opts ...grpc.CallOption) (*GetThreadResponse, error)
@@ -279,6 +283,15 @@ func (c *conversationServiceClient) DeleteMessage(ctx context.Context, in *Delet
 	return out, nil
 }
 
+func (c *conversationServiceClient) ForwardMessage(ctx context.Context, in *ForwardMessageRequest, opts ...grpc.CallOption) (*ForwardMessageResponse, error) {
+	out := new(ForwardMessageResponse)
+	err := c.cc.Invoke(ctx, ConversationService_ForwardMessage_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *conversationServiceClient) AddReaction(ctx context.Context, in *AddReactionRequest, opts ...grpc.CallOption) (*AddReactionResponse, error) {
 	out := new(AddReactionResponse)
 	err := c.cc.Invoke(ctx, ConversationService_AddReaction_FullMethodName, in, out, opts...)
@@ -300,6 +313,15 @@ func (c *conversationServiceClient) RemoveReaction(ctx context.Context, in *Remo
 func (c *conversationServiceClient) PinMessage(ctx context.Context, in *PinMessageRequest, opts ...grpc.CallOption) (*PinMessageResponse, error) {
 	out := new(PinMessageResponse)
 	err := c.cc.Invoke(ctx, ConversationService_PinMessage_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) UnpinMessage(ctx context.Context, in *UnpinMessageRequest, opts ...grpc.CallOption) (*UnpinMessageResponse, error) {
+	out := new(UnpinMessageResponse)
+	err := c.cc.Invoke(ctx, ConversationService_UnpinMessage_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -508,9 +530,11 @@ type ConversationServiceServer interface {
 	TranslateMessage(context.Context, *TranslateMessageRequest) (*TranslateMessageResponse, error)
 	EditMessage(context.Context, *EditMessageRequest) (*EditMessageResponse, error)
 	DeleteMessage(context.Context, *DeleteMessageRequest) (*DeleteMessageResponse, error)
+	ForwardMessage(context.Context, *ForwardMessageRequest) (*ForwardMessageResponse, error)
 	AddReaction(context.Context, *AddReactionRequest) (*AddReactionResponse, error)
 	RemoveReaction(context.Context, *RemoveReactionRequest) (*RemoveReactionResponse, error)
 	PinMessage(context.Context, *PinMessageRequest) (*PinMessageResponse, error)
+	UnpinMessage(context.Context, *UnpinMessageRequest) (*UnpinMessageResponse, error)
 	MarkRead(context.Context, *MarkReadRequest) (*MarkReadResponse, error)
 	CreateThread(context.Context, *CreateThreadRequest) (*CreateThreadResponse, error)
 	GetThread(context.Context, *GetThreadRequest) (*GetThreadResponse, error)
@@ -592,6 +616,9 @@ func (UnimplementedConversationServiceServer) EditMessage(context.Context, *Edit
 func (UnimplementedConversationServiceServer) DeleteMessage(context.Context, *DeleteMessageRequest) (*DeleteMessageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteMessage not implemented")
 }
+func (UnimplementedConversationServiceServer) ForwardMessage(context.Context, *ForwardMessageRequest) (*ForwardMessageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ForwardMessage not implemented")
+}
 func (UnimplementedConversationServiceServer) AddReaction(context.Context, *AddReactionRequest) (*AddReactionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddReaction not implemented")
 }
@@ -600,6 +627,9 @@ func (UnimplementedConversationServiceServer) RemoveReaction(context.Context, *R
 }
 func (UnimplementedConversationServiceServer) PinMessage(context.Context, *PinMessageRequest) (*PinMessageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PinMessage not implemented")
+}
+func (UnimplementedConversationServiceServer) UnpinMessage(context.Context, *UnpinMessageRequest) (*UnpinMessageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UnpinMessage not implemented")
 }
 func (UnimplementedConversationServiceServer) MarkRead(context.Context, *MarkReadRequest) (*MarkReadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MarkRead not implemented")
@@ -998,6 +1028,24 @@ func _ConversationService_DeleteMessage_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConversationService_ForwardMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ForwardMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).ForwardMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_ForwardMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).ForwardMessage(ctx, req.(*ForwardMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ConversationService_AddReaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AddReactionRequest)
 	if err := dec(in); err != nil {
@@ -1048,6 +1096,24 @@ func _ConversationService_PinMessage_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ConversationServiceServer).PinMessage(ctx, req.(*PinMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_UnpinMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnpinMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).UnpinMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_UnpinMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).UnpinMessage(ctx, req.(*UnpinMessageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1492,6 +1558,10 @@ var ConversationService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ConversationService_DeleteMessage_Handler,
 		},
 		{
+			MethodName: "ForwardMessage",
+			Handler:    _ConversationService_ForwardMessage_Handler,
+		},
+		{
 			MethodName: "AddReaction",
 			Handler:    _ConversationService_AddReaction_Handler,
 		},
@@ -1502,6 +1572,10 @@ var ConversationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PinMessage",
 			Handler:    _ConversationService_PinMessage_Handler,
+		},
+		{
+			MethodName: "UnpinMessage",
+			Handler:    _ConversationService_UnpinMessage_Handler,
 		},
 		{
 			MethodName: "MarkRead",

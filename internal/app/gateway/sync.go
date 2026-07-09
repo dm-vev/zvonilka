@@ -27,7 +27,8 @@ func (a *api) GetSyncState(
 	}
 
 	state, pending, err := a.conversation.GetSyncState(ctx, domainconversation.GetSyncStateParams{
-		DeviceID: deviceID,
+		AccountID: authContext.Account.ID,
+		DeviceID:  deviceID,
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -63,6 +64,7 @@ func (a *api) PullEvents(
 
 	for batchCount := 0; batchCount < 8 && len(eventRows) < limit; batchCount++ {
 		events, batchState, pullErr := a.conversation.PullEvents(ctx, domainconversation.PullEventsParams{
+			AccountID:       authContext.Account.ID,
 			DeviceID:        deviceID,
 			FromSequence:    scanSequence,
 			Limit:           rawBatchLimit,
@@ -120,6 +122,7 @@ func (a *api) AcknowledgeEvents(
 	}
 
 	state, err := a.conversation.AcknowledgeEvents(ctx, domainconversation.AcknowledgeEventsParams{
+		AccountID:     authContext.Account.ID,
 		DeviceID:      deviceID,
 		AckedSequence: req.GetAckedSequence(),
 		EventIDs:      req.GetEventIds(),
@@ -154,7 +157,14 @@ func (a *api) SubscribeEvents(
 	defer reconcileTicker.Stop()
 
 	for {
-		nextSequence, sentAny, err := a.streamSyncBacklog(stream.Context(), stream, req, deviceID, fromSequence)
+		nextSequence, sentAny, err := a.streamSyncBacklog(
+			stream.Context(),
+			stream,
+			req,
+			authContext.Account.ID,
+			deviceID,
+			fromSequence,
+		)
 		if err != nil {
 			if stream.Context().Err() != nil {
 				return nil
@@ -218,10 +228,12 @@ func (a *api) streamSyncBacklog(
 	ctx context.Context,
 	stream syncv1.SyncService_SubscribeEventsServer,
 	req *syncv1.SubscribeEventsRequest,
+	accountID string,
 	deviceID string,
 	fromSequence uint64,
 ) (uint64, bool, error) {
 	events, _, pullErr := a.conversation.PullEvents(ctx, domainconversation.PullEventsParams{
+		AccountID:       accountID,
 		DeviceID:        deviceID,
 		FromSequence:    fromSequence,
 		Limit:           defaultPageSize,

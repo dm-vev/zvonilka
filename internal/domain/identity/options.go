@@ -30,3 +30,10 @@ func WithIndexer(indexer domainsearch.Indexer) Option {
 		}
 	}
 }
+
+// WithDebugLogin enables fixed debug phone login challenges for development.
+func WithDebugLogin(enabled bool) Option {
+	return func(service *Service) {
+		service.debugLogin = enabled
+	}
+}

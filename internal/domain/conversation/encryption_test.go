@@ -180,7 +180,7 @@ func TestTrustedDevicePolicyImpliesEncryptedMessages(t *testing.T) {
 	}
 }
 
-func TestEncryptedHintsAreStrippedFromMessages(t *testing.T) {
+func TestEncryptedHintsPreserveReplySnippet(t *testing.T) {
 	t.Parallel()
 
 	store := teststore.NewMemoryStore()
@@ -248,8 +248,8 @@ func TestEncryptedHintsAreStrippedFromMessages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("send reply message: %v", err)
 	}
-	if replyMessage.ReplyTo.Snippet != "" {
-		t.Fatalf("expected reply snippet to be stripped, got %q", replyMessage.ReplyTo.Snippet)
+	if replyMessage.ReplyTo.Snippet != "plaintext quote" {
+		t.Fatalf("expected reply snippet to be preserved, got %q", replyMessage.ReplyTo.Snippet)
 	}
 	if len(replyMessage.Attachments) != 1 {
 		t.Fatalf("expected one attachment, got %d", len(replyMessage.Attachments))
@@ -268,8 +268,8 @@ func TestEncryptedHintsAreStrippedFromMessages(t *testing.T) {
 	if len(messages) != 2 {
 		t.Fatalf("expected 2 messages, got %d", len(messages))
 	}
-	if messages[1].ReplyTo.Snippet != "" {
-		t.Fatalf("expected persisted reply snippet to be stripped, got %q", messages[1].ReplyTo.Snippet)
+	if messages[1].ReplyTo.Snippet != "plaintext quote" {
+		t.Fatalf("expected persisted reply snippet to be preserved, got %q", messages[1].ReplyTo.Snippet)
 	}
 	if messages[1].Attachments[0].Caption != "" {
 		t.Fatalf("expected persisted attachment caption to be stripped, got %q", messages[1].Attachments[0].Caption)

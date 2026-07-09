@@ -109,6 +109,11 @@ func applyEnvOverrides(cfg *Configuration, serviceName string) error {
 	} else if ok {
 		cfg.Identity.LoginCodeLength = value
 	}
+	if value, ok, err := boolValue(serviceName, "IDENTITY_DEBUG_LOGIN_ENABLED", cfg.Identity.DebugLogin); err != nil {
+		return err
+	} else if ok {
+		cfg.Identity.DebugLogin = value
+	}
 	if value, ok, err := durationValue(serviceName, "CALL_INVITE_TIMEOUT", cfg.Call.InviteTimeout); err != nil {
 		return err
 	} else if ok {

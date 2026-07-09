@@ -78,7 +78,7 @@ func TestEncryptedPayloadRejectsInvalidMessage(t *testing.T) {
 	}
 }
 
-func TestEncryptedPayloadStripsPlaintextHints(t *testing.T) {
+func TestEncryptedPayloadPreservesReplySnippet(t *testing.T) {
 	db := openDockerPostgres(t)
 	t.Cleanup(func() {
 		_ = db.Close()
@@ -180,8 +180,8 @@ func TestEncryptedPayloadStripsPlaintextHints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("save message: %v", err)
 	}
-	if saved.ReplyTo.Snippet != "" {
-		t.Fatalf("expected persisted reply snippet to be stripped, got %q", saved.ReplyTo.Snippet)
+	if saved.ReplyTo.Snippet != "plaintext quote" {
+		t.Fatalf("expected persisted reply snippet to be preserved, got %q", saved.ReplyTo.Snippet)
 	}
 	if len(saved.Attachments) != 1 {
 		t.Fatalf("expected one attachment, got %d", len(saved.Attachments))
@@ -194,8 +194,8 @@ func TestEncryptedPayloadStripsPlaintextHints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load message: %v", err)
 	}
-	if loaded.ReplyTo.Snippet != "" {
-		t.Fatalf("expected loaded reply snippet to be stripped, got %q", loaded.ReplyTo.Snippet)
+	if loaded.ReplyTo.Snippet != "plaintext quote" {
+		t.Fatalf("expected loaded reply snippet to be preserved, got %q", loaded.ReplyTo.Snippet)
 	}
 	if len(loaded.Attachments) != 1 {
 		t.Fatalf("expected loaded attachment, got %d", len(loaded.Attachments))

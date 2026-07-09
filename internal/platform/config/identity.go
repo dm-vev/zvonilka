@@ -13,6 +13,7 @@ type IdentityConfig struct {
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
 	LoginCodeLength int
+	DebugLogin      bool
 }
 
 // ToSettings converts the config-facing identity lifecycle values into the

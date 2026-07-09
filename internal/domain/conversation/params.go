@@ -216,6 +216,7 @@ type MarkReadParams struct {
 
 // PullEventsParams filters the sync event stream.
 type PullEventsParams struct {
+	AccountID       string
 	DeviceID        string
 	FromSequence    uint64
 	Limit           int
@@ -224,6 +225,7 @@ type PullEventsParams struct {
 
 // AcknowledgeEventsParams updates the device ack cursor.
 type AcknowledgeEventsParams struct {
+	AccountID     string
 	DeviceID      string
 	AckedSequence uint64
 	EventIDs      []string
@@ -231,7 +233,8 @@ type AcknowledgeEventsParams struct {
 
 // GetSyncStateParams identifies the device sync state to resolve.
 type GetSyncStateParams struct {
-	DeviceID string
+	AccountID string
+	DeviceID  string
 }
 
 // PublishUserUpdateParams describes a fan-out user update event.

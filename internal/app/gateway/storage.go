@@ -125,10 +125,24 @@ func buildAppStorage(
 		),
 		postgresplatform.NewFactory(
 			postgresBootstrap,
+			cfg.Storage.CacheProvider,
+			domainstorage.KindCache,
+			domainstorage.PurposeCache,
+			domainstorage.CapabilityRead|domainstorage.CapabilityWrite|domainstorage.CapabilityKeyValue,
+		),
+		postgresplatform.NewFactory(
+			postgresBootstrap,
 			cfg.Storage.SearchProvider,
 			domainstorage.KindIndex,
 			domainstorage.PurposeSearch,
 			domainstorage.CapabilityRead|domainstorage.CapabilityWrite|domainstorage.CapabilityListing,
+		),
+		postgresplatform.NewFactory(
+			postgresBootstrap,
+			cfg.Storage.AuditProvider,
+			domainstorage.KindIndex,
+			domainstorage.PurposeAudit,
+			domainstorage.CapabilityWrite|domainstorage.CapabilityListing,
 		),
 		s3platform.NewFactory(
 			objectBootstrap,
@@ -210,6 +224,7 @@ func buildAppStorage(
 		domainidentity.NoopCodeSender{},
 		domainidentity.WithSettings(cfg.Identity.ToSettings()),
 		domainidentity.WithIndexer(searchService),
+		domainidentity.WithDebugLogin(cfg.Identity.DebugLogin),
 	)
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(

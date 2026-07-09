@@ -24,6 +24,26 @@ func (s *Service) BeginLogin(ctx context.Context, params BeginLoginParams) (Logi
 			return cached.challenge, cached.targets, nil
 		}
 	}
+	if s.debugLogin {
+		if _, ok := debugLoginCode(phone); ok {
+			challenge, targets, err := s.beginDebugLogin(ctx, phone, params)
+			if err != nil {
+				return LoginChallenge{}, nil, err
+			}
+			if params.IdempotencyKey != "" {
+				s.idempotency.storeBeginLoginResult(
+					params.IdempotencyKey,
+					fingerprint,
+					beginLoginCacheResult{
+						challenge: challenge,
+						targets:   targets,
+					},
+					s.currentTime(),
+				)
+			}
+			return challenge, targets, nil
+		}
+	}
 
 	account, err := s.lookupAccountByIdentifier(ctx, username, email, phone)
 	if err != nil {
@@ -182,6 +202,13 @@ func (s *Service) VerifyLoginCode(ctx context.Context, params VerifyLoginCodePar
 		result, err = s.issueSession(ctx, tx, account, params.DeviceName, params.Platform, params.PublicKey, params.PushToken)
 		if err != nil {
 			return err
+		}
+		if _, ok := debugLoginCode(account.Phone); ok && challenge.DeliveryChannel == LoginDeliveryChannelManual && result.Device.Status == DeviceStatusUnverified {
+			result.Device.Status = DeviceStatusActive
+			result.Device.LastSeenAt = now
+			if result.Device, err = tx.SaveDevice(ctx, result.Device); err != nil {
+				return fmt.Errorf("activate debug login device %s: %w", result.Device.ID, err)
+			}
 		}
 		if !params.EnablePasswordRecovery {
 			return nil

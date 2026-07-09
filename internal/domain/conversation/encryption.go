@@ -33,13 +33,12 @@ func ValidateEncryptedPayload(payload EncryptedPayload) error {
 	return nil
 }
 
-// StripMessageHints removes plaintext reply hints before persistence.
+// StripMessageHints removes plaintext attachment hints before persistence.
 func StripMessageHints(message *Message) {
 	if message == nil {
 		return
 	}
 
-	message.ReplyTo.Snippet = ""
 	for i := range message.Attachments {
 		message.Attachments[i].Caption = ""
 	}

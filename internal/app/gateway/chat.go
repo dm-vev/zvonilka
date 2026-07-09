@@ -450,9 +450,6 @@ func (a *api) ListMessages(
 	if err != nil {
 		return nil, err
 	}
-	if req.GetIncludeForwarded() {
-		return nil, grpcError(domainconversation.ErrInvalidInput)
-	}
 
 	fromSequence, err := decodeSequence(req.GetPage(), "messages")
 	if err != nil {
@@ -705,6 +702,82 @@ func (a *api) DeleteMessage(
 	}, nil
 }
 
+// ForwardMessage copies one visible message into another conversation.
+func (a *api) ForwardMessage(
+	ctx context.Context,
+	req *conversationv1.ForwardMessageRequest,
+) (*conversationv1.ForwardMessageResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	source, err := a.conversation.GetMessage(ctx, domainconversation.GetMessageParams{
+		ConversationID: req.GetFromConversationId(),
+		MessageID:      req.GetMessageId(),
+		AccountID:      authContext.Account.ID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	target, _, err := a.conversation.GetConversation(ctx, domainconversation.GetConversationParams{
+		ConversationID: req.GetToConversationId(),
+		AccountID:      authContext.Account.ID,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	if target.Settings.RequireEncryptedMessages {
+		if err := a.e2ee.ValidateConversationPayload(ctx, domaine2ee.ValidateConversationPayloadParams{
+			ConversationID:  req.GetToConversationId(),
+			SenderAccountID: authContext.Account.ID,
+			SenderDeviceID:  authContext.Device.ID,
+			PayloadKeyID:    source.Payload.KeyID,
+			PayloadMetadata: source.Payload.Metadata,
+		}); err != nil {
+			return nil, a.encryptedSendError(ctx, authContext.Account.ID, authContext.Device.ID, target, err)
+		}
+	}
+
+	metadata := cloneStringMap(source.Metadata)
+	if metadata == nil {
+		metadata = make(map[string]string, 2)
+	}
+	metadata["forward_from_conversation_id"] = source.ConversationID
+	metadata["forward_from_message_id"] = source.ID
+
+	message, event, err := a.conversation.SendMessage(ctx, domainconversation.SendMessageParams{
+		ConversationID:  req.GetToConversationId(),
+		SenderAccountID: authContext.Account.ID,
+		SenderDeviceID:  authContext.Device.ID,
+		Draft: domainconversation.MessageDraft{
+			Kind:                source.Kind,
+			Payload:             source.Payload,
+			Attachments:         slices.Clone(source.Attachments),
+			MentionAccountIDs:   slices.Clone(source.MentionAccountIDs),
+			Silent:              source.Silent,
+			DisableLinkPreviews: source.DisableLinkPreviews,
+			Metadata:            metadata,
+		},
+		CausationID: req.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishSyncEvent(event)
+
+	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &conversationv1.ForwardMessageResponse{
+		Message: messageProto(message, profiles[message.SenderAccountID]),
+	}, nil
+}
+
 // AddReaction stores one reaction for the authenticated account.
 func (a *api) AddReaction(
 	ctx context.Context,
@@ -797,6 +870,38 @@ func (a *api) PinMessage(
 	}
 
 	return &conversationv1.PinMessageResponse{
+		Message: messageProto(message, profiles[message.SenderAccountID]),
+	}, nil
+}
+
+// UnpinMessage clears the pin state of one message.
+func (a *api) UnpinMessage(
+	ctx context.Context,
+	req *conversationv1.UnpinMessageRequest,
+) (*conversationv1.UnpinMessageResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	message, event, err := a.conversation.PinMessage(ctx, domainconversation.PinMessageParams{
+		ConversationID: req.GetConversationId(),
+		MessageID:      req.GetMessageId(),
+		ActorAccountID: authContext.Account.ID,
+		ActorDeviceID:  authContext.Device.ID,
+		Pinned:         false,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishSyncEvent(event)
+
+	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+
+	return &conversationv1.UnpinMessageResponse{
 		Message: messageProto(message, profiles[message.SenderAccountID]),
 	}, nil
 }

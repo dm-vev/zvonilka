@@ -46,6 +46,9 @@ func (c Configuration) Validate() error {
 	if c.Identity.LoginCodeLength <= 0 {
 		errs = append(errs, errors.New("identity login code length must be positive"))
 	}
+	if c.Identity.DebugLogin && !isDevelopmentLikeEnvironment(c.Service.Environment) {
+		errs = append(errs, errors.New("identity debug login is only allowed in development environments"))
+	}
 	if c.Call.InviteTimeout <= 0 {
 		errs = append(errs, errors.New("call invite timeout must be positive"))
 	}

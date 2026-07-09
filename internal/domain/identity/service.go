@@ -21,6 +21,7 @@ type Service struct {
 	refreshTokenTTL time.Duration
 	loginCodeLength int
 	indexer         domainsearch.Indexer
+	debugLogin      bool
 }
 
 // NewService constructs a service backed by the provided store and sender.

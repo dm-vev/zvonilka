@@ -194,6 +194,7 @@ func (s *Service) PullEvents(ctx context.Context, params PullEventsParams) ([]Ev
 		return nil, SyncState{}, err
 	}
 	params.DeviceID = strings.TrimSpace(params.DeviceID)
+	params.AccountID = strings.TrimSpace(params.AccountID)
 	params.ConversationIDs = uniqueIDs(params.ConversationIDs)
 	if params.DeviceID == "" {
 		return nil, SyncState{}, ErrInvalidInput
@@ -204,7 +205,10 @@ func (s *Service) PullEvents(ctx context.Context, params PullEventsParams) ([]Ev
 		return nil, SyncState{}, fmt.Errorf("load events after %d: %w", params.FromSequence, err)
 	}
 
-	state, _, err := s.GetSyncState(ctx, GetSyncStateParams{DeviceID: params.DeviceID})
+	state, _, err := s.GetSyncState(ctx, GetSyncStateParams{
+		AccountID: params.AccountID,
+		DeviceID:  params.DeviceID,
+	})
 	if err != nil {
 		return nil, SyncState{}, err
 	}
@@ -225,6 +229,7 @@ func (s *Service) GetSyncState(ctx context.Context, params GetSyncStateParams) (
 		return SyncState{}, nil, err
 	}
 	params.DeviceID = strings.TrimSpace(params.DeviceID)
+	params.AccountID = strings.TrimSpace(params.AccountID)
 	if params.DeviceID == "" {
 		return SyncState{}, nil, ErrInvalidInput
 	}
@@ -257,6 +262,9 @@ func (s *Service) GetSyncState(ctx context.Context, params GetSyncStateParams) (
 	}
 	if state.AccountID == "" {
 		state.AccountID = accountID
+	}
+	if state.AccountID == "" {
+		state.AccountID = params.AccountID
 	}
 	if state.ConversationWatermarks == nil {
 		state.ConversationWatermarks = make(map[string]uint64, len(derived))
@@ -293,11 +301,15 @@ func (s *Service) AcknowledgeEvents(ctx context.Context, params AcknowledgeEvent
 		return SyncState{}, err
 	}
 	params.DeviceID = strings.TrimSpace(params.DeviceID)
+	params.AccountID = strings.TrimSpace(params.AccountID)
 	if params.DeviceID == "" {
 		return SyncState{}, ErrInvalidInput
 	}
 
-	state, pending, err := s.GetSyncState(ctx, GetSyncStateParams{DeviceID: params.DeviceID})
+	state, pending, err := s.GetSyncState(ctx, GetSyncStateParams{
+		AccountID: params.AccountID,
+		DeviceID:  params.DeviceID,
+	})
 	if err != nil {
 		return SyncState{}, err
 	}
