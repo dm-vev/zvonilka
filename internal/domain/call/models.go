@@ -1,0 +1,337 @@
+package call
+
+import "time"
+
+// State identifies the lifecycle stage of a call.
+type State string
+
+const (
+	// StateUnspecified is the zero value.
+	StateUnspecified State = ""
+	// StateRinging indicates an unanswered call.
+	StateRinging State = "ringing"
+	// StateActive indicates an answered call.
+	StateActive State = "active"
+	// StateEnded indicates a completed call.
+	StateEnded State = "ended"
+)
+
+// EndReason identifies why a call ended.
+type EndReason string
+
+const (
+	// EndReasonUnspecified is the zero value.
+	EndReasonUnspecified EndReason = ""
+	// EndReasonCancelled means the initiator cancelled the call.
+	EndReasonCancelled EndReason = "cancelled"
+	// EndReasonDeclined means the target explicitly declined the call.
+	EndReasonDeclined EndReason = "declined"
+	// EndReasonMissed means the call timed out unanswered.
+	EndReasonMissed EndReason = "missed"
+	// EndReasonEnded means a participant ended an active call.
+	EndReasonEnded EndReason = "ended"
+	// EndReasonFailed means the call failed before completion.
+	EndReasonFailed EndReason = "failed"
+)
+
+// InviteState identifies the state of one call invite.
+type InviteState string
+
+const (
+	// InviteStateUnspecified is the zero value.
+	InviteStateUnspecified InviteState = ""
+	// InviteStatePending indicates a live incoming invite.
+	InviteStatePending InviteState = "pending"
+	// InviteStateAccepted indicates an accepted invite.
+	InviteStateAccepted InviteState = "accepted"
+	// InviteStateDeclined indicates a declined invite.
+	InviteStateDeclined InviteState = "declined"
+	// InviteStateCancelled indicates a cancelled invite.
+	InviteStateCancelled InviteState = "cancelled"
+	// InviteStateExpired indicates an expired invite.
+	InviteStateExpired InviteState = "expired"
+)
+
+// ParticipantState identifies the state of one joined participant device.
+type ParticipantState string
+
+const (
+	// ParticipantStateUnspecified is the zero value.
+	ParticipantStateUnspecified ParticipantState = ""
+	// ParticipantStateJoined indicates an active participant.
+	ParticipantStateJoined ParticipantState = "joined"
+	// ParticipantStateLeft indicates a departed participant.
+	ParticipantStateLeft ParticipantState = "left"
+)
+
+// EventType identifies a call event.
+type EventType string
+
+const (
+	// EventTypeUnspecified is the zero value.
+	EventTypeUnspecified EventType = ""
+	// EventTypeStarted indicates a new call.
+	EventTypeStarted EventType = "call.started"
+	// EventTypeInvited indicates a ringing invite.
+	EventTypeInvited EventType = "call.invited"
+	// EventTypeAccepted indicates an accepted invite.
+	EventTypeAccepted EventType = "call.accepted"
+	// EventTypeDeclined indicates a declined invite.
+	EventTypeDeclined EventType = "call.declined"
+	// EventTypeJoined indicates a joined participant.
+	EventTypeJoined EventType = "call.joined"
+	// EventTypeLeft indicates a departed participant.
+	EventTypeLeft EventType = "call.left"
+	// EventTypeMediaUpdated indicates changed participant media state.
+	EventTypeMediaUpdated EventType = "call.media_updated"
+	// EventTypeSessionMigrated indicates one server-initiated session failover.
+	EventTypeSessionMigrated EventType = "call.session_migrated"
+	// EventTypeEnded indicates a finished call.
+	EventTypeEnded EventType = "call.ended"
+	// EventTypeSignalDescription indicates a published SDP description.
+	EventTypeSignalDescription EventType = "call.signal_description"
+	// EventTypeSignalCandidate indicates a published ICE candidate.
+	EventTypeSignalCandidate EventType = "call.signal_candidate"
+	// EventTypeRecordingUpdated indicates changed call recording state.
+	EventTypeRecordingUpdated EventType = "call.recording_updated"
+	// EventTypeTranscriptionUpdated indicates changed call transcription state.
+	EventTypeTranscriptionUpdated EventType = "call.transcription_updated"
+)
+
+// RecordingState identifies the lifecycle stage of one call recording.
+type RecordingState string
+
+const (
+	// RecordingStateUnspecified is the zero value.
+	RecordingStateUnspecified RecordingState = ""
+	// RecordingStateInactive indicates that recording is disabled.
+	RecordingStateInactive RecordingState = "inactive"
+	// RecordingStateActive indicates that recording is enabled.
+	RecordingStateActive RecordingState = "active"
+	// RecordingStateFailed indicates that recording failed.
+	RecordingStateFailed RecordingState = "failed"
+)
+
+// TranscriptionState identifies the lifecycle stage of one call transcription flow.
+type TranscriptionState string
+
+const (
+	// TranscriptionStateUnspecified is the zero value.
+	TranscriptionStateUnspecified TranscriptionState = ""
+	// TranscriptionStateInactive indicates that transcription is disabled.
+	TranscriptionStateInactive TranscriptionState = "inactive"
+	// TranscriptionStateActive indicates that transcription is enabled.
+	TranscriptionStateActive TranscriptionState = "active"
+	// TranscriptionStateFailed indicates that transcription failed.
+	TranscriptionStateFailed TranscriptionState = "failed"
+)
+
+// MediaState describes the participant media toggles visible to other clients.
+type MediaState struct {
+	AudioMuted         bool
+	VideoMuted         bool
+	CameraEnabled      bool
+	ScreenShareEnabled bool
+}
+
+// TransportStats describes live transport quality counters for one participant device.
+type TransportQualitySample struct {
+	Quality            string
+	RecommendedProfile string
+	RecordedAt         time.Time
+}
+
+// TransportQoSSample describes one derived QoS snapshot from RTCP feedback.
+type TransportQoSSample struct {
+	PacketLossPct float64
+	JitterScore   uint32
+	Escalation    string
+	RecordedAt    time.Time
+}
+
+// TransportStats describes live transport quality counters for one participant device.
+type TransportStats struct {
+	PeerConnectionState      string
+	IceConnectionState       string
+	SignalingState           string
+	Quality                  string
+	AdaptationRevision       uint64
+	PendingAdaptation        bool
+	AckedAdaptationRevision  uint64
+	AppliedProfile           string
+	AppliedAt                time.Time
+	RecommendedProfile       string
+	RecommendationReason     string
+	VideoFallbackRecommended bool
+	ScreenSharePriority      bool
+	ReconnectRecommended     bool
+	SuppressCameraVideo      bool
+	SuppressOutgoingVideo    bool
+	SuppressIncomingVideo    bool
+	SuppressOutgoingAudio    bool
+	SuppressIncomingAudio    bool
+	ReconnectAttempt         uint32
+	ReconnectBackoffUntil    time.Time
+	QualityTrend             string
+	DegradedTransitions      uint32
+	RecoveredTransitions     uint32
+	LastQualityChangeAt      time.Time
+	RecentSamples            []TransportQualitySample
+	PacketLossPct            float64
+	JitterScore              uint32
+	QoSEscalation            string
+	QoSTrend                 string
+	QoSBadStreak             uint32
+	LastQoSUpdatedAt         time.Time
+	RecentQoSSamples         []TransportQoSSample
+	RelayTracks              uint32
+	ScreenShareRelayTracks   uint32
+	RelayPackets             uint64
+	RelayBytes               uint64
+	RelayWriteErrors         uint64
+	ActiveSpeaker            bool
+	DominantSpeaker          bool
+	LastSpokeAt              time.Time
+	LastUpdatedAt            time.Time
+}
+
+// QualitySummary describes aggregated quality state for one call.
+type QualitySummary struct {
+	WorstQuality                    string
+	DominantProfile                 string
+	ParticipantCount                uint32
+	ActiveSpeakerCount              uint32
+	VideoFallbackParticipants       uint32
+	ScreenSharePriorityParticipants uint32
+	ReconnectParticipants           uint32
+	CameraVideoSuppressed           uint32
+	OutgoingVideoSuppressed         uint32
+	IncomingVideoSuppressed         uint32
+	OutgoingAudioSuppressed         uint32
+	IncomingAudioSuppressed         uint32
+	DominantSpeakerAccountID        string
+	DominantSpeakerDeviceID         string
+	DegradedTransitions             uint32
+	RecoveredTransitions            uint32
+	LastChangedAt                   time.Time
+}
+
+// Diagnostics describes one client-facing call diagnostics report.
+type Diagnostics struct {
+	Call                     Call
+	DurationSeconds          uint32
+	ActiveDurationSeconds    uint32
+	PeakQoSEscalation        string
+	MaxReconnectAttempt      uint32
+	TotalAdaptationRevisions uint32
+	TotalAdaptationAcks      uint32
+	LastAppliedProfile       string
+	LastAppliedAt            time.Time
+}
+
+// IceServer describes one STUN or TURN server returned to a client.
+type IceServer struct {
+	URLs       []string
+	Username   string
+	Credential string
+	ExpiresAt  time.Time
+}
+
+// Invite describes one pending or completed call invite.
+type Invite struct {
+	CallID     string
+	AccountID  string
+	State      InviteState
+	ExpiresAt  time.Time
+	AnsweredAt time.Time
+	UpdatedAt  time.Time
+}
+
+// Participant describes one joined device in a call.
+type Participant struct {
+	CallID         string
+	AccountID      string
+	DeviceID       string
+	State          ParticipantState
+	MediaState     MediaState
+	PinnedSpeaker  bool
+	StageSlot      bool
+	HandRaised     bool
+	RaisedHandAt   time.Time
+	HostMutedAudio bool
+	HostMutedVideo bool
+	Transport      TransportStats
+	JoinedAt       time.Time
+	LeftAt         time.Time
+	UpdatedAt      time.Time
+}
+
+// Call describes one direct call and its current state.
+type Call struct {
+	ID                     string
+	ConversationID         string
+	InitiatorAccountID     string
+	HostAccountID          string
+	StageModeEnabled       bool
+	PinnedSpeakerAccountID string
+	PinnedSpeakerDeviceID  string
+	ActiveSessionID        string
+	RequestedVideo         bool
+	State                  State
+	EndReason              EndReason
+	RecordingState         RecordingState
+	RecordingStartedAt     time.Time
+	RecordingStoppedAt     time.Time
+	TranscriptionState     TranscriptionState
+	TranscriptionStartedAt time.Time
+	TranscriptionStoppedAt time.Time
+	StartedAt              time.Time
+	AnsweredAt             time.Time
+	EndedAt                time.Time
+	UpdatedAt              time.Time
+	Invites                []Invite
+	Participants           []Participant
+	QualitySummary         QualitySummary
+}
+
+// Event describes one persisted call event.
+type Event struct {
+	EventID        string
+	CallID         string
+	ConversationID string
+	EventType      EventType
+	ActorAccountID string
+	ActorDeviceID  string
+	Sequence       uint64
+	Metadata       map[string]string
+	CreatedAt      time.Time
+	Call           Call
+}
+
+// JoinDetails returns the client transport payload for a joined participant.
+type JoinDetails struct {
+	SessionID       string
+	SessionToken    string
+	RuntimeEndpoint string
+	ExpiresAt       time.Time
+	IceUfrag        string
+	IcePwd          string
+	DTLSFingerprint string
+	CandidateHost   string
+	CandidatePort   int
+	IceServers      []IceServer
+}
+
+// SessionDescription describes one SDP payload exchanged through call signaling.
+type SessionDescription struct {
+	Type string
+	SDP  string
+}
+
+// Candidate describes one ICE candidate payload exchanged through call signaling.
+type Candidate struct {
+	Candidate        string
+	SDPMid           string
+	SDPMLineIndex    uint32
+	UsernameFragment string
+}

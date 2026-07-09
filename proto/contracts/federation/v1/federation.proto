@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package zvonilka.federation.v1;
+
+import "contracts/federation/v1/requests.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/federation/v1;federationv1";
+
+service FederationService {
+  rpc CreatePeer(CreatePeerRequest) returns (CreatePeerResponse);
+  rpc GetPeer(GetPeerRequest) returns (GetPeerResponse);
+  rpc ListPeers(ListPeersRequest) returns (ListPeersResponse);
+  rpc UpdatePeer(UpdatePeerRequest) returns (UpdatePeerResponse);
+  rpc RotatePeerSigningKey(RotatePeerSigningKeyRequest) returns (RotatePeerSigningKeyResponse);
+  rpc CreateLink(CreateLinkRequest) returns (CreateLinkResponse);
+  rpc GetLink(GetLinkRequest) returns (GetLinkResponse);
+  rpc ListLinks(ListLinksRequest) returns (ListLinksResponse);
+  rpc UpdateLink(UpdateLinkRequest) returns (UpdateLinkResponse);
+  rpc PauseLink(PauseLinkRequest) returns (PauseLinkResponse);
+  rpc ResumeLink(ResumeLinkRequest) returns (ResumeLinkResponse);
+  rpc DeleteLink(DeleteLinkRequest) returns (DeleteLinkResponse);
+  rpc GetReplicationCursor(GetReplicationCursorRequest) returns (GetReplicationCursorResponse);
+  rpc PushBundles(PushBundlesRequest) returns (PushBundlesResponse);
+  rpc PullBundles(PullBundlesRequest) returns (PullBundlesResponse);
+  rpc AcknowledgeBundles(AcknowledgeBundlesRequest) returns (AcknowledgeBundlesResponse);
+}
+
+service FederationBridgeService {
+  rpc PullBridgeFragments(PullBridgeFragmentsRequest) returns (PullBridgeFragmentsResponse);
+  rpc SubmitBridgeFragments(SubmitBridgeFragmentsRequest) returns (SubmitBridgeFragmentsResponse);
+  rpc AcknowledgeBridgeFragments(AcknowledgeBridgeFragmentsRequest) returns (AcknowledgeBridgeFragmentsResponse);
+}

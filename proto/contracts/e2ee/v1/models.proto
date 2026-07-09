@@ -1,0 +1,181 @@
+syntax = "proto3";
+
+package zvonilka.e2ee.v1;
+
+import "google/protobuf/timestamp.proto";
+import "contracts/common/v1/messages.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/e2ee/v1;e2eev1";
+
+message PreKey {
+  zvonilka.common.v1.PublicKeyBundle key = 1;
+}
+
+message SignedPreKey {
+  zvonilka.common.v1.PublicKeyBundle key = 1;
+  bytes signature = 2;
+}
+
+message DevicePreKeyBundle {
+  string user_id = 1;
+  string device_id = 2;
+  zvonilka.common.v1.PublicKeyBundle identity_key = 3;
+  SignedPreKey signed_prekey = 4;
+  PreKey one_time_prekey = 5;
+  uint32 one_time_prekeys_available = 6;
+  google.protobuf.Timestamp device_last_seen_at = 7;
+}
+
+enum DeviceTrustState {
+  DEVICE_TRUST_STATE_UNSPECIFIED = 0;
+  DEVICE_TRUST_STATE_TRUSTED = 1;
+  DEVICE_TRUST_STATE_UNTRUSTED = 2;
+  DEVICE_TRUST_STATE_COMPROMISED = 3;
+}
+
+message DeviceTrust {
+  string observer_user_id = 1;
+  string observer_device_id = 2;
+  string target_user_id = 3;
+  string target_device_id = 4;
+  DeviceTrustState state = 5;
+  string key_fingerprint = 6;
+  string note = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message DeviceVerificationCode {
+  string observer_user_id = 1;
+  string observer_device_id = 2;
+  string target_user_id = 3;
+  string target_device_id = 4;
+  string target_key_fingerprint = 5;
+  string safety_number = 6;
+  DeviceTrustState current_trust_state = 7;
+}
+
+message VerificationRequiredDevice {
+  string user_id = 1;
+  string device_id = 2;
+  DeviceTrustState trust_state = 3;
+  string key_fingerprint = 4;
+  repeated string conversation_ids = 5;
+  bool direct_conversation = 6;
+}
+
+enum ConversationKeyCoverageState {
+  CONVERSATION_KEY_COVERAGE_STATE_UNSPECIFIED = 0;
+  CONVERSATION_KEY_COVERAGE_STATE_READY = 1;
+  CONVERSATION_KEY_COVERAGE_STATE_PENDING = 2;
+  CONVERSATION_KEY_COVERAGE_STATE_EXPIRED = 3;
+  CONVERSATION_KEY_COVERAGE_STATE_MISSING = 4;
+}
+
+message ConversationKeyCoverageEntry {
+  string user_id = 1;
+  string device_id = 2;
+  ConversationKeyCoverageState state = 3;
+  string reference_id = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  DeviceTrustState trust_state = 6;
+  string key_fingerprint = 7;
+  bool verification_required = 8;
+}
+
+enum E2EEUpdateType {
+  E2EE_UPDATE_TYPE_UNSPECIFIED = 0;
+  E2EE_UPDATE_TYPE_DEVICE_PREKEYS_UPDATED = 1;
+  E2EE_UPDATE_TYPE_DEVICE_TRUST_UPDATED = 2;
+  E2EE_UPDATE_TYPE_DIRECT_SESSION_CREATED = 3;
+  E2EE_UPDATE_TYPE_DIRECT_SESSION_ACKNOWLEDGED = 4;
+  E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_PUBLISHED = 5;
+  E2EE_UPDATE_TYPE_GROUP_SENDER_KEY_ACKNOWLEDGED = 6;
+  E2EE_UPDATE_TYPE_CONVERSATION_KEY_COVERAGE_CHANGED = 7;
+  E2EE_UPDATE_TYPE_DEVICE_VERIFIED = 8;
+}
+
+message E2EEUpdate {
+  string update_id = 1;
+  E2EEUpdateType update_type = 2;
+  string actor_user_id = 3;
+  string actor_device_id = 4;
+  string target_user_id = 5;
+  string target_device_id = 6;
+  string conversation_id = 7;
+  string session_id = 8;
+  string distribution_id = 9;
+  string sender_key_id = 10;
+  map<string, string> metadata = 11;
+  google.protobuf.Timestamp created_at = 12;
+  DeviceTrustState current_trust_state = 13;
+  string target_key_fingerprint = 14;
+  bool verification_required = 15;
+  repeated string conversation_ids = 16;
+}
+
+enum DirectSessionState {
+  DIRECT_SESSION_STATE_UNSPECIFIED = 0;
+  DIRECT_SESSION_STATE_PENDING = 1;
+  DIRECT_SESSION_STATE_ACKNOWLEDGED = 2;
+}
+
+message SessionBootstrapPayload {
+  string algorithm = 1;
+  bytes nonce = 2;
+  bytes ciphertext = 3;
+  map<string, string> metadata = 4;
+}
+
+message DirectSession {
+  string session_id = 1;
+  string initiator_user_id = 2;
+  string initiator_device_id = 3;
+  string recipient_user_id = 4;
+  string recipient_device_id = 5;
+  zvonilka.common.v1.PublicKeyBundle initiator_ephemeral_key = 6;
+  zvonilka.common.v1.PublicKeyBundle identity_key = 7;
+  SignedPreKey signed_prekey = 8;
+  PreKey one_time_prekey = 9;
+  SessionBootstrapPayload bootstrap = 10;
+  DirectSessionState state = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp acknowledged_at = 13;
+  google.protobuf.Timestamp expires_at = 14;
+}
+
+message SenderKeyPayload {
+  string algorithm = 1;
+  bytes nonce = 2;
+  bytes ciphertext = 3;
+  map<string, string> metadata = 4;
+  string key_id = 5;
+  bytes aad = 6;
+}
+
+enum GroupSenderKeyState {
+  GROUP_SENDER_KEY_STATE_UNSPECIFIED = 0;
+  GROUP_SENDER_KEY_STATE_PENDING = 1;
+  GROUP_SENDER_KEY_STATE_ACKNOWLEDGED = 2;
+}
+
+message RecipientSenderKey {
+  string recipient_user_id = 1;
+  string recipient_device_id = 2;
+  SenderKeyPayload payload = 3;
+}
+
+message GroupSenderKeyDistribution {
+  string distribution_id = 1;
+  string conversation_id = 2;
+  string sender_user_id = 3;
+  string sender_device_id = 4;
+  string recipient_user_id = 5;
+  string recipient_device_id = 6;
+  string sender_key_id = 7;
+  SenderKeyPayload payload = 8;
+  GroupSenderKeyState state = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp acknowledged_at = 11;
+  google.protobuf.Timestamp expires_at = 12;
+}

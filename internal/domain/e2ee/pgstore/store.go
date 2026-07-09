@@ -1,0 +1,807 @@
+package pgstore
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/dm-vev/zvonilka/internal/domain/e2ee"
+)
+
+type sqlConn interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+type Store struct {
+	db     *sql.DB
+	tx     *sql.Tx
+	schema string
+}
+
+func New(db *sql.DB, schema string) (*Store, error) {
+	if db == nil {
+		return nil, e2ee.ErrInvalidInput
+	}
+	return &Store{db: db, schema: normalizeSchema(schema)}, nil
+}
+
+func (s *Store) WithinTx(ctx context.Context, fn func(e2ee.Store) error) error {
+	if err := s.requireStore(); err != nil {
+		return err
+	}
+	if err := s.requireContext(ctx); err != nil {
+		return err
+	}
+	if fn == nil {
+		return e2ee.ErrInvalidInput
+	}
+	if s.tx != nil {
+		return fn(s)
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin postgres transaction: %w", err)
+	}
+	txStore := &Store{db: s.db, tx: tx, schema: s.schema}
+	if err := fn(txStore); err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return errors.Join(err, fmt.Errorf("rollback postgres transaction: %w", rollbackErr))
+		}
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit postgres transaction: %w", mapConstraintError(err))
+	}
+	return nil
+}
+
+func (s *Store) SaveSignedPreKey(ctx context.Context, accountID string, deviceID string, value e2ee.SignedPreKey) (e2ee.SignedPreKey, error) {
+	if err := s.requireContext(ctx); err != nil {
+		return e2ee.SignedPreKey{}, err
+	}
+	query := fmt.Sprintf(`
+INSERT INTO %s (
+	account_id, device_id, key_id, algorithm, public_key, signature, created_at, rotated_at, expires_at, updated_at
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
+ON CONFLICT (account_id, device_id)
+DO UPDATE SET
+	key_id = EXCLUDED.key_id,
+	algorithm = EXCLUDED.algorithm,
+	public_key = EXCLUDED.public_key,
+	signature = EXCLUDED.signature,
+	created_at = EXCLUDED.created_at,
+	rotated_at = EXCLUDED.rotated_at,
+	expires_at = EXCLUDED.expires_at,
+	updated_at = NOW()
+RETURNING key_id, algorithm, public_key, signature, created_at, rotated_at, expires_at
+`, s.table("e2ee_signed_prekeys"))
+	var saved e2ee.SignedPreKey
+	err := s.conn().QueryRowContext(
+		ctx,
+		query,
+		accountID,
+		deviceID,
+		value.Key.KeyID,
+		value.Key.Algorithm,
+		value.Key.PublicKey,
+		value.Signature,
+		nullTime(value.Key.CreatedAt),
+		nullTime(value.Key.RotatedAt),
+		nullTime(value.Key.ExpiresAt),
+	).Scan(
+		&saved.Key.KeyID,
+		&saved.Key.Algorithm,
+		&saved.Key.PublicKey,
+		&saved.Signature,
+		&saved.Key.CreatedAt,
+		&saved.Key.RotatedAt,
+		&saved.Key.ExpiresAt,
+	)
+	if err != nil {
+		return e2ee.SignedPreKey{}, mapConstraintError(err)
+	}
+	return saved, nil
+}
+
+func (s *Store) SignedPreKeyByDevice(ctx context.Context, accountID string, deviceID string) (e2ee.SignedPreKey, error) {
+	query := fmt.Sprintf(`
+SELECT key_id, algorithm, public_key, signature, created_at, rotated_at, expires_at
+FROM %s
+WHERE account_id = $1 AND device_id = $2
+`, s.table("e2ee_signed_prekeys"))
+	var value e2ee.SignedPreKey
+	err := s.conn().QueryRowContext(ctx, query, accountID, deviceID).Scan(
+		&value.Key.KeyID,
+		&value.Key.Algorithm,
+		&value.Key.PublicKey,
+		&value.Signature,
+		&value.Key.CreatedAt,
+		&value.Key.RotatedAt,
+		&value.Key.ExpiresAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return e2ee.SignedPreKey{}, e2ee.ErrNotFound
+	}
+	if err != nil {
+		return e2ee.SignedPreKey{}, err
+	}
+	return value, nil
+}
+
+func (s *Store) DeleteOneTimePreKeysByDevice(ctx context.Context, accountID string, deviceID string) error {
+	query := fmt.Sprintf(`DELETE FROM %s WHERE account_id = $1 AND device_id = $2 AND claimed_at IS NULL`, s.table("e2ee_one_time_prekeys"))
+	if _, err := s.conn().ExecContext(ctx, query, accountID, deviceID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Store) SaveOneTimePreKeys(ctx context.Context, accountID string, deviceID string, values []e2ee.OneTimePreKey) error {
+	for _, value := range values {
+		query := fmt.Sprintf(`
+INSERT INTO %s (
+	account_id, device_id, key_id, algorithm, public_key, created_at, rotated_at, expires_at
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+ON CONFLICT (account_id, device_id, key_id)
+DO UPDATE SET
+	algorithm = EXCLUDED.algorithm,
+	public_key = EXCLUDED.public_key,
+	created_at = EXCLUDED.created_at,
+	rotated_at = EXCLUDED.rotated_at,
+	expires_at = EXCLUDED.expires_at
+`, s.table("e2ee_one_time_prekeys"))
+		if _, err := s.conn().ExecContext(
+			ctx,
+			query,
+			accountID,
+			deviceID,
+			value.Key.KeyID,
+			value.Key.Algorithm,
+			value.Key.PublicKey,
+			nullTime(value.Key.CreatedAt),
+			nullTime(value.Key.RotatedAt),
+			nullTime(value.Key.ExpiresAt),
+		); err != nil {
+			return mapConstraintError(err)
+		}
+	}
+	return nil
+}
+
+func (s *Store) ClaimOneTimePreKey(
+	ctx context.Context,
+	accountID string,
+	deviceID string,
+	claimedByAccountID string,
+	claimedByDeviceID string,
+) (e2ee.OneTimePreKey, error) {
+	query := fmt.Sprintf(`
+WITH selected AS (
+	SELECT account_id, device_id, key_id
+	FROM %s
+	WHERE account_id = $1 AND device_id = $2 AND claimed_at IS NULL
+	ORDER BY created_at, key_id
+	FOR UPDATE SKIP LOCKED
+	LIMIT 1
+)
+UPDATE %s AS keys
+SET claimed_at = NOW(), claimed_by_account_id = $3, claimed_by_device_id = $4
+FROM selected
+WHERE keys.account_id = selected.account_id
+  AND keys.device_id = selected.device_id
+  AND keys.key_id = selected.key_id
+RETURNING keys.key_id, keys.algorithm, keys.public_key, keys.created_at, keys.rotated_at, keys.expires_at, keys.claimed_at, keys.claimed_by_account_id, keys.claimed_by_device_id
+`, s.table("e2ee_one_time_prekeys"), s.table("e2ee_one_time_prekeys"))
+	var value e2ee.OneTimePreKey
+	err := s.conn().QueryRowContext(ctx, query, accountID, deviceID, claimedByAccountID, claimedByDeviceID).Scan(
+		&value.Key.KeyID,
+		&value.Key.Algorithm,
+		&value.Key.PublicKey,
+		&value.Key.CreatedAt,
+		&value.Key.RotatedAt,
+		&value.Key.ExpiresAt,
+		&value.ClaimedAt,
+		&value.ClaimedByAccountID,
+		&value.ClaimedByDeviceID,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return e2ee.OneTimePreKey{}, e2ee.ErrNotFound
+	}
+	if err != nil {
+		return e2ee.OneTimePreKey{}, err
+	}
+	return value, nil
+}
+
+func (s *Store) CountAvailableOneTimePreKeys(ctx context.Context, accountID string, deviceID string) (uint32, error) {
+	query := fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE account_id = $1 AND device_id = $2 AND claimed_at IS NULL`, s.table("e2ee_one_time_prekeys"))
+	var count uint32
+	if err := s.conn().QueryRowContext(ctx, query, accountID, deviceID).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (s *Store) ExpirePendingDirectSessionsByDevice(ctx context.Context, accountID string, deviceID string, expiresAt time.Time) (uint32, error) {
+	query := fmt.Sprintf(`
+UPDATE %s
+SET expires_at = $3, updated_at = NOW()
+WHERE state = 'pending'
+  AND ((initiator_account_id = $1 AND initiator_device_id = $2) OR (recipient_account_id = $1 AND recipient_device_id = $2))
+  AND (expires_at IS NULL OR expires_at > $3)
+`, s.table("e2ee_direct_sessions"))
+	result, err := s.conn().ExecContext(ctx, query, accountID, deviceID, expiresAt.UTC())
+	if err != nil {
+		return 0, mapConstraintError(err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return uint32(affected), nil
+}
+
+func (s *Store) SaveDirectSession(ctx context.Context, value e2ee.DirectSession) (e2ee.DirectSession, error) {
+	if err := s.requireContext(ctx); err != nil {
+		return e2ee.DirectSession{}, err
+	}
+	query := fmt.Sprintf(`
+INSERT INTO %s (
+	id, initiator_account_id, initiator_device_id, recipient_account_id, recipient_device_id,
+	initiator_ephemeral_key_id, initiator_ephemeral_algorithm, initiator_ephemeral_public_key,
+	identity_key_id, identity_key_algorithm, identity_key_public_key,
+	signed_prekey_id, signed_prekey_algorithm, signed_prekey_public_key, signed_prekey_signature,
+	one_time_prekey_id, one_time_prekey_algorithm, one_time_prekey_public_key,
+	bootstrap_algorithm, bootstrap_nonce, bootstrap_ciphertext, bootstrap_metadata,
+	state, created_at, acknowledged_at, expires_at, updated_at
+) VALUES (
+	$1,$2,$3,$4,$5,
+	$6,$7,$8,
+	$9,$10,$11,
+	$12,$13,$14,$15,
+	$16,$17,$18,
+	$19,$20,$21,$22,
+	$23,$24,$25,$26,NOW()
+)
+ON CONFLICT (id)
+DO UPDATE SET
+	state = EXCLUDED.state,
+	acknowledged_at = EXCLUDED.acknowledged_at,
+	expires_at = EXCLUDED.expires_at,
+	bootstrap_algorithm = EXCLUDED.bootstrap_algorithm,
+	bootstrap_nonce = EXCLUDED.bootstrap_nonce,
+	bootstrap_ciphertext = EXCLUDED.bootstrap_ciphertext,
+	bootstrap_metadata = EXCLUDED.bootstrap_metadata,
+	updated_at = NOW()
+RETURNING
+	id, initiator_account_id, initiator_device_id, recipient_account_id, recipient_device_id,
+	initiator_ephemeral_key_id, initiator_ephemeral_algorithm, initiator_ephemeral_public_key,
+	identity_key_id, identity_key_algorithm, identity_key_public_key,
+	signed_prekey_id, signed_prekey_algorithm, signed_prekey_public_key, signed_prekey_signature,
+	one_time_prekey_id, one_time_prekey_algorithm, one_time_prekey_public_key,
+	bootstrap_algorithm, bootstrap_nonce, bootstrap_ciphertext, bootstrap_metadata,
+	state, created_at, acknowledged_at, expires_at
+`, s.table("e2ee_direct_sessions"))
+	saved, err := scanDirectSession(s.conn().QueryRowContext(
+		ctx,
+		query,
+		value.ID,
+		value.InitiatorAccountID,
+		value.InitiatorDeviceID,
+		value.RecipientAccountID,
+		value.RecipientDeviceID,
+		value.InitiatorEphemeral.KeyID,
+		value.InitiatorEphemeral.Algorithm,
+		value.InitiatorEphemeral.PublicKey,
+		value.IdentityKey.KeyID,
+		value.IdentityKey.Algorithm,
+		value.IdentityKey.PublicKey,
+		value.SignedPreKey.Key.KeyID,
+		value.SignedPreKey.Key.Algorithm,
+		value.SignedPreKey.Key.PublicKey,
+		value.SignedPreKey.Signature,
+		nullString(value.OneTimePreKey.Key.KeyID),
+		nullString(value.OneTimePreKey.Key.Algorithm),
+		nullBytes(value.OneTimePreKey.Key.PublicKey),
+		value.Bootstrap.Algorithm,
+		value.Bootstrap.Nonce,
+		value.Bootstrap.Ciphertext,
+		marshalMetadata(value.Bootstrap.Metadata),
+		value.State,
+		value.CreatedAt.UTC(),
+		nullTime(value.AcknowledgedAt),
+		nullTime(value.ExpiresAt),
+	))
+	if err != nil {
+		return e2ee.DirectSession{}, mapConstraintError(err)
+	}
+	return saved, nil
+}
+
+func (s *Store) DirectSessionByID(ctx context.Context, sessionID string) (e2ee.DirectSession, error) {
+	query := fmt.Sprintf(`
+SELECT
+	id, initiator_account_id, initiator_device_id, recipient_account_id, recipient_device_id,
+	initiator_ephemeral_key_id, initiator_ephemeral_algorithm, initiator_ephemeral_public_key,
+	identity_key_id, identity_key_algorithm, identity_key_public_key,
+	signed_prekey_id, signed_prekey_algorithm, signed_prekey_public_key, signed_prekey_signature,
+	one_time_prekey_id, one_time_prekey_algorithm, one_time_prekey_public_key,
+	bootstrap_algorithm, bootstrap_nonce, bootstrap_ciphertext, bootstrap_metadata,
+	state, created_at, acknowledged_at, expires_at
+FROM %s
+WHERE id = $1
+`, s.table("e2ee_direct_sessions"))
+	return s.scanDirectSession(ctx, query, sessionID)
+}
+
+func (s *Store) DirectSessionsByRecipientDevice(ctx context.Context, accountID string, deviceID string) ([]e2ee.DirectSession, error) {
+	query := fmt.Sprintf(`
+SELECT
+	id, initiator_account_id, initiator_device_id, recipient_account_id, recipient_device_id,
+	initiator_ephemeral_key_id, initiator_ephemeral_algorithm, initiator_ephemeral_public_key,
+	identity_key_id, identity_key_algorithm, identity_key_public_key,
+	signed_prekey_id, signed_prekey_algorithm, signed_prekey_public_key, signed_prekey_signature,
+	one_time_prekey_id, one_time_prekey_algorithm, one_time_prekey_public_key,
+	bootstrap_algorithm, bootstrap_nonce, bootstrap_ciphertext, bootstrap_metadata,
+	state, created_at, acknowledged_at, expires_at
+FROM %s
+WHERE recipient_account_id = $1 AND recipient_device_id = $2
+ORDER BY created_at DESC, id DESC
+`, s.table("e2ee_direct_sessions"))
+	queryRows, err := s.conn().QueryContext(ctx, query, accountID, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer queryRows.Close()
+
+	result := make([]e2ee.DirectSession, 0)
+	for queryRows.Next() {
+		value, scanErr := scanDirectSession(queryRows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		result = append(result, value)
+	}
+	if err := queryRows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *Store) DirectSessionsByParticipantDevice(ctx context.Context, accountID string, deviceID string) ([]e2ee.DirectSession, error) {
+	query := fmt.Sprintf(`
+SELECT
+	id, initiator_account_id, initiator_device_id, recipient_account_id, recipient_device_id,
+	initiator_ephemeral_key_id, initiator_ephemeral_algorithm, initiator_ephemeral_public_key,
+	identity_key_id, identity_key_algorithm, identity_key_public_key,
+	signed_prekey_id, signed_prekey_algorithm, signed_prekey_public_key, signed_prekey_signature,
+	one_time_prekey_id, one_time_prekey_algorithm, one_time_prekey_public_key,
+	bootstrap_algorithm, bootstrap_nonce, bootstrap_ciphertext, bootstrap_metadata,
+	state, created_at, acknowledged_at, expires_at
+FROM %s
+WHERE (initiator_account_id = $1 AND initiator_device_id = $2)
+   OR (recipient_account_id = $1 AND recipient_device_id = $2)
+ORDER BY created_at DESC, id DESC
+`, s.table("e2ee_direct_sessions"))
+	rows, err := s.conn().QueryContext(ctx, query, accountID, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]e2ee.DirectSession, 0)
+	for rows.Next() {
+		value, scanErr := scanDirectSession(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		result = append(result, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *Store) ExpirePendingGroupSenderKeysBySenderDevice(ctx context.Context, accountID string, deviceID string, expiresAt time.Time) (uint32, error) {
+	query := fmt.Sprintf(`
+UPDATE %s
+SET expires_at = $3, updated_at = NOW()
+WHERE state = 'pending'
+  AND sender_account_id = $1
+  AND sender_device_id = $2
+  AND (expires_at IS NULL OR expires_at > $3)
+`, s.table("e2ee_group_sender_keys"))
+	result, err := s.conn().ExecContext(ctx, query, accountID, deviceID, expiresAt.UTC())
+	if err != nil {
+		return 0, mapConstraintError(err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return uint32(affected), nil
+}
+
+func (s *Store) SaveGroupSenderKeyDistribution(ctx context.Context, value e2ee.GroupSenderKeyDistribution) (e2ee.GroupSenderKeyDistribution, error) {
+	if err := s.requireContext(ctx); err != nil {
+		return e2ee.GroupSenderKeyDistribution{}, err
+	}
+	query := fmt.Sprintf(`
+INSERT INTO %s (
+	id, conversation_id, sender_account_id, sender_device_id, recipient_account_id, recipient_device_id,
+	sender_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_metadata,
+	state, created_at, acknowledged_at, expires_at, updated_at
+) VALUES (
+	$1,$2,$3,$4,$5,$6,
+	$7,$8,$9,$10,$11,
+	$12,$13,$14,$15,NOW()
+)
+ON CONFLICT (id)
+DO UPDATE SET
+	state = EXCLUDED.state,
+	acknowledged_at = EXCLUDED.acknowledged_at,
+	expires_at = EXCLUDED.expires_at,
+	payload_algorithm = EXCLUDED.payload_algorithm,
+	payload_nonce = EXCLUDED.payload_nonce,
+	payload_ciphertext = EXCLUDED.payload_ciphertext,
+	payload_metadata = EXCLUDED.payload_metadata,
+	updated_at = NOW()
+RETURNING
+	id, conversation_id, sender_account_id, sender_device_id, recipient_account_id, recipient_device_id,
+	sender_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_metadata,
+	state, created_at, acknowledged_at, expires_at
+`, s.table("e2ee_group_sender_keys"))
+	saved, err := scanGroupSenderKeyDistribution(s.conn().QueryRowContext(
+		ctx,
+		query,
+		value.ID,
+		value.ConversationID,
+		value.SenderAccountID,
+		value.SenderDeviceID,
+		value.RecipientAccountID,
+		value.RecipientDeviceID,
+		value.SenderKeyID,
+		value.Payload.Algorithm,
+		value.Payload.Nonce,
+		value.Payload.Ciphertext,
+		marshalMetadata(value.Payload.Metadata),
+		value.State,
+		value.CreatedAt.UTC(),
+		nullTime(value.AcknowledgedAt),
+		nullTime(value.ExpiresAt),
+	))
+	if err != nil {
+		return e2ee.GroupSenderKeyDistribution{}, mapConstraintError(err)
+	}
+	return saved, nil
+}
+
+func (s *Store) GroupSenderKeyDistributionByID(ctx context.Context, distributionID string) (e2ee.GroupSenderKeyDistribution, error) {
+	query := fmt.Sprintf(`
+SELECT
+	id, conversation_id, sender_account_id, sender_device_id, recipient_account_id, recipient_device_id,
+	sender_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_metadata,
+	state, created_at, acknowledged_at, expires_at
+FROM %s
+WHERE id = $1
+`, s.table("e2ee_group_sender_keys"))
+	return s.scanGroupSenderKeyDistribution(ctx, query, distributionID)
+}
+
+func (s *Store) GroupSenderKeyDistributionsByRecipientDevice(ctx context.Context, conversationID string, accountID string, deviceID string) ([]e2ee.GroupSenderKeyDistribution, error) {
+	query := fmt.Sprintf(`
+SELECT
+	id, conversation_id, sender_account_id, sender_device_id, recipient_account_id, recipient_device_id,
+	sender_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_metadata,
+	state, created_at, acknowledged_at, expires_at
+FROM %s
+WHERE conversation_id = $1 AND recipient_account_id = $2 AND recipient_device_id = $3
+ORDER BY created_at DESC, id DESC
+`, s.table("e2ee_group_sender_keys"))
+	rows, err := s.conn().QueryContext(ctx, query, conversationID, accountID, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]e2ee.GroupSenderKeyDistribution, 0)
+	for rows.Next() {
+		value, scanErr := scanGroupSenderKeyDistribution(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		result = append(result, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *Store) GroupSenderKeyDistributionsBySenderKey(ctx context.Context, conversationID string, senderAccountID string, senderDeviceID string, senderKeyID string) ([]e2ee.GroupSenderKeyDistribution, error) {
+	query := fmt.Sprintf(`
+SELECT
+	id, conversation_id, sender_account_id, sender_device_id, recipient_account_id, recipient_device_id,
+	sender_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_metadata,
+	state, created_at, acknowledged_at, expires_at
+FROM %s
+WHERE conversation_id = $1 AND sender_account_id = $2 AND sender_device_id = $3 AND sender_key_id = $4
+ORDER BY created_at DESC, id DESC
+`, s.table("e2ee_group_sender_keys"))
+	rows, err := s.conn().QueryContext(ctx, query, conversationID, senderAccountID, senderDeviceID, senderKeyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]e2ee.GroupSenderKeyDistribution, 0)
+	for rows.Next() {
+		value, scanErr := scanGroupSenderKeyDistribution(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		result = append(result, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *Store) GroupSenderKeyDistributionsBySenderDevice(ctx context.Context, conversationID string, senderAccountID string, senderDeviceID string) ([]e2ee.GroupSenderKeyDistribution, error) {
+	query := fmt.Sprintf(`
+SELECT
+	id, conversation_id, sender_account_id, sender_device_id, recipient_account_id, recipient_device_id,
+	sender_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_metadata,
+	state, created_at, acknowledged_at, expires_at
+FROM %s
+WHERE conversation_id = $1 AND sender_account_id = $2 AND sender_device_id = $3
+ORDER BY created_at DESC, id DESC
+`, s.table("e2ee_group_sender_keys"))
+	rows, err := s.conn().QueryContext(ctx, query, conversationID, senderAccountID, senderDeviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]e2ee.GroupSenderKeyDistribution, 0)
+	for rows.Next() {
+		value, scanErr := scanGroupSenderKeyDistribution(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		result = append(result, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *Store) SaveDeviceTrust(ctx context.Context, value e2ee.DeviceTrust) (e2ee.DeviceTrust, error) {
+	if err := s.requireContext(ctx); err != nil {
+		return e2ee.DeviceTrust{}, err
+	}
+	query := fmt.Sprintf(`
+INSERT INTO %s (
+	observer_account_id, observer_device_id, target_account_id, target_device_id, state, key_fingerprint, note, created_at, updated_at
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+ON CONFLICT (observer_account_id, observer_device_id, target_account_id, target_device_id)
+DO UPDATE SET
+	state = EXCLUDED.state,
+	key_fingerprint = EXCLUDED.key_fingerprint,
+	note = EXCLUDED.note,
+	updated_at = EXCLUDED.updated_at
+RETURNING observer_account_id, observer_device_id, target_account_id, target_device_id, state, key_fingerprint, note, created_at, updated_at
+`, s.table("e2ee_device_trust"))
+	saved, err := scanDeviceTrust(s.conn().QueryRowContext(
+		ctx,
+		query,
+		value.ObserverAccountID,
+		value.ObserverDeviceID,
+		value.TargetAccountID,
+		value.TargetDeviceID,
+		value.State,
+		value.KeyFingerprint,
+		value.Note,
+		nullTime(value.CreatedAt),
+		nullTime(value.UpdatedAt),
+	))
+	if err != nil {
+		return e2ee.DeviceTrust{}, mapConstraintError(err)
+	}
+	return saved, nil
+}
+
+func (s *Store) DeviceTrustsByObserverDevice(ctx context.Context, observerAccountID string, observerDeviceID string, targetAccountID string) ([]e2ee.DeviceTrust, error) {
+	query := fmt.Sprintf(`
+SELECT observer_account_id, observer_device_id, target_account_id, target_device_id, state, key_fingerprint, note, created_at, updated_at
+FROM %s
+WHERE observer_account_id = $1 AND observer_device_id = $2
+`, s.table("e2ee_device_trust"))
+	args := []any{observerAccountID, observerDeviceID}
+	if strings.TrimSpace(targetAccountID) != "" {
+		query += " AND target_account_id = $3"
+		args = append(args, targetAccountID)
+	}
+	query += " ORDER BY updated_at DESC, target_account_id, target_device_id"
+	rows, err := s.conn().QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]e2ee.DeviceTrust, 0)
+	for rows.Next() {
+		value, scanErr := scanDeviceTrust(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		result = append(result, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *Store) SaveDeviceLinkTransfer(ctx context.Context, value e2ee.DeviceLinkTransfer) (e2ee.DeviceLinkTransfer, error) {
+	if err := s.requireContext(ctx); err != nil {
+		return e2ee.DeviceLinkTransfer{}, err
+	}
+	query := fmt.Sprintf(`
+INSERT INTO %s (
+	id, account_id, source_device_id, target_device_id, key_id, algorithm, nonce, ciphertext, aad, metadata, created_at, updated_at
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
+ON CONFLICT (account_id, target_device_id)
+DO UPDATE SET
+	id = EXCLUDED.id,
+	source_device_id = EXCLUDED.source_device_id,
+	key_id = EXCLUDED.key_id,
+	algorithm = EXCLUDED.algorithm,
+	nonce = EXCLUDED.nonce,
+	ciphertext = EXCLUDED.ciphertext,
+	aad = EXCLUDED.aad,
+	metadata = EXCLUDED.metadata,
+	created_at = EXCLUDED.created_at,
+	updated_at = NOW()
+RETURNING id, account_id, source_device_id, target_device_id, key_id, algorithm, nonce, ciphertext, aad, metadata, created_at
+`, s.table("e2ee_device_link_transfers"))
+	saved, err := scanDeviceLinkTransfer(s.conn().QueryRowContext(
+		ctx,
+		query,
+		value.ID,
+		value.AccountID,
+		value.SourceDeviceID,
+		value.TargetDeviceID,
+		nullString(value.Payload.KeyID),
+		value.Payload.Algorithm,
+		nullBytes(value.Payload.Nonce),
+		value.Payload.Ciphertext,
+		nullBytes(value.Payload.AAD),
+		marshalMetadata(value.Payload.Metadata),
+		nullTime(value.CreatedAt),
+	))
+	if err != nil {
+		return e2ee.DeviceLinkTransfer{}, mapConstraintError(err)
+	}
+	return saved, nil
+}
+
+func (s *Store) DeviceLinkTransferByTargetDevice(ctx context.Context, accountID string, deviceID string) (e2ee.DeviceLinkTransfer, error) {
+	query := fmt.Sprintf(`
+SELECT id, account_id, source_device_id, target_device_id, key_id, algorithm, nonce, ciphertext, aad, metadata, created_at
+FROM %s
+WHERE account_id = $1 AND target_device_id = $2
+`, s.table("e2ee_device_link_transfers"))
+	value, err := scanDeviceLinkTransfer(s.conn().QueryRowContext(ctx, query, accountID, deviceID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return e2ee.DeviceLinkTransfer{}, e2ee.ErrNotFound
+	}
+	if err != nil {
+		return e2ee.DeviceLinkTransfer{}, err
+	}
+	return value, nil
+}
+
+func (s *Store) DeleteDeviceLinkTransfer(ctx context.Context, transferID string) error {
+	query := fmt.Sprintf(`DELETE FROM %s WHERE id = $1`, s.table("e2ee_device_link_transfers"))
+	result, err := s.conn().ExecContext(ctx, query, transferID)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return e2ee.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) conn() sqlConn {
+	if s.tx != nil {
+		return s.tx
+	}
+	return s.db
+}
+
+func (s *Store) requireStore() error {
+	if s == nil || s.db == nil {
+		return e2ee.ErrInvalidInput
+	}
+	return nil
+}
+
+func (s *Store) requireContext(ctx context.Context) error {
+	if ctx == nil {
+		return e2ee.ErrInvalidInput
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Store) table(name string) string {
+	return qualifiedName(s.schema, name)
+}
+
+func normalizeSchema(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "public"
+	}
+	return value
+}
+
+func qualifiedName(schema string, name string) string {
+	return `"` + normalizeSchema(schema) + `"."` + strings.TrimSpace(name) + `"`
+}
+
+func mapConstraintError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case "23505", "23503", "23514":
+			return fmt.Errorf("%w: %v", e2ee.ErrConflict, err)
+		}
+	}
+	return err
+}
+
+func nullTime(value time.Time) any {
+	if value.IsZero() {
+		return nil
+	}
+	return value.UTC()
+}
+
+func nullString(value string) any {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return value
+}
+
+func nullBytes(value []byte) any {
+	if len(value) == 0 {
+		return nil
+	}
+	return value
+}
+
+var _ e2ee.Store = (*Store)(nil)

@@ -1,0 +1,312 @@
+syntax = "proto3";
+
+package zvonilka.call.v1;
+
+import "contracts/call/v1/models.proto";
+import "contracts/common/v1/messages.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1;callv1";
+
+message StartCallRequest {
+  string conversation_id = 1;
+  bool with_video = 2;
+}
+
+message StartCallResponse {
+  Call call = 1;
+}
+
+message GetCallRequest {
+  string call_id = 1;
+}
+
+message GetCallResponse {
+  Call call = 1;
+}
+
+message GetCallDiagnosticsRequest {
+  string call_id = 1;
+}
+
+message GetCallDiagnosticsResponse {
+  CallDiagnostics diagnostics = 1;
+}
+
+message GetCallRuntimeStateRequest {
+  string call_id = 1;
+}
+
+message GetCallRuntimeStateResponse {
+  CallRuntimeState runtime = 1;
+}
+
+message GetCallSessionSnapshotRequest {
+  string call_id = 1;
+}
+
+message GetCallSessionSnapshotResponse {
+  CallSessionSnapshot snapshot = 1;
+}
+
+message ListCallsRequest {
+  string conversation_id = 1;
+  bool include_ended = 2;
+  zvonilka.common.v1.PageRequest page = 3;
+}
+
+message ListCallsResponse {
+  repeated Call calls = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message AcceptCallRequest {
+  string call_id = 1;
+}
+
+message AcceptCallResponse {
+  Call call = 1;
+}
+
+message DeclineCallRequest {
+  string call_id = 1;
+}
+
+message DeclineCallResponse {
+  Call call = 1;
+}
+
+message CancelCallRequest {
+  string call_id = 1;
+}
+
+message CancelCallResponse {
+  Call call = 1;
+}
+
+message EndCallRequest {
+  string call_id = 1;
+  CallEndReason reason = 2;
+}
+
+message EndCallResponse {
+  Call call = 1;
+}
+
+message JoinCallRequest {
+  string call_id = 1;
+  bool with_video = 2;
+}
+
+message JoinCallResponse {
+  Call call = 1;
+  JoinTransport transport = 2;
+}
+
+message ReconnectCallRequest {
+  string call_id = 1;
+}
+
+message ReconnectCallResponse {
+  Call call = 1;
+  JoinTransport transport = 2;
+}
+
+message HandoffCallRequest {
+  string call_id = 1;
+  string from_device_id = 2;
+}
+
+message HandoffCallResponse {
+  Call call = 1;
+  CallParticipant participant = 2;
+  JoinTransport transport = 3;
+}
+
+message MigrateCallSessionRequest {
+  string call_id = 1;
+}
+
+message MigrateCallSessionResponse {
+  Call call = 1;
+  CallRuntimeState runtime = 2;
+}
+
+message PublishCallDescriptionRequest {
+  string call_id = 1;
+  string session_id = 2;
+  SessionDescription description = 3;
+}
+
+message PublishCallDescriptionResponse {
+  CallEvent event = 1;
+}
+
+message PublishCallIceCandidateRequest {
+  string call_id = 1;
+  string session_id = 2;
+  IceCandidate ice_candidate = 3;
+}
+
+message PublishCallIceCandidateResponse {
+  CallEvent event = 1;
+}
+
+message LeaveCallRequest {
+  string call_id = 1;
+}
+
+message LeaveCallResponse {
+  Call call = 1;
+}
+
+message UpdateCallMediaStateRequest {
+  string call_id = 1;
+  CallMediaState media_state = 2;
+}
+
+message UpdateCallMediaStateResponse {
+  Call call = 1;
+  CallParticipant participant = 2;
+}
+
+message UpdateCallRecordingRequest {
+  string call_id = 1;
+  bool enabled = 2;
+}
+
+message UpdateCallRecordingResponse {
+  Call call = 1;
+}
+
+message UpdateCallTranscriptionRequest {
+  string call_id = 1;
+  bool enabled = 2;
+}
+
+message UpdateCallTranscriptionResponse {
+  Call call = 1;
+}
+
+message RaiseCallHandRequest {
+  string call_id = 1;
+  bool raised = 2;
+}
+
+message RaiseCallHandResponse {
+  Call call = 1;
+  CallParticipant participant = 2;
+}
+
+message ModerateCallParticipantRequest {
+  string call_id = 1;
+  string target_device_id = 2;
+  bool host_muted_audio = 3;
+  bool host_muted_video = 4;
+  bool lower_hand = 5;
+}
+
+message ModerateCallParticipantResponse {
+  Call call = 1;
+  CallParticipant participant = 2;
+}
+
+message MuteAllCallParticipantsRequest {
+  string call_id = 1;
+  bool mute_audio = 2;
+  bool mute_video = 3;
+  bool lower_hands = 4;
+}
+
+message MuteAllCallParticipantsResponse {
+  Call call = 1;
+  repeated CallParticipant participants = 2;
+}
+
+message RemoveCallParticipantRequest {
+  string call_id = 1;
+  string target_device_id = 2;
+}
+
+message RemoveCallParticipantResponse {
+  Call call = 1;
+  CallParticipant participant = 2;
+}
+
+message TransferCallHostRequest {
+  string call_id = 1;
+  string target_user_id = 2;
+}
+
+message TransferCallHostResponse {
+  Call call = 1;
+}
+
+message ListRaisedHandsRequest {
+  string call_id = 1;
+}
+
+message ListRaisedHandsResponse {
+  repeated CallParticipant participants = 1;
+}
+
+message UpdateCallStageModeRequest {
+  string call_id = 1;
+  bool enabled = 2;
+}
+
+message UpdateCallStageModeResponse {
+  Call call = 1;
+}
+
+message PinCallSpeakerRequest {
+  string call_id = 1;
+  string target_device_id = 2;
+  bool pinned = 3;
+}
+
+message PinCallSpeakerResponse {
+  Call call = 1;
+  CallParticipant participant = 2;
+}
+
+message AcknowledgeCallAdaptationRequest {
+  string call_id = 1;
+  string session_id = 2;
+  uint64 adaptation_revision = 3;
+  string applied_profile = 4;
+}
+
+message AcknowledgeCallAdaptationResponse {
+  Call call = 1;
+  CallParticipant participant = 2;
+}
+
+message GetIceConfigRequest {
+  string call_id = 1;
+}
+
+message GetIceConfigResponse {
+  repeated IceServer ice_servers = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  string runtime_endpoint = 3;
+}
+
+message SubscribeCallEventsRequest {
+  string call_id = 1;
+  string conversation_id = 2;
+  uint64 from_sequence = 3;
+}
+
+message SubscribeCallEventsResponse {
+  CallEvent event = 1;
+}
+
+message SubscribeCallStatsRequest {
+  string call_id = 1;
+  uint32 interval_ms = 2;
+}
+
+message SubscribeCallStatsResponse {
+  CallStatsSnapshot snapshot = 1;
+}

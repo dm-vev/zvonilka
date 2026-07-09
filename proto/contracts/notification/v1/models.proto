@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package zvonilka.notification.v1;
+
+import "google/protobuf/timestamp.proto";
+import "contracts/common/v1/types.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/notification/v1;notificationv1";
+
+message QuietHours {
+  bool enabled = 1;
+  uint32 start_minute = 2;
+  uint32 end_minute = 3;
+  string timezone = 4;
+}
+
+message NotificationPreference {
+  bool enabled = 1;
+  bool direct_enabled = 2;
+  bool group_enabled = 3;
+  bool channel_enabled = 4;
+  bool mention_enabled = 5;
+  bool reply_enabled = 6;
+  QuietHours quiet_hours = 7;
+  google.protobuf.Timestamp muted_until = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message ConversationNotificationOverride {
+  string conversation_id = 1;
+  bool muted = 2;
+  bool mentions_only = 3;
+  google.protobuf.Timestamp muted_until = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message PushToken {
+  string token_id = 1;
+  string device_id = 2;
+  string provider = 3;
+  zvonilka.common.v1.DevicePlatform platform = 4;
+  bool enabled = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Timestamp revoked_at = 8;
+}

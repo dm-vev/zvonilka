@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package zvonilka.sync.v1;
+
+import "contracts/sync/v1/requests.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/sync/v1;syncv1";
+
+service SyncService {
+  rpc GetSyncState(GetSyncStateRequest) returns (GetSyncStateResponse);
+  rpc PullEvents(PullEventsRequest) returns (PullEventsResponse);
+  rpc AcknowledgeEvents(AcknowledgeEventsRequest) returns (AcknowledgeEventsResponse);
+  rpc SubscribeEvents(SubscribeEventsRequest) returns (stream SubscribeEventsResponse);
+}

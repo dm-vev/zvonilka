@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package zvonilka.media.v1;
+
+import "google/protobuf/timestamp.proto";
+import "contracts/common/v1/types.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/media/v1;mediav1";
+
+message MediaVariant {
+  string name = 1;
+  string url = 2;
+  uint32 width = 3;
+  uint32 height = 4;
+  string mime_type = 5;
+  uint64 size_bytes = 6;
+}
+
+message MediaObject {
+  string media_id = 1;
+  string owner_user_id = 2;
+  zvonilka.common.v1.MediaPurpose purpose = 3;
+  string file_name = 4;
+  string mime_type = 5;
+  uint64 size_bytes = 6;
+  string sha256_hex = 7;
+  string storage_key = 8;
+  string public_url = 9;
+  bool public_access = 10;
+  repeated MediaVariant variants = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp completed_at = 13;
+  google.protobuf.Timestamp deleted_at = 14;
+}
+
+message UploadSession {
+  string upload_id = 1;
+  string media_id = 2;
+  string upload_url = 3;
+  map<string, string> headers = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  bool multipart = 6;
+  uint32 part_size_bytes = 7;
+  uint32 part_count = 8;
+  string checksum_sha256 = 9;
+}

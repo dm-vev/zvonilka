@@ -1,1 +1,12 @@
 PROJECT.md
+.DS_Store
+.env
+.env.local
+.idea/
+.vscode/
+bin/
+dist/
+tmp/
+coverage.out
+vendor/
+target/

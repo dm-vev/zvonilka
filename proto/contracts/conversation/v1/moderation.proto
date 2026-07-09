@@ -1,0 +1,242 @@
+syntax = "proto3";
+
+package zvonilka.conversation.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "contracts/common/v1/messages.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1;conversationv1";
+
+enum ModerationTargetKind {
+  MODERATION_TARGET_KIND_UNSPECIFIED = 0;
+  MODERATION_TARGET_KIND_CONVERSATION = 1;
+  MODERATION_TARGET_KIND_THREAD = 2;
+  MODERATION_TARGET_KIND_CHANNEL = 3;
+}
+
+enum ModerationRestrictionState {
+  MODERATION_RESTRICTION_STATE_UNSPECIFIED = 0;
+  MODERATION_RESTRICTION_STATE_MUTED = 1;
+  MODERATION_RESTRICTION_STATE_BANNED = 2;
+  MODERATION_RESTRICTION_STATE_SHADOWED = 3;
+}
+
+enum ModerationReportStatus {
+  MODERATION_REPORT_STATUS_UNSPECIFIED = 0;
+  MODERATION_REPORT_STATUS_PENDING = 1;
+  MODERATION_REPORT_STATUS_RESOLVED = 2;
+  MODERATION_REPORT_STATUS_REJECTED = 3;
+}
+
+enum ModerationActionType {
+  MODERATION_ACTION_TYPE_UNSPECIFIED = 0;
+  MODERATION_ACTION_TYPE_BAN = 1;
+  MODERATION_ACTION_TYPE_KICK = 2;
+  MODERATION_ACTION_TYPE_MUTE = 3;
+  MODERATION_ACTION_TYPE_UNMUTE = 4;
+  MODERATION_ACTION_TYPE_SHADOW_BAN = 5;
+  MODERATION_ACTION_TYPE_SHADOW_UNBAN = 6;
+  MODERATION_ACTION_TYPE_POLICY_SET = 7;
+  MODERATION_ACTION_TYPE_REPORT_SET = 8;
+  MODERATION_ACTION_TYPE_REPORT_RESOLVE = 9;
+  MODERATION_ACTION_TYPE_REPORT_REJECT = 10;
+  MODERATION_ACTION_TYPE_SLOW_MODE_SET = 11;
+  MODERATION_ACTION_TYPE_ANTI_SPAM_SET = 12;
+}
+
+message ModerationTarget {
+  ModerationTargetKind kind = 1;
+  string conversation_id = 2;
+  string thread_id = 3;
+}
+
+message ModerationPolicy {
+  ModerationTarget target = 1;
+  bool only_admins_can_write = 2;
+  bool only_admins_can_add_members = 3;
+  bool allow_reactions = 4;
+  bool allow_forwards = 5;
+  bool allow_threads = 6;
+  bool require_encrypted_messages = 7;
+  bool require_trusted_devices = 8;
+  bool require_join_approval = 9;
+  bool pinned_messages_only_admins = 10;
+  google.protobuf.Duration slow_mode_interval = 11;
+  google.protobuf.Duration anti_spam_window = 12;
+  uint32 anti_spam_burst_limit = 13;
+  bool shadow_mode = 14;
+  google.protobuf.Timestamp created_at = 15;
+  google.protobuf.Timestamp updated_at = 16;
+}
+
+message ModerationRestriction {
+  ModerationTarget target = 1;
+  string user_id = 2;
+  ModerationRestrictionState state = 3;
+  string applied_by_user_id = 4;
+  string reason = 5;
+  google.protobuf.Timestamp expires_at = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message ModerationReport {
+  string report_id = 1;
+  ModerationTarget target = 2;
+  string reporter_user_id = 3;
+  string target_user_id = 4;
+  string reason = 5;
+  string details = 6;
+  ModerationReportStatus status = 7;
+  string reviewed_by_user_id = 8;
+  google.protobuf.Timestamp reviewed_at = 9;
+  string resolution = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+message ModerationAction {
+  string action_id = 1;
+  ModerationTarget target = 2;
+  string actor_user_id = 3;
+  string target_user_id = 4;
+  ModerationActionType action_type = 5;
+  google.protobuf.Duration duration = 6;
+  string reason = 7;
+  map<string, string> metadata = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message ModerationRateState {
+  ModerationTarget target = 1;
+  string user_id = 2;
+  google.protobuf.Timestamp last_write_at = 3;
+  google.protobuf.Timestamp window_started_at = 4;
+  uint64 window_count = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message ModerationWriteDecision {
+  bool allowed = 1;
+  bool shadow_hidden = 2;
+  google.protobuf.Duration retry_after = 3;
+}
+
+message GetModerationPolicyRequest {
+  ModerationTarget target = 1;
+}
+
+message GetModerationPolicyResponse {
+  ModerationPolicy policy = 1;
+}
+
+message GetModerationRateStateRequest {
+  ModerationTarget target = 1;
+  string user_id = 2;
+}
+
+message GetModerationRateStateResponse {
+  ModerationRateState state = 1;
+}
+
+message CheckModerationWriteRequest {
+  ModerationTarget target = 1;
+  string user_id = 2;
+}
+
+message CheckModerationWriteResponse {
+  ModerationWriteDecision decision = 1;
+}
+
+message SetModerationPolicyRequest {
+  ModerationPolicy policy = 1;
+  string idempotency_key = 2;
+}
+
+message SetModerationPolicyResponse {
+  ModerationPolicy policy = 1;
+}
+
+message ApplyModerationRestrictionRequest {
+  ModerationTarget target = 1;
+  string user_id = 2;
+  ModerationRestrictionState state = 3;
+  string reason = 4;
+  google.protobuf.Duration duration = 5;
+  string idempotency_key = 6;
+}
+
+message ApplyModerationRestrictionResponse {
+  ModerationRestriction restriction = 1;
+}
+
+message LiftModerationRestrictionRequest {
+  ModerationTarget target = 1;
+  string user_id = 2;
+  string reason = 3;
+  string idempotency_key = 4;
+}
+
+message LiftModerationRestrictionResponse {}
+
+message ListModerationRestrictionsRequest {
+  ModerationTarget target = 1;
+  zvonilka.common.v1.PageRequest page = 2;
+}
+
+message ListModerationRestrictionsResponse {
+  repeated ModerationRestriction restrictions = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message SubmitModerationReportRequest {
+  ModerationTarget target = 1;
+  string target_user_id = 2;
+  string reason = 3;
+  string details = 4;
+  string idempotency_key = 5;
+}
+
+message SubmitModerationReportResponse {
+  ModerationReport report = 1;
+}
+
+message GetModerationReportRequest {
+  string report_id = 1;
+}
+
+message GetModerationReportResponse {
+  ModerationReport report = 1;
+}
+
+message ListModerationReportsRequest {
+  ModerationTarget target = 1;
+  zvonilka.common.v1.PageRequest page = 2;
+}
+
+message ListModerationReportsResponse {
+  repeated ModerationReport reports = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message ResolveModerationReportRequest {
+  string report_id = 1;
+  bool resolved = 2;
+  string resolution = 3;
+  string idempotency_key = 4;
+}
+
+message ResolveModerationReportResponse {
+  ModerationReport report = 1;
+}
+
+message ListModerationActionsRequest {
+  ModerationTarget target = 1;
+  zvonilka.common.v1.PageRequest page = 2;
+}
+
+message ListModerationActionsResponse {
+  repeated ModerationAction actions = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}

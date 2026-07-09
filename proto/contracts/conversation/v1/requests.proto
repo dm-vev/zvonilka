@@ -1,0 +1,135 @@
+syntax = "proto3";
+
+package zvonilka.conversation.v1;
+
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "contracts/common/v1/messages.proto";
+import "contracts/common/v1/types.proto";
+import "contracts/conversation/v1/models.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1;conversationv1";
+
+message CreateConversationRequest {
+  string idempotency_key = 1;
+  zvonilka.common.v1.ConversationKind kind = 2;
+  string title = 3;
+  string description = 4;
+  string avatar_media_id = 5;
+  repeated string member_user_ids = 6;
+  ConversationSettings settings = 7;
+}
+
+message CreateConversationResponse {
+  Conversation conversation = 1;
+}
+
+message GetConversationRequest {
+  string conversation_id = 1;
+}
+
+message GetConversationResponse {
+  Conversation conversation = 1;
+  repeated ConversationMember members = 2;
+}
+
+message ListConversationsRequest {
+  zvonilka.common.v1.PageRequest page = 1;
+  repeated zvonilka.common.v1.ConversationKind kinds = 2;
+  bool include_archived = 3;
+  bool include_pinned = 4;
+  bool include_hidden = 5;
+}
+
+message ListConversationsResponse {
+  repeated Conversation conversations = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message UpdateConversationRequest {
+  Conversation conversation = 1;
+  google.protobuf.FieldMask update_mask = 2;
+  string idempotency_key = 3;
+}
+
+message UpdateConversationResponse {
+  Conversation conversation = 1;
+}
+
+message ListMembersRequest {
+  string conversation_id = 1;
+  zvonilka.common.v1.PageRequest page = 2;
+}
+
+message ListMembersResponse {
+  repeated ConversationMember members = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message AddMembersRequest {
+  string conversation_id = 1;
+  repeated string user_ids = 2;
+  zvonilka.common.v1.MemberRole role = 3;
+  string inviter_user_id = 4;
+  string idempotency_key = 5;
+}
+
+message AddMembersResponse {
+  repeated ConversationMember members = 1;
+}
+
+message RemoveMembersRequest {
+  string conversation_id = 1;
+  repeated string user_ids = 2;
+  string reason = 3;
+  string idempotency_key = 4;
+}
+
+message RemoveMembersResponse {
+  uint32 removed_members = 1;
+}
+
+message UpdateMemberRoleRequest {
+  string conversation_id = 1;
+  string user_id = 2;
+  zvonilka.common.v1.MemberRole role = 3;
+  string reason = 4;
+  string idempotency_key = 5;
+}
+
+message UpdateMemberRoleResponse {
+  ConversationMember member = 1;
+}
+
+message CreateInviteRequest {
+  string conversation_id = 1;
+  repeated zvonilka.common.v1.MemberRole allowed_roles = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  uint32 max_uses = 4;
+  string idempotency_key = 5;
+}
+
+message CreateInviteResponse {
+  Invite invite = 1;
+}
+
+message ListInvitesRequest {
+  string conversation_id = 1;
+  zvonilka.common.v1.PageRequest page = 2;
+}
+
+message ListInvitesResponse {
+  repeated Invite invites = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message RevokeInviteRequest {
+  string conversation_id = 1;
+  string invite_id = 2;
+  string reason = 3;
+  string idempotency_key = 4;
+}
+
+message RevokeInviteResponse {
+  Invite invite = 1;
+}

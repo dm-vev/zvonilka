@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package zvonilka.admin.v1;
+
+import "contracts/admin/v1/requests.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/admin/v1;adminv1";
+
+service AdminService {
+  rpc ListJoinRequests(ListJoinRequestsRequest) returns (ListJoinRequestsResponse);
+  rpc ApproveJoinRequest(ApproveJoinRequestRequest) returns (ApproveJoinRequestResponse);
+  rpc RejectJoinRequest(RejectJoinRequestRequest) returns (RejectJoinRequestResponse);
+  rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse);
+}

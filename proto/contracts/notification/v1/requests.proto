@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package zvonilka.notification.v1;
+
+import "contracts/notification/v1/models.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/notification/v1;notificationv1";
+
+message GetNotificationPreferenceRequest {}
+
+message GetNotificationPreferenceResponse {
+  NotificationPreference preference = 1;
+}
+
+message SetNotificationPreferenceRequest {
+  NotificationPreference preference = 1;
+}
+
+message SetNotificationPreferenceResponse {
+  NotificationPreference preference = 1;
+}
+
+message GetConversationNotificationOverrideRequest {
+  string conversation_id = 1;
+}
+
+message GetConversationNotificationOverrideResponse {
+  ConversationNotificationOverride override = 1;
+}
+
+message SetConversationNotificationOverrideRequest {
+  ConversationNotificationOverride override = 1;
+}
+
+message SetConversationNotificationOverrideResponse {
+  ConversationNotificationOverride override = 1;
+}
+
+message ListPushTokensRequest {}
+
+message ListPushTokensResponse {
+  repeated PushToken push_tokens = 1;
+}
+
+message RegisterPushTokenRequest {
+  string provider = 1;
+  string token = 2;
+}
+
+message RegisterPushTokenResponse {
+  PushToken push_token = 1;
+}
+
+message RevokePushTokenRequest {
+  string token_id = 1;
+}
+
+message RevokePushTokenResponse {
+  PushToken push_token = 1;
+}

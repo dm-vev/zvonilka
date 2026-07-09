@@ -1,0 +1,163 @@
+syntax = "proto3";
+
+package zvonilka.e2ee.v1;
+
+import "contracts/e2ee/v1/models.proto";
+import "contracts/common/v1/messages.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/e2ee/v1;e2eev1";
+
+message UploadDevicePreKeysRequest {
+  string device_id = 1;
+  SignedPreKey signed_prekey = 2;
+  repeated PreKey one_time_prekeys = 3;
+  bool replace_one_time_prekeys = 4;
+}
+
+message UploadDevicePreKeysResponse {
+  DevicePreKeyBundle bundle = 1;
+}
+
+message RotateE2EEKeysRequest {
+  string device_id = 1;
+  SignedPreKey signed_prekey = 2;
+  repeated PreKey one_time_prekeys = 3;
+  bool replace_one_time_prekeys = 4;
+  bool expire_pending_direct_sessions = 5;
+  bool expire_pending_group_sender_keys = 6;
+}
+
+message RotateE2EEKeysResponse {
+  DevicePreKeyBundle bundle = 1;
+  uint32 expired_pending_direct_sessions = 2;
+  uint32 expired_pending_group_sender_keys = 3;
+}
+
+message GetAccountPreKeyBundlesRequest {
+  string user_id = 1;
+  bool consume_one_time_prekeys = 2;
+}
+
+message GetAccountPreKeyBundlesResponse {
+  repeated DevicePreKeyBundle bundles = 1;
+}
+
+message GetDeviceVerificationCodeRequest {
+  string target_user_id = 1;
+  string target_device_id = 2;
+}
+
+message GetDeviceVerificationCodeResponse {
+  DeviceVerificationCode verification = 1;
+}
+
+message VerifyDeviceSafetyNumberRequest {
+  string target_user_id = 1;
+  string target_device_id = 2;
+  string safety_number = 3;
+  string note = 4;
+}
+
+message VerifyDeviceSafetyNumberResponse {
+  DeviceTrust trust = 1;
+}
+
+message SetDeviceTrustRequest {
+  string target_user_id = 1;
+  string target_device_id = 2;
+  DeviceTrustState state = 3;
+  string note = 4;
+}
+
+message SetDeviceTrustResponse {
+  DeviceTrust trust = 1;
+}
+
+message ListDeviceTrustsRequest {
+  string target_user_id = 1;
+}
+
+message ListDeviceTrustsResponse {
+  repeated DeviceTrust trusts = 1;
+}
+
+message ListVerificationRequiredDevicesRequest {}
+
+message ListVerificationRequiredDevicesResponse {
+  repeated VerificationRequiredDevice devices = 1;
+}
+
+message GetConversationKeyCoverageRequest {
+  string conversation_id = 1;
+  string sender_key_id = 2;
+}
+
+message GetConversationKeyCoverageResponse {
+  repeated ConversationKeyCoverageEntry entries = 1;
+}
+
+message SubscribeE2EEUpdatesRequest {
+  string device_id = 1;
+}
+
+message SubscribeE2EEUpdatesResponse {
+  E2EEUpdate update = 1;
+}
+
+message CreateDirectSessionsRequest {
+  string user_id = 1;
+  string device_id = 2;
+  zvonilka.common.v1.PublicKeyBundle initiator_ephemeral_key = 3;
+  SessionBootstrapPayload bootstrap = 4;
+  google.protobuf.Timestamp expires_at = 5;
+}
+
+message CreateDirectSessionsResponse {
+  repeated DirectSession sessions = 1;
+}
+
+message ListDeviceSessionsRequest {
+  bool include_acknowledged = 1;
+  string peer_user_id = 2;
+}
+
+message ListDeviceSessionsResponse {
+  repeated DirectSession sessions = 1;
+}
+
+message AcknowledgeDirectSessionRequest {
+  string session_id = 1;
+}
+
+message AcknowledgeDirectSessionResponse {
+  DirectSession session = 1;
+}
+
+message PublishGroupSenderKeysRequest {
+  string conversation_id = 1;
+  string sender_key_id = 2;
+  repeated RecipientSenderKey recipients = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message PublishGroupSenderKeysResponse {
+  repeated GroupSenderKeyDistribution distributions = 1;
+}
+
+message ListGroupSenderKeysRequest {
+  string conversation_id = 1;
+  bool include_acknowledged = 2;
+}
+
+message ListGroupSenderKeysResponse {
+  repeated GroupSenderKeyDistribution distributions = 1;
+}
+
+message AcknowledgeGroupSenderKeyRequest {
+  string distribution_id = 1;
+}
+
+message AcknowledgeGroupSenderKeyResponse {
+  GroupSenderKeyDistribution distribution = 1;
+}

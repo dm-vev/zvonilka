@@ -1,0 +1,313 @@
+syntax = "proto3";
+
+package zvonilka.call.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1;callv1";
+
+enum CallState {
+  CALL_STATE_UNSPECIFIED = 0;
+  CALL_STATE_RINGING = 1;
+  CALL_STATE_ACTIVE = 2;
+  CALL_STATE_ENDED = 3;
+}
+
+enum CallEndReason {
+  CALL_END_REASON_UNSPECIFIED = 0;
+  CALL_END_REASON_CANCELLED = 1;
+  CALL_END_REASON_DECLINED = 2;
+  CALL_END_REASON_MISSED = 3;
+  CALL_END_REASON_ENDED = 4;
+  CALL_END_REASON_FAILED = 5;
+}
+
+enum CallInviteState {
+  CALL_INVITE_STATE_UNSPECIFIED = 0;
+  CALL_INVITE_STATE_PENDING = 1;
+  CALL_INVITE_STATE_ACCEPTED = 2;
+  CALL_INVITE_STATE_DECLINED = 3;
+  CALL_INVITE_STATE_CANCELLED = 4;
+  CALL_INVITE_STATE_EXPIRED = 5;
+}
+
+enum CallParticipantState {
+  CALL_PARTICIPANT_STATE_UNSPECIFIED = 0;
+  CALL_PARTICIPANT_STATE_JOINED = 1;
+  CALL_PARTICIPANT_STATE_LEFT = 2;
+}
+
+enum CallEventType {
+  CALL_EVENT_TYPE_UNSPECIFIED = 0;
+  CALL_EVENT_TYPE_STARTED = 1;
+  CALL_EVENT_TYPE_INVITED = 2;
+  CALL_EVENT_TYPE_ACCEPTED = 3;
+  CALL_EVENT_TYPE_DECLINED = 4;
+  CALL_EVENT_TYPE_JOINED = 5;
+  CALL_EVENT_TYPE_LEFT = 6;
+  CALL_EVENT_TYPE_MEDIA_UPDATED = 7;
+  CALL_EVENT_TYPE_SESSION_MIGRATED = 8;
+  CALL_EVENT_TYPE_ENDED = 9;
+  CALL_EVENT_TYPE_SIGNAL_DESCRIPTION = 10;
+  CALL_EVENT_TYPE_SIGNAL_CANDIDATE = 11;
+  CALL_EVENT_TYPE_RECORDING_UPDATED = 12;
+  CALL_EVENT_TYPE_TRANSCRIPTION_UPDATED = 13;
+}
+
+enum CallRecordingState {
+  CALL_RECORDING_STATE_UNSPECIFIED = 0;
+  CALL_RECORDING_STATE_INACTIVE = 1;
+  CALL_RECORDING_STATE_ACTIVE = 2;
+  CALL_RECORDING_STATE_FAILED = 3;
+}
+
+enum CallTranscriptionState {
+  CALL_TRANSCRIPTION_STATE_UNSPECIFIED = 0;
+  CALL_TRANSCRIPTION_STATE_INACTIVE = 1;
+  CALL_TRANSCRIPTION_STATE_ACTIVE = 2;
+  CALL_TRANSCRIPTION_STATE_FAILED = 3;
+}
+
+message SessionDescription {
+  string type = 1;
+  string sdp = 2;
+}
+
+message IceCandidate {
+  string candidate = 1;
+  string sdp_mid = 2;
+  uint32 sdp_mline_index = 3;
+  string username_fragment = 4;
+}
+
+message CallMediaState {
+  bool audio_muted = 1;
+  bool video_muted = 2;
+  bool camera_enabled = 3;
+  bool screen_share_enabled = 4;
+}
+
+message CallTransportStats {
+  string peer_connection_state = 1;
+  string ice_connection_state = 2;
+  string signaling_state = 3;
+  string quality = 4;
+  uint64 adaptation_revision = 5;
+  bool pending_adaptation = 6;
+  uint64 acked_adaptation_revision = 7;
+  string applied_profile = 8;
+  google.protobuf.Timestamp applied_at = 9;
+  string recommended_profile = 10;
+  string recommendation_reason = 11;
+  bool video_fallback_recommended = 12;
+  bool screen_share_priority = 13;
+  bool reconnect_recommended = 14;
+  bool suppress_camera_video = 15;
+  bool suppress_outgoing_video = 16;
+  bool suppress_incoming_video = 17;
+  bool suppress_outgoing_audio = 18;
+  bool suppress_incoming_audio = 19;
+  uint32 reconnect_attempt = 20;
+  google.protobuf.Timestamp reconnect_backoff_until = 21;
+  string quality_trend = 22;
+  uint32 degraded_transitions = 23;
+  uint32 recovered_transitions = 24;
+  google.protobuf.Timestamp last_quality_change_at = 25;
+  repeated CallTransportQualitySample recent_samples = 26;
+  double packet_loss_pct = 27;
+  uint32 jitter_score = 28;
+  string qos_escalation = 29;
+  string qos_trend = 30;
+  uint32 qos_bad_streak = 31;
+  google.protobuf.Timestamp last_qos_updated_at = 32;
+  repeated CallTransportQoSSample recent_qos_samples = 33;
+  uint32 relay_tracks = 34;
+  uint32 screen_share_relay_tracks = 35;
+  uint64 relay_packets = 36;
+  uint64 relay_bytes = 37;
+  uint64 relay_write_errors = 38;
+  bool active_speaker = 39;
+  bool dominant_speaker = 40;
+  google.protobuf.Timestamp last_spoke_at = 41;
+  google.protobuf.Timestamp last_updated_at = 42;
+}
+
+message CallTransportQualitySample {
+  string quality = 1;
+  string recommended_profile = 2;
+  google.protobuf.Timestamp recorded_at = 3;
+}
+
+message CallTransportQoSSample {
+  double packet_loss_pct = 1;
+  uint32 jitter_score = 2;
+  string escalation = 3;
+  google.protobuf.Timestamp recorded_at = 4;
+}
+
+message IceServer {
+  repeated string urls = 1;
+  string username = 2;
+  string credential = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message CallInvite {
+  string user_id = 1;
+  CallInviteState state = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  google.protobuf.Timestamp answered_at = 4;
+}
+
+message CallParticipant {
+  string user_id = 1;
+  string device_id = 2;
+  CallParticipantState state = 3;
+  CallMediaState media_state = 4;
+  google.protobuf.Timestamp joined_at = 5;
+  google.protobuf.Timestamp left_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  CallTransportStats transport_stats = 8;
+  bool hand_raised = 9;
+  google.protobuf.Timestamp raised_hand_at = 10;
+  bool host_muted_audio = 11;
+  bool host_muted_video = 12;
+  bool pinned_speaker = 13;
+  bool stage_slot = 14;
+}
+
+message CallQualitySummary {
+  string worst_quality = 1;
+  string dominant_profile = 2;
+  uint32 participant_count = 3;
+  uint32 active_speaker_count = 4;
+  uint32 video_fallback_participants = 5;
+  uint32 screen_share_priority_participants = 6;
+  uint32 reconnect_participants = 7;
+  uint32 camera_video_suppressed = 8;
+  uint32 outgoing_video_suppressed = 9;
+  uint32 incoming_video_suppressed = 10;
+  uint32 outgoing_audio_suppressed = 11;
+  uint32 incoming_audio_suppressed = 12;
+  string dominant_speaker_user_id = 13;
+  string dominant_speaker_device_id = 14;
+  uint32 degraded_transitions = 15;
+  uint32 recovered_transitions = 16;
+  google.protobuf.Timestamp last_changed_at = 17;
+}
+
+message CallDiagnostics {
+  Call call = 1;
+  uint32 duration_seconds = 2;
+  uint32 active_duration_seconds = 3;
+  string peak_qos_escalation = 4;
+  uint32 max_reconnect_attempt = 5;
+  uint32 total_adaptation_revisions = 6;
+  uint32 total_adaptation_acks = 7;
+  string last_applied_profile = 8;
+  google.protobuf.Timestamp last_applied_at = 9;
+}
+
+message CallStatsSnapshot {
+  Call call = 1;
+  google.protobuf.Timestamp observed_at = 2;
+}
+
+message CallRuntimeState {
+  string call_id = 1;
+  string conversation_id = 2;
+  string session_id = 3;
+  string node_id = 4;
+  string runtime_endpoint = 5;
+  bool active = 6;
+  bool healthy = 7;
+  repeated string configured_replica_node_ids = 8;
+  repeated string healthy_migration_target_node_ids = 9;
+  google.protobuf.Timestamp observed_at = 10;
+}
+
+message CallSessionRelayTrack {
+  string source_user_id = 1;
+  string source_device_id = 2;
+  string track_id = 3;
+  string stream_id = 4;
+  string kind = 5;
+  bool screen_share = 6;
+  string codec_mime_type = 7;
+  uint32 codec_clock_rate = 8;
+  uint32 codec_channels = 9;
+}
+
+message CallSessionSnapshotParticipant {
+  string user_id = 1;
+  string device_id = 2;
+  bool with_video = 3;
+  CallMediaState media_state = 4;
+  CallTransportStats transport_stats = 5;
+  repeated CallSessionRelayTrack relay_tracks = 6;
+}
+
+message CallSessionSnapshot {
+  string call_id = 1;
+  string conversation_id = 2;
+  string session_id = 3;
+  string node_id = 4;
+  google.protobuf.Timestamp observed_at = 5;
+  repeated CallSessionSnapshotParticipant participants = 6;
+}
+
+message Call {
+  string call_id = 1;
+  string conversation_id = 2;
+  string initiator_user_id = 3;
+  string host_user_id = 4;
+  string active_session_id = 5;
+  bool requested_video = 6;
+  CallState state = 7;
+  CallEndReason end_reason = 8;
+  google.protobuf.Timestamp started_at = 9;
+  google.protobuf.Timestamp answered_at = 10;
+  google.protobuf.Timestamp ended_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  repeated CallInvite invites = 13;
+  repeated CallParticipant participants = 14;
+  CallQualitySummary quality_summary = 15;
+  bool stage_mode_enabled = 16;
+  string pinned_speaker_user_id = 17;
+  string pinned_speaker_device_id = 18;
+  CallRecordingState recording_state = 19;
+  google.protobuf.Timestamp recording_started_at = 20;
+  google.protobuf.Timestamp recording_stopped_at = 21;
+  CallTranscriptionState transcription_state = 22;
+  google.protobuf.Timestamp transcription_started_at = 23;
+  google.protobuf.Timestamp transcription_stopped_at = 24;
+}
+
+message CallEvent {
+  string event_id = 1;
+  string call_id = 2;
+  string conversation_id = 3;
+  CallEventType event_type = 4;
+  string actor_user_id = 5;
+  string actor_device_id = 6;
+  uint64 sequence = 7;
+  map<string, string> metadata = 8;
+  google.protobuf.Timestamp created_at = 9;
+  Call call = 10;
+  string session_id = 11;
+  SessionDescription description = 12;
+  IceCandidate ice_candidate = 13;
+}
+
+message JoinTransport {
+  string session_id = 1;
+  string session_token = 2;
+  string runtime_endpoint = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  repeated IceServer ice_servers = 5;
+  string ice_ufrag = 6;
+  string ice_pwd = 7;
+  string dtls_fingerprint = 8;
+  string candidate_host = 9;
+  uint32 candidate_port = 10;
+}

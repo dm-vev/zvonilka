@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package zvonilka.call.v1;
+
+import "contracts/call/v1/requests.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/call/v1;callv1";
+
+service CallService {
+  rpc StartCall(StartCallRequest) returns (StartCallResponse);
+  rpc GetCall(GetCallRequest) returns (GetCallResponse);
+  rpc GetCallDiagnostics(GetCallDiagnosticsRequest) returns (GetCallDiagnosticsResponse);
+  rpc GetCallRuntimeState(GetCallRuntimeStateRequest) returns (GetCallRuntimeStateResponse);
+  rpc GetCallSessionSnapshot(GetCallSessionSnapshotRequest) returns (GetCallSessionSnapshotResponse);
+  rpc ListCalls(ListCallsRequest) returns (ListCallsResponse);
+  rpc AcceptCall(AcceptCallRequest) returns (AcceptCallResponse);
+  rpc DeclineCall(DeclineCallRequest) returns (DeclineCallResponse);
+  rpc CancelCall(CancelCallRequest) returns (CancelCallResponse);
+  rpc EndCall(EndCallRequest) returns (EndCallResponse);
+  rpc JoinCall(JoinCallRequest) returns (JoinCallResponse);
+  rpc ReconnectCall(ReconnectCallRequest) returns (ReconnectCallResponse);
+  rpc HandoffCall(HandoffCallRequest) returns (HandoffCallResponse);
+  rpc MigrateCallSession(MigrateCallSessionRequest) returns (MigrateCallSessionResponse);
+  rpc PublishCallDescription(PublishCallDescriptionRequest) returns (PublishCallDescriptionResponse);
+  rpc PublishCallIceCandidate(PublishCallIceCandidateRequest) returns (PublishCallIceCandidateResponse);
+  rpc LeaveCall(LeaveCallRequest) returns (LeaveCallResponse);
+  rpc UpdateCallMediaState(UpdateCallMediaStateRequest) returns (UpdateCallMediaStateResponse);
+  rpc UpdateCallRecording(UpdateCallRecordingRequest) returns (UpdateCallRecordingResponse);
+  rpc UpdateCallTranscription(UpdateCallTranscriptionRequest) returns (UpdateCallTranscriptionResponse);
+  rpc RaiseCallHand(RaiseCallHandRequest) returns (RaiseCallHandResponse);
+  rpc ModerateCallParticipant(ModerateCallParticipantRequest) returns (ModerateCallParticipantResponse);
+  rpc MuteAllCallParticipants(MuteAllCallParticipantsRequest) returns (MuteAllCallParticipantsResponse);
+  rpc RemoveCallParticipant(RemoveCallParticipantRequest) returns (RemoveCallParticipantResponse);
+  rpc TransferCallHost(TransferCallHostRequest) returns (TransferCallHostResponse);
+  rpc ListRaisedHands(ListRaisedHandsRequest) returns (ListRaisedHandsResponse);
+  rpc UpdateCallStageMode(UpdateCallStageModeRequest) returns (UpdateCallStageModeResponse);
+  rpc PinCallSpeaker(PinCallSpeakerRequest) returns (PinCallSpeakerResponse);
+  rpc AcknowledgeCallAdaptation(AcknowledgeCallAdaptationRequest) returns (AcknowledgeCallAdaptationResponse);
+  rpc GetIceConfig(GetIceConfigRequest) returns (GetIceConfigResponse);
+  rpc SubscribeCallEvents(SubscribeCallEventsRequest) returns (stream SubscribeCallEventsResponse);
+  rpc SubscribeCallStats(SubscribeCallStatsRequest) returns (stream SubscribeCallStatsResponse);
+}

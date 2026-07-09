@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package zvonilka.conversation.v1;
+
+import "contracts/conversation/v1/messages.proto";
+import "contracts/conversation/v1/moderation.proto";
+import "contracts/conversation/v1/requests.proto";
+import "contracts/conversation/v1/threads.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/conversation/v1;conversationv1";
+
+service ConversationService {
+  rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
+  rpc GetConversation(GetConversationRequest) returns (GetConversationResponse);
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+  rpc UpdateConversation(UpdateConversationRequest) returns (UpdateConversationResponse);
+  rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
+  rpc AddMembers(AddMembersRequest) returns (AddMembersResponse);
+  rpc RemoveMembers(RemoveMembersRequest) returns (RemoveMembersResponse);
+  rpc UpdateMemberRole(UpdateMemberRoleRequest) returns (UpdateMemberRoleResponse);
+  rpc CreateInvite(CreateInviteRequest) returns (CreateInviteResponse);
+  rpc ListInvites(ListInvitesRequest) returns (ListInvitesResponse);
+  rpc RevokeInvite(RevokeInviteRequest) returns (RevokeInviteResponse);
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
+  rpc ListScheduledMessages(ListScheduledMessagesRequest) returns (ListScheduledMessagesResponse);
+  rpc GetMessage(GetMessageRequest) returns (GetMessageResponse);
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  rpc TranslateMessage(TranslateMessageRequest) returns (TranslateMessageResponse);
+  rpc EditMessage(EditMessageRequest) returns (EditMessageResponse);
+  rpc DeleteMessage(DeleteMessageRequest) returns (DeleteMessageResponse);
+  rpc ForwardMessage(ForwardMessageRequest) returns (ForwardMessageResponse);
+  rpc AddReaction(AddReactionRequest) returns (AddReactionResponse);
+  rpc RemoveReaction(RemoveReactionRequest) returns (RemoveReactionResponse);
+  rpc PinMessage(PinMessageRequest) returns (PinMessageResponse);
+  rpc UnpinMessage(UnpinMessageRequest) returns (UnpinMessageResponse);
+  rpc MarkRead(MarkReadRequest) returns (MarkReadResponse);
+  rpc CreateThread(CreateThreadRequest) returns (CreateThreadResponse);
+  rpc GetThread(GetThreadRequest) returns (GetThreadResponse);
+  rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse);
+  rpc RenameThread(RenameThreadRequest) returns (RenameThreadResponse);
+  rpc ArchiveThread(ArchiveThreadRequest) returns (ArchiveThreadResponse);
+  rpc CloseThread(CloseThreadRequest) returns (CloseThreadResponse);
+  rpc PinThread(PinThreadRequest) returns (PinThreadResponse);
+  rpc GetModerationPolicy(GetModerationPolicyRequest) returns (GetModerationPolicyResponse);
+  rpc GetModerationRateState(GetModerationRateStateRequest) returns (GetModerationRateStateResponse);
+  rpc CheckModerationWrite(CheckModerationWriteRequest) returns (CheckModerationWriteResponse);
+  rpc SetModerationPolicy(SetModerationPolicyRequest) returns (SetModerationPolicyResponse);
+  rpc ApplyModerationRestriction(ApplyModerationRestrictionRequest) returns (ApplyModerationRestrictionResponse);
+  rpc LiftModerationRestriction(LiftModerationRestrictionRequest) returns (LiftModerationRestrictionResponse);
+  rpc ListModerationRestrictions(ListModerationRestrictionsRequest) returns (ListModerationRestrictionsResponse);
+  rpc SubmitModerationReport(SubmitModerationReportRequest) returns (SubmitModerationReportResponse);
+  rpc GetModerationReport(GetModerationReportRequest) returns (GetModerationReportResponse);
+  rpc ListModerationReports(ListModerationReportsRequest) returns (ListModerationReportsResponse);
+  rpc ResolveModerationReport(ResolveModerationReportRequest) returns (ResolveModerationReportResponse);
+  rpc ListModerationActions(ListModerationActionsRequest) returns (ListModerationActionsResponse);
+}

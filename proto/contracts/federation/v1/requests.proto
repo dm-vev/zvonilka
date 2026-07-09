@@ -1,0 +1,228 @@
+syntax = "proto3";
+
+package zvonilka.federation.v1;
+
+import "google/protobuf/field_mask.proto";
+import "contracts/common/v1/messages.proto";
+import "contracts/common/v1/types.proto";
+import "contracts/federation/v1/models.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/federation/v1;federationv1";
+
+message CreatePeerRequest {
+  string server_name = 1;
+  string base_url = 2;
+  string shared_secret = 3;
+  repeated zvonilka.common.v1.FederationCapability capabilities = 4;
+  bool trusted = 5;
+  string idempotency_key = 6;
+  string signing_secret = 7;
+}
+
+message CreatePeerResponse {
+  Peer peer = 1;
+  string shared_secret = 2;
+  bool generated_shared_secret = 3;
+  string signing_secret = 4;
+  bool generated_signing_secret = 5;
+}
+
+message GetPeerRequest {
+  oneof lookup {
+    string peer_id = 1;
+    string server_name = 2;
+  }
+}
+
+message GetPeerResponse {
+  Peer peer = 1;
+}
+
+message ListPeersRequest {
+  zvonilka.common.v1.PageRequest page = 1;
+  PeerState state_filter = 2;
+}
+
+message ListPeersResponse {
+  repeated Peer peers = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message UpdatePeerRequest {
+  Peer peer = 1;
+  google.protobuf.FieldMask update_mask = 2;
+  string idempotency_key = 3;
+}
+
+message UpdatePeerResponse {
+  Peer peer = 1;
+}
+
+message RotatePeerSigningKeyRequest {
+  string peer_id = 1;
+  string signing_secret = 2;
+  string idempotency_key = 3;
+}
+
+message RotatePeerSigningKeyResponse {
+  Peer peer = 1;
+  string signing_secret = 2;
+  bool generated_signing_secret = 3;
+}
+
+message CreateLinkRequest {
+  string peer_id = 1;
+  string name = 2;
+  string endpoint = 3;
+  TransportKind transport_kind = 4;
+  DeliveryClass delivery_class = 5;
+  DiscoveryMode discovery_mode = 6;
+  MediaPolicy media_policy = 7;
+  uint32 max_bundle_bytes = 8;
+  uint32 max_fragment_bytes = 9;
+  repeated zvonilka.common.v1.ConversationKind allowed_conversation_kinds = 10;
+  string idempotency_key = 11;
+  repeated EventFamily allowed_event_families = 12;
+  repeated zvonilka.common.v1.MessageKind allowed_message_kinds = 13;
+}
+
+message CreateLinkResponse {
+  Link link = 1;
+}
+
+message GetLinkRequest {
+  string link_id = 1;
+}
+
+message GetLinkResponse {
+  Link link = 1;
+}
+
+message ListLinksRequest {
+  zvonilka.common.v1.PageRequest page = 1;
+  string peer_id = 2;
+  LinkState state_filter = 3;
+}
+
+message ListLinksResponse {
+  repeated Link links = 1;
+  zvonilka.common.v1.PageResponse page = 2;
+}
+
+message UpdateLinkRequest {
+  Link link = 1;
+  google.protobuf.FieldMask update_mask = 2;
+  string idempotency_key = 3;
+}
+
+message UpdateLinkResponse {
+  Link link = 1;
+}
+
+message PauseLinkRequest {
+  string link_id = 1;
+}
+
+message PauseLinkResponse {
+  Link link = 1;
+}
+
+message ResumeLinkRequest {
+  string link_id = 1;
+}
+
+message ResumeLinkResponse {
+  Link link = 1;
+}
+
+message DeleteLinkRequest {
+  string link_id = 1;
+}
+
+message DeleteLinkResponse {
+  Link link = 1;
+}
+
+message GetReplicationCursorRequest {
+  string peer_id = 1;
+  string link_id = 2;
+}
+
+message GetReplicationCursorResponse {
+  ReplicationCursor cursor = 1;
+}
+
+message PushBundlesRequest {
+  string server_name = 1;
+  string link_name = 2;
+  repeated Bundle bundles = 3;
+}
+
+message PushBundlesResponse {
+  repeated string accepted_bundle_ids = 1;
+  ReplicationCursor cursor = 2;
+}
+
+message PullBundlesRequest {
+  string server_name = 1;
+  string link_name = 2;
+  uint64 after_cursor = 3;
+  uint32 limit = 4;
+}
+
+message PullBundlesResponse {
+  repeated Bundle bundles = 1;
+  uint64 next_cursor = 2;
+  bool has_more = 3;
+  ReplicationCursor cursor = 4;
+}
+
+message AcknowledgeBundlesRequest {
+  string server_name = 1;
+  string link_name = 2;
+  uint64 up_to_cursor = 3;
+  repeated string bundle_ids = 4;
+}
+
+message AcknowledgeBundlesResponse {
+  repeated string acknowledged_bundle_ids = 1;
+  ReplicationCursor cursor = 2;
+}
+
+message PullBridgeFragmentsRequest {
+  string peer_server_name = 1;
+  string link_name = 2;
+  uint32 limit = 3;
+}
+
+message PullBridgeFragmentsResponse {
+  repeated BundleFragment fragments = 1;
+  bool has_more = 2;
+  ReplicationCursor cursor = 3;
+  Link link = 4;
+  string lease_token = 5;
+}
+
+message SubmitBridgeFragmentsRequest {
+  string peer_server_name = 1;
+  string link_name = 2;
+  repeated BundleFragment fragments = 3;
+}
+
+message SubmitBridgeFragmentsResponse {
+  repeated string accepted_fragment_ids = 1;
+  repeated string assembled_bundle_ids = 2;
+  ReplicationCursor cursor = 3;
+}
+
+message AcknowledgeBridgeFragmentsRequest {
+  string peer_server_name = 1;
+  string link_name = 2;
+  repeated string fragment_ids = 3;
+  string lease_token = 4;
+}
+
+message AcknowledgeBridgeFragmentsResponse {
+  repeated string acknowledged_fragment_ids = 1;
+  ReplicationCursor cursor = 2;
+}

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package zvonilka.notification.v1;
+
+import "contracts/notification/v1/requests.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/notification/v1;notificationv1";
+
+service NotificationService {
+  rpc GetNotificationPreference(GetNotificationPreferenceRequest) returns (GetNotificationPreferenceResponse);
+  rpc SetNotificationPreference(SetNotificationPreferenceRequest) returns (SetNotificationPreferenceResponse);
+  rpc GetConversationNotificationOverride(GetConversationNotificationOverrideRequest) returns (GetConversationNotificationOverrideResponse);
+  rpc SetConversationNotificationOverride(SetConversationNotificationOverrideRequest) returns (SetConversationNotificationOverrideResponse);
+  rpc ListPushTokens(ListPushTokensRequest) returns (ListPushTokensResponse);
+  rpc RegisterPushToken(RegisterPushTokenRequest) returns (RegisterPushTokenResponse);
+  rpc RevokePushToken(RevokePushTokenRequest) returns (RevokePushTokenResponse);
+}

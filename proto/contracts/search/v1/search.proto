@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package zvonilka.search.v1;
+
+import "contracts/search/v1/requests.proto";
+
+option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/search/v1;searchv1";
+
+service SearchService {
+  rpc Search(SearchRequest) returns (SearchResponse);
+}

@@ -1,0 +1,440 @@
+package gateway
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+
+	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
+	postgrescall "github.com/dm-vev/zvonilka/internal/domain/call/pgstore"
+	domainconversation "github.com/dm-vev/zvonilka/internal/domain/conversation"
+	postgresconversation "github.com/dm-vev/zvonilka/internal/domain/conversation/pgstore"
+	domaine2ee "github.com/dm-vev/zvonilka/internal/domain/e2ee"
+	postgrese2ee "github.com/dm-vev/zvonilka/internal/domain/e2ee/pgstore"
+	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
+	postgresidentity "github.com/dm-vev/zvonilka/internal/domain/identity/pgstore"
+	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
+	postgresmedia "github.com/dm-vev/zvonilka/internal/domain/media/pgstore"
+	domainnotification "github.com/dm-vev/zvonilka/internal/domain/notification"
+	postgresnotification "github.com/dm-vev/zvonilka/internal/domain/notification/pgstore"
+	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
+	postgrespresence "github.com/dm-vev/zvonilka/internal/domain/presence/pgstore"
+	domainsearch "github.com/dm-vev/zvonilka/internal/domain/search"
+	postgressearch "github.com/dm-vev/zvonilka/internal/domain/search/pgstore"
+	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
+	domaintranslation "github.com/dm-vev/zvonilka/internal/domain/translation"
+	postgrestranslation "github.com/dm-vev/zvonilka/internal/domain/translation/pgstore"
+	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
+	postgresuser "github.com/dm-vev/zvonilka/internal/domain/user/pgstore"
+	"github.com/dm-vev/zvonilka/internal/platform/config"
+	platformrtc "github.com/dm-vev/zvonilka/internal/platform/rtc"
+	platformstorage "github.com/dm-vev/zvonilka/internal/platform/storage"
+	postgresplatform "github.com/dm-vev/zvonilka/internal/platform/storage/postgres"
+	s3platform "github.com/dm-vev/zvonilka/internal/platform/storage/s3"
+	platformtranslation "github.com/dm-vev/zvonilka/internal/platform/translation"
+)
+
+type storageBuilder interface {
+	Build(ctx context.Context) (*domainstorage.Catalog, error)
+}
+
+var newStorageBuilder = func(
+	cfg config.Configuration,
+	factories ...platformstorage.Factory,
+) (storageBuilder, error) {
+	return platformstorage.NewBuilder(cfg, factories...)
+}
+
+var newIdentityStore = func(db *sql.DB, schema string) (domainidentity.Store, error) {
+	return postgresidentity.New(db, schema)
+}
+
+var newCallStore = func(db *sql.DB, schema string) (domaincall.Store, error) {
+	return postgrescall.New(db, schema)
+}
+
+var newE2EEStore = func(db *sql.DB, schema string) (domaine2ee.Store, error) {
+	return postgrese2ee.New(db, schema)
+}
+
+var newConversationStore = func(db *sql.DB, schema string) (domainconversation.Store, error) {
+	return postgresconversation.New(db, schema)
+}
+
+var newMediaStore = func(db *sql.DB, schema string) (domainmedia.Store, error) {
+	return postgresmedia.New(db, schema)
+}
+
+var newNotificationStore = func(db *sql.DB, schema string) (domainnotification.Store, error) {
+	return postgresnotification.New(db, schema)
+}
+
+var newPresenceStore = func(db *sql.DB, schema string) (domainpresence.Store, error) {
+	return postgrespresence.New(db, schema)
+}
+
+var newSearchStore = func(db *sql.DB, schema string) (domainsearch.Store, error) {
+	return postgressearch.New(db, schema)
+}
+
+var newUserStore = func(db *sql.DB, schema string) (domainuser.Store, error) {
+	return postgresuser.New(db, schema)
+}
+
+var newTranslationStore = func(db *sql.DB, schema string) (domaintranslation.Store, error) {
+	return postgrestranslation.New(db, schema)
+}
+
+func buildAppStorage(
+	ctx context.Context,
+	cfg config.Configuration,
+) (
+	*domainstorage.Catalog,
+	*platformrtc.Cluster,
+	*platformrtc.Manager,
+	*domaincall.Service,
+	*domaine2ee.Service,
+	*domainidentity.Service,
+	*domainconversation.Service,
+	*domainmedia.Service,
+	*domainnotification.Service,
+	*domainpresence.Service,
+	*domainsearch.Service,
+	*domaintranslation.Service,
+	*domainuser.Service,
+	error,
+) {
+	if !cfg.Infrastructure.Postgres.Enabled || !cfg.Infrastructure.ObjectStore.Enabled {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, fmt.Errorf(
+			"postgres and object storage are required for gateway: %w",
+			domainstorage.ErrInvalidInput,
+		)
+	}
+
+	postgresBootstrap := postgresplatform.NewBootstrap(cfg)
+	objectBootstrap := s3platform.NewBootstrap(cfg)
+	builder, err := newStorageBuilder(
+		cfg,
+		postgresplatform.NewFactory(
+			postgresBootstrap,
+			cfg.Storage.PrimaryProvider,
+			domainstorage.KindRelational,
+			domainstorage.PurposePrimary,
+			domainstorage.CapabilityRead|domainstorage.CapabilityWrite|domainstorage.CapabilityTransactions,
+		),
+		postgresplatform.NewFactory(
+			postgresBootstrap,
+			cfg.Storage.CacheProvider,
+			domainstorage.KindCache,
+			domainstorage.PurposeCache,
+			domainstorage.CapabilityRead|domainstorage.CapabilityWrite|domainstorage.CapabilityKeyValue,
+		),
+		postgresplatform.NewFactory(
+			postgresBootstrap,
+			cfg.Storage.SearchProvider,
+			domainstorage.KindIndex,
+			domainstorage.PurposeSearch,
+			domainstorage.CapabilityRead|domainstorage.CapabilityWrite|domainstorage.CapabilityListing,
+		),
+		postgresplatform.NewFactory(
+			postgresBootstrap,
+			cfg.Storage.AuditProvider,
+			domainstorage.KindIndex,
+			domainstorage.PurposeAudit,
+			domainstorage.CapabilityWrite|domainstorage.CapabilityListing,
+		),
+		s3platform.NewFactory(
+			objectBootstrap,
+			cfg.Storage.ObjectProvider,
+			domainstorage.KindObject,
+			domainstorage.PurposeObject,
+			domainstorage.CapabilityRead|domainstorage.CapabilityWrite|domainstorage.CapabilityBlob|domainstorage.CapabilityListing,
+		),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("configure storage builder: %w", err)
+	}
+	if builder == nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("configure storage builder: %w", domainstorage.ErrInvalidInput)
+	}
+
+	catalog, err := builder.Build(ctx)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+	}
+	if catalog == nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("build storage catalog: %w", domainstorage.ErrInvalidInput)
+	}
+
+	provider, err := catalog.Provider(cfg.Storage.PrimaryProvider)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("select primary storage provider %q: %w", cfg.Storage.PrimaryProvider, err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	relational, ok := provider.(domainstorage.RelationalProvider)
+	if !ok {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("select primary storage provider: expected relational provider"),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+
+	searchProvider, err := catalog.Provider(cfg.Storage.SearchProvider)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("select search storage provider %q: %w", cfg.Storage.SearchProvider, err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	searchRelational, ok := searchProvider.(domainstorage.RelationalProvider)
+	if !ok {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("select search storage provider: expected relational provider"),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+
+	searchStore, err := newSearchStore(searchRelational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres search store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	searchService, err := domainsearch.NewService(searchStore, domainsearch.WithSettings(cfg.Search.ToSettings()))
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct search service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+
+	identityStore, err := newIdentityStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres identity store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	identityService, err := domainidentity.NewService(
+		identityStore,
+		domainidentity.NoopCodeSender{},
+		domainidentity.WithSettings(cfg.Identity.ToSettings()),
+		domainidentity.WithIndexer(searchService),
+		domainidentity.WithDebugLogin(cfg.Identity.DebugLogin),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct identity service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	userStore, err := newUserStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres user store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	userService, err := domainuser.NewService(userStore, identityService)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct user service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+
+	conversationStore, err := newConversationStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres conversation store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	e2eeStore, err := newE2EEStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres e2ee store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	e2eeService, err := domaine2ee.NewService(e2eeStore, identityStore, conversationStore)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct e2ee service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	callStore, err := newCallStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres call store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+
+	localEndpoint := cfg.RTC.PublicEndpoint
+	for _, node := range cfg.RTC.Nodes {
+		if node.ID == cfg.RTC.NodeID && node.Endpoint != "" {
+			localEndpoint = node.Endpoint
+			break
+		}
+	}
+	localRuntime := platformrtc.NewManager(
+		localEndpoint,
+		cfg.RTC.CredentialTTL,
+		platformrtc.WithCandidateHost(cfg.RTC.CandidateHost),
+		platformrtc.WithUDPPortRange(cfg.RTC.UDPPortMin, cfg.RTC.UDPPortMax),
+	)
+	rtcCluster, err := platformrtc.NewCluster(cfg.RTC.ToDomain(), localRuntime)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct rtc cluster: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	callService, err := domaincall.NewService(
+		callStore,
+		conversationStore,
+		rtcCluster,
+		domaincall.WithSettings(cfg.Call.ToSettings()),
+		domaincall.WithRTC(cfg.RTC.ToDomain()),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct call service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	conversationService, err := domainconversation.NewService(
+		conversationStore,
+		domainconversation.WithIndexer(searchService),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct conversation service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+
+	notificationStore, err := newNotificationStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres notification store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	notificationService, err := domainnotification.NewService(
+		notificationStore,
+		identityStore,
+		domainnotification.WithSettings(cfg.Notification.ToSettings()),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct notification service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+
+	presenceStore, err := newPresenceStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres presence store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	presenceService, err := domainpresence.NewService(
+		presenceStore,
+		identityStore,
+		domainpresence.WithSettings(cfg.Presence.ToSettings()),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct presence service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+
+	objectProvider, err := catalog.Provider(cfg.Storage.ObjectProvider)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("select object storage provider %q: %w", cfg.Storage.ObjectProvider, err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	blob, ok := objectProvider.(domainstorage.BlobStore)
+	if !ok {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("select object storage provider: expected blob store"),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+
+	mediaStore, err := newMediaStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres media store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	mediaService, err := domainmedia.NewService(
+		mediaStore,
+		blob,
+		domainmedia.WithSettings(cfg.Media.ToSettings()),
+		domainmedia.WithIndexer(searchService),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct media service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	var translationService *domaintranslation.Service
+	if cfg.Features.TranslationEnabled {
+		translationStore, err := newTranslationStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+		if err != nil {
+			return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+				fmt.Errorf("construct postgres translation store: %w", err),
+				closeStorageCatalog(ctx, catalog),
+			)
+		}
+		translationProvider, err := platformtranslation.NewHTTPProvider(cfg.Translation)
+		if err != nil {
+			return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+				fmt.Errorf("construct translation provider: %w", err),
+				closeStorageCatalog(ctx, catalog),
+			)
+		}
+		translationService, err = domaintranslation.NewService(translationStore, conversationService, translationProvider)
+		if err != nil {
+			return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+				fmt.Errorf("construct translation service: %w", err),
+				closeStorageCatalog(ctx, catalog),
+			)
+		}
+	}
+
+	return catalog, rtcCluster, localRuntime, callService, e2eeService, identityService, conversationService, mediaService, notificationService, presenceService, searchService, translationService, userService, nil
+}
+
+func joinStorageError(runErr error, closeErr error) error {
+	if closeErr == nil {
+		return runErr
+	}
+	if runErr == nil {
+		return closeErr
+	}
+
+	return errors.Join(runErr, fmt.Errorf("close gateway storage catalog: %w", closeErr))
+}
+
+func closeStorageCatalog(ctx context.Context, catalog *domainstorage.Catalog) error {
+	if catalog == nil {
+		return nil
+	}
+
+	return catalog.Close(ctx)
+}
