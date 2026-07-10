@@ -1,6 +1,4 @@
-CREATE SCHEMA IF NOT EXISTS bot;
-
-CREATE TABLE IF NOT EXISTS bot.bot_public_ids (
+CREATE TABLE IF NOT EXISTS {{schema}}.bot_public_ids (
 	public_id BIGSERIAL PRIMARY KEY,
 	entity_kind TEXT NOT NULL,
 	internal_id TEXT NOT NULL,

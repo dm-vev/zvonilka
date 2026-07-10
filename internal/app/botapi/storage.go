@@ -86,6 +86,27 @@ func buildAppStorage(
 			domainstorage.PurposePrimary,
 			domainstorage.CapabilityRead|domainstorage.CapabilityWrite|domainstorage.CapabilityTransactions,
 		),
+		postgresplatform.NewFactory(
+			postgresBootstrap,
+			cfg.Storage.CacheProvider,
+			domainstorage.KindCache,
+			domainstorage.PurposeCache,
+			domainstorage.CapabilityRead|domainstorage.CapabilityWrite|domainstorage.CapabilityKeyValue,
+		),
+		postgresplatform.NewFactory(
+			postgresBootstrap,
+			cfg.Storage.AuditProvider,
+			domainstorage.KindIndex,
+			domainstorage.PurposeAudit,
+			domainstorage.CapabilityWrite|domainstorage.CapabilityListing,
+		),
+		postgresplatform.NewFactory(
+			postgresBootstrap,
+			cfg.Storage.SearchProvider,
+			domainstorage.KindIndex,
+			domainstorage.PurposeSearch,
+			domainstorage.CapabilityRead|domainstorage.CapabilityWrite|domainstorage.CapabilityListing,
+		),
 		s3platform.NewFactory(
 			objectBootstrap,
 			cfg.Storage.ObjectProvider,
