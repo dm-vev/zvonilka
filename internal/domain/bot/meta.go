@@ -1,9 +1,16 @@
 package bot
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
+)
+
+const (
+	metadataTextEntitiesKey    = "bot.text_entities"
+	metadataCaptionEntitiesKey = "bot.caption_entities"
 )
 
 func cloneMetadata(metadata map[string]string) map[string]string {
@@ -39,7 +46,6 @@ func withoutMarkup(metadata map[string]string) map[string]string {
 
 func withCaption(metadata map[string]string, caption string) map[string]string {
 	cloned := cloneMetadata(metadata)
-	caption = strings.TrimSpace(caption)
 	if caption == "" {
 		delete(cloned, metadataCaptionKey)
 	} else {
@@ -53,6 +59,40 @@ func withCaption(metadata map[string]string, caption string) map[string]string {
 	}
 
 	return cloned
+}
+
+func withTextEntities(metadata map[string]string, key string, entities []TextEntity) (map[string]string, error) {
+	cloned := cloneMetadata(metadata)
+	if len(entities) == 0 {
+		delete(cloned, key)
+		if len(cloned) == 0 {
+			return nil, nil
+		}
+		return cloned, nil
+	}
+
+	encoded, err := encodeTextEntities(entities)
+	if err != nil {
+		return nil, fmt.Errorf("encode %s: %w", key, err)
+	}
+	if cloned == nil {
+		cloned = make(map[string]string, 1)
+	}
+	cloned[key] = encoded
+	return cloned, nil
+}
+
+func textEntitiesFromMetadata(metadata map[string]string, key string) []TextEntity {
+	raw := strings.TrimSpace(metadata[key])
+	if raw == "" {
+		return nil
+	}
+
+	var entities []TextEntity
+	if err := json.Unmarshal([]byte(raw), &entities); err != nil {
+		return nil
+	}
+	return entities
 }
 
 func supportsCaption(message conversation.Message) bool {

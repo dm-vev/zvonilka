@@ -55,29 +55,39 @@ func (a *api) telegramMessage(ctx context.Context, value domainbot.Message) (*tg
 	if err != nil {
 		return nil, err
 	}
+	entities, err := a.telegramTextEntities(ctx, value.Entities)
+	if err != nil {
+		return nil, err
+	}
+	captionEntities, err := a.telegramTextEntities(ctx, value.CaptionEntities)
+	if err != nil {
+		return nil, err
+	}
 
 	result := &tgmodels.Message{
-		ID:             int(messageID),
-		Date:           int(value.Date),
-		Chat:           chat,
-		Text:           value.Text,
-		Caption:        value.Caption,
-		Photo:          a.telegramPhotos(value.Photo),
-		Document:       a.telegramDocument(value.Document),
-		Video:          a.telegramVideo(value.Video),
-		Animation:      a.telegramAnimation(value.Animation),
-		Audio:          a.telegramAudio(value.Audio),
-		VideoNote:      a.telegramVideoNote(value.VideoNote),
-		Voice:          a.telegramVoice(value.Voice),
-		Sticker:        a.telegramSticker(value.Sticker),
-		Location:       a.telegramLocation(value.Location),
-		Contact:        a.telegramContact(ctx, value.Contact),
-		Poll:           a.telegramPoll(value.Poll),
-		Game:           a.telegramGame(value.Game),
-		Venue:          a.telegramVenue(value.Venue),
-		Dice:           a.telegramDice(value.Dice),
-		ReplyMarkup:    telegramReplyMarkup(value.ReplyMarkup),
-		IsTopicMessage: value.MessageThreadID != "",
+		ID:              int(messageID),
+		Date:            int(value.Date),
+		Chat:            chat,
+		Text:            value.Text,
+		Entities:        entities,
+		Caption:         value.Caption,
+		CaptionEntities: captionEntities,
+		Photo:           a.telegramPhotos(value.Photo),
+		Document:        a.telegramDocument(value.Document),
+		Video:           a.telegramVideo(value.Video),
+		Animation:       a.telegramAnimation(value.Animation),
+		Audio:           a.telegramAudio(value.Audio),
+		VideoNote:       a.telegramVideoNote(value.VideoNote),
+		Voice:           a.telegramVoice(value.Voice),
+		Sticker:         a.telegramSticker(value.Sticker),
+		Location:        a.telegramLocation(value.Location),
+		Contact:         a.telegramContact(ctx, value.Contact),
+		Poll:            a.telegramPoll(value.Poll),
+		Game:            a.telegramGame(value.Game),
+		Venue:           a.telegramVenue(value.Venue),
+		Dice:            a.telegramDice(value.Dice),
+		ReplyMarkup:     telegramReplyMarkup(value.ReplyMarkup),
+		IsTopicMessage:  value.MessageThreadID != "",
 	}
 	if value.EditDate > 0 {
 		result.EditDate = int(value.EditDate)

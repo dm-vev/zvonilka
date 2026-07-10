@@ -23,6 +23,8 @@ type sendMediaParams struct {
 	MessageThreadID     string
 	MediaID             string
 	Caption             string
+	ParseMode           string
+	CaptionEntities     []TextEntity
 	ReplyToMessageID    string
 	ReplyMarkup         *InlineKeyboardMarkup
 	DisableNotification bool
@@ -38,6 +40,8 @@ func (s *Service) SendPhoto(ctx context.Context, params SendPhotoParams) (Messag
 		MessageThreadID:     params.MessageThreadID,
 		MediaID:             params.MediaID,
 		Caption:             params.Caption,
+		ParseMode:           params.ParseMode,
+		CaptionEntities:     params.CaptionEntities,
 		ReplyToMessageID:    params.ReplyToMessageID,
 		ReplyMarkup:         params.ReplyMarkup,
 		DisableNotification: params.DisableNotification,
@@ -54,6 +58,8 @@ func (s *Service) SendDocument(ctx context.Context, params SendDocumentParams) (
 		MessageThreadID:     params.MessageThreadID,
 		MediaID:             params.MediaID,
 		Caption:             params.Caption,
+		ParseMode:           params.ParseMode,
+		CaptionEntities:     params.CaptionEntities,
 		ReplyToMessageID:    params.ReplyToMessageID,
 		ReplyMarkup:         params.ReplyMarkup,
 		DisableNotification: params.DisableNotification,
@@ -70,6 +76,8 @@ func (s *Service) SendVideo(ctx context.Context, params SendVideoParams) (Messag
 		MessageThreadID:     params.MessageThreadID,
 		MediaID:             params.MediaID,
 		Caption:             params.Caption,
+		ParseMode:           params.ParseMode,
+		CaptionEntities:     params.CaptionEntities,
 		ReplyToMessageID:    params.ReplyToMessageID,
 		ReplyMarkup:         params.ReplyMarkup,
 		DisableNotification: params.DisableNotification,
@@ -86,6 +94,8 @@ func (s *Service) SendVoice(ctx context.Context, params SendVoiceParams) (Messag
 		MessageThreadID:     params.MessageThreadID,
 		MediaID:             params.MediaID,
 		Caption:             params.Caption,
+		ParseMode:           params.ParseMode,
+		CaptionEntities:     params.CaptionEntities,
 		ReplyToMessageID:    params.ReplyToMessageID,
 		ReplyMarkup:         params.ReplyMarkup,
 		DisableNotification: params.DisableNotification,
@@ -117,6 +127,8 @@ func (s *Service) SendAnimation(ctx context.Context, params SendAnimationParams)
 		MessageThreadID:     params.MessageThreadID,
 		MediaID:             params.MediaID,
 		Caption:             params.Caption,
+		ParseMode:           params.ParseMode,
+		CaptionEntities:     params.CaptionEntities,
 		ReplyToMessageID:    params.ReplyToMessageID,
 		ReplyMarkup:         params.ReplyMarkup,
 		DisableNotification: params.DisableNotification,
@@ -133,6 +145,8 @@ func (s *Service) SendAudio(ctx context.Context, params SendAudioParams) (Messag
 		MessageThreadID:     params.MessageThreadID,
 		MediaID:             params.MediaID,
 		Caption:             params.Caption,
+		ParseMode:           params.ParseMode,
+		CaptionEntities:     params.CaptionEntities,
 		ReplyToMessageID:    params.ReplyToMessageID,
 		ReplyMarkup:         params.ReplyMarkup,
 		DisableNotification: params.DisableNotification,
@@ -165,7 +179,6 @@ func (s *Service) sendMedia(ctx context.Context, params sendMediaParams) (Messag
 	params.ChatID = strings.TrimSpace(params.ChatID)
 	params.MessageThreadID = strings.TrimSpace(params.MessageThreadID)
 	params.MediaID = strings.TrimSpace(params.MediaID)
-	params.Caption = strings.TrimSpace(params.Caption)
 	params.ReplyToMessageID = strings.TrimSpace(params.ReplyToMessageID)
 	params.Shape = strings.TrimSpace(params.Shape)
 	if params.ChatID == "" || params.MediaID == "" || params.Method == conversation.MessageKindUnspecified || params.Shape == "" {
@@ -175,6 +188,17 @@ func (s *Service) sendMedia(ctx context.Context, params sendMediaParams) (Messag
 	if err != nil {
 		return Message{}, err
 	}
+	caption, metadata, err := formattedTextMetadata(
+		metadata,
+		params.Caption,
+		params.ParseMode,
+		params.CaptionEntities,
+		metadataCaptionEntitiesKey,
+	)
+	if err != nil {
+		return Message{}, err
+	}
+	metadata = withCaption(metadata, caption)
 
 	asset, err := s.media.MediaAssetByID(ctx, params.MediaID)
 	if err != nil {
@@ -194,7 +218,7 @@ func (s *Service) sendMedia(ctx context.Context, params sendMediaParams) (Messag
 		Kind:     params.Method,
 		ThreadID: params.MessageThreadID,
 		Silent:   params.DisableNotification,
-		Payload:  mediaPayload(params.Method, params.Caption, params.MediaID),
+		Payload:  mediaPayload(params.Method, caption, params.MediaID),
 		Metadata: metadata,
 		Attachments: []conversation.AttachmentRef{{
 			MediaID:   asset.ID,
@@ -338,8 +362,8 @@ func mediaMetadata(caption string, mediaID string, shape string) map[string]stri
 		metadataMediaIDKey: strings.TrimSpace(mediaID),
 		metadataShapeKey:   strings.TrimSpace(shape),
 	}
-	if strings.TrimSpace(caption) != "" {
-		metadata[metadataCaptionKey] = strings.TrimSpace(caption)
+	if caption != "" {
+		metadata[metadataCaptionKey] = caption
 	}
 
 	return metadata

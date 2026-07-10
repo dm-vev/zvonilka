@@ -6,14 +6,17 @@ import (
 
 	domainbot "github.com/dm-vev/zvonilka/internal/domain/bot"
 	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
+	tgmodels "github.com/go-telegram/bot/models"
 )
 
 func (a *api) editMessageCaption(writer http.ResponseWriter, request *http.Request, token string) {
 	var payload struct {
-		ChatID      textID                          `json:"chat_id"`
-		MessageID   textID                          `json:"message_id"`
-		Caption     string                          `json:"caption"`
-		ReplyMarkup *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
+		ChatID          textID                          `json:"chat_id"`
+		MessageID       textID                          `json:"message_id"`
+		Caption         string                          `json:"caption"`
+		ParseMode       string                          `json:"parse_mode"`
+		CaptionEntities []tgmodels.MessageEntity        `json:"caption_entities"`
+		ReplyMarkup     *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	}
 	if err := decodeRequest(request, &payload); err != nil {
 		writeError(writer, http.StatusBadRequest, "Bad Request")
@@ -32,13 +35,19 @@ func (a *api) editMessageCaption(writer http.ResponseWriter, request *http.Reque
 		writeError(writer, code, description)
 		return
 	}
+	caption, entities, err := a.formatText(request.Context(), payload.Caption, payload.ParseMode, payload.CaptionEntities)
+	if err != nil {
+		writeError(writer, http.StatusBadRequest, "Bad Request")
+		return
+	}
 
 	message, err := a.bot.EditMessageCaption(request.Context(), domainbot.EditCaptionParams{
-		BotToken:    token,
-		ChatID:      chatID,
-		MessageID:   messageID,
-		Caption:     payload.Caption,
-		ReplyMarkup: payload.ReplyMarkup,
+		BotToken:        token,
+		ChatID:          chatID,
+		MessageID:       messageID,
+		Caption:         caption,
+		CaptionEntities: entities,
+		ReplyMarkup:     payload.ReplyMarkup,
 	})
 	if err != nil {
 		code, description := botError(err)
@@ -142,15 +151,31 @@ func (a *api) editMessageMedia(writer http.ResponseWriter, request *http.Request
 		writeError(writer, code, description)
 		return
 	}
+	var captionEntities []domainbot.TextEntity
+	if payload.Media.Caption != nil {
+		caption, formattedEntities, formatErr := a.formatText(
+			request.Context(),
+			*payload.Media.Caption,
+			payload.Media.ParseMode,
+			payload.Media.CaptionEntities,
+		)
+		if formatErr != nil {
+			writeError(writer, http.StatusBadRequest, "Bad Request")
+			return
+		}
+		payload.Media.Caption = &caption
+		captionEntities = formattedEntities
+	}
 
 	message, err := a.bot.EditMessageMedia(request.Context(), domainbot.EditMediaParams{
-		BotToken:    token,
-		ChatID:      chatID,
-		MessageID:   messageID,
-		MediaID:     mediaID,
-		Shape:       strings.TrimSpace(payload.Media.Type),
-		Caption:     payload.Media.Caption,
-		ReplyMarkup: payload.ReplyMarkup,
+		BotToken:        token,
+		ChatID:          chatID,
+		MessageID:       messageID,
+		MediaID:         mediaID,
+		Shape:           strings.TrimSpace(payload.Media.Type),
+		Caption:         payload.Media.Caption,
+		CaptionEntities: captionEntities,
+		ReplyMarkup:     payload.ReplyMarkup,
 	})
 	if err != nil {
 		code, description := botError(err)

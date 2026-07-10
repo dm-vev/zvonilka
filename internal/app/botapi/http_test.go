@@ -8,9 +8,11 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
+	tgmodels "github.com/go-telegram/bot/models"
 	"github.com/stretchr/testify/require"
 
 	domainbot "github.com/dm-vev/zvonilka/internal/domain/bot"
@@ -80,6 +82,68 @@ func TestHTTPGetMeAndSendMessage(t *testing.T) {
 	var envelope map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(sendRecorder.Body.Bytes(), &envelope))
 	require.Equal(t, "true", strings.TrimSpace(string(envelope["ok"])))
+
+	formattedRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/bot"+botToken+"/sendMessage",
+		strings.NewReader(`{"chat_id":"`+conv.ID+`","text":"😀 *bold*","parse_mode":"MarkdownV2"}`),
+	)
+	formattedRequest.Header.Set("Content-Type", "application/json")
+	formattedRecorder := httptest.NewRecorder()
+	boundary.routes().ServeHTTP(formattedRecorder, formattedRequest)
+	require.Equal(t, http.StatusOK, formattedRecorder.Code)
+	var formattedEnvelope struct {
+		Result tgmodels.Message `json:"result"`
+	}
+	require.NoError(t, json.Unmarshal(formattedRecorder.Body.Bytes(), &formattedEnvelope))
+	require.Equal(t, "😀 bold", formattedEnvelope.Result.Text)
+	require.Equal(t, []tgmodels.MessageEntity{{
+		Type:   tgmodels.MessageEntityTypeBold,
+		Offset: 3,
+		Length: 4,
+	}}, formattedEnvelope.Result.Entities)
+
+	editRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/bot"+botToken+"/editMessageText",
+		strings.NewReader(`{"chat_id":"`+conv.ID+`","message_id":`+strconv.Itoa(formattedEnvelope.Result.ID)+`,"text":"<b>edited</b>","parse_mode":"HTML"}`),
+	)
+	editRequest.Header.Set("Content-Type", "application/json")
+	editRecorder := httptest.NewRecorder()
+	boundary.routes().ServeHTTP(editRecorder, editRequest)
+	require.Equal(t, http.StatusOK, editRecorder.Code)
+	var editedEnvelope struct {
+		Result tgmodels.Message `json:"result"`
+	}
+	require.NoError(t, json.Unmarshal(editRecorder.Body.Bytes(), &editedEnvelope))
+	require.Equal(t, "edited", editedEnvelope.Result.Text)
+	require.Equal(t, []tgmodels.MessageEntity{{
+		Type:   tgmodels.MessageEntityTypeBold,
+		Offset: 0,
+		Length: 6,
+	}}, editedEnvelope.Result.Entities)
+
+	for _, testCase := range []struct {
+		name string
+		text string
+		mode string
+	}{
+		{name: "html", text: "<b>broken", mode: "HTML"},
+		{name: "markdown", text: "*broken", mode: "MarkdownV2"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			invalidRequest := httptest.NewRequest(
+				http.MethodPost,
+				"/bot"+botToken+"/sendMessage",
+				strings.NewReader(`{"chat_id":"`+conv.ID+`","text":"`+testCase.text+`","parse_mode":"`+testCase.mode+`"}`),
+			)
+			invalidRequest.Header.Set("Content-Type", "application/json")
+			invalidRecorder := httptest.NewRecorder()
+			boundary.routes().ServeHTTP(invalidRecorder, invalidRequest)
+			require.Equal(t, http.StatusOK, invalidRecorder.Code)
+			require.Contains(t, invalidRecorder.Body.String(), `"error_code":400`)
+		})
+	}
 }
 
 func TestHTTPSendDocument(t *testing.T) {
@@ -270,7 +334,7 @@ func TestHTTPAnswerInlineQuery(t *testing.T) {
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/bot"+botToken+"/answerInlineQuery",
-		strings.NewReader(`{"inline_query_id":"`+query.ID+`","results":[{"type":"article","id":"r1","title":"Result","input_message_content":{"message_text":"hello"}}],"cache_time":10}`),
+		strings.NewReader(`{"inline_query_id":"`+query.ID+`","results":[{"type":"article","id":"r1","title":"Result","input_message_content":{"message_text":"😀 *hello*","parse_mode":"MarkdownV2"}}],"cache_time":10}`),
 	)
 	request.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
@@ -284,7 +348,8 @@ func TestHTTPAnswerInlineQuery(t *testing.T) {
 	require.True(t, state.Answered)
 	require.Len(t, state.Results, 1)
 	require.NotNil(t, state.Results[0].InputMessageContent)
-	require.Equal(t, "hello", state.Results[0].InputMessageContent.MessageText)
+	require.Equal(t, "😀 hello", state.Results[0].InputMessageContent.MessageText)
+	require.Equal(t, []domainbot.TextEntity{{Type: "bold", Offset: 3, Length: 5}}, state.Results[0].InputMessageContent.Entities)
 }
 
 func TestHTTPAnswerInlineQueryWithPhotoResult(t *testing.T) {

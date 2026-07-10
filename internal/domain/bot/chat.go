@@ -22,7 +22,11 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 	if params.ChatID == "" || params.Text == "" {
 		return Message{}, ErrInvalidInput
 	}
-	metadata, err := markupMetadata(nil, params.ReplyMarkup)
+	text, metadata, err := formattedTextMetadata(nil, params.Text, params.ParseMode, params.Entities, metadataTextEntitiesKey)
+	if err != nil {
+		return Message{}, err
+	}
+	metadata, err = markupMetadata(metadata, params.ReplyMarkup)
 	if err != nil {
 		return Message{}, err
 	}
@@ -30,7 +34,7 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 	draft := conversation.MessageDraft{
 		Kind: conversation.MessageKindText,
 		Payload: conversation.EncryptedPayload{
-			Ciphertext: []byte(params.Text),
+			Ciphertext: []byte(text),
 		},
 		ThreadID:            params.MessageThreadID,
 		Silent:              params.DisableNotification,
@@ -78,6 +82,10 @@ func (s *Service) EditMessageText(ctx context.Context, params EditMessageTextPar
 	if params.ChatID == "" || params.MessageID == "" || params.Text == "" {
 		return Message{}, ErrInvalidInput
 	}
+	text, metadata, err := formattedTextMetadata(nil, params.Text, params.ParseMode, params.Entities, metadataTextEntitiesKey)
+	if err != nil {
+		return Message{}, err
+	}
 
 	existingMessage, err := s.GetMessage(ctx, GetMessageParams{
 		BotToken:  params.BotToken,
@@ -92,7 +100,7 @@ func (s *Service) EditMessageText(ctx context.Context, params EditMessageTextPar
 	if replyMarkup == nil {
 		replyMarkup = existingMessage.ReplyMarkup
 	}
-	metadata, err := markupMetadata(nil, replyMarkup)
+	metadata, err = markupMetadata(metadata, replyMarkup)
 	if err != nil {
 		return Message{}, err
 	}
@@ -105,7 +113,7 @@ func (s *Service) EditMessageText(ctx context.Context, params EditMessageTextPar
 		Draft: conversation.MessageDraft{
 			Kind: conversation.MessageKindText,
 			Payload: conversation.EncryptedPayload{
-				Ciphertext: []byte(params.Text),
+				Ciphertext: []byte(text),
 			},
 			DisableLinkPreviews: params.DisableWebPagePreview,
 			Metadata:            metadata,

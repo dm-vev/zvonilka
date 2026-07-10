@@ -214,6 +214,17 @@ type Game struct {
 	ShortName   string      `json:"game_short_name,omitempty"`
 }
 
+// TextEntity describes one formatted text range using UTF-16 offsets.
+type TextEntity struct {
+	Type          string `json:"type"`
+	Offset        int    `json:"offset"`
+	Length        int    `json:"length"`
+	URL           string `json:"url,omitempty"`
+	Language      string `json:"language,omitempty"`
+	UserID        string `json:"user_id,omitempty"`
+	CustomEmojiID string `json:"custom_emoji_id,omitempty"`
+}
+
 // InlineQuery describes one Telegram-shaped inline query update.
 type InlineQuery struct {
 	ID       string `json:"id"`
@@ -225,7 +236,8 @@ type InlineQuery struct {
 
 // InputTextMessageContent describes text content for one inline result.
 type InputTextMessageContent struct {
-	MessageText string `json:"message_text"`
+	MessageText string       `json:"message_text"`
+	Entities    []TextEntity `json:"entities,omitempty"`
 }
 
 // InlineQueryResult describes one supported inline result shape.
@@ -235,6 +247,7 @@ type InlineQueryResult struct {
 	Title               string                   `json:"title,omitempty"`
 	Description         string                   `json:"description,omitempty"`
 	Caption             string                   `json:"caption,omitempty"`
+	CaptionEntities     []TextEntity             `json:"caption_entities,omitempty"`
 	InputMessageContent *InputTextMessageContent `json:"input_message_content,omitempty"`
 	ReplyMarkup         *InlineKeyboardMarkup    `json:"reply_markup,omitempty"`
 	PhotoURL            string                   `json:"photo_url,omitempty"`
@@ -264,7 +277,9 @@ type Message struct {
 	Chat            Chat                  `json:"chat"`
 	From            *User                 `json:"from,omitempty"`
 	Text            string                `json:"text,omitempty"`
+	Entities        []TextEntity          `json:"entities,omitempty"`
 	Caption         string                `json:"caption,omitempty"`
+	CaptionEntities []TextEntity          `json:"caption_entities,omitempty"`
 	Photo           []PhotoSize           `json:"photo,omitempty"`
 	Document        *Document             `json:"document,omitempty"`
 	Video           *Video                `json:"video,omitempty"`
@@ -534,7 +549,6 @@ func (q InlineQueryState) normalize(now time.Time) (InlineQueryState, error) {
 		result.ID = strings.TrimSpace(result.ID)
 		result.Title = strings.TrimSpace(result.Title)
 		result.Description = strings.TrimSpace(result.Description)
-		result.Caption = strings.TrimSpace(result.Caption)
 		result.PhotoURL = strings.TrimSpace(result.PhotoURL)
 		result.AudioURL = strings.TrimSpace(result.AudioURL)
 		result.DocumentURL = strings.TrimSpace(result.DocumentURL)
@@ -544,7 +558,9 @@ func (q InlineQueryState) normalize(now time.Time) (InlineQueryState, error) {
 		result.MimeType = strings.TrimSpace(result.MimeType)
 		result.ThumbURL = strings.TrimSpace(result.ThumbURL)
 		if result.InputMessageContent != nil {
-			result.InputMessageContent.MessageText = strings.TrimSpace(result.InputMessageContent.MessageText)
+			if strings.TrimSpace(result.InputMessageContent.MessageText) == "" {
+				return InlineQueryState{}, ErrInvalidInput
+			}
 		}
 		if result.Type == "" {
 			result.Type = "article"

@@ -70,7 +70,7 @@ func plainText(message conversation.Message) string {
 }
 
 func messageCaption(message conversation.Message) string {
-	return strings.TrimSpace(message.Metadata[metadataCaptionKey])
+	return message.Metadata[metadataCaptionKey]
 }
 
 func messageMediaID(message conversation.Message) string {
@@ -346,13 +346,15 @@ func (s *Service) messageForConversation(
 	}
 
 	result := Message{
-		MessageID:   msg.ID,
-		Date:        msg.CreatedAt.UTC().Unix(),
-		Chat:        chat,
-		From:        pointer(userFromAccount(sender)),
-		Text:        plainText(msg),
-		Caption:     messageCaption(msg),
-		ReplyMarkup: messageReplyMarkup(msg.Metadata),
+		MessageID:       msg.ID,
+		Date:            msg.CreatedAt.UTC().Unix(),
+		Chat:            chat,
+		From:            pointer(userFromAccount(sender)),
+		Text:            plainText(msg),
+		Entities:        textEntitiesFromMetadata(msg.Metadata, metadataTextEntitiesKey),
+		Caption:         messageCaption(msg),
+		CaptionEntities: textEntitiesFromMetadata(msg.Metadata, metadataCaptionEntitiesKey),
+		ReplyMarkup:     messageReplyMarkup(msg.Metadata),
 	}
 	if msg.ThreadID != "" {
 		result.MessageThreadID = msg.ThreadID

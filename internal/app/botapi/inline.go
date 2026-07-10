@@ -18,16 +18,42 @@ func (a *api) answerInlineQuery(writer http.ResponseWriter, request *http.Reques
 	for _, result := range payload.Results {
 		var input *domainbot.InputTextMessageContent
 		if result.InputMessageContent != nil {
-			input = &domainbot.InputTextMessageContent{
-				MessageText: result.InputMessageContent.MessageText,
+			inputEntities := result.InputMessageContent.Entities
+			if len(inputEntities) == 0 {
+				inputEntities = result.Entities
 			}
+			messageText, entities, err := a.formatText(
+				request.Context(),
+				result.InputMessageContent.MessageText,
+				result.InputMessageContent.ParseMode,
+				inputEntities,
+			)
+			if err != nil {
+				writeError(writer, http.StatusBadRequest, "Bad Request")
+				return
+			}
+			input = &domainbot.InputTextMessageContent{
+				MessageText: messageText,
+				Entities:    entities,
+			}
+		}
+		caption, captionEntities, err := a.formatText(
+			request.Context(),
+			result.Caption,
+			result.ParseMode,
+			result.CaptionEntities,
+		)
+		if err != nil {
+			writeError(writer, http.StatusBadRequest, "Bad Request")
+			return
 		}
 		results = append(results, domainbot.InlineQueryResult{
 			Type:                result.Type,
 			ID:                  result.ID,
 			Title:               result.Title,
 			Description:         result.Description,
-			Caption:             result.Caption,
+			Caption:             caption,
+			CaptionEntities:     captionEntities,
 			InputMessageContent: input,
 			ReplyMarkup:         result.ReplyMarkup,
 			PhotoURL:            result.PhotoURL,

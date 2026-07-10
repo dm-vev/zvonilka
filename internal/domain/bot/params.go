@@ -38,6 +38,8 @@ type SendMessageParams struct {
 	ChatID                string
 	MessageThreadID       string
 	Text                  string
+	ParseMode             string
+	Entities              []TextEntity
 	ReplyToMessageID      string
 	ReplyMarkup           *InlineKeyboardMarkup
 	DisableNotification   bool
@@ -51,6 +53,8 @@ type SendPhotoParams struct {
 	MessageThreadID     string
 	MediaID             string
 	Caption             string
+	ParseMode           string
+	CaptionEntities     []TextEntity
 	ReplyToMessageID    string
 	ReplyMarkup         *InlineKeyboardMarkup
 	DisableNotification bool
@@ -63,6 +67,8 @@ type SendDocumentParams struct {
 	MessageThreadID     string
 	MediaID             string
 	Caption             string
+	ParseMode           string
+	CaptionEntities     []TextEntity
 	ReplyToMessageID    string
 	ReplyMarkup         *InlineKeyboardMarkup
 	DisableNotification bool
@@ -75,6 +81,8 @@ type SendVideoParams struct {
 	MessageThreadID     string
 	MediaID             string
 	Caption             string
+	ParseMode           string
+	CaptionEntities     []TextEntity
 	ReplyToMessageID    string
 	ReplyMarkup         *InlineKeyboardMarkup
 	DisableNotification bool
@@ -87,6 +95,8 @@ type SendVoiceParams struct {
 	MessageThreadID     string
 	MediaID             string
 	Caption             string
+	ParseMode           string
+	CaptionEntities     []TextEntity
 	ReplyToMessageID    string
 	ReplyMarkup         *InlineKeyboardMarkup
 	DisableNotification bool
@@ -110,6 +120,8 @@ type SendAnimationParams struct {
 	MessageThreadID     string
 	MediaID             string
 	Caption             string
+	ParseMode           string
+	CaptionEntities     []TextEntity
 	ReplyToMessageID    string
 	ReplyMarkup         *InlineKeyboardMarkup
 	DisableNotification bool
@@ -122,6 +134,8 @@ type SendAudioParams struct {
 	MessageThreadID     string
 	MediaID             string
 	Caption             string
+	ParseMode           string
+	CaptionEntities     []TextEntity
 	ReplyToMessageID    string
 	ReplyMarkup         *InlineKeyboardMarkup
 	DisableNotification bool
@@ -197,13 +211,15 @@ type SendGameParams struct {
 
 // EditMediaParams describes one editMessageMedia request.
 type EditMediaParams struct {
-	BotToken    string
-	ChatID      string
-	MessageID   string
-	MediaID     string
-	Shape       string
-	Caption     *string
-	ReplyMarkup *InlineKeyboardMarkup
+	BotToken        string
+	ChatID          string
+	MessageID       string
+	MediaID         string
+	Shape           string
+	Caption         *string
+	ParseMode       string
+	CaptionEntities []TextEntity
+	ReplyMarkup     *InlineKeyboardMarkup
 }
 
 // EditLiveLocationParams describes one editMessageLiveLocation request.
@@ -226,6 +242,8 @@ type EditMessageTextParams struct {
 	ChatID                string
 	MessageID             string
 	Text                  string
+	ParseMode             string
+	Entities              []TextEntity
 	ReplyMarkup           *InlineKeyboardMarkup
 	DisableWebPagePreview bool
 }

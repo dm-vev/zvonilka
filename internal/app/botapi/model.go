@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	domainbot "github.com/dm-vev/zvonilka/internal/domain/bot"
+	tgmodels "github.com/go-telegram/bot/models"
 )
 
 type textID string
@@ -53,6 +54,8 @@ type sendMessageRequest struct {
 	ChatID                textID                          `json:"chat_id"`
 	MessageThreadID       textID                          `json:"message_thread_id"`
 	Text                  string                          `json:"text"`
+	ParseMode             string                          `json:"parse_mode"`
+	Entities              []tgmodels.MessageEntity        `json:"entities"`
 	ReplyToMessageID      textID                          `json:"reply_to_message_id"`
 	ReplyParameters       *replyData                      `json:"reply_parameters"`
 	ReplyMarkup           *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
@@ -66,6 +69,8 @@ type sendPhotoRequest struct {
 	MessageThreadID     textID                          `json:"message_thread_id"`
 	Photo               string                          `json:"photo"`
 	Caption             string                          `json:"caption"`
+	ParseMode           string                          `json:"parse_mode"`
+	CaptionEntities     []tgmodels.MessageEntity        `json:"caption_entities"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
 	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
@@ -77,6 +82,8 @@ type sendDocumentRequest struct {
 	MessageThreadID     textID                          `json:"message_thread_id"`
 	Document            string                          `json:"document"`
 	Caption             string                          `json:"caption"`
+	ParseMode           string                          `json:"parse_mode"`
+	CaptionEntities     []tgmodels.MessageEntity        `json:"caption_entities"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
 	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
@@ -88,6 +95,8 @@ type sendVideoRequest struct {
 	MessageThreadID     textID                          `json:"message_thread_id"`
 	Video               string                          `json:"video"`
 	Caption             string                          `json:"caption"`
+	ParseMode           string                          `json:"parse_mode"`
+	CaptionEntities     []tgmodels.MessageEntity        `json:"caption_entities"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
 	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
@@ -99,6 +108,8 @@ type sendVoiceRequest struct {
 	MessageThreadID     textID                          `json:"message_thread_id"`
 	Voice               string                          `json:"voice"`
 	Caption             string                          `json:"caption"`
+	ParseMode           string                          `json:"parse_mode"`
+	CaptionEntities     []tgmodels.MessageEntity        `json:"caption_entities"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
 	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
@@ -120,6 +131,8 @@ type sendAnimationRequest struct {
 	MessageThreadID     textID                          `json:"message_thread_id"`
 	Animation           string                          `json:"animation"`
 	Caption             string                          `json:"caption"`
+	ParseMode           string                          `json:"parse_mode"`
+	CaptionEntities     []tgmodels.MessageEntity        `json:"caption_entities"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
 	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
@@ -131,6 +144,8 @@ type sendAudioRequest struct {
 	MessageThreadID     textID                          `json:"message_thread_id"`
 	Audio               string                          `json:"audio"`
 	Caption             string                          `json:"caption"`
+	ParseMode           string                          `json:"parse_mode"`
+	CaptionEntities     []tgmodels.MessageEntity        `json:"caption_entities"`
 	ReplyToMessageID    textID                          `json:"reply_to_message_id"`
 	ReplyParameters     *replyData                      `json:"reply_parameters"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
@@ -221,15 +236,19 @@ type editMessageTextRequest struct {
 	ChatID                textID                          `json:"chat_id"`
 	MessageID             textID                          `json:"message_id"`
 	Text                  string                          `json:"text"`
+	ParseMode             string                          `json:"parse_mode"`
+	Entities              []tgmodels.MessageEntity        `json:"entities"`
 	ReplyMarkup           *domainbot.InlineKeyboardMarkup `json:"reply_markup"`
 	DisableWebPagePreview bool                            `json:"disable_web_page_preview"`
 	LinkPreviewOptions    *previewData                    `json:"link_preview_options"`
 }
 
 type editMediaData struct {
-	Type    string  `json:"type"`
-	Media   string  `json:"media"`
-	Caption *string `json:"caption"`
+	Type            string                   `json:"type"`
+	Media           string                   `json:"media"`
+	Caption         *string                  `json:"caption"`
+	ParseMode       string                   `json:"parse_mode"`
+	CaptionEntities []tgmodels.MessageEntity `json:"caption_entities"`
 }
 
 type editMessageMediaRequest struct {
@@ -271,6 +290,9 @@ type inlineQueryResultRequest struct {
 	Title               string                           `json:"title"`
 	Description         string                           `json:"description"`
 	Caption             string                           `json:"caption"`
+	ParseMode           string                           `json:"parse_mode"`
+	CaptionEntities     []tgmodels.MessageEntity         `json:"caption_entities"`
+	Entities            []tgmodels.MessageEntity         `json:"entities"`
 	InputMessageContent *inlineTextMessageContentRequest `json:"input_message_content"`
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup  `json:"reply_markup"`
 	PhotoURL            string                           `json:"photo_url"`
@@ -285,7 +307,9 @@ type inlineQueryResultRequest struct {
 }
 
 type inlineTextMessageContentRequest struct {
-	MessageText string `json:"message_text"`
+	MessageText string                   `json:"message_text"`
+	ParseMode   string                   `json:"parse_mode"`
+	Entities    []tgmodels.MessageEntity `json:"entities"`
 }
 
 type answerInlineQueryRequest struct {

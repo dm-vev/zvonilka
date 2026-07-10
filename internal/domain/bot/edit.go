@@ -11,11 +11,13 @@ import (
 
 // EditCaptionParams describes one editMessageCaption request.
 type EditCaptionParams struct {
-	BotToken    string
-	ChatID      string
-	MessageID   string
-	Caption     string
-	ReplyMarkup *InlineKeyboardMarkup
+	BotToken        string
+	ChatID          string
+	MessageID       string
+	Caption         string
+	ParseMode       string
+	CaptionEntities []TextEntity
+	ReplyMarkup     *InlineKeyboardMarkup
 }
 
 // EditMarkupParams describes one editMessageReplyMarkup request.
@@ -67,11 +69,27 @@ func (s *Service) EditMessageMedia(ctx context.Context, params EditMediaParams) 
 	}
 
 	caption := messageCaption(raw)
-	if params.Caption != nil {
-		caption = strings.TrimSpace(*params.Caption)
+	metadata := mediaMetadata("", params.MediaID, params.Shape)
+	if params.Caption == nil {
+		metadata = withCaption(metadata, caption)
+		metadata, err = withTextEntities(metadata, metadataCaptionEntitiesKey, textEntitiesFromMetadata(raw.Metadata, metadataCaptionEntitiesKey))
+		if err != nil {
+			return Message{}, err
+		}
+	} else {
+		caption, metadata, err = formattedTextMetadata(
+			metadata,
+			*params.Caption,
+			params.ParseMode,
+			params.CaptionEntities,
+			metadataCaptionEntitiesKey,
+		)
+		if err != nil {
+			return Message{}, err
+		}
+		metadata = withCaption(metadata, caption)
 	}
-
-	metadata, err := markupMetadata(mediaMetadata(caption, params.MediaID, params.Shape), replyMarkup)
+	metadata, err = markupMetadata(metadata, replyMarkup)
 	if err != nil {
 		return Message{}, err
 	}
@@ -123,7 +141,21 @@ func (s *Service) EditMessageCaption(ctx context.Context, params EditCaptionPara
 	if replyMarkup == nil {
 		replyMarkup = messageReplyMarkup(raw.Metadata)
 	}
-	metadata, err := markupMetadata(withCaption(withoutMarkup(raw.Metadata), params.Caption), replyMarkup)
+	metadata := withoutMarkup(raw.Metadata)
+	delete(metadata, metadataCaptionKey)
+	delete(metadata, metadataCaptionEntitiesKey)
+	caption, metadata, err := formattedTextMetadata(
+		metadata,
+		params.Caption,
+		params.ParseMode,
+		params.CaptionEntities,
+		metadataCaptionEntitiesKey,
+	)
+	if err != nil {
+		return Message{}, err
+	}
+	metadata = withCaption(metadata, caption)
+	metadata, err = markupMetadata(metadata, replyMarkup)
 	if err != nil {
 		return Message{}, err
 	}

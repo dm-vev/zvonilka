@@ -6,6 +6,7 @@ import (
 
 	domainbot "github.com/dm-vev/zvonilka/internal/domain/bot"
 	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
+	tgmodels "github.com/go-telegram/bot/models"
 )
 
 type normalizedMediaRequest struct {
@@ -13,6 +14,9 @@ type normalizedMediaRequest struct {
 	MessageThreadID     textID
 	MediaID             string
 	Caption             string
+	ParseMode           string
+	RawCaptionEntities  []tgmodels.MessageEntity
+	CaptionEntities     []domainbot.TextEntity
 	ReplyToMessageID    textID
 	ReplyMarkup         *domainbot.InlineKeyboardMarkup
 	DisableNotification bool
@@ -42,12 +46,19 @@ func (a *api) sendMessage(writer http.ResponseWriter, request *http.Request, tok
 		writeError(writer, code, description)
 		return
 	}
+	text, entities, err := a.formatText(request.Context(), payload.Text, payload.ParseMode, payload.Entities)
+	if err != nil {
+		writeError(writer, http.StatusBadRequest, "Bad Request")
+		return
+	}
 
 	result, err := a.bot.SendMessage(request.Context(), domainbot.SendMessageParams{
 		BotToken:              token,
 		ChatID:                chatID,
 		MessageThreadID:       threadID,
-		Text:                  payload.Text,
+		Text:                  text,
+		ParseMode:             "",
+		Entities:              entities,
 		ReplyToMessageID:      replyToMessageID,
 		ReplyMarkup:           payload.ReplyMarkup,
 		DisableNotification:   payload.DisableNotification,
@@ -77,6 +88,8 @@ func (a *api) sendPhoto(writer http.ResponseWriter, request *http.Request, token
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.Photo,
 			Caption:             payload.Caption,
+			ParseMode:           payload.ParseMode,
+			RawCaptionEntities:  payload.CaptionEntities,
 			ReplyToMessageID:    replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
@@ -88,6 +101,7 @@ func (a *api) sendPhoto(writer http.ResponseWriter, request *http.Request, token
 			MessageThreadID:     string(payload.MessageThreadID),
 			MediaID:             payload.MediaID,
 			Caption:             payload.Caption,
+			CaptionEntities:     payload.CaptionEntities,
 			ReplyToMessageID:    string(payload.ReplyToMessageID),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
@@ -103,6 +117,8 @@ func (a *api) sendDocument(writer http.ResponseWriter, request *http.Request, to
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.Document,
 			Caption:             payload.Caption,
+			ParseMode:           payload.ParseMode,
+			RawCaptionEntities:  payload.CaptionEntities,
 			ReplyToMessageID:    replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
@@ -114,6 +130,7 @@ func (a *api) sendDocument(writer http.ResponseWriter, request *http.Request, to
 			MessageThreadID:     string(payload.MessageThreadID),
 			MediaID:             payload.MediaID,
 			Caption:             payload.Caption,
+			CaptionEntities:     payload.CaptionEntities,
 			ReplyToMessageID:    string(payload.ReplyToMessageID),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
@@ -129,6 +146,8 @@ func (a *api) sendVideo(writer http.ResponseWriter, request *http.Request, token
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.Video,
 			Caption:             payload.Caption,
+			ParseMode:           payload.ParseMode,
+			RawCaptionEntities:  payload.CaptionEntities,
 			ReplyToMessageID:    replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
@@ -140,6 +159,7 @@ func (a *api) sendVideo(writer http.ResponseWriter, request *http.Request, token
 			MessageThreadID:     string(payload.MessageThreadID),
 			MediaID:             payload.MediaID,
 			Caption:             payload.Caption,
+			CaptionEntities:     payload.CaptionEntities,
 			ReplyToMessageID:    string(payload.ReplyToMessageID),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
@@ -155,6 +175,8 @@ func (a *api) sendAnimation(writer http.ResponseWriter, request *http.Request, t
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.Animation,
 			Caption:             payload.Caption,
+			ParseMode:           payload.ParseMode,
+			RawCaptionEntities:  payload.CaptionEntities,
 			ReplyToMessageID:    replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
@@ -166,6 +188,7 @@ func (a *api) sendAnimation(writer http.ResponseWriter, request *http.Request, t
 			MessageThreadID:     string(payload.MessageThreadID),
 			MediaID:             payload.MediaID,
 			Caption:             payload.Caption,
+			CaptionEntities:     payload.CaptionEntities,
 			ReplyToMessageID:    string(payload.ReplyToMessageID),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
@@ -181,6 +204,8 @@ func (a *api) sendAudio(writer http.ResponseWriter, request *http.Request, token
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.Audio,
 			Caption:             payload.Caption,
+			ParseMode:           payload.ParseMode,
+			RawCaptionEntities:  payload.CaptionEntities,
 			ReplyToMessageID:    replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
@@ -192,6 +217,7 @@ func (a *api) sendAudio(writer http.ResponseWriter, request *http.Request, token
 			MessageThreadID:     string(payload.MessageThreadID),
 			MediaID:             payload.MediaID,
 			Caption:             payload.Caption,
+			CaptionEntities:     payload.CaptionEntities,
 			ReplyToMessageID:    string(payload.ReplyToMessageID),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
@@ -400,6 +426,8 @@ func (a *api) sendVoice(writer http.ResponseWriter, request *http.Request, token
 			MessageThreadID:     payload.MessageThreadID,
 			MediaID:             payload.Voice,
 			Caption:             payload.Caption,
+			ParseMode:           payload.ParseMode,
+			RawCaptionEntities:  payload.CaptionEntities,
 			ReplyToMessageID:    replyMessageID(payload.ReplyToMessageID, payload.ReplyParameters),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
@@ -411,6 +439,7 @@ func (a *api) sendVoice(writer http.ResponseWriter, request *http.Request, token
 			MessageThreadID:     string(payload.MessageThreadID),
 			MediaID:             payload.MediaID,
 			Caption:             payload.Caption,
+			CaptionEntities:     payload.CaptionEntities,
 			ReplyToMessageID:    string(payload.ReplyToMessageID),
 			ReplyMarkup:         payload.ReplyMarkup,
 			DisableNotification: payload.DisableNotification,
@@ -489,6 +518,16 @@ func (a *api) sendMedia(
 	payload.ChatID = textID(chatID)
 	payload.MessageThreadID = textID(threadID)
 	payload.ReplyToMessageID = textID(replyToMessageID)
+	payload.Caption, payload.CaptionEntities, err = a.formatText(
+		request.Context(),
+		payload.Caption,
+		payload.ParseMode,
+		payload.RawCaptionEntities,
+	)
+	if err != nil {
+		writeError(writer, http.StatusBadRequest, "Bad Request")
+		return
+	}
 
 	mediaID, err := a.resolveMediaID(request.Context(), request, token, field, kind, payload.MediaID)
 	if err != nil {
@@ -533,12 +572,18 @@ func (a *api) editMessageText(writer http.ResponseWriter, request *http.Request,
 		writeError(writer, code, description)
 		return
 	}
+	text, entities, err := a.formatText(request.Context(), payload.Text, payload.ParseMode, payload.Entities)
+	if err != nil {
+		writeError(writer, http.StatusBadRequest, "Bad Request")
+		return
+	}
 
 	result, err := a.bot.EditMessageText(request.Context(), domainbot.EditMessageTextParams{
 		BotToken:              token,
 		ChatID:                chatID,
 		MessageID:             messageID,
-		Text:                  payload.Text,
+		Text:                  text,
+		Entities:              entities,
 		ReplyMarkup:           payload.ReplyMarkup,
 		DisableWebPagePreview: disablePreview(payload.DisableWebPagePreview, payload.LinkPreviewOptions),
 	})

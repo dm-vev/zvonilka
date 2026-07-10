@@ -233,16 +233,22 @@ func TestGoTelegramClientMediaSuite(t *testing.T) {
 			name: "sendPhoto",
 			send: func(ctx context.Context, client *telegrambot.Bot, chatID int64) (*tgmodels.Message, error) {
 				return client.SendPhoto(ctx, &telegrambot.SendPhotoParams{
-					ChatID:  chatID,
-					Photo:   &tgmodels.InputFileString{Data: "media-photo"},
-					Caption: "photo caption",
+					ChatID:    chatID,
+					Photo:     &tgmodels.InputFileString{Data: "media-photo"},
+					Caption:   "😀 *photo*",
+					ParseMode: "MarkdownV2",
 				})
 			},
 			assert: func(t *testing.T, message *tgmodels.Message) {
 				t.Helper()
 				require.Len(t, message.Photo, 1)
 				require.Equal(t, "media-photo", message.Photo[0].FileID)
-				require.Equal(t, "photo caption", message.Caption)
+				require.Equal(t, "😀 photo", message.Caption)
+				require.Equal(t, []tgmodels.MessageEntity{{
+					Type:   tgmodels.MessageEntityTypeBold,
+					Offset: 3,
+					Length: 5,
+				}}, message.CaptionEntities)
 			},
 		},
 		{
