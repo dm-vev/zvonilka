@@ -2,12 +2,16 @@ package gateway
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
+	domainbot "github.com/dm-vev/zvonilka/internal/domain/bot"
 	domainconversation "github.com/dm-vev/zvonilka/internal/domain/conversation"
 	domainidentity "github.com/dm-vev/zvonilka/internal/domain/identity"
+	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
 	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
 	domainsearch "github.com/dm-vev/zvonilka/internal/domain/search"
 	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
@@ -556,10 +560,58 @@ func (a *api) profilesByID(
 
 		relation := relations[accountID]
 		snapshot := presenceSnapshots[accountID]
-		result[accountID] = userProfile(account, snapshot, privacy, relation, viewerID == accountID)
+		userResult := userProfile(account, snapshot, privacy, relation, viewerID == accountID)
+		if account.Kind == domainidentity.AccountKindBot {
+			if err := a.addBotAvatar(ctx, userResult, account.ID); err != nil {
+				return nil, err
+			}
+		}
+		result[accountID] = userResult
 	}
 
 	return result, nil
+}
+
+func (a *api) addBotAvatar(
+	ctx context.Context,
+	profile *usersv1.UserProfile,
+	botAccountID string,
+) error {
+	if a.bot == nil {
+		return nil
+	}
+
+	mediaID, err := a.bot.AvatarMediaID(ctx, botAccountID)
+	if err != nil {
+		if errors.Is(err, domainbot.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+	asset, err := a.media.MediaAssetByID(ctx, mediaID)
+	if err != nil {
+		if errors.Is(err, domainmedia.ErrNotFound) {
+			return nil
+		}
+		return fmt.Errorf("load bot avatar asset %s: %w", mediaID, err)
+	}
+	if asset.Status != domainmedia.MediaStatusReady {
+		return nil
+	}
+
+	profile.Avatars = []*commonv1.Avatar{
+		{
+			MediaId:   asset.ID,
+			Variant:   "default",
+			IsPrimary: true,
+			Width:     asset.Width,
+			Height:    asset.Height,
+			MimeType:  asset.ContentType,
+			CreatedAt: protoTime(asset.CreatedAt),
+		},
+	}
+
+	return nil
 }
 
 func identityProfileUpdate(accountID string, req *usersv1.UpdateMyProfileRequest) domainidentity.UpdateProfileParams {

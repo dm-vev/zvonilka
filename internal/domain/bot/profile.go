@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/dm-vev/zvonilka/internal/domain/media"
 )
 
 // ProfileKind identifies one bot profile field.
@@ -15,6 +17,7 @@ const (
 	ProfileKindName             ProfileKind = "name"
 	ProfileKindDescription      ProfileKind = "description"
 	ProfileKindShortDescription ProfileKind = "short_description"
+	ProfileKindAvatar           ProfileKind = "avatar"
 )
 
 // ProfileValue stores one localized bot profile field.
@@ -64,6 +67,65 @@ type SetShortDescriptionParams struct {
 type GetShortDescriptionParams struct {
 	BotToken     string
 	LanguageCode string
+}
+
+// SetAvatarParams describes one bot avatar update.
+type SetAvatarParams struct {
+	BotToken string
+	MediaID  string
+}
+
+// SetMyAvatar stores the ready media asset used as the bot avatar.
+func (s *Service) SetMyAvatar(ctx context.Context, params SetAvatarParams) error {
+	account, err := s.botAccount(ctx, params.BotToken)
+	if err != nil {
+		return err
+	}
+
+	mediaID := strings.TrimSpace(params.MediaID)
+	if mediaID == "" {
+		return ErrInvalidInput
+	}
+	asset, err := s.media.MediaAssetByID(ctx, mediaID)
+	if err != nil {
+		return fmt.Errorf("load bot avatar media %s: %w", mediaID, err)
+	}
+	if asset.OwnerAccountID != account.ID {
+		return ErrForbidden
+	}
+	if asset.Kind != media.MediaKindAvatar || asset.Status != media.MediaStatusReady {
+		return ErrInvalidInput
+	}
+
+	now := s.currentTime()
+	_, err = s.store.SaveProfile(ctx, ProfileValue{
+		BotAccountID: account.ID,
+		Kind:         ProfileKindAvatar,
+		LanguageCode: "",
+		Value:        mediaID,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	})
+	if err != nil {
+		return fmt.Errorf("save bot avatar: %w", err)
+	}
+
+	return nil
+}
+
+// AvatarMediaID returns the media asset configured as a bot avatar.
+func (s *Service) AvatarMediaID(ctx context.Context, botAccountID string) (string, error) {
+	botAccountID = strings.TrimSpace(botAccountID)
+	if botAccountID == "" {
+		return "", ErrInvalidInput
+	}
+
+	value, err := s.store.ProfileByLanguage(ctx, botAccountID, ProfileKindAvatar, "")
+	if err != nil {
+		return "", fmt.Errorf("load bot avatar for %s: %w", botAccountID, err)
+	}
+
+	return strings.TrimSpace(value.Value), nil
 }
 
 // SetMyName stores one localized bot name override.
@@ -232,6 +294,10 @@ func normalizeProfileInput(kind ProfileKind, languageCode string, value string) 
 		}
 	case ProfileKindShortDescription:
 		if value != "" && utf8.RuneCountInString(value) > 120 {
+			return "", "", "", ErrInvalidInput
+		}
+	case ProfileKindAvatar:
+		if value == "" {
 			return "", "", "", ErrInvalidInput
 		}
 	default:

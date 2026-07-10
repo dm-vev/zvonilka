@@ -3,6 +3,7 @@ package bot_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -12,6 +13,7 @@ import (
 	conversationtest "github.com/dm-vev/zvonilka/internal/domain/conversation/teststore"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
 	identitytest "github.com/dm-vev/zvonilka/internal/domain/identity/teststore"
+	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
 )
 
 func TestBotProfileAndRightsLifecycle(t *testing.T) {
@@ -90,4 +92,46 @@ func TestBotProfileAndRightsLifecycle(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, rights.CanPostMessages)
+}
+
+func TestBotAvatarLifecycle(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	identityStore := identitytest.NewMemoryStore()
+	identityService, err := identity.NewService(identityStore, identity.NoopCodeSender{})
+	require.NoError(t, err)
+	conversationStore := conversationtest.NewMemoryStore()
+	conversationService, err := conversation.NewService(conversationStore)
+	require.NoError(t, err)
+	botAccount, botToken, err := identityService.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "avatarbot",
+		DisplayName: "Avatar Bot",
+		AccountKind: identity.AccountKindBot,
+	})
+	require.NoError(t, err)
+
+	avatar := domainmedia.MediaAsset{
+		ID:             "bot-avatar",
+		OwnerAccountID: botAccount.ID,
+		Kind:           domainmedia.MediaKindAvatar,
+		Status:         domainmedia.MediaStatusReady,
+		CreatedAt:      time.Now().UTC(),
+	}
+	service, err := domainbot.NewService(
+		bottest.NewMemoryStore(),
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaFixture{assets: map[string]domainmedia.MediaAsset{avatar.ID: avatar}},
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, service.SetMyAvatar(ctx, domainbot.SetAvatarParams{
+		BotToken: botToken,
+		MediaID:  avatar.ID,
+	}))
+	mediaID, err := service.AvatarMediaID(ctx, botAccount.ID)
+	require.NoError(t, err)
+	require.Equal(t, avatar.ID, mediaID)
 }
