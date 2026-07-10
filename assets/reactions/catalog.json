@@ -9,11 +9,11 @@
       "active": true,
       "sort_order": 10,
       "assets": {
-        "static_icon": "shared/static.webp",
-        "appear_animation": "shared/static.webp",
-        "select_animation": "shared/static.webp",
-        "activate_animation": "shared/static.webp",
-        "effect_animation": "shared/static.webp"
+        "static_icon": "thumbs_up/static.webp",
+        "appear_animation": "thumbs_up/static.webp",
+        "select_animation": "thumbs_up/static.webp",
+        "activate_animation": "thumbs_up/static.webp",
+        "effect_animation": "shared/custom_emoji_reaction.tgs"
       }
     },
     {
@@ -23,11 +23,11 @@
       "active": true,
       "sort_order": 20,
       "assets": {
-        "static_icon": "shared/static.webp",
-        "appear_animation": "shared/static.webp",
-        "select_animation": "shared/static.webp",
-        "activate_animation": "shared/static.webp",
-        "effect_animation": "shared/static.webp"
+        "static_icon": "red_heart/static.webp",
+        "appear_animation": "red_heart/static.webp",
+        "select_animation": "red_heart/static.webp",
+        "activate_animation": "red_heart/static.webp",
+        "effect_animation": "shared/custom_emoji_reaction.tgs"
       }
     },
     {
@@ -37,11 +37,11 @@
       "active": true,
       "sort_order": 30,
       "assets": {
-        "static_icon": "shared/static.webp",
-        "appear_animation": "shared/static.webp",
-        "select_animation": "shared/static.webp",
-        "activate_animation": "shared/static.webp",
-        "effect_animation": "shared/static.webp"
+        "static_icon": "fire/static.webp",
+        "appear_animation": "fire/static.webp",
+        "select_animation": "fire/static.webp",
+        "activate_animation": "fire/static.webp",
+        "effect_animation": "shared/custom_emoji_reaction.tgs"
       }
     },
     {
@@ -51,11 +51,11 @@
       "active": true,
       "sort_order": 40,
       "assets": {
-        "static_icon": "shared/static.webp",
-        "appear_animation": "shared/static.webp",
-        "select_animation": "shared/static.webp",
-        "activate_animation": "shared/static.webp",
-        "effect_animation": "shared/static.webp"
+        "static_icon": "laugh/static.webp",
+        "appear_animation": "laugh/static.webp",
+        "select_animation": "laugh/static.webp",
+        "activate_animation": "laugh/static.webp",
+        "effect_animation": "shared/custom_emoji_reaction.tgs"
       }
     },
     {
@@ -65,11 +65,11 @@
       "active": true,
       "sort_order": 50,
       "assets": {
-        "static_icon": "shared/static.webp",
-        "appear_animation": "shared/static.webp",
-        "select_animation": "shared/static.webp",
-        "activate_animation": "shared/static.webp",
-        "effect_animation": "shared/static.webp"
+        "static_icon": "party/static.webp",
+        "appear_animation": "party/static.webp",
+        "select_animation": "party/static.webp",
+        "activate_animation": "party/static.webp",
+        "effect_animation": "shared/custom_emoji_reaction.tgs"
       }
     },
     {
@@ -79,11 +79,11 @@
       "active": true,
       "sort_order": 60,
       "assets": {
-        "static_icon": "shared/static.webp",
-        "appear_animation": "shared/static.webp",
-        "select_animation": "shared/static.webp",
-        "activate_animation": "shared/static.webp",
-        "effect_animation": "shared/static.webp"
+        "static_icon": "surprised/static.webp",
+        "appear_animation": "surprised/static.webp",
+        "select_animation": "surprised/static.webp",
+        "activate_animation": "surprised/static.webp",
+        "effect_animation": "shared/custom_emoji_reaction.tgs"
       }
     },
     {
@@ -93,11 +93,11 @@
       "active": true,
       "sort_order": 70,
       "assets": {
-        "static_icon": "shared/static.webp",
-        "appear_animation": "shared/static.webp",
-        "select_animation": "shared/static.webp",
-        "activate_animation": "shared/static.webp",
-        "effect_animation": "shared/static.webp"
+        "static_icon": "sad/static.webp",
+        "appear_animation": "sad/static.webp",
+        "select_animation": "sad/static.webp",
+        "activate_animation": "sad/static.webp",
+        "effect_animation": "shared/custom_emoji_reaction.tgs"
       }
     },
     {
@@ -107,11 +107,11 @@
       "active": true,
       "sort_order": 80,
       "assets": {
-        "static_icon": "shared/static.webp",
-        "appear_animation": "shared/static.webp",
-        "select_animation": "shared/static.webp",
-        "activate_animation": "shared/static.webp",
-        "effect_animation": "shared/static.webp"
+        "static_icon": "thumbs_down/static.webp",
+        "appear_animation": "thumbs_down/static.webp",
+        "select_animation": "thumbs_down/static.webp",
+        "activate_animation": "thumbs_down/static.webp",
+        "effect_animation": "shared/custom_emoji_reaction.tgs"
       }
     }
   ]

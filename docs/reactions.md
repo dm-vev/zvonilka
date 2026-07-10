@@ -19,6 +19,10 @@ Use `-replace` only when reactions absent from the manifest should be marked
 inactive. Ordinary media upload RPCs cannot set `public_access`; only this
 privileged seed command can do so.
 
-The current seed contains eight reactions. It uses one own 100x100 WebP as a
-temporary asset for all five required Telegram-compatible fields. TGS and WebM
-assets are supported by the validator and can be added to the manifest later.
+The current seed contains eight reactions. Each reaction has its own 100x100
+WebP icon extracted from the ordinary Telegram Android client's
+`assets/emoji/<section>_<index>.png` files, with the client's alpha masks
+applied. The picker fields use that matching icon, while
+`shared/custom_emoji_reaction.tgs` is the Telegram Lottie activation effect.
+TGS and WebM assets are supported by the validator and can replace the static
+picker fields when per-reaction animation files are available.

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	domainbot "github.com/dm-vev/zvonilka/internal/domain/bot"
+	botpg "github.com/dm-vev/zvonilka/internal/domain/bot/pgstore"
 	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 	postgrescall "github.com/dm-vev/zvonilka/internal/domain/call/pgstore"
 	domainconversation "github.com/dm-vev/zvonilka/internal/domain/conversation"
@@ -54,6 +56,10 @@ var newIdentityStore = func(db *sql.DB, schema string) (domainidentity.Store, er
 
 var newCallStore = func(db *sql.DB, schema string) (domaincall.Store, error) {
 	return postgrescall.New(db, schema)
+}
+
+var newBotStore = func(db *sql.DB, schema string) (domainbot.Store, error) {
+	return botpg.New(db, schema)
 }
 
 var newE2EEStore = func(db *sql.DB, schema string) (domaine2ee.Store, error) {
@@ -452,6 +458,46 @@ func buildAppStorage(
 	}
 
 	return catalog, rtcCluster, localRuntime, callService, e2eeService, identityService, conversationService, mediaService, notificationService, presenceService, searchService, translationService, userService, nil
+}
+
+func buildGatewayBotService(
+	cfg config.Configuration,
+	catalog *domainstorage.Catalog,
+	identityService *domainidentity.Service,
+	conversationService *domainconversation.Service,
+	mediaService *domainmedia.Service,
+) (*domainbot.Service, error) {
+	if catalog == nil || identityService == nil || conversationService == nil || mediaService == nil {
+		return nil, fmt.Errorf("construct gateway bot service: %w", domainstorage.ErrInvalidInput)
+	}
+	provider, err := catalog.Provider(cfg.Storage.PrimaryProvider)
+	if err != nil {
+		return nil, fmt.Errorf("select bot storage provider %q: %w", cfg.Storage.PrimaryProvider, err)
+	}
+	relational, ok := provider.(domainstorage.RelationalProvider)
+	if !ok {
+		return nil, fmt.Errorf("select bot storage provider: expected relational provider")
+	}
+	botStore, err := newBotStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, fmt.Errorf("construct postgres bot store: %w", err)
+	}
+	conversationStore, err := newConversationStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, fmt.Errorf("construct postgres bot conversation store: %w", err)
+	}
+	service, err := domainbot.NewService(
+		botStore,
+		identityService,
+		conversationService,
+		conversationStore,
+		mediaService,
+		domainbot.WithSettings(cfg.Bot.ToSettings()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("construct gateway bot service: %w", err)
+	}
+	return service, nil
 }
 
 func joinStorageError(runErr error, closeErr error) error {

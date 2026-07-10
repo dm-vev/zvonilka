@@ -2085,6 +2085,7 @@ func messageProto(
 		EditedAt:       protoTime(message.EditedAt),
 		DeletedAt:      protoTime(message.DeletedAt),
 		ForwardFrom:    forwardOrigin,
+		Metadata:       message.Metadata,
 	}
 }
 

@@ -56,3 +56,25 @@ func TestBotAPIClientReturnsAPIErrors(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 }
+
+func TestDemoBotSendsHTMLParseMode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if payload["parse_mode"] != "HTML" {
+			t.Fatalf("parse_mode = %#v", payload["parse_mode"])
+		}
+		if payload["text"] != "<b>hello</b>" {
+			t.Fatalf("text = %#v", payload["text"])
+		}
+		_, _ = writer.Write([]byte(`{"ok":true,"result":true}`))
+	}))
+	defer server.Close()
+
+	bot := &demoBot{client: newBotAPIClient(server.URL, "secret")}
+	if err := bot.sendText(context.Background(), "7", "<b>hello</b>", nil); err != nil {
+		t.Fatalf("sendText: %v", err)
+	}
+}

@@ -31,6 +31,9 @@ Send `/start` to get the interactive menu. The bot has commands for:
 - inline query answers;
 - webhook lifecycle and long polling.
 
+The demo replies use `parse_mode=HTML`, so bold, italic, links and edited
+formatted messages are visible in clients that support message entities.
+
 Use `/methods` for the exact method inventory exposed by the current Zvonilka
 server. Media commands accept a Zvonilka/Telegram `file_id`, for example
 `/media photo <file_id>`. Send a file to the chat first if you need a fresh

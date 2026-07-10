@@ -99,6 +99,13 @@ func TestLoadManifestValidatesTGSAnimation(t *testing.T) {
 	}
 }
 
+func TestRepositoryReactionManifestAssets(t *testing.T) {
+	manifestPath := filepath.Join("..", "..", "assets", "reactions", "catalog.json")
+	if _, err := LoadManifest(manifestPath); err != nil {
+		t.Fatalf("repository reaction manifest: %v", err)
+	}
+}
+
 func testManifest() Manifest {
 	return Manifest{
 		Version:      1,

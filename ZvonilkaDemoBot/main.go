@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"log"
 	"os"
 	"os/signal"
@@ -203,7 +204,7 @@ func (b *demoBot) handleMessage(ctx context.Context, message map[string]any) err
 	}
 	command, args := parseCommand(text)
 	if command == "" {
-		return b.sendText(ctx, chatID, "Я получил: "+text+"\n\nИспользуй /start для меню демонстрации.", mainMenu())
+		return b.sendText(ctx, chatID, "Я получил: "+escapeHTML(text)+"\n\nИспользуй /start для меню демонстрации.", mainMenu())
 	}
 
 	userID := stringValue(nestedMap(message, "from")["id"])
@@ -229,7 +230,7 @@ func (b *demoBot) handleMessage(ctx context.Context, message map[string]any) err
 	case "callback":
 		return b.sendText(ctx, chatID, "Нажми кнопку в меню: callback_query будет обработан автоматически.", mainMenu())
 	default:
-		return b.sendText(ctx, chatID, "Неизвестная команда /"+command+". Открой /help.", mainMenu())
+		return b.sendText(ctx, chatID, "Неизвестная команда /"+escapeHTML(command)+". Открой /help.", mainMenu())
 	}
 }
 
@@ -280,7 +281,8 @@ func (b *demoBot) handleInlineQuery(ctx context.Context, query map[string]any) e
 			"title":       "Zvonilka Demo Bot",
 			"description": "Inline result from the Bot API demo",
 			"input_message_content": map[string]any{
-				"message_text": "Inline query работает: ZvonilkaDemoBot ответил через answerInlineQuery.",
+				"message_text": "<b>Inline query</b> работает: ZvonilkaDemoBot ответил через answerInlineQuery.",
+				"parse_mode":   "HTML",
 			},
 		}},
 	}, nil)
@@ -318,8 +320,9 @@ func (b *demoBot) demoAll(ctx context.Context, chatID, userID string) error {
 func (b *demoBot) demoCore(ctx context.Context, chatID, userID string) error {
 	var sent map[string]any
 	if err := b.client.call(ctx, "sendMessage", map[string]any{
-		"chat_id": chatID,
-		"text":    "sendMessage: это живое сообщение. Через секунду оно будет отредактировано.",
+		"chat_id":    chatID,
+		"text":       "<b>sendMessage</b>: это <i>живое сообщение</i>. Через секунду оно будет отредактировано.",
+		"parse_mode": "HTML",
 		"reply_markup": map[string]any{
 			"inline_keyboard": [][]map[string]any{{
 				{"text": "Нажми callback", "callback_data": "demo:core"},
@@ -337,7 +340,8 @@ func (b *demoBot) demoCore(ctx context.Context, chatID, userID string) error {
 	results = appendCallResult(results, "editMessageText", b.client.call(ctx, "editMessageText", map[string]any{
 		"chat_id":    chatID,
 		"message_id": messageID,
-		"text":       "editMessageText: сообщение изменено сервером.",
+		"text":       "<b>editMessageText</b>: сообщение изменено сервером.",
+		"parse_mode": "HTML",
 	}, nil))
 	results = appendCallResult(results, "editMessageReplyMarkup", b.client.call(ctx, "editMessageReplyMarkup", map[string]any{
 		"chat_id": chatID, "message_id": messageID,
@@ -410,7 +414,7 @@ func (b *demoBot) demoMedia(ctx context.Context, chatID string, args []string) e
 	var result map[string]any
 	err := b.client.call(ctx, method, params, &result)
 	if err != nil {
-		return b.sendText(ctx, chatID, method+" failed: "+err.Error(), nil)
+		return b.sendText(ctx, chatID, method+" failed: "+html.EscapeString(err.Error()), nil)
 	}
 
 	messageID := stringValue(result["message_id"])
@@ -418,11 +422,11 @@ func (b *demoBot) demoMedia(ctx context.Context, chatID string, args []string) e
 	results = appendCallResult(results, "getFile", b.client.call(ctx, "getFile", map[string]any{"file_id": args[1]}, nil))
 	if method != "sendSticker" && method != "sendVideoNote" && messageID != "" {
 		results = appendCallResult(results, "editMessageCaption", b.client.call(ctx, "editMessageCaption", map[string]any{
-			"chat_id": chatID, "message_id": messageID, "caption": "Caption edited by ZvonilkaDemoBot",
+			"chat_id": chatID, "message_id": messageID, "caption": "<b>Caption edited</b> by ZvonilkaDemoBot", "parse_mode": "HTML",
 		}, nil))
 		results = appendCallResult(results, "editMessageMedia", b.client.call(ctx, "editMessageMedia", map[string]any{
 			"chat_id": chatID, "message_id": messageID,
-			"media": map[string]any{"type": args[0], "media": args[1], "caption": "Media edited by ZvonilkaDemoBot"},
+			"media": map[string]any{"type": args[0], "media": args[1], "caption": "<b>Media edited</b> by ZvonilkaDemoBot", "parse_mode": "HTML"},
 		}, nil))
 	}
 	return b.sendText(ctx, chatID, strings.Join(results, "\n"), nil)
@@ -519,7 +523,7 @@ func (b *demoBot) demoWebhook(ctx context.Context, chatID string) error {
 }
 
 func (b *demoBot) sendText(ctx context.Context, chatID, text string, markup map[string]any) error {
-	params := map[string]any{"chat_id": chatID, "text": text}
+	params := map[string]any{"chat_id": chatID, "text": text, "parse_mode": "HTML"}
 	if markup != nil {
 		params["reply_markup"] = markup
 	}
@@ -542,6 +546,10 @@ func welcomeText() string {
 		"Команды: /demo_all, /demo_core, /demo_media, /demo_profile, /demo_webhook, /methods."
 }
 
+func escapeHTML(value string) string {
+	return html.EscapeString(value)
+}
+
 func methodReport() string {
 	var builder strings.Builder
 	builder.WriteString("<b>Methods exposed by the current Zvonilka server</b>\n\n")
@@ -557,7 +565,7 @@ func methodReport() string {
 
 func appendCallResult(results []string, method string, err error) []string {
 	if err != nil {
-		return append(results, method+": error ("+err.Error()+")")
+		return append(results, method+": error ("+escapeHTML(err.Error())+")")
 	}
 	return append(results, method+": ok")
 }

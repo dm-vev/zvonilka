@@ -17,6 +17,7 @@ import (
 	searchv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/search/v1"
 	syncv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/sync/v1"
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
+	domainbot "github.com/dm-vev/zvonilka/internal/domain/bot"
 	domaincall "github.com/dm-vev/zvonilka/internal/domain/call"
 	"github.com/dm-vev/zvonilka/internal/domain/conversation"
 	domaine2ee "github.com/dm-vev/zvonilka/internal/domain/e2ee"
@@ -69,6 +70,7 @@ type api struct {
 	search       *search.Service
 	translation  *domaintranslation.Service
 	user         *domainuser.Service
+	bot          *domainbot.Service
 	callNotifier *callNotifier
 	syncNotifier *syncNotifier
 	features     config.FeatureConfig
@@ -113,6 +115,11 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 	if err != nil {
 		return nil, err
 	}
+	botService, err := buildGatewayBotService(cfg, catalog, identityService, conversationService, mediaService)
+	if err != nil {
+		_ = catalog.Close(ctx)
+		return nil, err
+	}
 
 	return &app{
 		health:     health,
@@ -131,6 +138,7 @@ func newApp(ctx context.Context, cfg config.Configuration) (*app, error) {
 			search:       searchService,
 			translation:  translationService,
 			user:         userService,
+			bot:          botService,
 			callNotifier: newCallNotifier(),
 			syncNotifier: newSyncNotifier(),
 			features:     cfg.Features,

@@ -176,6 +176,7 @@ message Message {
   google.protobuf.Timestamp deleted_at = 19;
   google.protobuf.Timestamp deliver_at = 20;
   ForwardOrigin forward_from = 21;
+  map<string, string> metadata = 22;
 }
 
 message MessageTranslation {
