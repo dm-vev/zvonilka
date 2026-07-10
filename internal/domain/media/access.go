@@ -23,7 +23,22 @@ func (s *Service) GetDownloadURL(ctx context.Context, params GetDownloadParams) 
 		return MediaAsset{}, DownloadTarget{}, fmt.Errorf("load media asset %s: %w", params.MediaID, err)
 	}
 	if asset.OwnerAccountID != params.OwnerAccountID {
-		return MediaAsset{}, DownloadTarget{}, ErrForbidden
+		conversationID := strings.TrimSpace(asset.Metadata[MetadataConversationIDKey])
+		if conversationID == "" || s.conversationAccessChecker == nil {
+			return MediaAsset{}, DownloadTarget{}, ErrForbidden
+		}
+
+		allowed, err := s.conversationAccessChecker(ctx, conversationID, params.OwnerAccountID)
+		if err != nil {
+			return MediaAsset{}, DownloadTarget{}, fmt.Errorf(
+				"check conversation media access for %s: %w",
+				params.MediaID,
+				err,
+			)
+		}
+		if !allowed {
+			return MediaAsset{}, DownloadTarget{}, ErrForbidden
+		}
 	}
 	if asset.Status != MediaStatusReady {
 		return MediaAsset{}, DownloadTarget{}, ErrNotFound

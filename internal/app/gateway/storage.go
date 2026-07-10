@@ -385,6 +385,23 @@ func buildAppStorage(
 		blob,
 		domainmedia.WithSettings(cfg.Media.ToSettings()),
 		domainmedia.WithIndexer(searchService),
+		domainmedia.WithConversationAccessChecker(func(
+			checkCtx context.Context,
+			conversationID string,
+			accountID string,
+		) (bool, error) {
+			_, _, checkErr := conversationService.GetConversation(checkCtx, domainconversation.GetConversationParams{
+				ConversationID: conversationID,
+				AccountID:      accountID,
+			})
+			if checkErr != nil {
+				if errors.Is(checkErr, domainconversation.ErrNotFound) || errors.Is(checkErr, domainconversation.ErrForbidden) {
+					return false, nil
+				}
+				return false, checkErr
+			}
+			return true, nil
+		}),
 	)
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(

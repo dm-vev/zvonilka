@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -716,6 +717,60 @@ func TestMediaFiltersVariantAndHardDelete(t *testing.T) {
 	_, err = fixture.api.GetMedia(authCtx, &mediav1.GetMediaRequest{MediaId: first.Media.MediaId})
 	if status.Code(err).String() == "OK" || err == nil {
 		t.Fatal("expected deleted media to disappear after hard delete")
+	}
+}
+
+func TestMediaDownloadURLAllowsConversationMember(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+	owner, ownerCtx := fixture.mustCreateUserAndLogin(t, "media-video-owner", "media-video-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "media-video-peer", "media-video-peer@example.com")
+	_, outsiderCtx := fixture.mustCreateUserAndLogin(t, "media-video-outsider", "media-video-outsider@example.com")
+
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Video access",
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	now := fixture.now()
+	if _, err := fixture.mediaStore.SaveMediaAsset(context.Background(), media.MediaAsset{
+		ID:              "media-video-member",
+		OwnerAccountID:  owner.ID,
+		Kind:            media.MediaKindVideo,
+		Status:          media.MediaStatusReady,
+		StorageProvider: "object",
+		Bucket:          fixture.mediaBlob.bucket,
+		ObjectKey:       "media/" + owner.ID + "/media-video-member",
+		FileName:        "video.mp4",
+		ContentType:     "video/mp4",
+		SizeBytes:       2048,
+		Metadata: map[string]string{
+			media.MetadataConversationIDKey: created.Conversation.ConversationId,
+		},
+		UploadExpiresAt: now.Add(time.Minute),
+		ReadyAt:         now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}); err != nil {
+		t.Fatalf("seed video asset: %v", err)
+	}
+
+	if _, err := fixture.api.GetDownloadUrl(peerCtx, &mediav1.GetDownloadUrlRequest{
+		MediaId: "media-video-member",
+	}); err != nil {
+		t.Fatalf("conversation member cannot download video: %v", err)
+	}
+
+	_, err = fixture.api.GetDownloadUrl(outsiderCtx, &mediav1.GetDownloadUrlRequest{
+		MediaId: "media-video-member",
+	})
+	if status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("expected outsider download to be forbidden, got %v", err)
 	}
 }
 
@@ -1611,6 +1666,23 @@ func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
 			MaxUploadSize:  10 << 20,
 		}),
 		media.WithIndexer(searchService),
+		media.WithConversationAccessChecker(func(
+			checkCtx context.Context,
+			conversationID string,
+			accountID string,
+		) (bool, error) {
+			_, _, checkErr := conversationService.GetConversation(checkCtx, conversation.GetConversationParams{
+				ConversationID: conversationID,
+				AccountID:      accountID,
+			})
+			if checkErr != nil {
+				if errors.Is(checkErr, conversation.ErrNotFound) || errors.Is(checkErr, conversation.ErrForbidden) {
+					return false, nil
+				}
+				return false, checkErr
+			}
+			return true, nil
+		}),
 	)
 	if err != nil {
 		t.Fatalf("new media service: %v", err)

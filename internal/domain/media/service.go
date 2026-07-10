@@ -12,11 +12,12 @@ import (
 
 // Service coordinates media metadata and object-storage lifecycle.
 type Service struct {
-	store    Store
-	blob     domainstorage.BlobStore
-	now      func() time.Time
-	settings Settings
-	indexer  domainsearch.Indexer
+	store                     Store
+	blob                      domainstorage.BlobStore
+	now                       func() time.Time
+	settings                  Settings
+	indexer                   domainsearch.Indexer
+	conversationAccessChecker ConversationAccessChecker
 }
 
 // NewService constructs a media service backed by the provided store and blob store.
