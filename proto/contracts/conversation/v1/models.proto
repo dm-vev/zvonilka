@@ -152,6 +152,7 @@ message Message {
   google.protobuf.Timestamp edited_at = 18;
   google.protobuf.Timestamp deleted_at = 19;
   google.protobuf.Timestamp deliver_at = 20;
+  ForwardOrigin forward_from = 21;
 }
 
 message MessageTranslation {
@@ -181,4 +182,13 @@ message Thread {
   google.protobuf.Timestamp last_message_at = 13;
   google.protobuf.Timestamp archived_at = 14;
   google.protobuf.Timestamp closed_at = 15;
+}
+
+message ForwardOrigin {
+  string conversation_id = 1;
+  string message_id = 2;
+  string sender_user_id = 3;
+  zvonilka.users.v1.UserProfile sender_profile = 4;
+  zvonilka.common.v1.MessageKind message_kind = 5;
+  string snippet = 6;
 }

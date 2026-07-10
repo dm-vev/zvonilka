@@ -233,6 +233,7 @@ type MessageDraft struct {
 	Attachments         []AttachmentRef
 	MentionAccountIDs   []string
 	ReplyTo             MessageReference
+	ForwardFrom         MessageReference
 	ThreadID            string
 	DeliverAt           time.Time
 	Silent              bool
@@ -254,6 +255,7 @@ type Message struct {
 	Attachments         []AttachmentRef
 	MentionAccountIDs   []string
 	ReplyTo             MessageReference
+	ForwardFrom         MessageReference
 	ThreadID            string
 	Silent              bool
 	Pinned              bool

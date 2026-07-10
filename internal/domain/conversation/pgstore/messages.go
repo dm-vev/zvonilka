@@ -72,6 +72,11 @@ func (s *Store) saveMessage(ctx context.Context, message conversation.Message) (
 	replyMessageID := nullString(message.ReplyTo.MessageID)
 	replySenderAccountID := nullString(message.ReplyTo.SenderAccountID)
 	replySnippet := nullString(message.ReplyTo.Snippet)
+	forwardKind := string(message.ForwardFrom.MessageKind)
+	forwardConversationID := nullString(message.ForwardFrom.ConversationID)
+	forwardMessageID := nullString(message.ForwardFrom.MessageID)
+	forwardSenderAccountID := nullString(message.ForwardFrom.SenderAccountID)
+	forwardSnippet := nullString(message.ForwardFrom.Snippet)
 	metadata, err := encodeMetadata(message.Metadata)
 	if err != nil {
 		return conversation.Message{}, fmt.Errorf("encode message metadata: %w", err)
@@ -82,14 +87,16 @@ INSERT INTO %s (
 	id, conversation_id, sender_account_id, sender_device_id, client_message_id, sequence, kind, status,
 	payload_key_id, payload_algorithm, payload_nonce, payload_ciphertext, payload_aad, payload_metadata,
 	reply_conversation_id, reply_message_id, reply_sender_account_id, reply_kind, reply_snippet,
+	forward_conversation_id, forward_message_id, forward_sender_account_id, forward_kind, forward_snippet,
 	thread_id, silent, pinned, disable_link_previews, view_count, deliver_at, metadata,
 	created_at, updated_at, edited_at, deleted_at
 ) VALUES (
 	$1, $2, $3, $4, $5, $6, $7, $8,
 	$9, $10, $11, $12, $13, $14,
 	$15, $16, $17, $18, $19,
-	$20, $21, $22, $23, $24, $25, $26,
-	$27, $28, $29, $30
+	$20, $21, $22, $23, $24,
+	$25, $26, $27, $28, $29, $30, $31,
+	$32, $33, $34, $35
 )
 ON CONFLICT (id) DO UPDATE SET
 	conversation_id = EXCLUDED.conversation_id,
@@ -110,6 +117,11 @@ ON CONFLICT (id) DO UPDATE SET
 	reply_sender_account_id = EXCLUDED.reply_sender_account_id,
 	reply_kind = EXCLUDED.reply_kind,
 	reply_snippet = EXCLUDED.reply_snippet,
+	forward_conversation_id = EXCLUDED.forward_conversation_id,
+	forward_message_id = EXCLUDED.forward_message_id,
+	forward_sender_account_id = EXCLUDED.forward_sender_account_id,
+	forward_kind = EXCLUDED.forward_kind,
+	forward_snippet = EXCLUDED.forward_snippet,
 	thread_id = EXCLUDED.thread_id,
 	silent = EXCLUDED.silent,
 	pinned = EXCLUDED.pinned,
@@ -143,6 +155,11 @@ RETURNING %s
 		replySenderAccountID,
 		replyKind,
 		replySnippet,
+		forwardConversationID,
+		forwardMessageID,
+		forwardSenderAccountID,
+		forwardKind,
+		forwardSnippet,
 		message.ThreadID,
 		message.Silent,
 		message.Pinned,

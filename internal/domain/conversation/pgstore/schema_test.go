@@ -40,6 +40,8 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 		"0018.sql",
 		"0019.sql",
 		"0022.sql",
+		"0057.sql",
+		"0058.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -83,6 +85,12 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 		Draft: conversation.MessageDraft{
 			ClientMessageID: "client-1",
 			Kind:            conversation.MessageKindText,
+			ForwardFrom: conversation.MessageReference{
+				ConversationID:  "source-conversation",
+				MessageID:       "source-message",
+				SenderAccountID: "source-sender",
+				MessageKind:     conversation.MessageKindText,
+			},
 			Payload: conversation.EncryptedPayload{
 				KeyID:      "key-1",
 				Algorithm:  "xchacha20poly1305",
@@ -164,6 +172,10 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 	}
 	if loadedMessage.ReplyTo.MessageID != "" || loadedMessage.ReplyTo.ConversationID != "" {
 		t.Fatalf("expected root message without reply reference, got %+v", loadedMessage.ReplyTo)
+	}
+	if loadedMessage.ForwardFrom.MessageID != "source-message" ||
+		loadedMessage.ForwardFrom.SenderAccountID != "source-sender" {
+		t.Fatalf("expected forward origin to survive persistence, got %+v", loadedMessage.ForwardFrom)
 	}
 	if loadedMessage.Attachments[0].Caption != "" {
 		t.Fatalf("expected attachment caption to be stripped, got %q", loadedMessage.Attachments[0].Caption)
@@ -479,6 +491,8 @@ func TestConversationTopicSchemaLifecycle(t *testing.T) {
 		"0018.sql",
 		"0019.sql",
 		"0022.sql",
+		"0057.sql",
+		"0058.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -696,6 +710,8 @@ func TestConversationMessageActionSchemaLifecycle(t *testing.T) {
 		"0018.sql",
 		"0019.sql",
 		"0022.sql",
+		"0057.sql",
+		"0058.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)

@@ -55,11 +55,22 @@ func (s *Service) ForwardMessage(ctx context.Context, params ForwardMessageParam
 		return Message{}, fmt.Errorf("load forwarded bot message: %w", mapConversationError(err))
 	}
 
+	draft := copyDraft(source, targetThreadID, params.DisableNotification, source.Metadata)
+	draft.ForwardFrom = source.ForwardFrom
+	if draft.ForwardFrom.MessageID == "" {
+		draft.ForwardFrom = conversation.MessageReference{
+			ConversationID:  source.ConversationID,
+			MessageID:       source.ID,
+			SenderAccountID: source.SenderAccountID,
+			MessageKind:     source.Kind,
+		}
+	}
+
 	message, _, err := s.conversations.SendMessage(ctx, conversation.SendMessageParams{
 		ConversationID:  targetChatID,
 		SenderAccountID: account.ID,
 		SenderDeviceID:  botDeviceID,
-		Draft:           copyDraft(source, targetThreadID, params.DisableNotification, source.Metadata),
+		Draft:           draft,
 	})
 	if err != nil {
 		return Message{}, fmt.Errorf("forward bot message: %w", mapConversationError(err))

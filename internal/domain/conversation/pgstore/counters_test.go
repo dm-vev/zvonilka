@@ -28,6 +28,8 @@ func TestConversationCountersIgnoreHistoryBeforeJoin(t *testing.T) {
 		"0012.sql",
 		"0018.sql",
 		"0019.sql",
+		"0057.sql",
+		"0058.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -152,6 +154,8 @@ func TestConversationCountersPersistMentions(t *testing.T) {
 		"0012.sql",
 		"0018.sql",
 		"0019.sql",
+		"0057.sql",
+		"0058.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)

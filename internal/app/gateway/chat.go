@@ -566,13 +566,13 @@ func (a *api) GetMessage(
 		return nil, grpcError(err)
 	}
 
-	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
+	profiles, err := a.messageProfiles(ctx, []domainconversation.Message{message}, authContext.Account.ID)
 	if err != nil {
 		return nil, grpcError(err)
 	}
 
 	return &conversationv1.GetMessageResponse{
-		Message: messageProto(message, profiles[message.SenderAccountID]),
+		Message: messageProto(message, profiles[message.SenderAccountID], profiles[message.ForwardFrom.SenderAccountID]),
 	}, nil
 }
 
@@ -623,7 +623,7 @@ func (a *api) SendMessage(
 		a.publishSyncEvent(event)
 	}
 
-	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
+	profiles, err := a.messageProfiles(ctx, []domainconversation.Message{message}, authContext.Account.ID)
 	if err != nil {
 		return nil, grpcError(err)
 	}
@@ -634,7 +634,7 @@ func (a *api) SendMessage(
 	}
 
 	return &conversationv1.SendMessageResponse{
-		Message: messageProto(message, profiles[message.SenderAccountID]),
+		Message: messageProto(message, profiles[message.SenderAccountID], profiles[message.ForwardFrom.SenderAccountID]),
 		Event:   responseEvent,
 	}, nil
 }
@@ -661,13 +661,13 @@ func (a *api) EditMessage(
 	}
 	a.publishSyncEvent(event)
 
-	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
+	profiles, err := a.messageProfiles(ctx, []domainconversation.Message{message}, authContext.Account.ID)
 	if err != nil {
 		return nil, grpcError(err)
 	}
 
 	return &conversationv1.EditMessageResponse{
-		Message: messageProto(message, profiles[message.SenderAccountID]),
+		Message: messageProto(message, profiles[message.SenderAccountID], profiles[message.ForwardFrom.SenderAccountID]),
 	}, nil
 }
 
@@ -692,13 +692,13 @@ func (a *api) DeleteMessage(
 	}
 	a.publishSyncEvent(event)
 
-	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
+	profiles, err := a.messageProfiles(ctx, []domainconversation.Message{message}, authContext.Account.ID)
 	if err != nil {
 		return nil, grpcError(err)
 	}
 
 	return &conversationv1.DeleteMessageResponse{
-		Message: messageProto(message, profiles[message.SenderAccountID]),
+		Message: messageProto(message, profiles[message.SenderAccountID], profiles[message.ForwardFrom.SenderAccountID]),
 	}, nil
 }
 
@@ -747,6 +747,15 @@ func (a *api) ForwardMessage(
 	}
 	metadata["forward_from_conversation_id"] = source.ConversationID
 	metadata["forward_from_message_id"] = source.ID
+	forwardFrom := source.ForwardFrom
+	if forwardFrom.MessageID == "" {
+		forwardFrom = domainconversation.MessageReference{
+			ConversationID:  source.ConversationID,
+			MessageID:       source.ID,
+			SenderAccountID: source.SenderAccountID,
+			MessageKind:     source.Kind,
+		}
+	}
 
 	message, event, err := a.conversation.SendMessage(ctx, domainconversation.SendMessageParams{
 		ConversationID:  req.GetToConversationId(),
@@ -757,6 +766,7 @@ func (a *api) ForwardMessage(
 			Payload:             source.Payload,
 			Attachments:         slices.Clone(source.Attachments),
 			MentionAccountIDs:   slices.Clone(source.MentionAccountIDs),
+			ForwardFrom:         forwardFrom,
 			Silent:              source.Silent,
 			DisableLinkPreviews: source.DisableLinkPreviews,
 			Metadata:            metadata,
@@ -768,13 +778,13 @@ func (a *api) ForwardMessage(
 	}
 	a.publishSyncEvent(event)
 
-	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
+	profiles, err := a.messageProfiles(ctx, []domainconversation.Message{message}, authContext.Account.ID)
 	if err != nil {
 		return nil, grpcError(err)
 	}
 
 	return &conversationv1.ForwardMessageResponse{
-		Message: messageProto(message, profiles[message.SenderAccountID]),
+		Message: messageProto(message, profiles[message.SenderAccountID], profiles[message.ForwardFrom.SenderAccountID]),
 	}, nil
 }
 
@@ -800,13 +810,13 @@ func (a *api) AddReaction(
 	}
 	a.publishSyncEvent(event)
 
-	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
+	profiles, err := a.messageProfiles(ctx, []domainconversation.Message{message}, authContext.Account.ID)
 	if err != nil {
 		return nil, grpcError(err)
 	}
 
 	return &conversationv1.AddReactionResponse{
-		Message: messageProto(message, profiles[message.SenderAccountID]),
+		Message: messageProto(message, profiles[message.SenderAccountID], profiles[message.ForwardFrom.SenderAccountID]),
 	}, nil
 }
 
@@ -832,13 +842,13 @@ func (a *api) RemoveReaction(
 	}
 	a.publishSyncEvent(event)
 
-	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
+	profiles, err := a.messageProfiles(ctx, []domainconversation.Message{message}, authContext.Account.ID)
 	if err != nil {
 		return nil, grpcError(err)
 	}
 
 	return &conversationv1.RemoveReactionResponse{
-		Message: messageProto(message, profiles[message.SenderAccountID]),
+		Message: messageProto(message, profiles[message.SenderAccountID], profiles[message.ForwardFrom.SenderAccountID]),
 	}, nil
 }
 
@@ -864,13 +874,13 @@ func (a *api) PinMessage(
 	}
 	a.publishSyncEvent(event)
 
-	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
+	profiles, err := a.messageProfiles(ctx, []domainconversation.Message{message}, authContext.Account.ID)
 	if err != nil {
 		return nil, grpcError(err)
 	}
 
 	return &conversationv1.PinMessageResponse{
-		Message: messageProto(message, profiles[message.SenderAccountID]),
+		Message: messageProto(message, profiles[message.SenderAccountID], profiles[message.ForwardFrom.SenderAccountID]),
 	}, nil
 }
 
@@ -896,13 +906,13 @@ func (a *api) UnpinMessage(
 	}
 	a.publishSyncEvent(event)
 
-	profiles, err := a.profilesByID(ctx, []string{message.SenderAccountID}, authContext.Account.ID)
+	profiles, err := a.messageProfiles(ctx, []domainconversation.Message{message}, authContext.Account.ID)
 	if err != nil {
 		return nil, grpcError(err)
 	}
 
 	return &conversationv1.UnpinMessageResponse{
-		Message: messageProto(message, profiles[message.SenderAccountID]),
+		Message: messageProto(message, profiles[message.SenderAccountID], profiles[message.ForwardFrom.SenderAccountID]),
 	}, nil
 }
 
@@ -1993,7 +2003,11 @@ func draftFromProto(draft *commonv1.MessageDraft) domainconversation.MessageDraf
 	}
 }
 
-func messageProto(message domainconversation.Message, senderProfile *usersv1.UserProfile) *conversationv1.Message {
+func messageProto(
+	message domainconversation.Message,
+	senderProfile *usersv1.UserProfile,
+	forwardProfile *usersv1.UserProfile,
+) *conversationv1.Message {
 	reactions := make([]*conversationv1.Reaction, 0, len(message.Reactions))
 	for _, reaction := range message.Reactions {
 		reactions = append(reactions, &conversationv1.Reaction{
@@ -2006,6 +2020,18 @@ func messageProto(message domainconversation.Message, senderProfile *usersv1.Use
 	attachments := make([]*commonv1.AttachmentRef, 0, len(message.Attachments))
 	for _, attachment := range message.Attachments {
 		attachments = append(attachments, attachmentToProto(attachment))
+	}
+
+	var forwardOrigin *conversationv1.ForwardOrigin
+	if message.ForwardFrom.MessageID != "" {
+		forwardOrigin = &conversationv1.ForwardOrigin{
+			ConversationId: message.ForwardFrom.ConversationID,
+			MessageId:      message.ForwardFrom.MessageID,
+			SenderUserId:   message.ForwardFrom.SenderAccountID,
+			SenderProfile:  forwardProfile,
+			MessageKind:    messageKindToProto(message.ForwardFrom.MessageKind),
+			Snippet:        message.ForwardFrom.Snippet,
+		}
 	}
 
 	return &conversationv1.Message{
@@ -2029,6 +2055,7 @@ func messageProto(message domainconversation.Message, senderProfile *usersv1.Use
 		CreatedAt:      protoTime(message.CreatedAt),
 		EditedAt:       protoTime(message.EditedAt),
 		DeletedAt:      protoTime(message.DeletedAt),
+		ForwardFrom:    forwardOrigin,
 	}
 }
 
@@ -2038,7 +2065,11 @@ func messagesProto(
 ) []*conversationv1.Message {
 	result := make([]*conversationv1.Message, 0, len(messages))
 	for _, message := range messages {
-		result = append(result, messageProto(message, profiles[message.SenderAccountID]))
+		result = append(result, messageProto(
+			message,
+			profiles[message.SenderAccountID],
+			profiles[message.ForwardFrom.SenderAccountID],
+		))
 	}
 
 	return result
@@ -2192,11 +2223,16 @@ func (a *api) messageProfiles(
 	accountIDs := make([]string, 0, len(messages))
 	seen := make(map[string]struct{}, len(messages))
 	for _, message := range messages {
-		if _, ok := seen[message.SenderAccountID]; ok {
-			continue
+		for _, accountID := range []string{message.SenderAccountID, message.ForwardFrom.SenderAccountID} {
+			if accountID == "" {
+				continue
+			}
+			if _, ok := seen[accountID]; ok {
+				continue
+			}
+			seen[accountID] = struct{}{}
+			accountIDs = append(accountIDs, accountID)
 		}
-		seen[message.SenderAccountID] = struct{}{}
-		accountIDs = append(accountIDs, message.SenderAccountID)
 	}
 
 	return a.profilesByID(ctx, accountIDs, viewerID)

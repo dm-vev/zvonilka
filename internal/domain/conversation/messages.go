@@ -248,6 +248,7 @@ func (s *Service) SendMessage(ctx context.Context, params SendMessageParams) (Me
 			Attachments:         append([]AttachmentRef(nil), draft.Attachments...),
 			MentionAccountIDs:   append([]string(nil), draft.MentionAccountIDs...),
 			ReplyTo:             replyTo,
+			ForwardFrom:         draft.ForwardFrom,
 			ThreadID:            strings.TrimSpace(draft.ThreadID),
 			Silent:              draft.Silent,
 			Pinned:              false,

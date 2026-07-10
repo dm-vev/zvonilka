@@ -306,22 +306,27 @@ func scanReaction(row rowScanner) (conversation.MessageReaction, error) {
 
 func scanMessage(row rowScanner) (conversation.Message, error) {
 	var (
-		message             conversation.Message
-		keyID               string
-		algorithm           string
-		nonce               []byte
-		ciphertext          []byte
-		aad                 []byte
-		rawPayloadMetadata  string
-		rawMetadata         string
-		replyConversationID sql.NullString
-		replyMessageID      sql.NullString
-		replySenderID       sql.NullString
-		replyKind           sql.NullString
-		replySnippet        sql.NullString
-		deliverAt           sql.NullTime
-		editedAt            sql.NullTime
-		deletedAt           sql.NullTime
+		message               conversation.Message
+		keyID                 string
+		algorithm             string
+		nonce                 []byte
+		ciphertext            []byte
+		aad                   []byte
+		rawPayloadMetadata    string
+		rawMetadata           string
+		replyConversationID   sql.NullString
+		replyMessageID        sql.NullString
+		replySenderID         sql.NullString
+		replyKind             sql.NullString
+		replySnippet          sql.NullString
+		forwardConversationID sql.NullString
+		forwardMessageID      sql.NullString
+		forwardSenderID       sql.NullString
+		forwardKind           sql.NullString
+		forwardSnippet        sql.NullString
+		deliverAt             sql.NullTime
+		editedAt              sql.NullTime
+		deletedAt             sql.NullTime
 	)
 
 	if err := row.Scan(
@@ -344,6 +349,11 @@ func scanMessage(row rowScanner) (conversation.Message, error) {
 		&replySenderID,
 		&replyKind,
 		&replySnippet,
+		&forwardConversationID,
+		&forwardMessageID,
+		&forwardSenderID,
+		&forwardKind,
+		&forwardSnippet,
 		&message.ThreadID,
 		&message.Silent,
 		&message.Pinned,
@@ -371,6 +381,13 @@ func scanMessage(row rowScanner) (conversation.Message, error) {
 		SenderAccountID: replySenderID.String,
 		MessageKind:     conversation.MessageKind(replyKind.String),
 		Snippet:         replySnippet.String,
+	}
+	message.ForwardFrom = conversation.MessageReference{
+		ConversationID:  forwardConversationID.String,
+		MessageID:       forwardMessageID.String,
+		SenderAccountID: forwardSenderID.String,
+		MessageKind:     conversation.MessageKind(forwardKind.String),
+		Snippet:         forwardSnippet.String,
 	}
 	message.DeliverAt = decodeTime(deliverAt)
 	message.CreatedAt = message.CreatedAt.UTC()
