@@ -957,6 +957,35 @@ func (a *api) MarkRead(
 	return &conversationv1.MarkReadResponse{ReadThroughSequence: state.LastReadSequence}, nil
 }
 
+// SetTyping publishes the authenticated user's transient typing state to one conversation.
+func (a *api) SetTyping(
+	ctx context.Context,
+	req *conversationv1.SetTypingRequest,
+) (*conversationv1.SetTypingResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	typingState := "false"
+	if req.GetTyping() {
+		typingState = "true"
+	}
+	_, event, err := a.conversation.PublishConversationUpdate(ctx, domainconversation.PublishConversationUpdateParams{
+		ConversationID: req.GetConversationId(),
+		AccountID:      authContext.Account.ID,
+		DeviceID:       authContext.Device.ID,
+		PayloadType:    "typing",
+		Metadata:       map[string]string{"typing": typingState},
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	a.publishSyncEvent(event)
+
+	return &conversationv1.SetTypingResponse{}, nil
+}
+
 // CreateThread creates a group topic.
 func (a *api) CreateThread(
 	ctx context.Context,

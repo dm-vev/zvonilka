@@ -964,6 +964,70 @@ func TestPullEventsPresenceFilteringAdvancesSequence(t *testing.T) {
 	}
 }
 
+func TestSetTypingPublishesConversationEvent(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+
+	owner, ownerCtx := fixture.mustCreateUserAndLogin(t, "typing-owner", "typing-owner@example.com")
+	peer, peerCtx := fixture.mustCreateUserAndLogin(t, "typing-peer", "typing-peer@example.com")
+	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
+		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
+		Title:         "Typing",
+		MemberUserIds: []string{peer.ID},
+	})
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+
+	conversationID := created.Conversation.ConversationId
+	baseline := created.Conversation.LastSequence
+	if _, err := fixture.api.SetTyping(ownerCtx, &conversationv1.SetTypingRequest{
+		ConversationId: conversationID,
+		Typing:         true,
+	}); err != nil {
+		t.Fatalf("set typing: %v", err)
+	}
+
+	included, err := fixture.api.PullEvents(peerCtx, &syncv1.PullEventsRequest{
+		FromSequence:    baseline,
+		ConversationIds: []string{conversationID},
+	})
+	if err != nil {
+		t.Fatalf("pull typing event: %v", err)
+	}
+	if len(included.Events) != 1 {
+		t.Fatalf("expected one typing event, got %+v", included.Events)
+	}
+	event := included.Events[0]
+	if event.GetEventType() != commonv1.EventType_EVENT_TYPE_CONVERSATION_UPDATED {
+		t.Fatalf("expected conversation update event, got %s", event.GetEventType())
+	}
+	if event.GetPayloadType() != "typing" || event.GetMetadata()["typing"] != "true" {
+		t.Fatalf("expected typing payload, got %+v", event)
+	}
+	if event.GetActorUserId() != owner.ID {
+		t.Fatalf("expected typing actor %s, got %s", owner.ID, event.GetActorUserId())
+	}
+
+	if _, err := fixture.api.SetTyping(ownerCtx, &conversationv1.SetTypingRequest{
+		ConversationId: conversationID,
+		Typing:         false,
+	}); err != nil {
+		t.Fatalf("clear typing: %v", err)
+	}
+	cleared, err := fixture.api.PullEvents(peerCtx, &syncv1.PullEventsRequest{
+		FromSequence:    included.NextSequence,
+		ConversationIds: []string{conversationID},
+	})
+	if err != nil {
+		t.Fatalf("pull typing clear event: %v", err)
+	}
+	if len(cleared.Events) != 1 || cleared.Events[0].GetMetadata()["typing"] != "false" {
+		t.Fatalf("expected typing clear event, got %+v", cleared.Events)
+	}
+}
+
 func TestPullEventsModerationFilteringAdvancesSequence(t *testing.T) {
 	t.Parallel()
 

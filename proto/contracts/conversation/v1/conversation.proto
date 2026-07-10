@@ -34,6 +34,7 @@ service ConversationService {
   rpc PinMessage(PinMessageRequest) returns (PinMessageResponse);
   rpc UnpinMessage(UnpinMessageRequest) returns (UnpinMessageResponse);
   rpc MarkRead(MarkReadRequest) returns (MarkReadResponse);
+  rpc SetTyping(SetTypingRequest) returns (SetTypingResponse);
   rpc CreateThread(CreateThreadRequest) returns (CreateThreadResponse);
   rpc GetThread(GetThreadRequest) returns (GetThreadResponse);
   rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse);

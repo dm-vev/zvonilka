@@ -1579,6 +1579,99 @@ func (x *MarkReadResponse) GetReadThroughSequence() uint64 {
 	return 0
 }
 
+type SetTypingRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ConversationId string `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Typing         bool   `protobuf:"varint,2,opt,name=typing,proto3" json:"typing,omitempty"`
+}
+
+func (x *SetTypingRequest) Reset() {
+	*x = SetTypingRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_conversation_v1_messages_proto_msgTypes[26]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *SetTypingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetTypingRequest) ProtoMessage() {}
+
+func (x *SetTypingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_conversation_v1_messages_proto_msgTypes[26]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetTypingRequest.ProtoReflect.Descriptor instead.
+func (*SetTypingRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_conversation_v1_messages_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *SetTypingRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *SetTypingRequest) GetTyping() bool {
+	if x != nil {
+		return x.Typing
+	}
+	return false
+}
+
+type SetTypingResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *SetTypingResponse) Reset() {
+	*x = SetTypingResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_conversation_v1_messages_proto_msgTypes[27]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *SetTypingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetTypingResponse) ProtoMessage() {}
+
+func (x *SetTypingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_conversation_v1_messages_proto_msgTypes[27]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetTypingResponse.ProtoReflect.Descriptor instead.
+func (*SetTypingResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_conversation_v1_messages_proto_rawDescGZIP(), []int{27}
+}
+
 var File_contracts_conversation_v1_messages_proto protoreflect.FileDescriptor
 
 var file_contracts_conversation_v1_messages_proto_rawDesc = []byte{
@@ -1819,12 +1912,19 @@ var file_contracts_conversation_v1_messages_proto_rawDesc = []byte{
 	0x73, 0x65, 0x12, 0x32, 0x0a, 0x15, 0x72, 0x65, 0x61, 0x64, 0x5f, 0x74, 0x68, 0x72, 0x6f, 0x75,
 	0x67, 0x68, 0x5f, 0x73, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28,
 	0x04, 0x52, 0x13, 0x72, 0x65, 0x61, 0x64, 0x54, 0x68, 0x72, 0x6f, 0x75, 0x67, 0x68, 0x53, 0x65,
-	0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x42, 0x4f, 0x5a, 0x4d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62,
-	0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6d, 0x2d, 0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e,
-	0x69, 0x6c, 0x6b, 0x61, 0x2f, 0x67, 0x65, 0x6e, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63,
-	0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74, 0x73, 0x2f, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73,
-	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x76, 0x31, 0x3b, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73,
-	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x76, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x22, 0x53, 0x0a, 0x10, 0x53, 0x65, 0x74, 0x54, 0x79, 0x70,
+	0x69, 0x6e, 0x67, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x27, 0x0a, 0x0f, 0x63, 0x6f,
+	0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x0e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f,
+	0x6e, 0x49, 0x64, 0x12, 0x16, 0x0a, 0x06, 0x74, 0x79, 0x70, 0x69, 0x6e, 0x67, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x08, 0x52, 0x06, 0x74, 0x79, 0x70, 0x69, 0x6e, 0x67, 0x22, 0x13, 0x0a, 0x11, 0x53,
+	0x65, 0x74, 0x54, 0x79, 0x70, 0x69, 0x6e, 0x67, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
+	0x42, 0x4f, 0x5a, 0x4d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64,
+	0x6d, 0x2d, 0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2f, 0x67,
+	0x65, 0x6e, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63,
+	0x74, 0x73, 0x2f, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f,
+	0x76, 0x31, 0x3b, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x76,
+	0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1839,7 +1939,7 @@ func file_contracts_conversation_v1_messages_proto_rawDescGZIP() []byte {
 	return file_contracts_conversation_v1_messages_proto_rawDescData
 }
 
-var file_contracts_conversation_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_contracts_conversation_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_contracts_conversation_v1_messages_proto_goTypes = []interface{}{
 	(*ListMessagesRequest)(nil),           // 0: zvonilka.conversation.v1.ListMessagesRequest
 	(*ListMessagesResponse)(nil),          // 1: zvonilka.conversation.v1.ListMessagesResponse
@@ -1867,33 +1967,35 @@ var file_contracts_conversation_v1_messages_proto_goTypes = []interface{}{
 	(*UnpinMessageResponse)(nil),          // 23: zvonilka.conversation.v1.UnpinMessageResponse
 	(*MarkReadRequest)(nil),               // 24: zvonilka.conversation.v1.MarkReadRequest
 	(*MarkReadResponse)(nil),              // 25: zvonilka.conversation.v1.MarkReadResponse
-	(*v1.PageRequest)(nil),                // 26: zvonilka.common.v1.PageRequest
-	(*Message)(nil),                       // 27: zvonilka.conversation.v1.Message
-	(*v1.PageResponse)(nil),               // 28: zvonilka.common.v1.PageResponse
-	(*v1.MessageDraft)(nil),               // 29: zvonilka.common.v1.MessageDraft
-	(*v1.EventEnvelope)(nil),              // 30: zvonilka.common.v1.EventEnvelope
-	(*MessageTranslation)(nil),            // 31: zvonilka.conversation.v1.MessageTranslation
+	(*SetTypingRequest)(nil),              // 26: zvonilka.conversation.v1.SetTypingRequest
+	(*SetTypingResponse)(nil),             // 27: zvonilka.conversation.v1.SetTypingResponse
+	(*v1.PageRequest)(nil),                // 28: zvonilka.common.v1.PageRequest
+	(*Message)(nil),                       // 29: zvonilka.conversation.v1.Message
+	(*v1.PageResponse)(nil),               // 30: zvonilka.common.v1.PageResponse
+	(*v1.MessageDraft)(nil),               // 31: zvonilka.common.v1.MessageDraft
+	(*v1.EventEnvelope)(nil),              // 32: zvonilka.common.v1.EventEnvelope
+	(*MessageTranslation)(nil),            // 33: zvonilka.conversation.v1.MessageTranslation
 }
 var file_contracts_conversation_v1_messages_proto_depIdxs = []int32{
-	26, // 0: zvonilka.conversation.v1.ListMessagesRequest.page:type_name -> zvonilka.common.v1.PageRequest
-	27, // 1: zvonilka.conversation.v1.ListMessagesResponse.messages:type_name -> zvonilka.conversation.v1.Message
-	28, // 2: zvonilka.conversation.v1.ListMessagesResponse.page:type_name -> zvonilka.common.v1.PageResponse
-	26, // 3: zvonilka.conversation.v1.ListScheduledMessagesRequest.page:type_name -> zvonilka.common.v1.PageRequest
-	27, // 4: zvonilka.conversation.v1.ListScheduledMessagesResponse.messages:type_name -> zvonilka.conversation.v1.Message
-	28, // 5: zvonilka.conversation.v1.ListScheduledMessagesResponse.page:type_name -> zvonilka.common.v1.PageResponse
-	27, // 6: zvonilka.conversation.v1.GetMessageResponse.message:type_name -> zvonilka.conversation.v1.Message
-	29, // 7: zvonilka.conversation.v1.SendMessageRequest.draft:type_name -> zvonilka.common.v1.MessageDraft
-	27, // 8: zvonilka.conversation.v1.SendMessageResponse.message:type_name -> zvonilka.conversation.v1.Message
-	30, // 9: zvonilka.conversation.v1.SendMessageResponse.event:type_name -> zvonilka.common.v1.EventEnvelope
-	31, // 10: zvonilka.conversation.v1.TranslateMessageResponse.translation:type_name -> zvonilka.conversation.v1.MessageTranslation
-	29, // 11: zvonilka.conversation.v1.EditMessageRequest.draft:type_name -> zvonilka.common.v1.MessageDraft
-	27, // 12: zvonilka.conversation.v1.EditMessageResponse.message:type_name -> zvonilka.conversation.v1.Message
-	27, // 13: zvonilka.conversation.v1.DeleteMessageResponse.message:type_name -> zvonilka.conversation.v1.Message
-	27, // 14: zvonilka.conversation.v1.ForwardMessageResponse.message:type_name -> zvonilka.conversation.v1.Message
-	27, // 15: zvonilka.conversation.v1.AddReactionResponse.message:type_name -> zvonilka.conversation.v1.Message
-	27, // 16: zvonilka.conversation.v1.RemoveReactionResponse.message:type_name -> zvonilka.conversation.v1.Message
-	27, // 17: zvonilka.conversation.v1.PinMessageResponse.message:type_name -> zvonilka.conversation.v1.Message
-	27, // 18: zvonilka.conversation.v1.UnpinMessageResponse.message:type_name -> zvonilka.conversation.v1.Message
+	28, // 0: zvonilka.conversation.v1.ListMessagesRequest.page:type_name -> zvonilka.common.v1.PageRequest
+	29, // 1: zvonilka.conversation.v1.ListMessagesResponse.messages:type_name -> zvonilka.conversation.v1.Message
+	30, // 2: zvonilka.conversation.v1.ListMessagesResponse.page:type_name -> zvonilka.common.v1.PageResponse
+	28, // 3: zvonilka.conversation.v1.ListScheduledMessagesRequest.page:type_name -> zvonilka.common.v1.PageRequest
+	29, // 4: zvonilka.conversation.v1.ListScheduledMessagesResponse.messages:type_name -> zvonilka.conversation.v1.Message
+	30, // 5: zvonilka.conversation.v1.ListScheduledMessagesResponse.page:type_name -> zvonilka.common.v1.PageResponse
+	29, // 6: zvonilka.conversation.v1.GetMessageResponse.message:type_name -> zvonilka.conversation.v1.Message
+	31, // 7: zvonilka.conversation.v1.SendMessageRequest.draft:type_name -> zvonilka.common.v1.MessageDraft
+	29, // 8: zvonilka.conversation.v1.SendMessageResponse.message:type_name -> zvonilka.conversation.v1.Message
+	32, // 9: zvonilka.conversation.v1.SendMessageResponse.event:type_name -> zvonilka.common.v1.EventEnvelope
+	33, // 10: zvonilka.conversation.v1.TranslateMessageResponse.translation:type_name -> zvonilka.conversation.v1.MessageTranslation
+	31, // 11: zvonilka.conversation.v1.EditMessageRequest.draft:type_name -> zvonilka.common.v1.MessageDraft
+	29, // 12: zvonilka.conversation.v1.EditMessageResponse.message:type_name -> zvonilka.conversation.v1.Message
+	29, // 13: zvonilka.conversation.v1.DeleteMessageResponse.message:type_name -> zvonilka.conversation.v1.Message
+	29, // 14: zvonilka.conversation.v1.ForwardMessageResponse.message:type_name -> zvonilka.conversation.v1.Message
+	29, // 15: zvonilka.conversation.v1.AddReactionResponse.message:type_name -> zvonilka.conversation.v1.Message
+	29, // 16: zvonilka.conversation.v1.RemoveReactionResponse.message:type_name -> zvonilka.conversation.v1.Message
+	29, // 17: zvonilka.conversation.v1.PinMessageResponse.message:type_name -> zvonilka.conversation.v1.Message
+	29, // 18: zvonilka.conversation.v1.UnpinMessageResponse.message:type_name -> zvonilka.conversation.v1.Message
 	19, // [19:19] is the sub-list for method output_type
 	19, // [19:19] is the sub-list for method input_type
 	19, // [19:19] is the sub-list for extension type_name
@@ -2220,6 +2322,30 @@ func file_contracts_conversation_v1_messages_proto_init() {
 				return nil
 			}
 		}
+		file_contracts_conversation_v1_messages_proto_msgTypes[26].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*SetTypingRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_conversation_v1_messages_proto_msgTypes[27].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*SetTypingResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -2227,7 +2353,7 @@ func file_contracts_conversation_v1_messages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_contracts_conversation_v1_messages_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   26,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

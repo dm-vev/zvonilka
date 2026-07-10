@@ -43,6 +43,7 @@ const (
 	ConversationService_PinMessage_FullMethodName                 = "/zvonilka.conversation.v1.ConversationService/PinMessage"
 	ConversationService_UnpinMessage_FullMethodName               = "/zvonilka.conversation.v1.ConversationService/UnpinMessage"
 	ConversationService_MarkRead_FullMethodName                   = "/zvonilka.conversation.v1.ConversationService/MarkRead"
+	ConversationService_SetTyping_FullMethodName                  = "/zvonilka.conversation.v1.ConversationService/SetTyping"
 	ConversationService_CreateThread_FullMethodName               = "/zvonilka.conversation.v1.ConversationService/CreateThread"
 	ConversationService_GetThread_FullMethodName                  = "/zvonilka.conversation.v1.ConversationService/GetThread"
 	ConversationService_ListThreads_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/ListThreads"
@@ -92,6 +93,7 @@ type ConversationServiceClient interface {
 	PinMessage(ctx context.Context, in *PinMessageRequest, opts ...grpc.CallOption) (*PinMessageResponse, error)
 	UnpinMessage(ctx context.Context, in *UnpinMessageRequest, opts ...grpc.CallOption) (*UnpinMessageResponse, error)
 	MarkRead(ctx context.Context, in *MarkReadRequest, opts ...grpc.CallOption) (*MarkReadResponse, error)
+	SetTyping(ctx context.Context, in *SetTypingRequest, opts ...grpc.CallOption) (*SetTypingResponse, error)
 	CreateThread(ctx context.Context, in *CreateThreadRequest, opts ...grpc.CallOption) (*CreateThreadResponse, error)
 	GetThread(ctx context.Context, in *GetThreadRequest, opts ...grpc.CallOption) (*GetThreadResponse, error)
 	ListThreads(ctx context.Context, in *ListThreadsRequest, opts ...grpc.CallOption) (*ListThreadsResponse, error)
@@ -337,6 +339,15 @@ func (c *conversationServiceClient) MarkRead(ctx context.Context, in *MarkReadRe
 	return out, nil
 }
 
+func (c *conversationServiceClient) SetTyping(ctx context.Context, in *SetTypingRequest, opts ...grpc.CallOption) (*SetTypingResponse, error) {
+	out := new(SetTypingResponse)
+	err := c.cc.Invoke(ctx, ConversationService_SetTyping_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *conversationServiceClient) CreateThread(ctx context.Context, in *CreateThreadRequest, opts ...grpc.CallOption) (*CreateThreadResponse, error) {
 	out := new(CreateThreadResponse)
 	err := c.cc.Invoke(ctx, ConversationService_CreateThread_FullMethodName, in, out, opts...)
@@ -536,6 +547,7 @@ type ConversationServiceServer interface {
 	PinMessage(context.Context, *PinMessageRequest) (*PinMessageResponse, error)
 	UnpinMessage(context.Context, *UnpinMessageRequest) (*UnpinMessageResponse, error)
 	MarkRead(context.Context, *MarkReadRequest) (*MarkReadResponse, error)
+	SetTyping(context.Context, *SetTypingRequest) (*SetTypingResponse, error)
 	CreateThread(context.Context, *CreateThreadRequest) (*CreateThreadResponse, error)
 	GetThread(context.Context, *GetThreadRequest) (*GetThreadResponse, error)
 	ListThreads(context.Context, *ListThreadsRequest) (*ListThreadsResponse, error)
@@ -633,6 +645,9 @@ func (UnimplementedConversationServiceServer) UnpinMessage(context.Context, *Unp
 }
 func (UnimplementedConversationServiceServer) MarkRead(context.Context, *MarkReadRequest) (*MarkReadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MarkRead not implemented")
+}
+func (UnimplementedConversationServiceServer) SetTyping(context.Context, *SetTypingRequest) (*SetTypingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetTyping not implemented")
 }
 func (UnimplementedConversationServiceServer) CreateThread(context.Context, *CreateThreadRequest) (*CreateThreadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateThread not implemented")
@@ -1136,6 +1151,24 @@ func _ConversationService_MarkRead_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConversationService_SetTyping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetTypingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).SetTyping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_SetTyping_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).SetTyping(ctx, req.(*SetTypingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ConversationService_CreateThread_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateThreadRequest)
 	if err := dec(in); err != nil {
@@ -1580,6 +1613,10 @@ var ConversationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "MarkRead",
 			Handler:    _ConversationService_MarkRead_Handler,
+		},
+		{
+			MethodName: "SetTyping",
+			Handler:    _ConversationService_SetTyping_Handler,
 		},
 		{
 			MethodName: "CreateThread",
