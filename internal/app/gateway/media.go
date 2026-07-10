@@ -30,6 +30,7 @@ func (a *api) InitiateUpload(
 		SizeBytes:      req.GetSizeBytes(),
 		SHA256Hex:      req.GetSha256Hex(),
 		Metadata:       mediaUploadMetadata(req),
+		PublicAccess:   req.GetPurpose() == commonv1.MediaPurpose_MEDIA_PURPOSE_PROFILE_AVATAR,
 	})
 	if err != nil {
 		return nil, grpcError(err)

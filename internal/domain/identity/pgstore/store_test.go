@@ -151,10 +151,10 @@ func TestSaveAccountPersistsRow(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(`
 INSERT INTO %s (
 	id, kind, username, display_name, bio, email, phone, roles, status, bot_token_hash,
-	created_by, created_at, updated_at, disabled_at, last_auth_at, custom_badge_emoji
+	created_by, created_at, updated_at, disabled_at, last_auth_at, custom_badge_emoji, avatar_media_id, username_changed_at
 ) VALUES (
 	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-	$11, $12, $13, $14, $15, $16
+	$11, $12, $13, $14, $15, $16, $17, $18
 )
 ON CONFLICT (id) DO UPDATE SET
 	kind = EXCLUDED.kind,
@@ -170,7 +170,9 @@ ON CONFLICT (id) DO UPDATE SET
 	updated_at = EXCLUDED.updated_at,
 	disabled_at = EXCLUDED.disabled_at,
 	last_auth_at = EXCLUDED.last_auth_at,
-	custom_badge_emoji = EXCLUDED.custom_badge_emoji
+	custom_badge_emoji = EXCLUDED.custom_badge_emoji,
+	avatar_media_id = EXCLUDED.avatar_media_id,
+	username_changed_at = EXCLUDED.username_changed_at
 RETURNING %s
 `, qualifiedName("tenant", "identity_accounts"), accountColumnList))).
 		WithArgs(
@@ -190,6 +192,8 @@ RETURNING %s
 			nil,
 			nil,
 			"",
+			"media-avatar",
+			now,
 		).
 		WillReturnRows(sqlmock.NewRows(strings.Split(accountColumnList, ", ")).AddRow(
 			"acc-1",
@@ -208,26 +212,31 @@ RETURNING %s
 			nil,
 			nil,
 			"",
+			"media-avatar",
+			now,
 		))
 	mock.ExpectCommit()
 
 	account, err := store.SaveAccount(context.Background(), identity.Account{
-		ID:          "acc-1",
-		Kind:        identity.AccountKindUser,
-		Username:    "alice",
-		DisplayName: "Alice",
-		Email:       "alice@example.com",
-		Phone:       "12345",
-		Roles:       []identity.Role{"admin"},
-		Status:      identity.AccountStatusActive,
-		CreatedBy:   "admin-1",
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:                "acc-1",
+		Kind:              identity.AccountKindUser,
+		Username:          "alice",
+		DisplayName:       "Alice",
+		Email:             "alice@example.com",
+		Phone:             "12345",
+		Roles:             []identity.Role{"admin"},
+		Status:            identity.AccountStatusActive,
+		CreatedBy:         "admin-1",
+		CreatedAt:         now,
+		UpdatedAt:         now,
+		AvatarMediaID:     "media-avatar",
+		UsernameChangedAt: now,
 	})
 	if err != nil {
 		t.Fatalf("save account: %v", err)
 	}
-	if account.ID != "acc-1" || account.Username != "alice" {
+	if account.ID != "acc-1" || account.Username != "alice" || account.AvatarMediaID != "media-avatar" ||
+		!account.UsernameChangedAt.Equal(now) {
 		t.Fatalf("unexpected saved account: %+v", account)
 	}
 

@@ -43,6 +43,11 @@ type approveJoinRequestCacheResult struct {
 	account     Account
 }
 
+// updateProfileCacheResult keeps the saved account for an idempotent profile update.
+type updateProfileCacheResult struct {
+	account Account
+}
+
 // idempotencyExpiration records when a key should be reaped from a bucket.
 type idempotencyExpiration struct {
 	key       string
@@ -176,6 +181,7 @@ type idempotencyCache struct {
 	registerDevice       *idempotencyBucket[registerDeviceCacheResult]
 	revokeSession        *idempotencyBucket[Session]
 	revokeAllSessions    *idempotencyBucket[uint32]
+	updateProfile        *idempotencyBucket[updateProfileCacheResult]
 }
 
 // newIdempotencyCache constructs the full cache set used by the service.
@@ -193,6 +199,7 @@ func newIdempotencyCache() *idempotencyCache {
 		registerDevice:       newIdempotencyBucket[registerDeviceCacheResult](),
 		revokeSession:        newIdempotencyBucket[Session](),
 		revokeAllSessions:    newIdempotencyBucket[uint32](),
+		updateProfile:        newIdempotencyBucket[updateProfileCacheResult](),
 	}
 }
 
@@ -446,6 +453,32 @@ func (c *idempotencyCache) storeRevokeAllSessionsResult(
 	now time.Time,
 ) {
 	c.revokeAllSessions.put(key, fingerprint, revoked, now)
+}
+
+// updateProfileResult returns a cached profile update when its request fingerprint matches.
+func (c *idempotencyCache) updateProfileResult(
+	key string,
+	fingerprint string,
+	now time.Time,
+) (updateProfileCacheResult, bool, error) {
+	result, ok, err := c.updateProfile.get(key, fingerprint, now)
+	if err != nil || !ok {
+		return updateProfileCacheResult{}, ok, err
+	}
+
+	result.account = cloneAccount(result.account)
+	return result, true, nil
+}
+
+// storeUpdateProfileResult caches a successful profile update.
+func (c *idempotencyCache) storeUpdateProfileResult(
+	key string,
+	fingerprint string,
+	result updateProfileCacheResult,
+	now time.Time,
+) {
+	result.account = cloneAccount(result.account)
+	c.updateProfile.put(key, fingerprint, result, now)
 }
 
 // lookupIdempotencyResult enforces the request fingerprint and TTL contract for one bucket.

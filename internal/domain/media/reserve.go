@@ -63,6 +63,7 @@ func (s *Service) ReserveUpload(ctx context.Context, params ReserveUploadParams)
 			Height:          params.Height,
 			Duration:        params.Duration,
 			Metadata:        params.Metadata,
+			PublicAccess:    params.PublicAccess,
 			UploadExpiresAt: presignedUpload.ExpiresAt,
 			CreatedAt:       now,
 			UpdatedAt:       now,

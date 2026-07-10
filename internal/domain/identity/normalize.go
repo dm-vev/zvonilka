@@ -3,6 +3,7 @@ package identity
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 	"strings"
 	"unicode"
 )
@@ -10,6 +11,37 @@ import (
 // normalizeUsername canonicalizes usernames for lookup and uniqueness checks.
 func normalizeUsername(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
+}
+
+// validateUsername applies the public username policy to profile changes.
+func validateUsername(value string) error {
+	if value == "" {
+		return nil
+	}
+	if len(value) < 5 || len(value) > 32 {
+		return fmt.Errorf("username length: %w", ErrInvalidInput)
+	}
+	if reservedUsernames[value] {
+		return fmt.Errorf("username is reserved: %w", ErrConflict)
+	}
+	for _, symbol := range value {
+		if symbol > unicode.MaxASCII || !(symbol >= 'a' && symbol <= 'z') &&
+			!(symbol >= '0' && symbol <= '9') && symbol != '_' && symbol != '-' {
+			return fmt.Errorf("username contains invalid characters: %w", ErrInvalidInput)
+		}
+	}
+
+	return nil
+}
+
+var reservedUsernames = map[string]bool{
+	"admin":         true,
+	"administrator": true,
+	"root":          true,
+	"support":       true,
+	"system":        true,
+	"zvon":          true,
+	"zvonilka":      true,
 }
 
 // normalizeEmail canonicalizes email addresses for lookup and uniqueness checks.

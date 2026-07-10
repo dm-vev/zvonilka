@@ -90,10 +90,10 @@ func (s *Store) saveAccount(ctx context.Context, account identity.Account) (iden
 	query := fmt.Sprintf(`
 INSERT INTO %s (
 	id, kind, username, display_name, bio, email, phone, roles, status, bot_token_hash,
-	created_by, created_at, updated_at, disabled_at, last_auth_at, custom_badge_emoji
+	created_by, created_at, updated_at, disabled_at, last_auth_at, custom_badge_emoji, avatar_media_id, username_changed_at
 ) VALUES (
 	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-	$11, $12, $13, $14, $15, $16
+	$11, $12, $13, $14, $15, $16, $17, $18
 )
 ON CONFLICT (id) DO UPDATE SET
 	kind = EXCLUDED.kind,
@@ -109,7 +109,9 @@ ON CONFLICT (id) DO UPDATE SET
 	updated_at = EXCLUDED.updated_at,
 	disabled_at = EXCLUDED.disabled_at,
 	last_auth_at = EXCLUDED.last_auth_at,
-	custom_badge_emoji = EXCLUDED.custom_badge_emoji
+	custom_badge_emoji = EXCLUDED.custom_badge_emoji,
+	avatar_media_id = EXCLUDED.avatar_media_id,
+	username_changed_at = EXCLUDED.username_changed_at
 RETURNING %s
 `, s.table("identity_accounts"), accountColumnList)
 
@@ -131,6 +133,8 @@ RETURNING %s
 		nullTime(account.DisabledAt),
 		nullTime(account.LastAuthAt),
 		account.CustomBadgeEmoji,
+		nullString(account.AvatarMediaID),
+		nullTime(account.UsernameChangedAt),
 	))
 	if err != nil {
 		if mappedErr := mapConstraintError(err, identity.ErrNotFound); mappedErr != nil {

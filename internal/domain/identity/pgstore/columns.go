@@ -1,6 +1,6 @@
 package pgstore
 
-const accountColumnList = `id, kind, username, display_name, bio, email, phone, roles, status, bot_token_hash, created_by, created_at, updated_at, disabled_at, last_auth_at, custom_badge_emoji`
+const accountColumnList = `id, kind, username, display_name, bio, email, phone, roles, status, bot_token_hash, created_by, created_at, updated_at, disabled_at, last_auth_at, custom_badge_emoji, avatar_media_id, username_changed_at`
 
 const joinRequestColumnList = `id, username, display_name, email, phone, note, status, requested_at, reviewed_at, reviewed_by, decision_reason, expires_at`
 

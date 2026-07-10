@@ -2,14 +2,50 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	authv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/auth/v1"
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
+	mediav1 "github.com/dm-vev/zvonilka/gen/proto/contracts/media/v1"
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
+	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
+
+func TestIdentityProfileUpdateValidatesFieldMaskAndAvatarPresence(t *testing.T) {
+	t.Parallel()
+
+	avatar := &usersv1.ProfileAvatarUpdate{Clear: true}
+	params, err := identityProfileUpdate("account-1", &usersv1.UpdateMyProfileRequest{
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"avatar"}},
+		Avatar:     avatar,
+	})
+	if err != nil {
+		t.Fatalf("clear avatar update: %v", err)
+	}
+	if params.AvatarMediaID == nil || *params.AvatarMediaID != "" {
+		t.Fatalf("unexpected clear avatar params: %+v", params)
+	}
+
+	_, err = identityProfileUpdate("account-1", &usersv1.UpdateMyProfileRequest{
+		Profile:    &usersv1.UserProfile{},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"email"}},
+	})
+	if !errors.Is(err, identity.ErrInvalidInput) {
+		t.Fatalf("unknown profile path error = %v", err)
+	}
+
+	_, err = identityProfileUpdate("account-1", &usersv1.UpdateMyProfileRequest{
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"avatar"}},
+		Avatar:     &usersv1.ProfileAvatarUpdate{},
+	})
+	if !errors.Is(err, identity.ErrInvalidInput) {
+		t.Fatalf("empty avatar media error = %v", err)
+	}
+}
 
 func TestUpdateMyProfileAndPrivacyRPC(t *testing.T) {
 	t.Parallel()
@@ -90,6 +126,69 @@ func TestUpdateMyProfileAndPrivacyRPC(t *testing.T) {
 	}
 	if me.Profile.Privacy == nil || me.Profile.Phone == "" {
 		t.Fatalf("expected own profile to expose privacy and phone: %+v", me.Profile)
+	}
+}
+
+func TestProfileAvatarUpdateReturnsAvatarAndAllowsPublicDownload(t *testing.T) {
+	fixture := newGatewayFeatureFixture(t)
+	ctx := context.Background()
+	now := fixture.nowFunc()
+
+	owner, _, err := fixture.api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "avatar-owner",
+		Email:       "avatar-owner@example.com",
+		AccountKind: identity.AccountKindUser,
+	})
+	if err != nil {
+		t.Fatalf("create owner: %v", err)
+	}
+	const mediaID = "profile-avatar-test"
+	if _, err := fixture.mediaStore.SaveMediaAsset(ctx, domainmedia.MediaAsset{
+		ID:             mediaID,
+		OwnerAccountID: owner.ID,
+		Kind:           domainmedia.MediaKindAvatar,
+		Status:         domainmedia.MediaStatusReady,
+		ObjectKey:      "media/avatar-owner/profile-avatar-test",
+		ContentType:    "image/png",
+		SizeBytes:      128,
+		Width:          128,
+		Height:         128,
+		Metadata:       map[string]string{"purpose": "profile_avatar"},
+		PublicAccess:   true,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+		ReadyAt:        now,
+	}); err != nil {
+		t.Fatalf("save avatar asset: %v", err)
+	}
+
+	ownerCtx, _ := mustLoginOnDevice(t, fixture.api, fixture.sender, ctx, owner.Username, "owner-phone", "owner-key")
+	updated, err := fixture.api.UpdateMyProfile(ownerCtx, &usersv1.UpdateMyProfileRequest{
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"avatar"}},
+		Avatar:     &usersv1.ProfileAvatarUpdate{MediaId: mediaID},
+	})
+	if err != nil {
+		t.Fatalf("update avatar: %v", err)
+	}
+	if len(updated.Profile.Avatars) != 1 || updated.Profile.Avatars[0].MediaId != mediaID {
+		t.Fatalf("unexpected avatar profile: %+v", updated.Profile.Avatars)
+	}
+
+	viewer, _, err := fixture.api.identity.CreateAccount(ctx, identity.CreateAccountParams{
+		Username:    "avatar-viewer",
+		Email:       "avatar-viewer@example.com",
+		AccountKind: identity.AccountKindUser,
+	})
+	if err != nil {
+		t.Fatalf("create viewer: %v", err)
+	}
+	viewerCtx, _ := mustLoginOnDevice(t, fixture.api, fixture.sender, ctx, viewer.Username, "viewer-phone", "viewer-key")
+	download, err := fixture.api.GetDownloadUrl(viewerCtx, &mediav1.GetDownloadUrlRequest{MediaId: mediaID})
+	if err != nil {
+		t.Fatalf("download public avatar: %v", err)
+	}
+	if download.GetUrl() == "" {
+		t.Fatal("expected public avatar download URL")
 	}
 }
 
@@ -187,6 +286,17 @@ func TestContactsBlocksAndSearchRPC(t *testing.T) {
 	}
 	if len(hidden.Profiles) != 0 {
 		t.Fatalf("expected blocked user to be hidden, got %+v", hidden.Profiles)
+	}
+
+	marked, err := api.SearchUsers(authCtx, &usersv1.SearchUsersRequest{
+		Query:          "@bob-users",
+		IncludeBlocked: true,
+	})
+	if err != nil {
+		t.Fatalf("search users with username marker: %v", err)
+	}
+	if len(marked.Profiles) != 1 || marked.Profiles[0].Username != bob.Username {
+		t.Fatalf("expected username marker search result, got %+v", marked.Profiles)
 	}
 
 	included, err := api.SearchUsers(authCtx, &usersv1.SearchUsersRequest{

@@ -89,12 +89,22 @@ func nullTime(value time.Time) sql.NullTime {
 	return sql.NullTime{Time: value.UTC(), Valid: true}
 }
 
+func nullString(value string) sql.NullString {
+	if value == "" {
+		return sql.NullString{}
+	}
+
+	return sql.NullString{String: value, Valid: true}
+}
+
 func scanAccount(row rowScanner) (identity.Account, error) {
 	var (
-		account    identity.Account
-		rolesRaw   string
-		disabledAt sql.NullTime
-		lastAuthAt sql.NullTime
+		account           identity.Account
+		rolesRaw          string
+		disabledAt        sql.NullTime
+		lastAuthAt        sql.NullTime
+		avatarID          sql.NullString
+		usernameChangedAt sql.NullTime
 	)
 
 	if err := row.Scan(
@@ -114,6 +124,8 @@ func scanAccount(row rowScanner) (identity.Account, error) {
 		&disabledAt,
 		&lastAuthAt,
 		&account.CustomBadgeEmoji,
+		&avatarID,
+		&usernameChangedAt,
 	); err != nil {
 		return identity.Account{}, err
 	}
@@ -127,6 +139,10 @@ func scanAccount(row rowScanner) (identity.Account, error) {
 	account.UpdatedAt = account.UpdatedAt.UTC()
 	account.DisabledAt = scanNullableTime(disabledAt)
 	account.LastAuthAt = scanNullableTime(lastAuthAt)
+	if avatarID.Valid {
+		account.AvatarMediaID = avatarID.String
+	}
+	account.UsernameChangedAt = scanNullableTime(usernameChangedAt)
 	account.Roles = roles
 
 	return account, nil

@@ -174,6 +174,8 @@ RETURNING %s
 			nil,
 			nil,
 			"",
+			nil,
+			nil,
 		))
 
 	mock.ExpectQuery(regexp.QuoteMeta(fmt.Sprintf(

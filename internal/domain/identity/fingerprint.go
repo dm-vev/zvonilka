@@ -202,16 +202,25 @@ func rotateDeviceKeyFingerprint(params RotateDeviceKeyParams) string {
 
 // updateProfileFingerprint captures the fields that define a profile update.
 func updateProfileFingerprint(params UpdateProfileParams) string {
-	username, email, phone := normalizeUsername(params.Username), normalizeEmail(params.Email), normalizePhone(params.Phone)
+	username := normalizeUsername(params.Username)
+	avatarID := ""
+	avatarClear := false
+	if params.AvatarMediaID != nil {
+		avatarID = strings.TrimSpace(*params.AvatarMediaID)
+		avatarClear = avatarID == ""
+	}
+	fieldMask := append([]string(nil), params.FieldMask...)
+	sort.Strings(fieldMask)
 	return idempotencyFingerprint(
 		"update-profile",
 		params.AccountID,
+		strings.Join(fieldMask, ","),
 		username,
 		trimmed(params.DisplayName),
 		trimmed(params.Bio),
-		email,
-		phone,
 		trimmed(params.CustomBadgeEmoji),
+		avatarID,
+		strconv.FormatBool(avatarClear),
 	)
 }
 

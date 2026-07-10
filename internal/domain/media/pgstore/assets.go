@@ -357,6 +357,9 @@ func (s *Store) DeleteMediaAsset(ctx context.Context, mediaID string) error {
 	query := fmt.Sprintf(`DELETE FROM %s WHERE id = $1`, s.table("media_assets"))
 	result, err := s.conn().ExecContext(ctx, query, mediaID)
 	if err != nil {
+		if isConstraintError(err, "23503") {
+			return media.ErrConflict
+		}
 		return fmt.Errorf("delete media asset %s: %w", mediaID, err)
 	}
 

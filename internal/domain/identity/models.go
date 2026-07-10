@@ -126,22 +126,24 @@ const (
 
 // Account describes a platform account.
 type Account struct {
-	ID               string
-	Kind             AccountKind
-	Username         string
-	DisplayName      string
-	Bio              string
-	Email            string
-	Phone            string
-	Roles            []Role
-	Status           AccountStatus
-	BotTokenHash     string
-	CreatedBy        string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	DisabledAt       time.Time
-	LastAuthAt       time.Time
-	CustomBadgeEmoji string
+	ID                string
+	Kind              AccountKind
+	Username          string
+	DisplayName       string
+	Bio               string
+	Email             string
+	Phone             string
+	Roles             []Role
+	Status            AccountStatus
+	BotTokenHash      string
+	CreatedBy         string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	DisabledAt        time.Time
+	LastAuthAt        time.Time
+	CustomBadgeEmoji  string
+	AvatarMediaID     string
+	UsernameChangedAt time.Time
 }
 
 // JoinRequest describes a pending account request.

@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
+	"image/png"
 	"io"
 	"net/http"
 	"sort"
@@ -112,6 +114,81 @@ func TestMediaLifecycle(t *testing.T) {
 	}
 	if deleted.Status != media.MediaStatusDeleted {
 		t.Fatalf("expected deleted asset, got %s", deleted.Status)
+	}
+}
+
+func TestFinalizeProfileAvatarValidatesImageContent(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	now := time.Date(2026, time.July, 10, 12, 0, 0, 0, time.UTC)
+	store := newMemoryStore()
+	blob := newMemoryBlobStore("media-bucket")
+	svc, err := media.NewService(store, blob, media.WithNow(func() time.Time { return now }))
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, image.NewRGBA(image.Rect(0, 0, 2, 3))); err != nil {
+		t.Fatalf("encode avatar: %v", err)
+	}
+	payload := encoded.Bytes()
+	asset, upload, err := svc.ReserveUpload(ctx, media.ReserveUploadParams{
+		OwnerAccountID: "account-avatar",
+		Kind:           media.MediaKindAvatar,
+		FileName:       "avatar.png",
+		ContentType:    "image/png",
+		SizeBytes:      uint64(len(payload)),
+		Metadata:       map[string]string{"purpose": "profile_avatar"},
+		CreatedAt:      now,
+	})
+	if err != nil {
+		t.Fatalf("reserve avatar: %v", err)
+	}
+	blob.seedObject(upload.ObjectKey, domainstorage.BlobObject{
+		Bucket:        upload.Bucket,
+		Key:           upload.ObjectKey,
+		ContentLength: int64(len(payload)),
+		ContentType:   "application/octet-stream",
+	}, payload)
+
+	finalized, err := svc.FinalizeUpload(ctx, media.FinalizeUploadParams{
+		OwnerAccountID: "account-avatar",
+		MediaID:        asset.ID,
+		CreatedAt:      now.Add(time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("finalize avatar: %v", err)
+	}
+	if finalized.ContentType != "image/png" || finalized.Width != 2 || finalized.Height != 3 {
+		t.Fatalf("unexpected avatar metadata: %+v", finalized)
+	}
+
+	invalid, invalidUpload, err := svc.ReserveUpload(ctx, media.ReserveUploadParams{
+		OwnerAccountID: "account-avatar",
+		Kind:           media.MediaKindAvatar,
+		FileName:       "avatar.html",
+		ContentType:    "image/png",
+		SizeBytes:      5,
+		Metadata:       map[string]string{"purpose": "profile_avatar"},
+		CreatedAt:      now,
+	})
+	if err != nil {
+		t.Fatalf("reserve invalid avatar: %v", err)
+	}
+	blob.seedObject(invalidUpload.ObjectKey, domainstorage.BlobObject{
+		Bucket:        invalidUpload.Bucket,
+		Key:           invalidUpload.ObjectKey,
+		ContentLength: 5,
+		ContentType:   "image/png",
+	}, []byte("<html"))
+	if _, err := svc.FinalizeUpload(ctx, media.FinalizeUploadParams{
+		OwnerAccountID: "account-avatar",
+		MediaID:        invalid.ID,
+		CreatedAt:      now.Add(time.Minute),
+	}); !errors.Is(err, media.ErrInvalidInput) {
+		t.Fatalf("invalid avatar error = %v", err)
 	}
 }
 

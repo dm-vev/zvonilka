@@ -154,11 +154,17 @@ type RotateDeviceKeyParams struct {
 type UpdateProfileParams struct {
 	AccountID        string
 	Username         string
+	UsernameSet      bool
 	DisplayName      string
+	DisplayNameSet   bool
 	Bio              string
+	BioSet           bool
 	Email            string
 	Phone            string
 	CustomBadgeEmoji string
+	CustomBadgeSet   bool
+	AvatarMediaID    *string
+	FieldMask        []string
 	IdempotencyKey   string
 	RequestedAt      time.Time
 }

@@ -44,34 +44,43 @@ func (a *api) UpdateMyProfile(
 	if err != nil {
 		return nil, err
 	}
-	if req.GetProfile() == nil {
-		return nil, grpcError(domainuser.ErrInvalidInput)
-	}
-
-	params := identityProfileUpdate(authContext.Account.ID, req)
-	account, err := a.identity.UpdateProfile(ctx, params)
+	params, err := identityProfileUpdate(authContext.Account.ID, req)
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	if err := a.validateProfileAvatar(ctx, authContext.Account.ID, params.AvatarMediaID); err != nil {
+		return nil, grpcError(err)
+	}
+
+	result, err := a.identity.UpdateProfileWithResult(ctx, params)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	account := result.Account
 
 	userProfile, err := a.profileByID(ctx, account.ID, authContext.Account.ID)
 	if err != nil {
 		return nil, grpcError(err)
 	}
 
-	events, err := a.conversation.PublishUserUpdate(ctx, domainconversation.PublishUserUpdateParams{
-		AccountID:   account.ID,
-		DeviceID:    authContext.Device.ID,
-		PayloadType: "profile",
-		Metadata: map[string]string{
-			"scope": "profile",
-		},
-		CreatedAt: account.UpdatedAt,
-	})
-	if err != nil {
-		return nil, grpcError(err)
+	if !result.Replayed {
+		metadata := map[string]string{"scope": "profile"}
+		if params.AvatarMediaID != nil {
+			metadata["avatar_media_id"] = account.AvatarMediaID
+			metadata["old_avatar_media_id"] = authContext.Account.AvatarMediaID
+		}
+		events, err := a.conversation.PublishUserUpdate(ctx, domainconversation.PublishUserUpdateParams{
+			AccountID:   account.ID,
+			DeviceID:    authContext.Device.ID,
+			PayloadType: "profile",
+			Metadata:    metadata,
+			CreatedAt:   account.UpdatedAt,
+		})
+		if err != nil {
+			return nil, grpcError(err)
+		}
+		a.publishSyncEvents(events...)
 	}
-	a.publishSyncEvents(events...)
 
 	return &usersv1.UpdateMyProfileResponse{Profile: userProfile}, nil
 }
@@ -197,8 +206,9 @@ func (a *api) SearchUsers(
 		return nil, grpcError(domainsearch.ErrInvalidInput)
 	}
 
+	query := strings.TrimLeft(strings.TrimSpace(req.GetQuery()), "@")
 	result, err := a.search.Search(ctx, domainsearch.SearchParams{
-		Query:  req.GetQuery(),
+		Query:  query,
 		Scopes: []domainsearch.SearchScope{domainsearch.SearchScopeUsers},
 		Limit:  pageSize(req.GetPage()),
 		Offset: offset,
@@ -561,15 +571,171 @@ func (a *api) profilesByID(
 		relation := relations[accountID]
 		snapshot := presenceSnapshots[accountID]
 		userResult := userProfile(account, snapshot, privacy, relation, viewerID == accountID)
+		if err := a.addAccountAvatar(ctx, userResult, account); err != nil {
+			return nil, err
+		}
 		if account.Kind == domainidentity.AccountKindBot {
-			if err := a.addBotAvatar(ctx, userResult, account.ID); err != nil {
-				return nil, err
+			if len(userResult.Avatars) == 0 {
+				if err := a.addBotAvatar(ctx, userResult, account.ID); err != nil {
+					return nil, err
+				}
 			}
 		}
 		result[accountID] = userResult
 	}
 
 	return result, nil
+}
+
+func (a *api) addAccountAvatar(
+	ctx context.Context,
+	profile *usersv1.UserProfile,
+	account domainidentity.Account,
+) error {
+	mediaID := strings.TrimSpace(account.AvatarMediaID)
+	if mediaID == "" {
+		return nil
+	}
+
+	asset, err := a.media.MediaAssetByID(ctx, mediaID)
+	if err != nil {
+		if errors.Is(err, domainmedia.ErrNotFound) {
+			return nil
+		}
+		return fmt.Errorf("load profile avatar asset %s: %w", mediaID, err)
+	}
+	if asset.OwnerAccountID != account.ID || asset.Kind != domainmedia.MediaKindAvatar ||
+		asset.Status != domainmedia.MediaStatusReady || !asset.DeletedAt.IsZero() ||
+		mediaPurposeFromAsset(asset) != commonv1.MediaPurpose_MEDIA_PURPOSE_PROFILE_AVATAR {
+		return nil
+	}
+
+	profile.Avatars = []*commonv1.Avatar{
+		{
+			MediaId:   asset.ID,
+			Variant:   "default",
+			IsPrimary: true,
+			Width:     asset.Width,
+			Height:    asset.Height,
+			MimeType:  asset.ContentType,
+			CreatedAt: protoTime(asset.CreatedAt),
+		},
+	}
+
+	return nil
+}
+
+func (a *api) validateProfileAvatar(
+	ctx context.Context,
+	accountID string,
+	mediaID *string,
+) error {
+	if mediaID == nil || strings.TrimSpace(*mediaID) == "" {
+		return nil
+	}
+
+	asset, err := a.media.MediaAssetByID(ctx, strings.TrimSpace(*mediaID))
+	if err != nil {
+		return fmt.Errorf("load profile avatar media: %w", err)
+	}
+	if asset.OwnerAccountID != accountID || asset.Status != domainmedia.MediaStatusReady ||
+		asset.Kind != domainmedia.MediaKindAvatar || !asset.DeletedAt.IsZero() ||
+		mediaPurposeFromAsset(asset) != commonv1.MediaPurpose_MEDIA_PURPOSE_PROFILE_AVATAR {
+		return domainmedia.ErrForbidden
+	}
+	if asset.SizeBytes == 0 || asset.SizeBytes > 10<<20 || asset.Width == 0 || asset.Height == 0 ||
+		asset.Width > 2048 || asset.Height > 2048 {
+		return domainmedia.ErrConflict
+	}
+	switch strings.ToLower(strings.TrimSpace(asset.ContentType)) {
+	case "image/jpeg", "image/png":
+		return nil
+	default:
+		return domainmedia.ErrInvalidInput
+	}
+}
+
+func identityProfileUpdate(
+	accountID string,
+	req *usersv1.UpdateMyProfileRequest,
+) (domainidentity.UpdateProfileParams, error) {
+	if req == nil {
+		return domainidentity.UpdateProfileParams{}, domainidentity.ErrInvalidInput
+	}
+	profile := req.GetProfile()
+	mask := req.GetUpdateMask()
+	if mask == nil || len(mask.GetPaths()) == 0 {
+		if profile == nil || req.GetAvatar() != nil {
+			return domainidentity.UpdateProfileParams{}, domainidentity.ErrInvalidInput
+		}
+		return domainidentity.UpdateProfileParams{
+			AccountID:        accountID,
+			IdempotencyKey:   req.GetIdempotencyKey(),
+			Username:         profile.GetUsername(),
+			DisplayName:      profile.GetDisplayName(),
+			Bio:              profile.GetBio(),
+			BioSet:           true,
+			CustomBadgeEmoji: profile.GetCustomBadgeEmoji(),
+			CustomBadgeSet:   true,
+			FieldMask:        []string{"username", "display_name", "bio", "custom_badge_emoji"},
+		}, nil
+	}
+
+	params := domainidentity.UpdateProfileParams{
+		AccountID:      accountID,
+		IdempotencyKey: req.GetIdempotencyKey(),
+		FieldMask:      append([]string(nil), mask.GetPaths()...),
+	}
+	seen := make(map[string]struct{}, len(mask.GetPaths()))
+	for _, path := range mask.GetPaths() {
+		if _, exists := seen[path]; exists {
+			return domainidentity.UpdateProfileParams{}, domainidentity.ErrInvalidInput
+		}
+		seen[path] = struct{}{}
+		switch path {
+		case "username":
+			if profile == nil {
+				return domainidentity.UpdateProfileParams{}, domainidentity.ErrInvalidInput
+			}
+			params.Username = profile.GetUsername()
+			params.UsernameSet = true
+		case "display_name":
+			if profile == nil {
+				return domainidentity.UpdateProfileParams{}, domainidentity.ErrInvalidInput
+			}
+			params.DisplayName = profile.GetDisplayName()
+			params.DisplayNameSet = true
+		case "bio":
+			if profile == nil {
+				return domainidentity.UpdateProfileParams{}, domainidentity.ErrInvalidInput
+			}
+			params.Bio = profile.GetBio()
+			params.BioSet = true
+		case "custom_badge_emoji":
+			if profile == nil {
+				return domainidentity.UpdateProfileParams{}, domainidentity.ErrInvalidInput
+			}
+			params.CustomBadgeEmoji = profile.GetCustomBadgeEmoji()
+			params.CustomBadgeSet = true
+		case "avatar":
+			avatar := req.GetAvatar()
+			if avatar == nil || (avatar.GetClear() && strings.TrimSpace(avatar.GetMediaId()) != "") ||
+				(!avatar.GetClear() && strings.TrimSpace(avatar.GetMediaId()) == "") {
+				return domainidentity.UpdateProfileParams{}, domainidentity.ErrInvalidInput
+			}
+			avatarID := strings.TrimSpace(avatar.GetMediaId())
+			params.AvatarMediaID = &avatarID
+		default:
+			return domainidentity.UpdateProfileParams{}, domainidentity.ErrInvalidInput
+		}
+	}
+	if req.GetAvatar() != nil {
+		if _, ok := seen["avatar"]; !ok {
+			return domainidentity.UpdateProfileParams{}, domainidentity.ErrInvalidInput
+		}
+	}
+
+	return params, nil
 }
 
 func (a *api) addBotAvatar(
@@ -612,45 +778,4 @@ func (a *api) addBotAvatar(
 	}
 
 	return nil
-}
-
-func identityProfileUpdate(accountID string, req *usersv1.UpdateMyProfileRequest) domainidentity.UpdateProfileParams {
-	profile := req.GetProfile()
-	params := domainidentity.UpdateProfileParams{
-		AccountID:        accountID,
-		IdempotencyKey:   req.GetIdempotencyKey(),
-		Username:         profile.GetUsername(),
-		DisplayName:      profile.GetDisplayName(),
-		Bio:              profile.GetBio(),
-		Email:            profile.GetEmail(),
-		Phone:            profile.GetPhone(),
-		CustomBadgeEmoji: profile.GetCustomBadgeEmoji(),
-	}
-
-	if req.GetUpdateMask() == nil || len(req.GetUpdateMask().GetPaths()) == 0 {
-		return params
-	}
-
-	masked := domainidentity.UpdateProfileParams{
-		AccountID:      accountID,
-		IdempotencyKey: req.GetIdempotencyKey(),
-	}
-	for _, path := range req.GetUpdateMask().GetPaths() {
-		switch path {
-		case "username":
-			masked.Username = profile.GetUsername()
-		case "display_name":
-			masked.DisplayName = profile.GetDisplayName()
-		case "bio":
-			masked.Bio = profile.GetBio()
-		case "email":
-			masked.Email = profile.GetEmail()
-		case "phone":
-			masked.Phone = profile.GetPhone()
-		case "custom_badge_emoji":
-			masked.CustomBadgeEmoji = profile.GetCustomBadgeEmoji()
-		}
-	}
-
-	return masked
 }

@@ -16,10 +16,16 @@ message GetMyProfileResponse {
   UserProfile profile = 1;
 }
 
+message ProfileAvatarUpdate {
+  string media_id = 1;
+  bool clear = 2;
+}
+
 message UpdateMyProfileRequest {
   UserProfile profile = 1;
   google.protobuf.FieldMask update_mask = 2;
   string idempotency_key = 3;
+  ProfileAvatarUpdate avatar = 4;
 }
 
 message UpdateMyProfileResponse {
