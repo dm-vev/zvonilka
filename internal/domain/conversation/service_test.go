@@ -17,7 +17,10 @@ func TestConversationLifecycle(t *testing.T) {
 	store := teststore.NewMemoryStore()
 	fixedNow := time.Date(2026, time.March, 24, 10, 0, 0, 0, time.UTC)
 
-	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time { return fixedNow }))
+	svc, err := conversation.NewService(store,
+		conversation.WithNow(func() time.Time { return fixedNow }),
+		conversation.WithReactionValidator(func(_ context.Context, emoji string) (string, error) { return emoji, nil }),
+	)
 	if err != nil {
 		t.Fatalf("new service: %v", err)
 	}
@@ -508,7 +511,10 @@ func TestMessageActionsLifecycle(t *testing.T) {
 	store := teststore.NewMemoryStore()
 	fixedNow := time.Date(2026, time.March, 24, 15, 0, 0, 0, time.UTC)
 
-	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time { return fixedNow }))
+	svc, err := conversation.NewService(store,
+		conversation.WithNow(func() time.Time { return fixedNow }),
+		conversation.WithReactionValidator(func(_ context.Context, emoji string) (string, error) { return emoji, nil }),
+	)
 	if err != nil {
 		t.Fatalf("new service: %v", err)
 	}
@@ -634,12 +640,19 @@ func TestMessageActionsLifecycle(t *testing.T) {
 	if len(reacted.Reactions) != 1 || reacted.Reactions[0].Reaction != "❤️" {
 		t.Fatalf("expected updated reaction, got %+v", reacted.Reactions)
 	}
+	svc.SetReactionValidator(func(_ context.Context, emoji string) (string, error) {
+		if emoji == "❤️" {
+			return "", conversation.ErrForbidden
+		}
+		return emoji, nil
+	})
 
 	reacted, reactionEvent, err = svc.RemoveMessageReaction(ctx, conversation.RemoveMessageReactionParams{
 		ConversationID: created.ID,
 		MessageID:      replyMessage.ID,
 		ActorAccountID: "acc-owner",
 		ActorDeviceID:  "dev-owner",
+		Reaction:       "❤️",
 		RemovedAt:      fixedNow.Add(6 * time.Minute),
 	})
 	if err != nil {

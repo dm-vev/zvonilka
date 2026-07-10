@@ -12,6 +12,7 @@ import (
 	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
 	domainnotification "github.com/dm-vev/zvonilka/internal/domain/notification"
 	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
+	domainreaction "github.com/dm-vev/zvonilka/internal/domain/reaction"
 	domainsearch "github.com/dm-vev/zvonilka/internal/domain/search"
 	domaintranslation "github.com/dm-vev/zvonilka/internal/domain/translation"
 	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
@@ -81,6 +82,14 @@ func grpcError(err error) error {
 		errors.Is(err, domaintranslation.ErrInvalidInput),
 		errors.Is(err, domainuser.ErrInvalidInput):
 		return status.Error(codes.InvalidArgument, "invalid request")
+	case errors.Is(err, domainreaction.ErrInactive):
+		return status.Error(codes.PermissionDenied, "reaction is inactive")
+	case errors.Is(err, domainreaction.ErrEmptyCatalog):
+		return status.Error(codes.FailedPrecondition, "reaction catalog is empty")
+	case errors.Is(err, domainreaction.ErrInvalidCatalog):
+		return status.Error(codes.Internal, "reaction catalog is invalid")
+	case errors.Is(err, domainreaction.ErrInvalidInput):
+		return status.Error(codes.InvalidArgument, "invalid reaction")
 	default:
 		return status.Error(codes.Internal, fmt.Sprintf("internal error: %v", err))
 	}

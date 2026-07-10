@@ -9,6 +9,7 @@ import (
 
 	federationv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/federation/v1"
 	transport "github.com/dm-vev/zvonilka/internal/platform/federation/transport"
+	"google.golang.org/protobuf/proto"
 )
 
 type settings struct {
@@ -148,7 +149,5 @@ func cloneFragment(fragment *federationv1.BundleFragment) *federationv1.BundleFr
 		return nil
 	}
 
-	copy := *fragment
-	copy.Payload = append([]byte(nil), fragment.GetPayload()...)
-	return &copy
+	return proto.Clone(fragment).(*federationv1.BundleFragment)
 }

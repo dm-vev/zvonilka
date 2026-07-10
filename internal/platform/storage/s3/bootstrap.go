@@ -22,6 +22,7 @@ type Bootstrap struct {
 	mu         sync.Mutex
 	cfg        config.Configuration
 	httpClient *http.Client
+	name       string
 	provider   *Provider
 }
 
@@ -47,6 +48,16 @@ func WithHTTPClient(client *http.Client) Option {
 			return
 		}
 		bootstrap.httpClient = client
+	}
+}
+
+// WithName sets the logical provider name for direct bootstrap consumers.
+func WithName(name string) Option {
+	return func(bootstrap *Bootstrap) {
+		if bootstrap == nil {
+			return
+		}
+		bootstrap.name = strings.TrimSpace(name)
 	}
 }
 
@@ -136,6 +147,7 @@ func (b *Bootstrap) open(ctx context.Context) (*Provider, error) {
 		client:  client,
 		presign: s3.NewPresignClient(client),
 		bucket:  objectCfg.Bucket,
+		name:    b.name,
 	}, nil
 }
 

@@ -57,6 +57,7 @@ type MediaAsset struct {
 	Height          uint32
 	Duration        time.Duration
 	Metadata        map[string]string
+	PublicAccess    bool
 	UploadExpiresAt time.Time
 	ReadyAt         time.Time
 	DeletedAt       time.Time

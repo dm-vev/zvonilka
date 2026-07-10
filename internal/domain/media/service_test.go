@@ -115,6 +115,53 @@ func TestMediaLifecycle(t *testing.T) {
 	}
 }
 
+func TestPublicAssetDownloadIsAvailableToAuthenticatedNonOwner(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := newMemoryStore()
+	blob := newMemoryBlobStore("media-bucket")
+	now := time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC)
+	svc, err := media.NewService(store, blob, media.WithNow(func() time.Time { return now }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	asset := media.MediaAsset{
+		ID:              "public-reaction",
+		OwnerAccountID:  "catalog-owner",
+		Kind:            media.MediaKindSticker,
+		Status:          media.MediaStatusReady,
+		StorageProvider: "object",
+		Bucket:          "media-bucket",
+		ObjectKey:       "media/catalog-owner/public-reaction",
+		FileName:        "static.webp",
+		ContentType:     "image/webp",
+		SizeBytes:       10,
+		SHA256Hex:       "sha-public",
+		PublicAccess:    true,
+		UploadExpiresAt: now.Add(time.Hour),
+		ReadyAt:         now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	if _, err := store.SaveMediaAsset(ctx, asset); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := svc.GetDownloadURL(ctx, media.GetDownloadParams{OwnerAccountID: "another-user", MediaID: asset.ID}); err != nil {
+		t.Fatalf("public asset download: %v", err)
+	}
+
+	asset.PublicAccess = false
+	asset.ID = "private-reaction"
+	asset.ObjectKey = "media/catalog-owner/private-reaction"
+	if _, err := store.SaveMediaAsset(ctx, asset); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := svc.GetDownloadURL(ctx, media.GetDownloadParams{OwnerAccountID: "another-user", MediaID: asset.ID}); !errors.Is(err, media.ErrForbidden) {
+		t.Fatalf("private asset error = %v", err)
+	}
+}
+
 func TestServerSideUpload(t *testing.T) {
 	t.Parallel()
 

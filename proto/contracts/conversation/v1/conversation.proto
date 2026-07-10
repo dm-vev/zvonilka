@@ -31,6 +31,7 @@ service ConversationService {
   rpc ForwardMessage(ForwardMessageRequest) returns (ForwardMessageResponse);
   rpc AddReaction(AddReactionRequest) returns (AddReactionResponse);
   rpc RemoveReaction(RemoveReactionRequest) returns (RemoveReactionResponse);
+  rpc GetReactionCatalog(GetReactionCatalogRequest) returns (GetReactionCatalogResponse);
   rpc PinMessage(PinMessageRequest) returns (PinMessageResponse);
   rpc UnpinMessage(UnpinMessageRequest) returns (UnpinMessageResponse);
   rpc MarkRead(MarkReadRequest) returns (MarkReadResponse);

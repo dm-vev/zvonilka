@@ -44,7 +44,6 @@ func (s *Service) AddMessageReaction(ctx context.Context, params AddMessageReact
 	if params.ConversationID == "" || params.MessageID == "" || params.ActorAccountID == "" || params.Reaction == "" {
 		return Message{}, EventEnvelope{}, ErrInvalidInput
 	}
-
 	now := params.CreatedAt
 	if now.IsZero() {
 		now = s.currentTime()
@@ -66,6 +65,17 @@ func (s *Service) AddMessageReaction(ctx context.Context, params AddMessageReact
 		}
 		if !policy.AllowReactions {
 			return ErrForbidden
+		}
+		if s.reactionValidator == nil {
+			return ErrInvalidInput
+		}
+		canonicalReaction, validationErr := s.reactionValidator(ctx, params.Reaction)
+		if validationErr != nil {
+			return validationErr
+		}
+		params.Reaction = strings.TrimSpace(canonicalReaction)
+		if params.Reaction == "" {
+			return ErrInvalidInput
 		}
 		checkPolicy := policy
 		checkPolicy.SlowModeInterval = 0

@@ -131,6 +131,29 @@ message Reaction {
   google.protobuf.Timestamp created_at = 3;
 }
 
+message ReactionAsset {
+  string media_id = 1;
+  string mime_type = 2;
+  uint32 width = 3;
+  uint32 height = 4;
+  uint64 size_bytes = 5;
+  string sha256_hex = 6;
+}
+
+message EmojiReactionDefinition {
+  string emoji = 1;
+  string title = 2;
+  bool active = 3;
+  uint32 sort_order = 4;
+  ReactionAsset static_icon = 5;
+  ReactionAsset appear_animation = 6;
+  ReactionAsset select_animation = 7;
+  ReactionAsset activate_animation = 8;
+  ReactionAsset effect_animation = 9;
+  ReactionAsset around_animation = 10;
+  ReactionAsset center_animation = 11;
+}
+
 message Message {
   string message_id = 1;
   string conversation_id = 2;

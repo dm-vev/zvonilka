@@ -65,11 +65,11 @@ func (s *Store) saveMediaAsset(ctx context.Context, asset media.MediaAsset) (med
 INSERT INTO %s (
 	id, owner_account_id, kind, status, storage_provider, bucket, object_key, file_name,
 	content_type, size_bytes, sha256_hex, width, height, duration_nanos, metadata,
-	upload_expires_at, ready_at, deleted_at, created_at, updated_at
+	public_access, upload_expires_at, ready_at, deleted_at, created_at, updated_at
 ) VALUES (
 	$1, $2, $3, $4, $5, $6, $7, $8,
 	$9, $10, $11, $12, $13, $14, $15,
-	$16, $17, $18, $19, $20
+	$16, $17, $18, $19, $20, $21
 )
 ON CONFLICT (id) DO UPDATE SET
 	owner_account_id = EXCLUDED.owner_account_id,
@@ -86,6 +86,7 @@ ON CONFLICT (id) DO UPDATE SET
 	height = EXCLUDED.height,
 	duration_nanos = EXCLUDED.duration_nanos,
 	metadata = EXCLUDED.metadata,
+	public_access = EXCLUDED.public_access,
 	upload_expires_at = EXCLUDED.upload_expires_at,
 	ready_at = EXCLUDED.ready_at,
 	deleted_at = EXCLUDED.deleted_at,
@@ -109,6 +110,7 @@ RETURNING %s
 		asset.Height,
 		encodeDuration(asset.Duration),
 		metadata,
+		asset.PublicAccess,
 		encodeTime(asset.UploadExpiresAt),
 		encodeTime(asset.ReadyAt),
 		encodeTime(asset.DeletedAt),
@@ -191,6 +193,36 @@ func (s *Store) MediaAssetByID(ctx context.Context, mediaID string) (media.Media
 			return media.MediaAsset{}, media.ErrNotFound
 		}
 		return media.MediaAsset{}, fmt.Errorf("load media asset %s: %w", mediaID, err)
+	}
+
+	return asset, nil
+}
+
+// MediaAssetBySHA256 finds an existing ready asset for idempotent seed uploads.
+func (s *Store) MediaAssetBySHA256(ctx context.Context, sha256Hex string) (media.MediaAsset, error) {
+	if err := s.requireStore(); err != nil {
+		return media.MediaAsset{}, err
+	}
+	if err := s.requireContext(ctx); err != nil {
+		return media.MediaAsset{}, err
+	}
+	sha256Hex = strings.TrimSpace(sha256Hex)
+	if sha256Hex == "" {
+		return media.MediaAsset{}, media.ErrInvalidInput
+	}
+
+	query := fmt.Sprintf(`
+SELECT %s
+FROM %s
+WHERE sha256_hex = $1 AND status = $2
+ORDER BY public_access DESC, updated_at DESC, id ASC
+LIMIT 1`, mediaColumnList, s.table("media_assets"))
+	asset, err := scanAsset(s.conn().QueryRowContext(ctx, query, sha256Hex, media.MediaStatusReady))
+	if err != nil {
+		if isNotFound(err) {
+			return media.MediaAsset{}, media.ErrNotFound
+		}
+		return media.MediaAsset{}, fmt.Errorf("load media asset by sha256 %s: %w", sha256Hex, err)
 	}
 
 	return asset, nil

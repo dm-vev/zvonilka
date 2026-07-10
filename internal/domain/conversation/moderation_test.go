@@ -90,7 +90,7 @@ func TestModerationPolicyBlocksReactions(t *testing.T) {
 
 	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time {
 		return now
-	}))
+	}), conversation.WithReactionValidator(func(_ context.Context, emoji string) (string, error) { return emoji, nil }))
 	require.NoError(t, err)
 
 	created, _, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{
@@ -402,7 +402,7 @@ func TestTopicModerationPolicyBlocksReactionsAndPins(t *testing.T) {
 
 	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time {
 		return now
-	}))
+	}), conversation.WithReactionValidator(func(_ context.Context, emoji string) (string, error) { return emoji, nil }))
 	require.NoError(t, err)
 
 	created, _, err := svc.CreateConversation(ctx, conversation.CreateConversationParams{

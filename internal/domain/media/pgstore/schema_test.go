@@ -36,6 +36,7 @@ func TestMediaSchema(t *testing.T) {
 		"0006.sql",
 		"0007.sql",
 		"0008.sql",
+		"0059.sql",
 	)
 	if err := platformpostgres.ApplyMigrations(context.Background(), db, migrationsPath, "tenant"); err != nil {
 		t.Fatalf("apply migrations: %v", err)
@@ -62,6 +63,7 @@ func TestMediaSchema(t *testing.T) {
 			SizeBytes:       1024,
 			SHA256Hex:       "abc123",
 			Metadata:        map[string]string{"album": "vacation"},
+			PublicAccess:    true,
 			UploadExpiresAt: time.Date(2026, time.March, 24, 12, 15, 0, 0, time.UTC),
 			CreatedAt:       time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC),
 			UpdatedAt:       time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC),
@@ -81,6 +83,9 @@ func TestMediaSchema(t *testing.T) {
 		}
 		if loaded.ObjectKey != asset.ObjectKey {
 			t.Fatalf("expected object key %s, got %s", asset.ObjectKey, loaded.ObjectKey)
+		}
+		if !loaded.PublicAccess {
+			t.Fatal("expected public access flag to round-trip")
 		}
 
 		assets, err := store.MediaAssetsByOwner(context.Background(), "acc-owner", 10)

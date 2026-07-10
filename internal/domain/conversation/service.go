@@ -9,15 +9,19 @@ import (
 	"strings"
 	"time"
 
+	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
+	domainreaction "github.com/dm-vev/zvonilka/internal/domain/reaction"
 	domainsearch "github.com/dm-vev/zvonilka/internal/domain/search"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
 )
 
 // Service coordinates conversation, message, and sync state changes.
 type Service struct {
-	store   Store
-	now     func() time.Time
-	indexer domainsearch.Indexer
+	store             Store
+	now               func() time.Time
+	indexer           domainsearch.Indexer
+	reactionValidator ReactionValidator
+	reactionCatalog   *domainreaction.Service
 }
 
 // NewService constructs a conversation service backed by the provided store.
@@ -37,6 +41,53 @@ func NewService(store Store, opts ...Option) (*Service, error) {
 	}
 
 	return service, nil
+}
+
+// SetReactionValidator wires the global reaction catalog into the message domain.
+func (s *Service) SetReactionValidator(validator ReactionValidator) {
+	if s != nil {
+		s.reactionValidator = validator
+	}
+}
+
+// SetReactionCatalog wires the global catalog into reaction validation and reads.
+func (s *Service) SetReactionCatalog(catalog *domainreaction.Service) {
+	if s == nil {
+		return
+	}
+	s.reactionCatalog = catalog
+	if catalog == nil {
+		s.reactionValidator = nil
+		return
+	}
+	s.reactionValidator = func(ctx context.Context, emoji string) (string, error) {
+		canonical, err := catalog.ValidateReaction(ctx, emoji)
+		if errors.Is(err, domainreaction.ErrInvalidInput) {
+			return "", ErrInvalidInput
+		}
+		if errors.Is(err, domainreaction.ErrInactive) {
+			return "", ErrForbidden
+		}
+		return canonical, err
+	}
+}
+
+// GetReactionCatalog returns the validated global reaction catalog.
+func (s *Service) GetReactionCatalog(ctx context.Context, knownVersion string) (domainreaction.Catalog, bool, error) {
+	if s == nil || s.reactionCatalog == nil {
+		return domainreaction.Catalog{}, false, ErrInvalidInput
+	}
+
+	return s.reactionCatalog.Catalog(ctx, knownVersion)
+}
+
+// ReactionAssets resolves the validated media metadata for a catalog entry.
+func (s *Service) ReactionAssets(ctx context.Context, definition domainreaction.Definition) (map[string]domainmedia.MediaAsset, error) {
+	if s == nil || s.reactionCatalog == nil {
+		return nil, ErrInvalidInput
+	}
+
+	return s.reactionCatalog.AssetsForDefinition(ctx, definition)
 }
 
 func (s *Service) currentTime() time.Time {

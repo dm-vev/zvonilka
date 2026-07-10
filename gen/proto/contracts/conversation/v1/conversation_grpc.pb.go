@@ -40,6 +40,7 @@ const (
 	ConversationService_ForwardMessage_FullMethodName             = "/zvonilka.conversation.v1.ConversationService/ForwardMessage"
 	ConversationService_AddReaction_FullMethodName                = "/zvonilka.conversation.v1.ConversationService/AddReaction"
 	ConversationService_RemoveReaction_FullMethodName             = "/zvonilka.conversation.v1.ConversationService/RemoveReaction"
+	ConversationService_GetReactionCatalog_FullMethodName         = "/zvonilka.conversation.v1.ConversationService/GetReactionCatalog"
 	ConversationService_PinMessage_FullMethodName                 = "/zvonilka.conversation.v1.ConversationService/PinMessage"
 	ConversationService_UnpinMessage_FullMethodName               = "/zvonilka.conversation.v1.ConversationService/UnpinMessage"
 	ConversationService_MarkRead_FullMethodName                   = "/zvonilka.conversation.v1.ConversationService/MarkRead"
@@ -90,6 +91,7 @@ type ConversationServiceClient interface {
 	ForwardMessage(ctx context.Context, in *ForwardMessageRequest, opts ...grpc.CallOption) (*ForwardMessageResponse, error)
 	AddReaction(ctx context.Context, in *AddReactionRequest, opts ...grpc.CallOption) (*AddReactionResponse, error)
 	RemoveReaction(ctx context.Context, in *RemoveReactionRequest, opts ...grpc.CallOption) (*RemoveReactionResponse, error)
+	GetReactionCatalog(ctx context.Context, in *GetReactionCatalogRequest, opts ...grpc.CallOption) (*GetReactionCatalogResponse, error)
 	PinMessage(ctx context.Context, in *PinMessageRequest, opts ...grpc.CallOption) (*PinMessageResponse, error)
 	UnpinMessage(ctx context.Context, in *UnpinMessageRequest, opts ...grpc.CallOption) (*UnpinMessageResponse, error)
 	MarkRead(ctx context.Context, in *MarkReadRequest, opts ...grpc.CallOption) (*MarkReadResponse, error)
@@ -306,6 +308,15 @@ func (c *conversationServiceClient) AddReaction(ctx context.Context, in *AddReac
 func (c *conversationServiceClient) RemoveReaction(ctx context.Context, in *RemoveReactionRequest, opts ...grpc.CallOption) (*RemoveReactionResponse, error) {
 	out := new(RemoveReactionResponse)
 	err := c.cc.Invoke(ctx, ConversationService_RemoveReaction_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) GetReactionCatalog(ctx context.Context, in *GetReactionCatalogRequest, opts ...grpc.CallOption) (*GetReactionCatalogResponse, error) {
+	out := new(GetReactionCatalogResponse)
+	err := c.cc.Invoke(ctx, ConversationService_GetReactionCatalog_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -544,6 +555,7 @@ type ConversationServiceServer interface {
 	ForwardMessage(context.Context, *ForwardMessageRequest) (*ForwardMessageResponse, error)
 	AddReaction(context.Context, *AddReactionRequest) (*AddReactionResponse, error)
 	RemoveReaction(context.Context, *RemoveReactionRequest) (*RemoveReactionResponse, error)
+	GetReactionCatalog(context.Context, *GetReactionCatalogRequest) (*GetReactionCatalogResponse, error)
 	PinMessage(context.Context, *PinMessageRequest) (*PinMessageResponse, error)
 	UnpinMessage(context.Context, *UnpinMessageRequest) (*UnpinMessageResponse, error)
 	MarkRead(context.Context, *MarkReadRequest) (*MarkReadResponse, error)
@@ -636,6 +648,9 @@ func (UnimplementedConversationServiceServer) AddReaction(context.Context, *AddR
 }
 func (UnimplementedConversationServiceServer) RemoveReaction(context.Context, *RemoveReactionRequest) (*RemoveReactionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveReaction not implemented")
+}
+func (UnimplementedConversationServiceServer) GetReactionCatalog(context.Context, *GetReactionCatalogRequest) (*GetReactionCatalogResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetReactionCatalog not implemented")
 }
 func (UnimplementedConversationServiceServer) PinMessage(context.Context, *PinMessageRequest) (*PinMessageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PinMessage not implemented")
@@ -1093,6 +1108,24 @@ func _ConversationService_RemoveReaction_Handler(srv interface{}, ctx context.Co
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ConversationServiceServer).RemoveReaction(ctx, req.(*RemoveReactionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_GetReactionCatalog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetReactionCatalogRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).GetReactionCatalog(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_GetReactionCatalog_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).GetReactionCatalog(ctx, req.(*GetReactionCatalogRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1601,6 +1634,10 @@ var ConversationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveReaction",
 			Handler:    _ConversationService_RemoveReaction_Handler,
+		},
+		{
+			MethodName: "GetReactionCatalog",
+			Handler:    _ConversationService_GetReactionCatalog_Handler,
 		},
 		{
 			MethodName: "PinMessage",

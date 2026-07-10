@@ -20,6 +20,8 @@ import (
 	postgresnotification "github.com/dm-vev/zvonilka/internal/domain/notification/pgstore"
 	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
 	postgrespresence "github.com/dm-vev/zvonilka/internal/domain/presence/pgstore"
+	domainreaction "github.com/dm-vev/zvonilka/internal/domain/reaction"
+	postgresreaction "github.com/dm-vev/zvonilka/internal/domain/reaction/pgstore"
 	domainsearch "github.com/dm-vev/zvonilka/internal/domain/search"
 	postgressearch "github.com/dm-vev/zvonilka/internal/domain/search/pgstore"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
@@ -409,6 +411,21 @@ func buildAppStorage(
 			closeStorageCatalog(ctx, catalog),
 		)
 	}
+	reactionStore, err := postgresreaction.New(relational.DB(), cfg.Infrastructure.Postgres.Schema)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct postgres reaction catalog store: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	reactionService, err := domainreaction.NewService(reactionStore, mediaService)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, joinStorageError(
+			fmt.Errorf("construct reaction catalog service: %w", err),
+			closeStorageCatalog(ctx, catalog),
+		)
+	}
+	conversationService.SetReactionCatalog(reactionService)
 	var translationService *domaintranslation.Service
 	if cfg.Features.TranslationEnabled {
 		translationStore, err := newTranslationStore(relational.DB(), cfg.Infrastructure.Postgres.Schema)

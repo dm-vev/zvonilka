@@ -39,6 +39,7 @@ type UploadParams struct {
 	Height         uint32
 	Duration       time.Duration
 	Metadata       map[string]string
+	PublicAccess   bool
 	Body           io.Reader
 	CreatedAt      time.Time
 }

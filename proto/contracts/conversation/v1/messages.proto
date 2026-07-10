@@ -121,6 +121,17 @@ message RemoveReactionResponse {
   Message message = 1;
 }
 
+message GetReactionCatalogRequest {
+  string known_version = 1;
+}
+
+message GetReactionCatalogResponse {
+  string version = 1;
+  repeated EmojiReactionDefinition reactions = 2;
+  string default_emoji = 3;
+  bool not_modified = 4;
+}
+
 message PinMessageRequest {
   string conversation_id = 1;
   string message_id = 2;

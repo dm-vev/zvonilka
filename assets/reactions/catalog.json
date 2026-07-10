@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "default_emoji": "👍",
+  "reactions": [
+    {
+      "emoji": "👍",
+      "slug": "thumbs_up",
+      "title": "Нравится",
+      "active": true,
+      "sort_order": 10,
+      "assets": {
+        "static_icon": "shared/static.webp",
+        "appear_animation": "shared/static.webp",
+        "select_animation": "shared/static.webp",
+        "activate_animation": "shared/static.webp",
+        "effect_animation": "shared/static.webp"
+      }
+    },
+    {
+      "emoji": "❤️",
+      "slug": "red_heart",
+      "title": "Сердце",
+      "active": true,
+      "sort_order": 20,
+      "assets": {
+        "static_icon": "shared/static.webp",
+        "appear_animation": "shared/static.webp",
+        "select_animation": "shared/static.webp",
+        "activate_animation": "shared/static.webp",
+        "effect_animation": "shared/static.webp"
+      }
+    },
+    {
+      "emoji": "🔥",
+      "slug": "fire",
+      "title": "Огонь",
+      "active": true,
+      "sort_order": 30,
+      "assets": {
+        "static_icon": "shared/static.webp",
+        "appear_animation": "shared/static.webp",
+        "select_animation": "shared/static.webp",
+        "activate_animation": "shared/static.webp",
+        "effect_animation": "shared/static.webp"
+      }
+    },
+    {
+      "emoji": "😂",
+      "slug": "laugh",
+      "title": "Смешно",
+      "active": true,
+      "sort_order": 40,
+      "assets": {
+        "static_icon": "shared/static.webp",
+        "appear_animation": "shared/static.webp",
+        "select_animation": "shared/static.webp",
+        "activate_animation": "shared/static.webp",
+        "effect_animation": "shared/static.webp"
+      }
+    },
+    {
+      "emoji": "🎉",
+      "slug": "party",
+      "title": "Праздник",
+      "active": true,
+      "sort_order": 50,
+      "assets": {
+        "static_icon": "shared/static.webp",
+        "appear_animation": "shared/static.webp",
+        "select_animation": "shared/static.webp",
+        "activate_animation": "shared/static.webp",
+        "effect_animation": "shared/static.webp"
+      }
+    },
+    {
+      "emoji": "😮",
+      "slug": "surprised",
+      "title": "Удивление",
+      "active": true,
+      "sort_order": 60,
+      "assets": {
+        "static_icon": "shared/static.webp",
+        "appear_animation": "shared/static.webp",
+        "select_animation": "shared/static.webp",
+        "activate_animation": "shared/static.webp",
+        "effect_animation": "shared/static.webp"
+      }
+    },
+    {
+      "emoji": "😢",
+      "slug": "sad",
+      "title": "Грустно",
+      "active": true,
+      "sort_order": 70,
+      "assets": {
+        "static_icon": "shared/static.webp",
+        "appear_animation": "shared/static.webp",
+        "select_animation": "shared/static.webp",
+        "activate_animation": "shared/static.webp",
+        "effect_animation": "shared/static.webp"
+      }
+    },
+    {
+      "emoji": "👎",
+      "slug": "thumbs_down",
+      "title": "Не нравится",
+      "active": true,
+      "sort_order": 80,
+      "assets": {
+        "static_icon": "shared/static.webp",
+        "appear_animation": "shared/static.webp",
+        "select_animation": "shared/static.webp",
+        "activate_animation": "shared/static.webp",
+        "effect_animation": "shared/static.webp"
+      }
+    }
+  ]
+}

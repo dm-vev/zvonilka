@@ -30,6 +30,8 @@ import (
 	notificationtest "github.com/dm-vev/zvonilka/internal/domain/notification/teststore"
 	"github.com/dm-vev/zvonilka/internal/domain/presence"
 	presencetest "github.com/dm-vev/zvonilka/internal/domain/presence/teststore"
+	domainreaction "github.com/dm-vev/zvonilka/internal/domain/reaction"
+	reactiontest "github.com/dm-vev/zvonilka/internal/domain/reaction/teststore"
 	"github.com/dm-vev/zvonilka/internal/domain/search"
 	searchtest "github.com/dm-vev/zvonilka/internal/domain/search/teststore"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
@@ -650,7 +652,7 @@ func TestMediaFiltersVariantAndHardDelete(t *testing.T) {
 		t.Fatalf("initiate first upload: %v", err)
 	}
 
-	_, err = fixture.api.InitiateUpload(authCtx, &mediav1.InitiateUploadRequest{
+	second, err := fixture.api.InitiateUpload(authCtx, &mediav1.InitiateUploadRequest{
 		Purpose:        commonv1.MediaPurpose_MEDIA_PURPOSE_STICKER_ASSET,
 		FileName:       "sticker.webp",
 		MimeType:       "image/webp",
@@ -659,6 +661,13 @@ func TestMediaFiltersVariantAndHardDelete(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("initiate second upload: %v", err)
+	}
+	storedSticker, err := fixture.mediaStore.MediaAssetByID(context.Background(), second.Media.MediaId)
+	if err != nil {
+		t.Fatalf("load initiated sticker asset: %v", err)
+	}
+	if storedSticker.PublicAccess {
+		t.Fatal("ordinary initiate upload must not create a public asset")
 	}
 
 	listed, err := fixture.api.ListMedia(authCtx, &mediav1.ListMediaRequest{
@@ -771,6 +780,96 @@ func TestMediaDownloadURLAllowsConversationMember(t *testing.T) {
 	})
 	if status.Code(err) != codes.PermissionDenied {
 		t.Fatalf("expected outsider download to be forbidden, got %v", err)
+	}
+
+	publicAsset := media.MediaAsset{
+		ID:              "media-public-reaction",
+		OwnerAccountID:  owner.ID,
+		Kind:            media.MediaKindSticker,
+		Status:          media.MediaStatusReady,
+		StorageProvider: "object",
+		Bucket:          fixture.mediaBlob.bucket,
+		ObjectKey:       "media/reactions/media-public-reaction",
+		FileName:        "static.webp",
+		ContentType:     "image/webp",
+		SizeBytes:       1392,
+		SHA256Hex:       "public-reaction-sha",
+		Metadata:        map[string]string{media.MetadataPurposeKey: "sticker_asset"},
+		PublicAccess:    true,
+		UploadExpiresAt: now.Add(time.Hour),
+		ReadyAt:         now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	if _, err := fixture.mediaStore.SaveMediaAsset(context.Background(), publicAsset); err != nil {
+		t.Fatalf("seed public reaction asset: %v", err)
+	}
+	if _, err := fixture.api.GetDownloadUrl(outsiderCtx, &mediav1.GetDownloadUrlRequest{MediaId: publicAsset.ID}); err != nil {
+		t.Fatalf("authenticated user cannot download public reaction asset: %v", err)
+	}
+}
+
+func TestReactionCatalogRPC(t *testing.T) {
+	t.Parallel()
+
+	fixture := newGatewayFeatureFixture(t)
+	account, authCtx := fixture.mustCreateUserAndLogin(t, "reaction-catalog-user", "reaction-catalog-user@example.com")
+	now := fixture.now()
+	if _, err := fixture.mediaStore.SaveMediaAsset(context.Background(), media.MediaAsset{
+		ID:              "reaction-media",
+		OwnerAccountID:  account.ID,
+		Kind:            media.MediaKindSticker,
+		Status:          media.MediaStatusReady,
+		StorageProvider: "object",
+		Bucket:          fixture.mediaBlob.bucket,
+		ObjectKey:       "media/reactions/reaction-media",
+		FileName:        "static.webp",
+		ContentType:     "image/webp",
+		SizeBytes:       1392,
+		SHA256Hex:       "reaction-sha",
+		Width:           100,
+		Height:          100,
+		Metadata:        map[string]string{media.MetadataPurposeKey: "sticker_asset"},
+		PublicAccess:    true,
+		UploadExpiresAt: now.Add(time.Hour),
+		ReadyAt:         now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}); err != nil {
+		t.Fatalf("seed reaction asset: %v", err)
+	}
+	if _, err := fixture.reactionStore.SaveDefinition(context.Background(), domainreaction.Definition{
+		Emoji:             "👍",
+		Title:             "Like",
+		Active:            true,
+		SortOrder:         10,
+		StaticIcon:        "reaction-media",
+		AppearAnimation:   "reaction-media",
+		SelectAnimation:   "reaction-media",
+		ActivateAnimation: "reaction-media",
+		EffectAnimation:   "reaction-media",
+	}); err != nil {
+		t.Fatalf("seed reaction definition: %v", err)
+	}
+
+	response, err := fixture.api.GetReactionCatalog(authCtx, &conversationv1.GetReactionCatalogRequest{})
+	if err != nil {
+		t.Fatalf("get reaction catalog: %v", err)
+	}
+	if response.GetDefaultEmoji() != "👍" || len(response.GetReactions()) != 1 {
+		t.Fatalf("unexpected catalog response: %+v", response)
+	}
+	definition := response.GetReactions()[0]
+	if definition.GetStaticIcon() == nil || definition.GetStaticIcon().GetMediaId() != "reaction-media" || definition.GetEffectAnimation() == nil {
+		t.Fatalf("required reaction assets are incomplete: %+v", definition)
+	}
+
+	unchanged, err := fixture.api.GetReactionCatalog(authCtx, &conversationv1.GetReactionCatalogRequest{KnownVersion: response.GetVersion()})
+	if err != nil {
+		t.Fatalf("get unchanged reaction catalog: %v", err)
+	}
+	if !unchanged.GetNotModified() || len(unchanged.GetReactions()) != 0 {
+		t.Fatalf("unexpected not_modified response: %+v", unchanged)
 	}
 }
 
@@ -1589,11 +1688,12 @@ func TestTranslateMessageRPCUsesCache(t *testing.T) {
 }
 
 type gatewayFeatureFixture struct {
-	api        *api
-	sender     *recordingSender
-	mediaStore *gatewayMediaStore
-	mediaBlob  *gatewayBlobStore
-	nowFunc    func() time.Time
+	api           *api
+	sender        *recordingSender
+	mediaStore    *gatewayMediaStore
+	mediaBlob     *gatewayBlobStore
+	reactionStore *reactiontest.Store
+	nowFunc       func() time.Time
 }
 
 func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
@@ -1687,6 +1787,12 @@ func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
 	if err != nil {
 		t.Fatalf("new media service: %v", err)
 	}
+	reactionStore := reactiontest.New()
+	reactionService, err := domainreaction.NewService(reactionStore, mediaService)
+	if err != nil {
+		t.Fatalf("new reaction service: %v", err)
+	}
+	conversationService.SetReactionCatalog(reactionService)
 	notificationService, err := notification.NewService(
 		notificationtest.NewMemoryStore(),
 		identityStore,
@@ -1729,10 +1835,11 @@ func newGatewayFeatureFixture(t *testing.T) *gatewayFeatureFixture {
 				TranslationEnabled:       true,
 			},
 		},
-		sender:     sender,
-		mediaStore: mediaStore,
-		mediaBlob:  mediaBlob,
-		nowFunc:    nowFunc,
+		sender:        sender,
+		mediaStore:    mediaStore,
+		mediaBlob:     mediaBlob,
+		reactionStore: reactionStore,
+		nowFunc:       nowFunc,
 	}
 }
 

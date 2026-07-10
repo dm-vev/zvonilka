@@ -6,6 +6,23 @@ import (
 	"strings"
 )
 
+// MediaAssetByID loads media metadata for trusted internal catalog validation.
+func (s *Service) MediaAssetByID(ctx context.Context, mediaID string) (MediaAsset, error) {
+	if err := s.validateContext(ctx, "load media asset"); err != nil {
+		return MediaAsset{}, err
+	}
+	mediaID = strings.TrimSpace(mediaID)
+	if mediaID == "" {
+		return MediaAsset{}, ErrInvalidInput
+	}
+
+	asset, err := s.store.MediaAssetByID(ctx, mediaID)
+	if err != nil {
+		return MediaAsset{}, fmt.Errorf("load media asset %s: %w", mediaID, err)
+	}
+	return asset, nil
+}
+
 // GetMedia resolves one media asset visible to the owner.
 func (s *Service) GetMedia(ctx context.Context, ownerAccountID string, mediaID string) (MediaAsset, error) {
 	if err := s.validateContext(ctx, "get media"); err != nil {

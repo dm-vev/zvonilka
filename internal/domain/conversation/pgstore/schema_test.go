@@ -59,7 +59,7 @@ func TestConversationSchemaLifecycle(t *testing.T) {
 
 	svc, err := conversation.NewService(store, conversation.WithNow(func() time.Time {
 		return time.Date(2026, time.March, 24, 11, 0, 0, 0, time.UTC)
-	}))
+	}), conversation.WithReactionValidator(func(_ context.Context, emoji string) (string, error) { return emoji, nil }))
 	if err != nil {
 		t.Fatalf("new service: %v", err)
 	}
