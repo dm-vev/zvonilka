@@ -41,6 +41,22 @@ message UpdatePrivacySettingsResponse {
   PrivacySettings privacy = 1;
 }
 
+message GetAccountSettingsRequest {}
+
+message GetAccountSettingsResponse {
+  AccountSettings settings = 1;
+}
+
+message UpdateAccountSettingsRequest {
+  AccountSettings settings = 1;
+  google.protobuf.FieldMask update_mask = 2;
+  string idempotency_key = 3;
+}
+
+message UpdateAccountSettingsResponse {
+  AccountSettings settings = 1;
+}
+
 message SetPresenceRequest {
   zvonilka.common.v1.PresenceState presence = 1;
   string custom_status = 2;

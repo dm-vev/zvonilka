@@ -967,18 +967,18 @@ func mediaPurposeToKind(purpose commonv1.MediaPurpose) domainmedia.MediaKind {
 
 func mediaObject(asset domainmedia.MediaAsset) *mediav1.MediaObject {
 	return &mediav1.MediaObject{
-		MediaId:     asset.ID,
-		OwnerUserId: asset.OwnerAccountID,
-		Purpose:     mediaPurposeFromAsset(asset),
-		FileName:    asset.FileName,
-		MimeType:    asset.ContentType,
-		SizeBytes:   asset.SizeBytes,
-		Sha256Hex:   asset.SHA256Hex,
+		MediaId:      asset.ID,
+		OwnerUserId:  asset.OwnerAccountID,
+		Purpose:      mediaPurposeFromAsset(asset),
+		FileName:     asset.FileName,
+		MimeType:     asset.ContentType,
+		SizeBytes:    asset.SizeBytes,
+		Sha256Hex:    asset.SHA256Hex,
 		StorageKey:   asset.ObjectKey,
 		PublicAccess: asset.PublicAccess,
-		CreatedAt:   protoTime(asset.CreatedAt),
-		CompletedAt: protoTime(asset.ReadyAt),
-		DeletedAt:   protoTime(asset.DeletedAt),
+		CreatedAt:    protoTime(asset.CreatedAt),
+		CompletedAt:  protoTime(asset.ReadyAt),
+		DeletedAt:    protoTime(asset.DeletedAt),
 	}
 }
 
@@ -1150,6 +1150,168 @@ func privacyToProto(privacy domainuser.Privacy) *usersv1.PrivacySettings {
 		AllowContactSync:    privacy.AllowContactSync,
 		AllowUnknownSenders: privacy.AllowUnknownSenders,
 		AllowUsernameSearch: privacy.AllowUsernameSearch,
+	}
+}
+
+func accountSettingsFromProto(settings *usersv1.AccountSettings) domainuser.AccountSettings {
+	if settings == nil {
+		return domainuser.AccountSettings{}
+	}
+	result := domainuser.AccountSettings{
+		AccountTTLDays:                  settings.GetAccountTtlDays(),
+		InactiveSessionTTLDays:          settings.GetInactiveSessionTtlDays(),
+		DefaultReaction:                 settings.GetDefaultReaction(),
+		DefaultMessageAutoDeleteSeconds: settings.GetDefaultMessageAutoDeleteSeconds(),
+		AllowNewChatsFromUnknownUsers:   settings.GetAllowNewChatsFromUnknownUsers(),
+		IncomingPaidMessageStarCount:    settings.GetIncomingPaidMessageStarCount(),
+	}
+	result.AutoDownload = autoDownloadSettingsFromProto(settings.GetAutoDownload())
+	result.Autosave = autosaveSettingsFromProto(settings.GetAutosave())
+	if browser := settings.GetBrowser(); browser != nil {
+		result.Browser.OpenExternal = browser.GetOpenExternal()
+		result.Browser.DisplayCloseButton = browser.GetDisplayCloseButton()
+		for _, exception := range browser.GetExceptions() {
+			result.Browser.Exceptions = append(result.Browser.Exceptions, domainuser.BrowserDomainException{
+				Domain: exception.GetDomain(), OpenExternal: exception.GetOpenExternal(),
+			})
+		}
+	}
+	if reactions := settings.GetReactionNotifications(); reactions != nil {
+		result.ReactionNotifications = domainuser.ReactionNotificationSettings{
+			MessageReactions: reactionNotificationSourceFromProto(reactions.GetMessageReactions()),
+			StoryReactions:   reactionNotificationSourceFromProto(reactions.GetStoryReactions()),
+			PollVotes:        reactionNotificationSourceFromProto(reactions.GetPollVotes()),
+			SoundID:          reactions.GetSoundId(),
+			ShowPreview:      reactions.GetShowPreview(),
+		}
+	}
+	return result
+}
+
+func accountSettingsToProto(settings domainuser.AccountSettings) *usersv1.AccountSettings {
+	result := &usersv1.AccountSettings{
+		AccountTtlDays:                  settings.AccountTTLDays,
+		InactiveSessionTtlDays:          settings.InactiveSessionTTLDays,
+		DefaultReaction:                 settings.DefaultReaction,
+		DefaultMessageAutoDeleteSeconds: settings.DefaultMessageAutoDeleteSeconds,
+		AutoDownload:                    autoDownloadSettingsToProto(settings.AutoDownload),
+		Autosave:                        autosaveSettingsToProto(settings.Autosave),
+		Browser: &usersv1.BrowserSettings{
+			OpenExternal: settings.Browser.OpenExternal, DisplayCloseButton: settings.Browser.DisplayCloseButton,
+		},
+		ReactionNotifications: &usersv1.ReactionNotificationSettings{
+			MessageReactions: reactionNotificationSourceToProto(settings.ReactionNotifications.MessageReactions),
+			StoryReactions:   reactionNotificationSourceToProto(settings.ReactionNotifications.StoryReactions),
+			PollVotes:        reactionNotificationSourceToProto(settings.ReactionNotifications.PollVotes),
+			SoundId:          settings.ReactionNotifications.SoundID,
+			ShowPreview:      settings.ReactionNotifications.ShowPreview,
+		},
+		AllowNewChatsFromUnknownUsers: settings.AllowNewChatsFromUnknownUsers,
+		IncomingPaidMessageStarCount:  settings.IncomingPaidMessageStarCount,
+		CreatedAt:                     protoTime(settings.CreatedAt),
+		UpdatedAt:                     protoTime(settings.UpdatedAt),
+	}
+	for _, exception := range settings.Browser.Exceptions {
+		result.Browser.Exceptions = append(result.Browser.Exceptions, &usersv1.BrowserDomainException{
+			Domain: exception.Domain, OpenExternal: exception.OpenExternal,
+		})
+	}
+	return result
+}
+
+func autoDownloadSettingsFromProto(settings *usersv1.AutoDownloadSettings) domainuser.AutoDownloadSettings {
+	if settings == nil {
+		return domainuser.AutoDownloadSettings{}
+	}
+	return domainuser.AutoDownloadSettings{
+		Mobile:  mediaDownloadSettingsFromProto(settings.GetMobile()),
+		WiFi:    mediaDownloadSettingsFromProto(settings.GetWifi()),
+		Roaming: mediaDownloadSettingsFromProto(settings.GetRoaming()),
+	}
+}
+
+func autoDownloadSettingsToProto(settings domainuser.AutoDownloadSettings) *usersv1.AutoDownloadSettings {
+	return &usersv1.AutoDownloadSettings{
+		Mobile:  mediaDownloadSettingsToProto(settings.Mobile),
+		Wifi:    mediaDownloadSettingsToProto(settings.WiFi),
+		Roaming: mediaDownloadSettingsToProto(settings.Roaming),
+	}
+}
+
+func mediaDownloadSettingsFromProto(settings *usersv1.MediaDownloadSettings) domainuser.MediaDownloadSettings {
+	if settings == nil {
+		return domainuser.MediaDownloadSettings{}
+	}
+	return domainuser.MediaDownloadSettings{
+		Enabled: settings.GetEnabled(), MaxPhotoBytes: settings.GetMaxPhotoBytes(),
+		MaxVideoBytes: settings.GetMaxVideoBytes(), MaxFileBytes: settings.GetMaxFileBytes(),
+		PreloadLargeVideos: settings.GetPreloadLargeVideos(), PreloadNextAudio: settings.GetPreloadNextAudio(),
+		PreloadStories: settings.GetPreloadStories(), UseLessDataForCalls: settings.GetUseLessDataForCalls(),
+	}
+}
+
+func mediaDownloadSettingsToProto(settings domainuser.MediaDownloadSettings) *usersv1.MediaDownloadSettings {
+	return &usersv1.MediaDownloadSettings{
+		Enabled: settings.Enabled, MaxPhotoBytes: settings.MaxPhotoBytes,
+		MaxVideoBytes: settings.MaxVideoBytes, MaxFileBytes: settings.MaxFileBytes,
+		PreloadLargeVideos: settings.PreloadLargeVideos, PreloadNextAudio: settings.PreloadNextAudio,
+		PreloadStories: settings.PreloadStories, UseLessDataForCalls: settings.UseLessDataForCalls,
+	}
+}
+
+func autosaveSettingsFromProto(settings *usersv1.AutosaveSettings) domainuser.AutosaveSettings {
+	if settings == nil {
+		return domainuser.AutosaveSettings{}
+	}
+	return domainuser.AutosaveSettings{
+		PrivateChats: mediaAutosaveSettingsFromProto(settings.GetPrivateChats()),
+		GroupChats:   mediaAutosaveSettingsFromProto(settings.GetGroupChats()),
+		ChannelChats: mediaAutosaveSettingsFromProto(settings.GetChannelChats()),
+	}
+}
+
+func autosaveSettingsToProto(settings domainuser.AutosaveSettings) *usersv1.AutosaveSettings {
+	return &usersv1.AutosaveSettings{
+		PrivateChats: mediaAutosaveSettingsToProto(settings.PrivateChats),
+		GroupChats:   mediaAutosaveSettingsToProto(settings.GroupChats),
+		ChannelChats: mediaAutosaveSettingsToProto(settings.ChannelChats),
+	}
+}
+
+func mediaAutosaveSettingsFromProto(settings *usersv1.MediaAutosaveSettings) domainuser.MediaAutosaveSettings {
+	if settings == nil {
+		return domainuser.MediaAutosaveSettings{}
+	}
+	return domainuser.MediaAutosaveSettings{Photos: settings.GetPhotos(), Videos: settings.GetVideos(), MaxVideoBytes: settings.GetMaxVideoBytes()}
+}
+
+func mediaAutosaveSettingsToProto(settings domainuser.MediaAutosaveSettings) *usersv1.MediaAutosaveSettings {
+	return &usersv1.MediaAutosaveSettings{Photos: settings.Photos, Videos: settings.Videos, MaxVideoBytes: settings.MaxVideoBytes}
+}
+
+func reactionNotificationSourceFromProto(source usersv1.ReactionNotificationSource) domainuser.ReactionNotificationSource {
+	switch source {
+	case usersv1.ReactionNotificationSource_REACTION_NOTIFICATION_SOURCE_NONE:
+		return domainuser.ReactionNotificationSourceNone
+	case usersv1.ReactionNotificationSource_REACTION_NOTIFICATION_SOURCE_CONTACTS:
+		return domainuser.ReactionNotificationSourceContacts
+	case usersv1.ReactionNotificationSource_REACTION_NOTIFICATION_SOURCE_ALL:
+		return domainuser.ReactionNotificationSourceAll
+	default:
+		return ""
+	}
+}
+
+func reactionNotificationSourceToProto(source domainuser.ReactionNotificationSource) usersv1.ReactionNotificationSource {
+	switch source {
+	case domainuser.ReactionNotificationSourceNone:
+		return usersv1.ReactionNotificationSource_REACTION_NOTIFICATION_SOURCE_NONE
+	case domainuser.ReactionNotificationSourceContacts:
+		return usersv1.ReactionNotificationSource_REACTION_NOTIFICATION_SOURCE_CONTACTS
+	case domainuser.ReactionNotificationSourceAll:
+		return usersv1.ReactionNotificationSource_REACTION_NOTIFICATION_SOURCE_ALL
+	default:
+		return usersv1.ReactionNotificationSource_REACTION_NOTIFICATION_SOURCE_UNSPECIFIED
 	}
 }
 

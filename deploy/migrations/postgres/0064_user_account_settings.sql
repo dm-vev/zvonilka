@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS {{schema}}.user_account_settings (
+	account_id TEXT PRIMARY KEY,
+	account_ttl_days INTEGER NOT NULL DEFAULT 180,
+	inactive_session_ttl_days INTEGER NOT NULL DEFAULT 180,
+	default_reaction TEXT NOT NULL DEFAULT '👍',
+	default_message_auto_delete_seconds BIGINT NOT NULL DEFAULT 0,
+	auto_download JSONB NOT NULL DEFAULT '{}',
+	autosave JSONB NOT NULL DEFAULT '{}',
+	browser JSONB NOT NULL DEFAULT '{}',
+	reaction_notifications JSONB NOT NULL DEFAULT '{}',
+	allow_new_chats_from_unknown_users BOOLEAN NOT NULL DEFAULT TRUE,
+	incoming_paid_message_star_count BIGINT NOT NULL DEFAULT 0,
+	created_at TIMESTAMPTZ NOT NULL,
+	updated_at TIMESTAMPTZ NOT NULL,
+	FOREIGN KEY (account_id) REFERENCES {{schema}}.identity_accounts (id) ON DELETE CASCADE,
+	CONSTRAINT user_account_settings_account_ttl_check CHECK (account_ttl_days BETWEEN 30 AND 730),
+	CONSTRAINT user_account_settings_session_ttl_check CHECK (inactive_session_ttl_days BETWEEN 1 AND 730),
+	CONSTRAINT user_account_settings_auto_delete_check CHECK (default_message_auto_delete_seconds BETWEEN 0 AND 31536000),
+	CONSTRAINT user_account_settings_paid_messages_check CHECK (incoming_paid_message_star_count BETWEEN 0 AND 1000000)
+);

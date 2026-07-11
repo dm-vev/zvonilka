@@ -66,3 +66,27 @@ func defaultPrivacy(accountID string, now time.Time) Privacy {
 		UpdatedAt:           now,
 	}
 }
+
+func defaultAccountSettings(accountID string, now time.Time) AccountSettings {
+	return AccountSettings{
+		AccountID:              accountID,
+		AccountTTLDays:         180,
+		InactiveSessionTTLDays: 180,
+		DefaultReaction:        "👍",
+		AutoDownload: AutoDownloadSettings{
+			Mobile:  MediaDownloadSettings{Enabled: true, MaxPhotoBytes: 10 << 20, MaxVideoBytes: 50 << 20, MaxFileBytes: 20 << 20, UseLessDataForCalls: true},
+			WiFi:    MediaDownloadSettings{Enabled: true, MaxPhotoBytes: 10 << 20, MaxVideoBytes: 100 << 20, MaxFileBytes: 100 << 20, PreloadLargeVideos: true, PreloadNextAudio: true, PreloadStories: true},
+			Roaming: MediaDownloadSettings{UseLessDataForCalls: true},
+		},
+		Browser: BrowserSettings{DisplayCloseButton: true},
+		ReactionNotifications: ReactionNotificationSettings{
+			MessageReactions: ReactionNotificationSourceContacts,
+			StoryReactions:   ReactionNotificationSourceContacts,
+			PollVotes:        ReactionNotificationSourceContacts,
+			ShowPreview:      true,
+		},
+		AllowNewChatsFromUnknownUsers: true,
+		CreatedAt:                     now,
+		UpdatedAt:                     now,
+	}
+}

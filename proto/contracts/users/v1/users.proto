@@ -10,6 +10,8 @@ service UserService {
   rpc GetMyProfile(GetMyProfileRequest) returns (GetMyProfileResponse);
   rpc UpdateMyProfile(UpdateMyProfileRequest) returns (UpdateMyProfileResponse);
   rpc UpdatePrivacySettings(UpdatePrivacySettingsRequest) returns (UpdatePrivacySettingsResponse);
+  rpc GetAccountSettings(GetAccountSettingsRequest) returns (GetAccountSettingsResponse);
+  rpc UpdateAccountSettings(UpdateAccountSettingsRequest) returns (UpdateAccountSettingsResponse);
   rpc SetPresence(SetPresenceRequest) returns (SetPresenceResponse);
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
   rpc SearchUsers(SearchUsersRequest) returns (SearchUsersResponse);

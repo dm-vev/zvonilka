@@ -22,6 +22,8 @@ const (
 	UserService_GetMyProfile_FullMethodName          = "/zvonilka.users.v1.UserService/GetMyProfile"
 	UserService_UpdateMyProfile_FullMethodName       = "/zvonilka.users.v1.UserService/UpdateMyProfile"
 	UserService_UpdatePrivacySettings_FullMethodName = "/zvonilka.users.v1.UserService/UpdatePrivacySettings"
+	UserService_GetAccountSettings_FullMethodName    = "/zvonilka.users.v1.UserService/GetAccountSettings"
+	UserService_UpdateAccountSettings_FullMethodName = "/zvonilka.users.v1.UserService/UpdateAccountSettings"
 	UserService_SetPresence_FullMethodName           = "/zvonilka.users.v1.UserService/SetPresence"
 	UserService_GetUser_FullMethodName               = "/zvonilka.users.v1.UserService/GetUser"
 	UserService_SearchUsers_FullMethodName           = "/zvonilka.users.v1.UserService/SearchUsers"
@@ -41,6 +43,8 @@ type UserServiceClient interface {
 	GetMyProfile(ctx context.Context, in *GetMyProfileRequest, opts ...grpc.CallOption) (*GetMyProfileResponse, error)
 	UpdateMyProfile(ctx context.Context, in *UpdateMyProfileRequest, opts ...grpc.CallOption) (*UpdateMyProfileResponse, error)
 	UpdatePrivacySettings(ctx context.Context, in *UpdatePrivacySettingsRequest, opts ...grpc.CallOption) (*UpdatePrivacySettingsResponse, error)
+	GetAccountSettings(ctx context.Context, in *GetAccountSettingsRequest, opts ...grpc.CallOption) (*GetAccountSettingsResponse, error)
+	UpdateAccountSettings(ctx context.Context, in *UpdateAccountSettingsRequest, opts ...grpc.CallOption) (*UpdateAccountSettingsResponse, error)
 	SetPresence(ctx context.Context, in *SetPresenceRequest, opts ...grpc.CallOption) (*SetPresenceResponse, error)
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
 	SearchUsers(ctx context.Context, in *SearchUsersRequest, opts ...grpc.CallOption) (*SearchUsersResponse, error)
@@ -82,6 +86,24 @@ func (c *userServiceClient) UpdateMyProfile(ctx context.Context, in *UpdateMyPro
 func (c *userServiceClient) UpdatePrivacySettings(ctx context.Context, in *UpdatePrivacySettingsRequest, opts ...grpc.CallOption) (*UpdatePrivacySettingsResponse, error) {
 	out := new(UpdatePrivacySettingsResponse)
 	err := c.cc.Invoke(ctx, UserService_UpdatePrivacySettings_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) GetAccountSettings(ctx context.Context, in *GetAccountSettingsRequest, opts ...grpc.CallOption) (*GetAccountSettingsResponse, error) {
+	out := new(GetAccountSettingsResponse)
+	err := c.cc.Invoke(ctx, UserService_GetAccountSettings_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) UpdateAccountSettings(ctx context.Context, in *UpdateAccountSettingsRequest, opts ...grpc.CallOption) (*UpdateAccountSettingsResponse, error) {
+	out := new(UpdateAccountSettingsResponse)
+	err := c.cc.Invoke(ctx, UserService_UpdateAccountSettings_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -185,6 +207,8 @@ type UserServiceServer interface {
 	GetMyProfile(context.Context, *GetMyProfileRequest) (*GetMyProfileResponse, error)
 	UpdateMyProfile(context.Context, *UpdateMyProfileRequest) (*UpdateMyProfileResponse, error)
 	UpdatePrivacySettings(context.Context, *UpdatePrivacySettingsRequest) (*UpdatePrivacySettingsResponse, error)
+	GetAccountSettings(context.Context, *GetAccountSettingsRequest) (*GetAccountSettingsResponse, error)
+	UpdateAccountSettings(context.Context, *UpdateAccountSettingsRequest) (*UpdateAccountSettingsResponse, error)
 	SetPresence(context.Context, *SetPresenceRequest) (*SetPresenceResponse, error)
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
 	SearchUsers(context.Context, *SearchUsersRequest) (*SearchUsersResponse, error)
@@ -210,6 +234,12 @@ func (UnimplementedUserServiceServer) UpdateMyProfile(context.Context, *UpdateMy
 }
 func (UnimplementedUserServiceServer) UpdatePrivacySettings(context.Context, *UpdatePrivacySettingsRequest) (*UpdatePrivacySettingsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdatePrivacySettings not implemented")
+}
+func (UnimplementedUserServiceServer) GetAccountSettings(context.Context, *GetAccountSettingsRequest) (*GetAccountSettingsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAccountSettings not implemented")
+}
+func (UnimplementedUserServiceServer) UpdateAccountSettings(context.Context, *UpdateAccountSettingsRequest) (*UpdateAccountSettingsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateAccountSettings not implemented")
 }
 func (UnimplementedUserServiceServer) SetPresence(context.Context, *SetPresenceRequest) (*SetPresenceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetPresence not implemented")
@@ -304,6 +334,42 @@ func _UserService_UpdatePrivacySettings_Handler(srv interface{}, ctx context.Con
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(UserServiceServer).UpdatePrivacySettings(ctx, req.(*UpdatePrivacySettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_GetAccountSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAccountSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetAccountSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetAccountSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetAccountSettings(ctx, req.(*GetAccountSettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_UpdateAccountSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAccountSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).UpdateAccountSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_UpdateAccountSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).UpdateAccountSettings(ctx, req.(*UpdateAccountSettingsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -506,6 +572,14 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdatePrivacySettings",
 			Handler:    _UserService_UpdatePrivacySettings_Handler,
+		},
+		{
+			MethodName: "GetAccountSettings",
+			Handler:    _UserService_GetAccountSettings_Handler,
+		},
+		{
+			MethodName: "UpdateAccountSettings",
+			Handler:    _UserService_UpdateAccountSettings_Handler,
 		},
 		{
 			MethodName: "SetPresence",

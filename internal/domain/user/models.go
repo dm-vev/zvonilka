@@ -32,6 +32,87 @@ type Privacy struct {
 	UpdatedAt           time.Time
 }
 
+// MediaDownloadSettings stores one network's automatic download policy.
+type MediaDownloadSettings struct {
+	Enabled             bool
+	MaxPhotoBytes       int64
+	MaxVideoBytes       int64
+	MaxFileBytes        int64
+	PreloadLargeVideos  bool
+	PreloadNextAudio    bool
+	PreloadStories      bool
+	UseLessDataForCalls bool
+}
+
+// AutoDownloadSettings stores synchronized download policies by network.
+type AutoDownloadSettings struct {
+	Mobile  MediaDownloadSettings
+	WiFi    MediaDownloadSettings
+	Roaming MediaDownloadSettings
+}
+
+// MediaAutosaveSettings stores one chat scope's gallery autosave policy.
+type MediaAutosaveSettings struct {
+	Photos        bool
+	Videos        bool
+	MaxVideoBytes int64
+}
+
+// AutosaveSettings stores gallery autosave policies by chat scope.
+type AutosaveSettings struct {
+	PrivateChats MediaAutosaveSettings
+	GroupChats   MediaAutosaveSettings
+	ChannelChats MediaAutosaveSettings
+}
+
+// BrowserDomainException overrides browser behavior for one domain.
+type BrowserDomainException struct {
+	Domain       string `json:"domain"`
+	OpenExternal bool   `json:"open_external"`
+}
+
+// BrowserSettings stores synchronized in-app browser preferences.
+type BrowserSettings struct {
+	OpenExternal       bool
+	DisplayCloseButton bool
+	Exceptions         []BrowserDomainException
+}
+
+// ReactionNotificationSource limits which senders produce notifications.
+type ReactionNotificationSource string
+
+const (
+	ReactionNotificationSourceNone     ReactionNotificationSource = "none"
+	ReactionNotificationSourceContacts ReactionNotificationSource = "contacts"
+	ReactionNotificationSourceAll      ReactionNotificationSource = "all"
+)
+
+// ReactionNotificationSettings stores reaction, story, and poll notification preferences.
+type ReactionNotificationSettings struct {
+	MessageReactions ReactionNotificationSource
+	StoryReactions   ReactionNotificationSource
+	PollVotes        ReactionNotificationSource
+	SoundID          string
+	ShowPreview      bool
+}
+
+// AccountSettings stores server-synchronized account and client preferences.
+type AccountSettings struct {
+	AccountID                       string
+	AccountTTLDays                  uint32
+	InactiveSessionTTLDays          uint32
+	DefaultReaction                 string
+	DefaultMessageAutoDeleteSeconds uint32
+	AutoDownload                    AutoDownloadSettings
+	Autosave                        AutosaveSettings
+	Browser                         BrowserSettings
+	ReactionNotifications           ReactionNotificationSettings
+	AllowNewChatsFromUnknownUsers   bool
+	IncomingPaidMessageStarCount    int64
+	CreatedAt                       time.Time
+	UpdatedAt                       time.Time
+}
+
 // ContactSource tracks how a contact entry was introduced.
 type ContactSource string
 

@@ -118,6 +118,46 @@ func (a *api) UpdatePrivacySettings(
 	return &usersv1.UpdatePrivacySettingsResponse{Privacy: privacyToProto(privacy)}, nil
 }
 
+// GetAccountSettings returns synchronized settings for the authenticated account.
+func (a *api) GetAccountSettings(
+	ctx context.Context,
+	_ *usersv1.GetAccountSettingsRequest,
+) (*usersv1.GetAccountSettingsResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	settings, err := a.user.GetAccountSettings(ctx, authContext.Account.ID)
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &usersv1.GetAccountSettingsResponse{Settings: accountSettingsToProto(settings)}, nil
+}
+
+// UpdateAccountSettings updates only fields selected by the request mask.
+func (a *api) UpdateAccountSettings(
+	ctx context.Context,
+	req *usersv1.UpdateAccountSettingsRequest,
+) (*usersv1.UpdateAccountSettingsResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if req.GetSettings() == nil || len(req.GetUpdateMask().GetPaths()) == 0 {
+		return nil, grpcError(domainuser.ErrInvalidInput)
+	}
+	settings, err := a.user.UpdateAccountSettings(ctx, domainuser.UpdateAccountSettingsParams{
+		AccountID:      authContext.Account.ID,
+		Settings:       accountSettingsFromProto(req.GetSettings()),
+		FieldMask:      append([]string(nil), req.GetUpdateMask().GetPaths()...),
+		IdempotencyKey: req.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &usersv1.UpdateAccountSettingsResponse{Settings: accountSettingsToProto(settings)}, nil
+}
+
 // SetPresence stores an explicit presence preference for the authenticated account.
 func (a *api) SetPresence(
 	ctx context.Context,

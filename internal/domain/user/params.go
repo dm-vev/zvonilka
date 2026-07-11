@@ -7,6 +7,14 @@ type UpdatePrivacyParams struct {
 	IdempotencyKey string
 }
 
+// UpdateAccountSettingsParams contains a partial account-settings update.
+type UpdateAccountSettingsParams struct {
+	AccountID      string
+	Settings       AccountSettings
+	FieldMask      []string
+	IdempotencyKey string
+}
+
 // ListContactsParams contains one contact-list request.
 type ListContactsParams struct {
 	AccountID   string

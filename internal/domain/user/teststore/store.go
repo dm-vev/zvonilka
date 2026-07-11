@@ -11,6 +11,7 @@ import (
 func NewMemoryStore() domainuser.Store {
 	return &memoryStore{
 		privacies: make(map[string]domainuser.Privacy),
+		settings:  make(map[string]domainuser.AccountSettings),
 		contacts:  make(map[string]domainuser.Contact),
 		blocks:    make(map[string]domainuser.BlockEntry),
 	}
@@ -19,6 +20,7 @@ func NewMemoryStore() domainuser.Store {
 type memoryStore struct {
 	mu        sync.RWMutex
 	privacies map[string]domainuser.Privacy
+	settings  map[string]domainuser.AccountSettings
 	contacts  map[string]domainuser.Contact
 	blocks    map[string]domainuser.BlockEntry
 }
@@ -39,6 +41,7 @@ func (s *memoryStore) WithinTx(ctx context.Context, fn func(domainuser.Store) er
 
 	tx := &memoryStore{
 		privacies: clonePrivacies(s.privacies),
+		settings:  cloneSettings(s.settings),
 		contacts:  cloneContacts(s.contacts),
 		blocks:    cloneBlocks(s.blocks),
 	}
@@ -47,9 +50,19 @@ func (s *memoryStore) WithinTx(ctx context.Context, fn func(domainuser.Store) er
 	}
 
 	s.privacies = clonePrivacies(tx.privacies)
+	s.settings = cloneSettings(tx.settings)
 	s.contacts = cloneContacts(tx.contacts)
 	s.blocks = cloneBlocks(tx.blocks)
 	return nil
+}
+
+func cloneSettings(src map[string]domainuser.AccountSettings) map[string]domainuser.AccountSettings {
+	dst := make(map[string]domainuser.AccountSettings, len(src))
+	for key, value := range src {
+		value.Browser.Exceptions = append([]domainuser.BrowserDomainException(nil), value.Browser.Exceptions...)
+		dst[key] = value
+	}
+	return dst
 }
 
 func clonePrivacies(src map[string]domainuser.Privacy) map[string]domainuser.Privacy {

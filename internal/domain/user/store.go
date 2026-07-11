@@ -19,6 +19,8 @@ type Store interface {
 
 	SavePrivacy(ctx context.Context, privacy Privacy) (Privacy, error)
 	PrivacyByAccountID(ctx context.Context, accountID string) (Privacy, error)
+	SaveAccountSettings(ctx context.Context, settings AccountSettings) (AccountSettings, error)
+	AccountSettingsByAccountID(ctx context.Context, accountID string) (AccountSettings, error)
 
 	SaveContact(ctx context.Context, contact Contact) (Contact, error)
 	ContactByAccountAndUserID(ctx context.Context, accountID string, userID string) (Contact, error)

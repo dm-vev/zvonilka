@@ -47,6 +47,76 @@ message PrivacySettings {
   bool allow_username_search = 7;
 }
 
+enum ReactionNotificationSource {
+  REACTION_NOTIFICATION_SOURCE_UNSPECIFIED = 0;
+  REACTION_NOTIFICATION_SOURCE_NONE = 1;
+  REACTION_NOTIFICATION_SOURCE_CONTACTS = 2;
+  REACTION_NOTIFICATION_SOURCE_ALL = 3;
+}
+
+message MediaDownloadSettings {
+  bool enabled = 1;
+  int64 max_photo_bytes = 2;
+  int64 max_video_bytes = 3;
+  int64 max_file_bytes = 4;
+  bool preload_large_videos = 5;
+  bool preload_next_audio = 6;
+  bool preload_stories = 7;
+  bool use_less_data_for_calls = 8;
+}
+
+message AutoDownloadSettings {
+  MediaDownloadSettings mobile = 1;
+  MediaDownloadSettings wifi = 2;
+  MediaDownloadSettings roaming = 3;
+}
+
+message MediaAutosaveSettings {
+  bool photos = 1;
+  bool videos = 2;
+  int64 max_video_bytes = 3;
+}
+
+message AutosaveSettings {
+  MediaAutosaveSettings private_chats = 1;
+  MediaAutosaveSettings group_chats = 2;
+  MediaAutosaveSettings channel_chats = 3;
+}
+
+message BrowserDomainException {
+  string domain = 1;
+  bool open_external = 2;
+}
+
+message BrowserSettings {
+  bool open_external = 1;
+  bool display_close_button = 2;
+  repeated BrowserDomainException exceptions = 3;
+}
+
+message ReactionNotificationSettings {
+  ReactionNotificationSource message_reactions = 1;
+  ReactionNotificationSource story_reactions = 2;
+  ReactionNotificationSource poll_votes = 3;
+  string sound_id = 4;
+  bool show_preview = 5;
+}
+
+message AccountSettings {
+  uint32 account_ttl_days = 1;
+  uint32 inactive_session_ttl_days = 2;
+  string default_reaction = 3;
+  uint32 default_message_auto_delete_seconds = 4;
+  AutoDownloadSettings auto_download = 5;
+  AutosaveSettings autosave = 6;
+  BrowserSettings browser = 7;
+  ReactionNotificationSettings reaction_notifications = 8;
+  bool allow_new_chats_from_unknown_users = 9;
+  int64 incoming_paid_message_star_count = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
 message Contact {
   string contact_user_id = 1;
   string display_name = 2;

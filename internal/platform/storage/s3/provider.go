@@ -250,14 +250,25 @@ func (p *Provider) PresignPutObject(
 		return domainstorage.PresignedRequest{}, domainstorage.ErrInvalidInput
 	}
 
-	request, err := p.presign.PresignPutObject(ctx, &s3.PutObjectInput{
-		Bucket:             aws.String(p.bucket),
-		Key:                aws.String(key),
-		ContentType:        aws.String(strings.TrimSpace(options.ContentType)),
-		ContentDisposition: aws.String(strings.TrimSpace(options.ContentDisposition)),
-		CacheControl:       aws.String(strings.TrimSpace(options.CacheControl)),
-		Metadata:           copyStringMap(options.Metadata),
-	}, func(opts *s3.PresignOptions) {
+	input := &s3.PutObjectInput{
+		Bucket:   aws.String(p.bucket),
+		Key:      aws.String(key),
+		Metadata: copyStringMap(options.Metadata),
+	}
+	if contentType := strings.TrimSpace(options.ContentType); contentType != "" {
+		input.ContentType = aws.String(contentType)
+	}
+	if contentDisposition := strings.TrimSpace(options.ContentDisposition); contentDisposition != "" {
+		input.ContentDisposition = aws.String(contentDisposition)
+	} else {
+		input.ContentDisposition = aws.String("inline")
+	}
+	if cacheControl := strings.TrimSpace(options.CacheControl); cacheControl != "" {
+		input.CacheControl = aws.String(cacheControl)
+	} else {
+		input.CacheControl = aws.String("no-cache")
+	}
+	request, err := p.presign.PresignPutObject(ctx, input, func(opts *s3.PresignOptions) {
 		opts.Expires = expires
 	})
 	if err != nil {
