@@ -655,6 +655,23 @@ func (a *api) validateProfileAvatar(
 	}
 }
 
+func (a *api) rejectCurrentProfileAvatar(
+	ctx context.Context,
+	accountID string,
+	mediaID string,
+) error {
+	account, err := a.identity.AccountByID(ctx, accountID)
+	if err != nil {
+		return fmt.Errorf("load account before deleting media: %w", err)
+	}
+	mediaID = strings.TrimSpace(mediaID)
+	if mediaID != "" && strings.TrimSpace(account.AvatarMediaID) == mediaID {
+		return domainmedia.ErrConflict
+	}
+
+	return nil
+}
+
 func identityProfileUpdate(
 	accountID string,
 	req *usersv1.UpdateMyProfileRequest,

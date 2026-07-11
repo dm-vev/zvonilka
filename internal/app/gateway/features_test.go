@@ -2167,12 +2167,14 @@ type gatewayBlobStore struct {
 	mu      sync.Mutex
 	bucket  string
 	payload map[string][]byte
+	objects map[string]domainstorage.BlobObject
 }
 
 func newGatewayBlobStore(bucket string) *gatewayBlobStore {
 	return &gatewayBlobStore{
 		bucket:  bucket,
 		payload: make(map[string][]byte),
+		objects: make(map[string]domainstorage.BlobObject),
 	}
 }
 
@@ -2189,15 +2191,23 @@ func (s *gatewayBlobStore) PutObject(
 	_ context.Context,
 	key string,
 	body io.Reader,
-	_ int64,
-	_ domainstorage.PutObjectOptions,
+	size int64,
+	options domainstorage.PutObjectOptions,
 ) (domainstorage.BlobObject, error) {
 	payload, _ := io.ReadAll(body)
+	object := domainstorage.BlobObject{
+		Bucket:        s.bucket,
+		Key:           key,
+		ContentLength: size,
+		ContentType:   options.ContentType,
+		Metadata:      options.Metadata,
+	}
 	s.mu.Lock()
 	s.payload[key] = append([]byte(nil), payload...)
+	s.objects[key] = object
 	s.mu.Unlock()
 
-	return domainstorage.BlobObject{Bucket: s.bucket, Key: key}, nil
+	return object, nil
 }
 
 func (s *gatewayBlobStore) GetObject(_ context.Context, key string) (io.ReadCloser, domainstorage.BlobObject, error) {
@@ -2209,7 +2219,7 @@ func (s *gatewayBlobStore) GetObject(_ context.Context, key string) (io.ReadClos
 		return nil, domainstorage.BlobObject{}, domainstorage.ErrNotFound
 	}
 
-	return io.NopCloser(bytes.NewReader(payload)), domainstorage.BlobObject{Bucket: s.bucket, Key: key}, nil
+	return io.NopCloser(bytes.NewReader(payload)), s.objects[key], nil
 }
 
 func (s *gatewayBlobStore) HeadObject(_ context.Context, key string) (domainstorage.BlobObject, error) {
@@ -2220,7 +2230,7 @@ func (s *gatewayBlobStore) HeadObject(_ context.Context, key string) (domainstor
 		return domainstorage.BlobObject{}, domainstorage.ErrNotFound
 	}
 
-	return domainstorage.BlobObject{Bucket: s.bucket, Key: key}, nil
+	return s.objects[key], nil
 }
 
 func (s *gatewayBlobStore) DeleteObject(_ context.Context, key string) error {
@@ -2228,7 +2238,16 @@ func (s *gatewayBlobStore) DeleteObject(_ context.Context, key string) error {
 	defer s.mu.Unlock()
 
 	delete(s.payload, key)
+	delete(s.objects, key)
 	return nil
+}
+
+func (s *gatewayBlobStore) seedObject(key string, object domainstorage.BlobObject, payload []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.payload[key] = append([]byte(nil), payload...)
+	s.objects[key] = object
 }
 
 func (s *gatewayBlobStore) PresignPutObject(

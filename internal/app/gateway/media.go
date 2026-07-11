@@ -215,6 +215,9 @@ func (a *api) DeleteMedia(
 	if err != nil {
 		return nil, err
 	}
+	if err := a.rejectCurrentProfileAvatar(ctx, authContext.Account.ID, req.GetMediaId()); err != nil {
+		return nil, grpcError(err)
+	}
 
 	asset, err := a.media.DeleteMedia(ctx, domainmedia.DeleteParams{
 		OwnerAccountID: authContext.Account.ID,

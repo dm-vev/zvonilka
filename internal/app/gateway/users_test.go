@@ -1,8 +1,11 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"image"
+	"image/png"
 	"testing"
 
 	authv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/auth/v1"
@@ -10,8 +13,10 @@ import (
 	mediav1 "github.com/dm-vev/zvonilka/gen/proto/contracts/media/v1"
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
-	domainmedia "github.com/dm-vev/zvonilka/internal/domain/media"
+	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
@@ -132,7 +137,6 @@ func TestUpdateMyProfileAndPrivacyRPC(t *testing.T) {
 func TestProfileAvatarUpdateReturnsAvatarAndAllowsPublicDownload(t *testing.T) {
 	fixture := newGatewayFeatureFixture(t)
 	ctx := context.Background()
-	now := fixture.nowFunc()
 
 	owner, _, err := fixture.api.identity.CreateAccount(ctx, identity.CreateAccountParams{
 		Username:    "avatar-owner",
@@ -142,27 +146,46 @@ func TestProfileAvatarUpdateReturnsAvatarAndAllowsPublicDownload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create owner: %v", err)
 	}
-	const mediaID = "profile-avatar-test"
-	if _, err := fixture.mediaStore.SaveMediaAsset(ctx, domainmedia.MediaAsset{
-		ID:             mediaID,
-		OwnerAccountID: owner.ID,
-		Kind:           domainmedia.MediaKindAvatar,
-		Status:         domainmedia.MediaStatusReady,
-		ObjectKey:      "media/avatar-owner/profile-avatar-test",
-		ContentType:    "image/png",
-		SizeBytes:      128,
-		Width:          128,
-		Height:         128,
-		Metadata:       map[string]string{"purpose": "profile_avatar"},
-		PublicAccess:   true,
-		CreatedAt:      now,
-		UpdatedAt:      now,
-		ReadyAt:        now,
-	}); err != nil {
-		t.Fatalf("save avatar asset: %v", err)
+	ownerCtx, _ := mustLoginOnDevice(t, fixture.api, fixture.sender, ctx, owner.Username, "owner-phone", "owner-key")
+	var payload bytes.Buffer
+	if err := png.Encode(&payload, image.NewRGBA(image.Rect(0, 0, 2, 2))); err != nil {
+		t.Fatalf("encode avatar: %v", err)
+	}
+	initiated, err := fixture.api.InitiateUpload(ownerCtx, &mediav1.InitiateUploadRequest{
+		Purpose:   commonv1.MediaPurpose_MEDIA_PURPOSE_PROFILE_AVATAR,
+		FileName:  "avatar.png",
+		MimeType:  "image/png",
+		SizeBytes: uint64(payload.Len()),
+	})
+	if err != nil {
+		t.Fatalf("initiate avatar upload: %v", err)
+	}
+	reserved, err := fixture.mediaStore.MediaAssetByID(ctx, initiated.Media.MediaId)
+	if err != nil {
+		t.Fatalf("load reserved avatar: %v", err)
+	}
+	fixture.mediaBlob.seedObject(reserved.ObjectKey, domainstorage.BlobObject{
+		Bucket:        reserved.Bucket,
+		Key:           reserved.ObjectKey,
+		ContentLength: int64(payload.Len()),
+		ContentType:   "image/png",
+	}, payload.Bytes())
+	completed, err := fixture.api.CompleteUpload(ownerCtx, &mediav1.CompleteUploadRequest{
+		UploadId: initiated.Upload.UploadId,
+		MediaId:  initiated.Upload.MediaId,
+	})
+	if err != nil {
+		t.Fatalf("complete avatar upload: %v", err)
+	}
+	mediaID := completed.Media.MediaId
+	completedAsset, err := fixture.mediaStore.MediaAssetByID(ctx, mediaID)
+	if err != nil {
+		t.Fatalf("load completed avatar: %v", err)
+	}
+	if !completed.Media.PublicAccess || completedAsset.Width != 2 || completedAsset.Height != 2 {
+		t.Fatalf("unexpected completed avatar: %+v", completed.Media)
 	}
 
-	ownerCtx, _ := mustLoginOnDevice(t, fixture.api, fixture.sender, ctx, owner.Username, "owner-phone", "owner-key")
 	updated, err := fixture.api.UpdateMyProfile(ownerCtx, &usersv1.UpdateMyProfileRequest{
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"avatar"}},
 		Avatar:     &usersv1.ProfileAvatarUpdate{MediaId: mediaID},
@@ -172,6 +195,9 @@ func TestProfileAvatarUpdateReturnsAvatarAndAllowsPublicDownload(t *testing.T) {
 	}
 	if len(updated.Profile.Avatars) != 1 || updated.Profile.Avatars[0].MediaId != mediaID {
 		t.Fatalf("unexpected avatar profile: %+v", updated.Profile.Avatars)
+	}
+	if _, err := fixture.api.DeleteMedia(ownerCtx, &mediav1.DeleteMediaRequest{MediaId: mediaID}); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("delete current avatar error = %v", err)
 	}
 
 	viewer, _, err := fixture.api.identity.CreateAccount(ctx, identity.CreateAccountParams{
@@ -189,6 +215,16 @@ func TestProfileAvatarUpdateReturnsAvatarAndAllowsPublicDownload(t *testing.T) {
 	}
 	if download.GetUrl() == "" {
 		t.Fatal("expected public avatar download URL")
+	}
+
+	if _, err := fixture.api.UpdateMyProfile(ownerCtx, &usersv1.UpdateMyProfileRequest{
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"avatar"}},
+		Avatar:     &usersv1.ProfileAvatarUpdate{Clear: true},
+	}); err != nil {
+		t.Fatalf("clear avatar: %v", err)
+	}
+	if _, err := fixture.api.DeleteMedia(ownerCtx, &mediav1.DeleteMediaRequest{MediaId: mediaID}); err != nil {
+		t.Fatalf("delete cleared avatar: %v", err)
 	}
 }
 
