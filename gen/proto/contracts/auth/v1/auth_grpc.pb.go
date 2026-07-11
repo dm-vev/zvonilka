@@ -33,6 +33,7 @@ const (
 	AuthService_ListDevices_FullMethodName              = "/zvonilka.auth.v1.AuthService/ListDevices"
 	AuthService_ListSessions_FullMethodName             = "/zvonilka.auth.v1.AuthService/ListSessions"
 	AuthService_RevokeSession_FullMethodName            = "/zvonilka.auth.v1.AuthService/RevokeSession"
+	AuthService_RevokeOtherSessions_FullMethodName      = "/zvonilka.auth.v1.AuthService/RevokeOtherSessions"
 	AuthService_RevokeAllSessions_FullMethodName        = "/zvonilka.auth.v1.AuthService/RevokeAllSessions"
 	AuthService_BeginPasswordRecovery_FullMethodName    = "/zvonilka.auth.v1.AuthService/BeginPasswordRecovery"
 	AuthService_CompletePasswordRecovery_FullMethodName = "/zvonilka.auth.v1.AuthService/CompletePasswordRecovery"
@@ -56,6 +57,7 @@ type AuthServiceClient interface {
 	ListDevices(ctx context.Context, in *ListDevicesRequest, opts ...grpc.CallOption) (*ListDevicesResponse, error)
 	ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error)
 	RevokeSession(ctx context.Context, in *RevokeSessionRequest, opts ...grpc.CallOption) (*RevokeSessionResponse, error)
+	RevokeOtherSessions(ctx context.Context, in *RevokeOtherSessionsRequest, opts ...grpc.CallOption) (*RevokeOtherSessionsResponse, error)
 	RevokeAllSessions(ctx context.Context, in *RevokeAllSessionsRequest, opts ...grpc.CallOption) (*RevokeAllSessionsResponse, error)
 	BeginPasswordRecovery(ctx context.Context, in *BeginPasswordRecoveryRequest, opts ...grpc.CallOption) (*BeginPasswordRecoveryResponse, error)
 	CompletePasswordRecovery(ctx context.Context, in *CompletePasswordRecoveryRequest, opts ...grpc.CallOption) (*CompletePasswordRecoveryResponse, error)
@@ -195,6 +197,15 @@ func (c *authServiceClient) RevokeSession(ctx context.Context, in *RevokeSession
 	return out, nil
 }
 
+func (c *authServiceClient) RevokeOtherSessions(ctx context.Context, in *RevokeOtherSessionsRequest, opts ...grpc.CallOption) (*RevokeOtherSessionsResponse, error) {
+	out := new(RevokeOtherSessionsResponse)
+	err := c.cc.Invoke(ctx, AuthService_RevokeOtherSessions_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *authServiceClient) RevokeAllSessions(ctx context.Context, in *RevokeAllSessionsRequest, opts ...grpc.CallOption) (*RevokeAllSessionsResponse, error) {
 	out := new(RevokeAllSessionsResponse)
 	err := c.cc.Invoke(ctx, AuthService_RevokeAllSessions_FullMethodName, in, out, opts...)
@@ -240,6 +251,7 @@ type AuthServiceServer interface {
 	ListDevices(context.Context, *ListDevicesRequest) (*ListDevicesResponse, error)
 	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
 	RevokeSession(context.Context, *RevokeSessionRequest) (*RevokeSessionResponse, error)
+	RevokeOtherSessions(context.Context, *RevokeOtherSessionsRequest) (*RevokeOtherSessionsResponse, error)
 	RevokeAllSessions(context.Context, *RevokeAllSessionsRequest) (*RevokeAllSessionsResponse, error)
 	BeginPasswordRecovery(context.Context, *BeginPasswordRecoveryRequest) (*BeginPasswordRecoveryResponse, error)
 	CompletePasswordRecovery(context.Context, *CompletePasswordRecoveryRequest) (*CompletePasswordRecoveryResponse, error)
@@ -291,6 +303,9 @@ func (UnimplementedAuthServiceServer) ListSessions(context.Context, *ListSession
 }
 func (UnimplementedAuthServiceServer) RevokeSession(context.Context, *RevokeSessionRequest) (*RevokeSessionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RevokeSession not implemented")
+}
+func (UnimplementedAuthServiceServer) RevokeOtherSessions(context.Context, *RevokeOtherSessionsRequest) (*RevokeOtherSessionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RevokeOtherSessions not implemented")
 }
 func (UnimplementedAuthServiceServer) RevokeAllSessions(context.Context, *RevokeAllSessionsRequest) (*RevokeAllSessionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RevokeAllSessions not implemented")
@@ -566,6 +581,24 @@ func _AuthService_RevokeSession_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_RevokeOtherSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeOtherSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).RevokeOtherSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_RevokeOtherSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).RevokeOtherSessions(ctx, req.(*RevokeOtherSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AuthService_RevokeAllSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RevokeAllSessionsRequest)
 	if err := dec(in); err != nil {
@@ -682,6 +715,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RevokeSession",
 			Handler:    _AuthService_RevokeSession_Handler,
+		},
+		{
+			MethodName: "RevokeOtherSessions",
+			Handler:    _AuthService_RevokeOtherSessions_Handler,
 		},
 		{
 			MethodName: "RevokeAllSessions",

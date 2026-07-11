@@ -546,6 +546,23 @@ func (a *api) RevokeAllSessions(
 	return &authv1.RevokeAllSessionsResponse{RevokedSessions: revoked}, nil
 }
 
+// RevokeOtherSessions revokes all sessions except the one used by the bearer.
+func (a *api) RevokeOtherSessions(
+	ctx context.Context,
+	req *authv1.RevokeOtherSessionsRequest,
+) (*authv1.RevokeOtherSessionsResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	revoked, err := a.identity.RevokeOtherSessions(ctx, authContext.Account.ID, authContext.Session.ID,
+		identity.RevokeAllSessionsParams{Reason: req.GetReason(), IdempotencyKey: req.GetIdempotencyKey()})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &authv1.RevokeOtherSessionsResponse{RevokedSessions: revoked}, nil
+}
+
 // BeginPasswordRecovery starts a recovery challenge for a human account.
 func (a *api) BeginPasswordRecovery(
 	ctx context.Context,

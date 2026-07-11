@@ -209,6 +209,15 @@ message RevokeSessionResponse {
   Session session = 2;
 }
 
+message RevokeOtherSessionsRequest {
+  string reason = 1;
+  string idempotency_key = 2;
+}
+
+message RevokeOtherSessionsResponse {
+  uint32 revoked_sessions = 1;
+}
+
 message RevokeAllSessionsRequest {
   string reason = 1;
   string idempotency_key = 2;

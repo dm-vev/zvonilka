@@ -70,6 +70,15 @@ func revokeAllSessionsFingerprint(accountID string, params RevokeAllSessionsPara
 	)
 }
 
+func revokeOtherSessionsFingerprint(accountID string, preservedSessionID string, params RevokeAllSessionsParams) string {
+	return idempotencyFingerprint(
+		"revoke-other-sessions",
+		accountID,
+		preservedSessionID,
+		params.Reason,
+	)
+}
+
 // submitJoinRequestFingerprint captures the fields that define a join request submission.
 func submitJoinRequestFingerprint(params SubmitJoinRequestParams) string {
 	username, email, phone := normalizeUsername(params.Username), normalizeEmail(params.Email), normalizePhone(params.Phone)

@@ -158,6 +158,47 @@ func TestRevokeAllSessionsIdempotencyKeyDeduplicatesSuccessfulBulkRevoke(t *test
 	}
 }
 
+func TestRevokeOtherSessionsPreservesAuthenticatedSession(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := teststore.NewMemoryStore()
+	sender := &recordingCodeSender{}
+	svc, err := identity.NewService(store, sender)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	account, _, err := svc.CreateAccount(ctx, identity.CreateAccountParams{
+		Username: "revoke-other-user", DisplayName: "Revoke Other", Email: "revoke-other@example.com",
+		AccountKind: identity.AccountKindUser, CreatedBy: "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	preserved := newLoggedInAccount(t, svc, sender, account.Username, "preserved-phone", "preserved-key")
+	other := newLoggedInAccount(t, svc, sender, account.Username, "other-phone", "other-key")
+	revoked, err := svc.RevokeOtherSessions(ctx, account.ID, preserved.ID, identity.RevokeAllSessionsParams{
+		Reason: "logout others", IdempotencyKey: "revoke-other-key",
+	})
+	if err != nil {
+		t.Fatalf("revoke other sessions: %v", err)
+	}
+	if revoked != 1 {
+		t.Fatalf("expected one revoked session, got %d", revoked)
+	}
+	sessions, err := svc.ListSessions(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("list sessions: %v", err)
+	}
+	for _, session := range sessions {
+		if session.ID == preserved.ID && session.Status != identity.SessionStatusActive {
+			t.Fatalf("preserved session status = %s", session.Status)
+		}
+		if session.ID == other.ID && session.Status != identity.SessionStatusRevoked {
+			t.Fatalf("other session status = %s", session.Status)
+		}
+	}
+}
+
 func TestRevokeAllSessionsReturnsZeroCountOnRollback(t *testing.T) {
 	t.Parallel()
 

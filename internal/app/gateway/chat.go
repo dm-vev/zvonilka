@@ -14,6 +14,7 @@ import (
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
 	domainconversation "github.com/dm-vev/zvonilka/internal/domain/conversation"
 	domaine2ee "github.com/dm-vev/zvonilka/internal/domain/e2ee"
+	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
 	"google.golang.org/grpc/status"
 )
 
@@ -26,10 +27,35 @@ func (a *api) CreateConversation(
 	if err != nil {
 		return nil, err
 	}
+	kind := conversationKindFromProto(req.GetKind())
+	if kind == domainconversation.ConversationKindDirect {
+		peerID := ""
+		for _, memberID := range req.GetMemberUserIds() {
+			if memberID != authContext.Account.ID {
+				peerID = memberID
+				break
+			}
+		}
+		if peerID == "" {
+			return nil, grpcError(domainconversation.ErrInvalidInput)
+		}
+		settings, err := a.user.GetAccountSettings(ctx, peerID)
+		if err != nil {
+			return nil, grpcError(err)
+		}
+		relations, err := a.user.Relations(ctx, peerID, []string{authContext.Account.ID})
+		if err != nil {
+			return nil, grpcError(err)
+		}
+		relation := relations[authContext.Account.ID]
+		if relation.IsBlocked || (!settings.AllowNewChatsFromUnknownUsers && !relation.IsContact) {
+			return nil, grpcError(domainuser.ErrForbidden)
+		}
+	}
 
 	conversationRow, _, err := a.conversation.CreateConversation(ctx, domainconversation.CreateConversationParams{
 		OwnerAccountID:   authContext.Account.ID,
-		Kind:             conversationKindFromProto(req.GetKind()),
+		Kind:             kind,
 		Title:            req.GetTitle(),
 		Description:      req.GetDescription(),
 		AvatarMediaID:    req.GetAvatarMediaId(),

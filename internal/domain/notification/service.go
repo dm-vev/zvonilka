@@ -156,6 +156,25 @@ func (s *Service) SetConversationOverride(ctx context.Context, params SetOverrid
 	return saved, nil
 }
 
+// DeleteConversationOverride restores the account's default notification settings for a conversation.
+func (s *Service) DeleteConversationOverride(ctx context.Context, conversationID string, accountID string) error {
+	if err := s.validateContext(ctx, "delete notification override"); err != nil {
+		return err
+	}
+	conversationID = strings.TrimSpace(conversationID)
+	accountID = strings.TrimSpace(accountID)
+	if conversationID == "" || accountID == "" {
+		return ErrInvalidInput
+	}
+	if _, err := s.activeAccount(ctx, accountID); err != nil {
+		return err
+	}
+	if err := s.store.DeleteOverride(ctx, conversationID, accountID); err != nil && !errors.Is(err, ErrNotFound) {
+		return fmt.Errorf("delete notification override for conversation %s and account %s: %w", conversationID, accountID, err)
+	}
+	return nil
+}
+
 // ConversationOverrideByConversationAndAccount resolves the effective per-chat override.
 func (s *Service) ConversationOverrideByConversationAndAccount(
 	ctx context.Context,

@@ -19,13 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	NotificationService_GetNotificationPreference_FullMethodName           = "/zvonilka.notification.v1.NotificationService/GetNotificationPreference"
-	NotificationService_SetNotificationPreference_FullMethodName           = "/zvonilka.notification.v1.NotificationService/SetNotificationPreference"
-	NotificationService_GetConversationNotificationOverride_FullMethodName = "/zvonilka.notification.v1.NotificationService/GetConversationNotificationOverride"
-	NotificationService_SetConversationNotificationOverride_FullMethodName = "/zvonilka.notification.v1.NotificationService/SetConversationNotificationOverride"
-	NotificationService_ListPushTokens_FullMethodName                      = "/zvonilka.notification.v1.NotificationService/ListPushTokens"
-	NotificationService_RegisterPushToken_FullMethodName                   = "/zvonilka.notification.v1.NotificationService/RegisterPushToken"
-	NotificationService_RevokePushToken_FullMethodName                     = "/zvonilka.notification.v1.NotificationService/RevokePushToken"
+	NotificationService_GetNotificationPreference_FullMethodName              = "/zvonilka.notification.v1.NotificationService/GetNotificationPreference"
+	NotificationService_SetNotificationPreference_FullMethodName              = "/zvonilka.notification.v1.NotificationService/SetNotificationPreference"
+	NotificationService_GetConversationNotificationOverride_FullMethodName    = "/zvonilka.notification.v1.NotificationService/GetConversationNotificationOverride"
+	NotificationService_SetConversationNotificationOverride_FullMethodName    = "/zvonilka.notification.v1.NotificationService/SetConversationNotificationOverride"
+	NotificationService_DeleteConversationNotificationOverride_FullMethodName = "/zvonilka.notification.v1.NotificationService/DeleteConversationNotificationOverride"
+	NotificationService_ListPushTokens_FullMethodName                         = "/zvonilka.notification.v1.NotificationService/ListPushTokens"
+	NotificationService_RegisterPushToken_FullMethodName                      = "/zvonilka.notification.v1.NotificationService/RegisterPushToken"
+	NotificationService_RevokePushToken_FullMethodName                        = "/zvonilka.notification.v1.NotificationService/RevokePushToken"
 )
 
 // NotificationServiceClient is the client API for NotificationService service.
@@ -36,6 +37,7 @@ type NotificationServiceClient interface {
 	SetNotificationPreference(ctx context.Context, in *SetNotificationPreferenceRequest, opts ...grpc.CallOption) (*SetNotificationPreferenceResponse, error)
 	GetConversationNotificationOverride(ctx context.Context, in *GetConversationNotificationOverrideRequest, opts ...grpc.CallOption) (*GetConversationNotificationOverrideResponse, error)
 	SetConversationNotificationOverride(ctx context.Context, in *SetConversationNotificationOverrideRequest, opts ...grpc.CallOption) (*SetConversationNotificationOverrideResponse, error)
+	DeleteConversationNotificationOverride(ctx context.Context, in *DeleteConversationNotificationOverrideRequest, opts ...grpc.CallOption) (*DeleteConversationNotificationOverrideResponse, error)
 	ListPushTokens(ctx context.Context, in *ListPushTokensRequest, opts ...grpc.CallOption) (*ListPushTokensResponse, error)
 	RegisterPushToken(ctx context.Context, in *RegisterPushTokenRequest, opts ...grpc.CallOption) (*RegisterPushTokenResponse, error)
 	RevokePushToken(ctx context.Context, in *RevokePushTokenRequest, opts ...grpc.CallOption) (*RevokePushTokenResponse, error)
@@ -85,6 +87,15 @@ func (c *notificationServiceClient) SetConversationNotificationOverride(ctx cont
 	return out, nil
 }
 
+func (c *notificationServiceClient) DeleteConversationNotificationOverride(ctx context.Context, in *DeleteConversationNotificationOverrideRequest, opts ...grpc.CallOption) (*DeleteConversationNotificationOverrideResponse, error) {
+	out := new(DeleteConversationNotificationOverrideResponse)
+	err := c.cc.Invoke(ctx, NotificationService_DeleteConversationNotificationOverride_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *notificationServiceClient) ListPushTokens(ctx context.Context, in *ListPushTokensRequest, opts ...grpc.CallOption) (*ListPushTokensResponse, error) {
 	out := new(ListPushTokensResponse)
 	err := c.cc.Invoke(ctx, NotificationService_ListPushTokens_FullMethodName, in, out, opts...)
@@ -120,6 +131,7 @@ type NotificationServiceServer interface {
 	SetNotificationPreference(context.Context, *SetNotificationPreferenceRequest) (*SetNotificationPreferenceResponse, error)
 	GetConversationNotificationOverride(context.Context, *GetConversationNotificationOverrideRequest) (*GetConversationNotificationOverrideResponse, error)
 	SetConversationNotificationOverride(context.Context, *SetConversationNotificationOverrideRequest) (*SetConversationNotificationOverrideResponse, error)
+	DeleteConversationNotificationOverride(context.Context, *DeleteConversationNotificationOverrideRequest) (*DeleteConversationNotificationOverrideResponse, error)
 	ListPushTokens(context.Context, *ListPushTokensRequest) (*ListPushTokensResponse, error)
 	RegisterPushToken(context.Context, *RegisterPushTokenRequest) (*RegisterPushTokenResponse, error)
 	RevokePushToken(context.Context, *RevokePushTokenRequest) (*RevokePushTokenResponse, error)
@@ -141,6 +153,9 @@ func (UnimplementedNotificationServiceServer) GetConversationNotificationOverrid
 }
 func (UnimplementedNotificationServiceServer) SetConversationNotificationOverride(context.Context, *SetConversationNotificationOverrideRequest) (*SetConversationNotificationOverrideResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetConversationNotificationOverride not implemented")
+}
+func (UnimplementedNotificationServiceServer) DeleteConversationNotificationOverride(context.Context, *DeleteConversationNotificationOverrideRequest) (*DeleteConversationNotificationOverrideResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteConversationNotificationOverride not implemented")
 }
 func (UnimplementedNotificationServiceServer) ListPushTokens(context.Context, *ListPushTokensRequest) (*ListPushTokensResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListPushTokens not implemented")
@@ -236,6 +251,24 @@ func _NotificationService_SetConversationNotificationOverride_Handler(srv interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NotificationService_DeleteConversationNotificationOverride_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteConversationNotificationOverrideRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).DeleteConversationNotificationOverride(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_DeleteConversationNotificationOverride_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).DeleteConversationNotificationOverride(ctx, req.(*DeleteConversationNotificationOverrideRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _NotificationService_ListPushTokens_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListPushTokensRequest)
 	if err := dec(in); err != nil {
@@ -312,6 +345,10 @@ var NotificationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetConversationNotificationOverride",
 			Handler:    _NotificationService_SetConversationNotificationOverride_Handler,
+		},
+		{
+			MethodName: "DeleteConversationNotificationOverride",
+			Handler:    _NotificationService_DeleteConversationNotificationOverride_Handler,
 		},
 		{
 			MethodName: "ListPushTokens",

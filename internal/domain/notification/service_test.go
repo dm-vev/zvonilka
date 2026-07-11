@@ -63,6 +63,12 @@ func TestPreferenceAndOverrideRegistry(t *testing.T) {
 	loadedOverride, err := svc.ConversationOverrideByConversationAndAccount(ctx, "conv-1", "acc-1")
 	require.NoError(t, err)
 	require.True(t, loadedOverride.MentionsOnly)
+	require.NoError(t, svc.DeleteConversationOverride(ctx, "conv-1", "acc-1"))
+	require.NoError(t, svc.DeleteConversationOverride(ctx, "conv-1", "acc-1"))
+	loadedOverride, err = svc.ConversationOverrideByConversationAndAccount(ctx, "conv-1", "acc-1")
+	require.NoError(t, err)
+	require.False(t, loadedOverride.Muted)
+	require.False(t, loadedOverride.MentionsOnly)
 }
 
 func TestPushTokenRegistryAndRevocation(t *testing.T) {

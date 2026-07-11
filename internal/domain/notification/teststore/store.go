@@ -116,6 +116,17 @@ func (s *memoryStore) OverrideByConversationAndAccount(_ context.Context, conver
 	return cloneOverride(override), nil
 }
 
+func (s *memoryStore) DeleteOverride(_ context.Context, conversationID string, accountID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := overrideKey(conversationID, accountID)
+	if _, ok := s.overridesByKey[key]; !ok {
+		return notification.ErrNotFound
+	}
+	delete(s.overridesByKey, key)
+	return nil
+}
+
 func (s *memoryStore) SavePushToken(_ context.Context, token notification.PushToken) (notification.PushToken, error) {
 	token, err := notification.NormalizePushToken(token, time.Now().UTC())
 	if err != nil {

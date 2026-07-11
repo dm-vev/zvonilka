@@ -123,6 +123,24 @@ func (a *api) SetConversationNotificationOverride(
 	}, nil
 }
 
+// DeleteConversationNotificationOverride restores inherited notification settings.
+func (a *api) DeleteConversationNotificationOverride(
+	ctx context.Context,
+	req *notificationv1.DeleteConversationNotificationOverrideRequest,
+) (*notificationv1.DeleteConversationNotificationOverrideResponse, error) {
+	authContext, err := a.requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := a.requireConversationAccess(ctx, authContext.Account.ID, req.GetConversationId()); err != nil {
+		return nil, grpcError(err)
+	}
+	if err := a.notification.DeleteConversationOverride(ctx, req.GetConversationId(), authContext.Account.ID); err != nil {
+		return nil, grpcError(err)
+	}
+	return &notificationv1.DeleteConversationNotificationOverrideResponse{}, nil
+}
+
 // ListPushTokens returns the active push tokens registered for the authenticated account.
 func (a *api) ListPushTokens(
 	ctx context.Context,

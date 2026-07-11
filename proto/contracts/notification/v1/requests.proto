@@ -36,6 +36,12 @@ message SetConversationNotificationOverrideResponse {
   ConversationNotificationOverride override = 1;
 }
 
+message DeleteConversationNotificationOverrideRequest {
+  string conversation_id = 1;
+}
+
+message DeleteConversationNotificationOverrideResponse {}
+
 message ListPushTokensRequest {}
 
 message ListPushTokensResponse {

@@ -11,6 +11,7 @@ service NotificationService {
   rpc SetNotificationPreference(SetNotificationPreferenceRequest) returns (SetNotificationPreferenceResponse);
   rpc GetConversationNotificationOverride(GetConversationNotificationOverrideRequest) returns (GetConversationNotificationOverrideResponse);
   rpc SetConversationNotificationOverride(SetConversationNotificationOverrideRequest) returns (SetConversationNotificationOverrideResponse);
+  rpc DeleteConversationNotificationOverride(DeleteConversationNotificationOverrideRequest) returns (DeleteConversationNotificationOverrideResponse);
   rpc ListPushTokens(ListPushTokensRequest) returns (ListPushTokensResponse);
   rpc RegisterPushToken(RegisterPushTokenRequest) returns (RegisterPushTokenResponse);
   rpc RevokePushToken(RevokePushTokenRequest) returns (RevokePushTokenResponse);

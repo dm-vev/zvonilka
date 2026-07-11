@@ -180,6 +180,69 @@ func (s *Service) RevokeAllSessions(ctx context.Context, accountID string, param
 	return revoked, nil
 }
 
+// RevokeOtherSessions revokes every active session except the authenticated one.
+func (s *Service) RevokeOtherSessions(ctx context.Context, accountID string, preservedSessionID string, params RevokeAllSessionsParams) (uint32, error) {
+	if err := s.validateContext(ctx, "revoke other sessions"); err != nil {
+		return 0, err
+	}
+	if accountID == "" || preservedSessionID == "" {
+		return 0, ErrInvalidInput
+	}
+	fingerprint := revokeOtherSessionsFingerprint(accountID, preservedSessionID, params)
+	if params.IdempotencyKey != "" {
+		if revoked, ok, err := s.idempotency.revokeAllSessionsResult(params.IdempotencyKey, fingerprint, s.currentTime()); err != nil {
+			return 0, err
+		} else if ok {
+			return revoked, nil
+		}
+	}
+
+	var revoked uint32
+	err := s.store.WithinTx(ctx, func(tx Store) error {
+		if _, err := s.lockAccount(ctx, tx, accountID); err != nil {
+			return fmt.Errorf("load account %s for revoke other sessions: %w", accountID, err)
+		}
+		preserved, err := tx.SessionByID(ctx, preservedSessionID)
+		if err != nil {
+			return fmt.Errorf("load preserved session %s: %w", preservedSessionID, err)
+		}
+		if preserved.AccountID != accountID || preserved.Status != SessionStatusActive {
+			return ErrForbidden
+		}
+		sessions, err := tx.SessionsByAccountID(ctx, accountID)
+		if err != nil {
+			return fmt.Errorf("list sessions for account %s: %w", accountID, err)
+		}
+		now := params.RequestedAt
+		if now.IsZero() {
+			now = s.currentTime()
+		}
+		for _, session := range sessions {
+			if session.ID == preservedSessionID || session.Status == SessionStatusRevoked {
+				continue
+			}
+			session.Status = SessionStatusRevoked
+			session.RevokedAt = now
+			session.Current = false
+			if _, err := tx.UpdateSession(ctx, session); err != nil {
+				return fmt.Errorf("revoke session %s: %w", session.ID, err)
+			}
+			if err := tx.DeleteSessionCredentialsBySessionID(ctx, session.ID); err != nil && !isNotFound(err) {
+				return fmt.Errorf("delete credentials for revoked session %s: %w", session.ID, err)
+			}
+			revoked++
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	if params.IdempotencyKey != "" {
+		s.idempotency.storeRevokeAllSessionsResult(params.IdempotencyKey, fingerprint, revoked, s.currentTime())
+	}
+	return revoked, nil
+}
+
 // normalizeCurrentSessions turns the persisted session list into a stable read model.
 //
 // Only one active session is marked current. All others are cleared so the caller can

@@ -14,6 +14,7 @@ type Store interface {
 
 	SaveOverride(ctx context.Context, override ConversationOverride) (ConversationOverride, error)
 	OverrideByConversationAndAccount(ctx context.Context, conversationID string, accountID string) (ConversationOverride, error)
+	DeleteOverride(ctx context.Context, conversationID string, accountID string) error
 
 	SavePushToken(ctx context.Context, token PushToken) (PushToken, error)
 	PushTokenByID(ctx context.Context, tokenID string) (PushToken, error)

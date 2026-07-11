@@ -21,6 +21,7 @@ service AuthService {
   rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
   rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
   rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
+  rpc RevokeOtherSessions(RevokeOtherSessionsRequest) returns (RevokeOtherSessionsResponse);
   rpc RevokeAllSessions(RevokeAllSessionsRequest) returns (RevokeAllSessionsResponse);
   rpc BeginPasswordRecovery(BeginPasswordRecoveryRequest) returns (BeginPasswordRecoveryResponse);
   rpc CompletePasswordRecovery(CompletePasswordRecoveryRequest) returns (CompletePasswordRecoveryResponse);

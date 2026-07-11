@@ -387,6 +387,91 @@ func (x *SetConversationNotificationOverrideResponse) GetOverride() *Conversatio
 	return nil
 }
 
+type DeleteConversationNotificationOverrideRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ConversationId string `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+}
+
+func (x *DeleteConversationNotificationOverrideRequest) Reset() {
+	*x = DeleteConversationNotificationOverrideRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_notification_v1_requests_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DeleteConversationNotificationOverrideRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteConversationNotificationOverrideRequest) ProtoMessage() {}
+
+func (x *DeleteConversationNotificationOverrideRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_notification_v1_requests_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteConversationNotificationOverrideRequest.ProtoReflect.Descriptor instead.
+func (*DeleteConversationNotificationOverrideRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_notification_v1_requests_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *DeleteConversationNotificationOverrideRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+type DeleteConversationNotificationOverrideResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *DeleteConversationNotificationOverrideResponse) Reset() {
+	*x = DeleteConversationNotificationOverrideResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_contracts_notification_v1_requests_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DeleteConversationNotificationOverrideResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteConversationNotificationOverrideResponse) ProtoMessage() {}
+
+func (x *DeleteConversationNotificationOverrideResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_notification_v1_requests_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteConversationNotificationOverrideResponse.ProtoReflect.Descriptor instead.
+func (*DeleteConversationNotificationOverrideResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_notification_v1_requests_proto_rawDescGZIP(), []int{9}
+}
+
 type ListPushTokensRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -396,7 +481,7 @@ type ListPushTokensRequest struct {
 func (x *ListPushTokensRequest) Reset() {
 	*x = ListPushTokensRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_notification_v1_requests_proto_msgTypes[8]
+		mi := &file_contracts_notification_v1_requests_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -409,7 +494,7 @@ func (x *ListPushTokensRequest) String() string {
 func (*ListPushTokensRequest) ProtoMessage() {}
 
 func (x *ListPushTokensRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_notification_v1_requests_proto_msgTypes[8]
+	mi := &file_contracts_notification_v1_requests_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -422,7 +507,7 @@ func (x *ListPushTokensRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPushTokensRequest.ProtoReflect.Descriptor instead.
 func (*ListPushTokensRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_notification_v1_requests_proto_rawDescGZIP(), []int{8}
+	return file_contracts_notification_v1_requests_proto_rawDescGZIP(), []int{10}
 }
 
 type ListPushTokensResponse struct {
@@ -436,7 +521,7 @@ type ListPushTokensResponse struct {
 func (x *ListPushTokensResponse) Reset() {
 	*x = ListPushTokensResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_notification_v1_requests_proto_msgTypes[9]
+		mi := &file_contracts_notification_v1_requests_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -449,7 +534,7 @@ func (x *ListPushTokensResponse) String() string {
 func (*ListPushTokensResponse) ProtoMessage() {}
 
 func (x *ListPushTokensResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_notification_v1_requests_proto_msgTypes[9]
+	mi := &file_contracts_notification_v1_requests_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -462,7 +547,7 @@ func (x *ListPushTokensResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPushTokensResponse.ProtoReflect.Descriptor instead.
 func (*ListPushTokensResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_notification_v1_requests_proto_rawDescGZIP(), []int{9}
+	return file_contracts_notification_v1_requests_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ListPushTokensResponse) GetPushTokens() []*PushToken {
@@ -484,7 +569,7 @@ type RegisterPushTokenRequest struct {
 func (x *RegisterPushTokenRequest) Reset() {
 	*x = RegisterPushTokenRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_notification_v1_requests_proto_msgTypes[10]
+		mi := &file_contracts_notification_v1_requests_proto_msgTypes[12]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -497,7 +582,7 @@ func (x *RegisterPushTokenRequest) String() string {
 func (*RegisterPushTokenRequest) ProtoMessage() {}
 
 func (x *RegisterPushTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_notification_v1_requests_proto_msgTypes[10]
+	mi := &file_contracts_notification_v1_requests_proto_msgTypes[12]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -510,7 +595,7 @@ func (x *RegisterPushTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterPushTokenRequest.ProtoReflect.Descriptor instead.
 func (*RegisterPushTokenRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_notification_v1_requests_proto_rawDescGZIP(), []int{10}
+	return file_contracts_notification_v1_requests_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *RegisterPushTokenRequest) GetProvider() string {
@@ -538,7 +623,7 @@ type RegisterPushTokenResponse struct {
 func (x *RegisterPushTokenResponse) Reset() {
 	*x = RegisterPushTokenResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_notification_v1_requests_proto_msgTypes[11]
+		mi := &file_contracts_notification_v1_requests_proto_msgTypes[13]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -551,7 +636,7 @@ func (x *RegisterPushTokenResponse) String() string {
 func (*RegisterPushTokenResponse) ProtoMessage() {}
 
 func (x *RegisterPushTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_notification_v1_requests_proto_msgTypes[11]
+	mi := &file_contracts_notification_v1_requests_proto_msgTypes[13]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -564,7 +649,7 @@ func (x *RegisterPushTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterPushTokenResponse.ProtoReflect.Descriptor instead.
 func (*RegisterPushTokenResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_notification_v1_requests_proto_rawDescGZIP(), []int{11}
+	return file_contracts_notification_v1_requests_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RegisterPushTokenResponse) GetPushToken() *PushToken {
@@ -585,7 +670,7 @@ type RevokePushTokenRequest struct {
 func (x *RevokePushTokenRequest) Reset() {
 	*x = RevokePushTokenRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_notification_v1_requests_proto_msgTypes[12]
+		mi := &file_contracts_notification_v1_requests_proto_msgTypes[14]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -598,7 +683,7 @@ func (x *RevokePushTokenRequest) String() string {
 func (*RevokePushTokenRequest) ProtoMessage() {}
 
 func (x *RevokePushTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_notification_v1_requests_proto_msgTypes[12]
+	mi := &file_contracts_notification_v1_requests_proto_msgTypes[14]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -611,7 +696,7 @@ func (x *RevokePushTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokePushTokenRequest.ProtoReflect.Descriptor instead.
 func (*RevokePushTokenRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_notification_v1_requests_proto_rawDescGZIP(), []int{12}
+	return file_contracts_notification_v1_requests_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RevokePushTokenRequest) GetTokenId() string {
@@ -632,7 +717,7 @@ type RevokePushTokenResponse struct {
 func (x *RevokePushTokenResponse) Reset() {
 	*x = RevokePushTokenResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_contracts_notification_v1_requests_proto_msgTypes[13]
+		mi := &file_contracts_notification_v1_requests_proto_msgTypes[15]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -645,7 +730,7 @@ func (x *RevokePushTokenResponse) String() string {
 func (*RevokePushTokenResponse) ProtoMessage() {}
 
 func (x *RevokePushTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_notification_v1_requests_proto_msgTypes[13]
+	mi := &file_contracts_notification_v1_requests_proto_msgTypes[15]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -658,7 +743,7 @@ func (x *RevokePushTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokePushTokenResponse.ProtoReflect.Descriptor instead.
 func (*RevokePushTokenResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_notification_v1_requests_proto_rawDescGZIP(), []int{13}
+	return file_contracts_notification_v1_requests_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RevokePushTokenResponse) GetPushToken() *PushToken {
@@ -733,40 +818,49 @@ var file_contracts_notification_v1_requests_proto_rawDesc = []byte{
 	0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61,
 	0x74, 0x69, 0x6f, 0x6e, 0x4e, 0x6f, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e,
 	0x4f, 0x76, 0x65, 0x72, 0x72, 0x69, 0x64, 0x65, 0x52, 0x08, 0x6f, 0x76, 0x65, 0x72, 0x72, 0x69,
-	0x64, 0x65, 0x22, 0x17, 0x0a, 0x15, 0x4c, 0x69, 0x73, 0x74, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f,
-	0x6b, 0x65, 0x6e, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0x5e, 0x0a, 0x16, 0x4c,
-	0x69, 0x73, 0x74, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x73, 0x52, 0x65, 0x73,
-	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x44, 0x0a, 0x0b, 0x70, 0x75, 0x73, 0x68, 0x5f, 0x74, 0x6f,
-	0x6b, 0x65, 0x6e, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x23, 0x2e, 0x7a, 0x76, 0x6f,
-	0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x6e, 0x6f, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x69,
-	0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x52,
-	0x0a, 0x70, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x73, 0x22, 0x4c, 0x0a, 0x18, 0x52,
-	0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e,
-	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1a, 0x0a, 0x08, 0x70, 0x72, 0x6f, 0x76, 0x69,
-	0x64, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x70, 0x72, 0x6f, 0x76, 0x69,
-	0x64, 0x65, 0x72, 0x12, 0x14, 0x0a, 0x05, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x18, 0x02, 0x20, 0x01,
-	0x28, 0x09, 0x52, 0x05, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x22, 0x5f, 0x0a, 0x19, 0x52, 0x65, 0x67,
-	0x69, 0x73, 0x74, 0x65, 0x72, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x52, 0x65,
+	0x64, 0x65, 0x22, 0x58, 0x0a, 0x2d, 0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x43, 0x6f, 0x6e, 0x76,
+	0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4e, 0x6f, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61,
+	0x74, 0x69, 0x6f, 0x6e, 0x4f, 0x76, 0x65, 0x72, 0x72, 0x69, 0x64, 0x65, 0x52, 0x65, 0x71, 0x75,
+	0x65, 0x73, 0x74, 0x12, 0x27, 0x0a, 0x0f, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x63, 0x6f,
+	0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x49, 0x64, 0x22, 0x30, 0x0a, 0x2e,
+	0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69,
+	0x6f, 0x6e, 0x4e, 0x6f, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4f, 0x76,
+	0x65, 0x72, 0x72, 0x69, 0x64, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x17,
+	0x0a, 0x15, 0x4c, 0x69, 0x73, 0x74, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x73,
+	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0x5e, 0x0a, 0x16, 0x4c, 0x69, 0x73, 0x74, 0x50,
+	0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
+	0x65, 0x12, 0x44, 0x0a, 0x0b, 0x70, 0x75, 0x73, 0x68, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x73,
+	0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x23, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b,
+	0x61, 0x2e, 0x6e, 0x6f, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76,
+	0x31, 0x2e, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x52, 0x0a, 0x70, 0x75, 0x73,
+	0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x73, 0x22, 0x4c, 0x0a, 0x18, 0x52, 0x65, 0x67, 0x69, 0x73,
+	0x74, 0x65, 0x72, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x52, 0x65, 0x71, 0x75,
+	0x65, 0x73, 0x74, 0x12, 0x1a, 0x0a, 0x08, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x12,
+	0x14, 0x0a, 0x05, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05,
+	0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x22, 0x5f, 0x0a, 0x19, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65,
+	0x72, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x12, 0x42, 0x0a, 0x0a, 0x70, 0x75, 0x73, 0x68, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x23, 0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b,
+	0x61, 0x2e, 0x6e, 0x6f, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76,
+	0x31, 0x2e, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x52, 0x09, 0x70, 0x75, 0x73,
+	0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x22, 0x33, 0x0a, 0x16, 0x52, 0x65, 0x76, 0x6f, 0x6b, 0x65,
+	0x50, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
+	0x12, 0x19, 0x0a, 0x08, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x07, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x49, 0x64, 0x22, 0x5d, 0x0a, 0x17, 0x52,
+	0x65, 0x76, 0x6f, 0x6b, 0x65, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x52, 0x65,
 	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x42, 0x0a, 0x0a, 0x70, 0x75, 0x73, 0x68, 0x5f, 0x74,
 	0x6f, 0x6b, 0x65, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x23, 0x2e, 0x7a, 0x76, 0x6f,
 	0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x6e, 0x6f, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x69,
 	0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x52,
-	0x09, 0x70, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x22, 0x33, 0x0a, 0x16, 0x52, 0x65,
-	0x76, 0x6f, 0x6b, 0x65, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x52, 0x65, 0x71,
-	0x75, 0x65, 0x73, 0x74, 0x12, 0x19, 0x0a, 0x08, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x5f, 0x69, 0x64,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x49, 0x64, 0x22,
-	0x5d, 0x0a, 0x17, 0x52, 0x65, 0x76, 0x6f, 0x6b, 0x65, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b,
-	0x65, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x42, 0x0a, 0x0a, 0x70, 0x75,
-	0x73, 0x68, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x23,
-	0x2e, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2e, 0x6e, 0x6f, 0x74, 0x69, 0x66, 0x69,
-	0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x50, 0x75, 0x73, 0x68, 0x54, 0x6f,
-	0x6b, 0x65, 0x6e, 0x52, 0x09, 0x70, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x42, 0x4f,
-	0x5a, 0x4d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6d, 0x2d,
-	0x76, 0x65, 0x76, 0x2f, 0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2f, 0x67, 0x65, 0x6e,
-	0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74, 0x73,
-	0x2f, 0x6e, 0x6f, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x76, 0x31,
-	0x3b, 0x6e, 0x6f, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x76, 0x31, 0x62,
-	0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x09, 0x70, 0x75, 0x73, 0x68, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x42, 0x4f, 0x5a, 0x4d, 0x67, 0x69,
+	0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6d, 0x2d, 0x76, 0x65, 0x76, 0x2f,
+	0x7a, 0x76, 0x6f, 0x6e, 0x69, 0x6c, 0x6b, 0x61, 0x2f, 0x67, 0x65, 0x6e, 0x2f, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74, 0x73, 0x2f, 0x6e, 0x6f, 0x74,
+	0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x76, 0x31, 0x3b, 0x6e, 0x6f, 0x74,
+	0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x76, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x33,
 }
 
 var (
@@ -781,36 +875,38 @@ func file_contracts_notification_v1_requests_proto_rawDescGZIP() []byte {
 	return file_contracts_notification_v1_requests_proto_rawDescData
 }
 
-var file_contracts_notification_v1_requests_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_contracts_notification_v1_requests_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_contracts_notification_v1_requests_proto_goTypes = []interface{}{
-	(*GetNotificationPreferenceRequest)(nil),            // 0: zvonilka.notification.v1.GetNotificationPreferenceRequest
-	(*GetNotificationPreferenceResponse)(nil),           // 1: zvonilka.notification.v1.GetNotificationPreferenceResponse
-	(*SetNotificationPreferenceRequest)(nil),            // 2: zvonilka.notification.v1.SetNotificationPreferenceRequest
-	(*SetNotificationPreferenceResponse)(nil),           // 3: zvonilka.notification.v1.SetNotificationPreferenceResponse
-	(*GetConversationNotificationOverrideRequest)(nil),  // 4: zvonilka.notification.v1.GetConversationNotificationOverrideRequest
-	(*GetConversationNotificationOverrideResponse)(nil), // 5: zvonilka.notification.v1.GetConversationNotificationOverrideResponse
-	(*SetConversationNotificationOverrideRequest)(nil),  // 6: zvonilka.notification.v1.SetConversationNotificationOverrideRequest
-	(*SetConversationNotificationOverrideResponse)(nil), // 7: zvonilka.notification.v1.SetConversationNotificationOverrideResponse
-	(*ListPushTokensRequest)(nil),                       // 8: zvonilka.notification.v1.ListPushTokensRequest
-	(*ListPushTokensResponse)(nil),                      // 9: zvonilka.notification.v1.ListPushTokensResponse
-	(*RegisterPushTokenRequest)(nil),                    // 10: zvonilka.notification.v1.RegisterPushTokenRequest
-	(*RegisterPushTokenResponse)(nil),                   // 11: zvonilka.notification.v1.RegisterPushTokenResponse
-	(*RevokePushTokenRequest)(nil),                      // 12: zvonilka.notification.v1.RevokePushTokenRequest
-	(*RevokePushTokenResponse)(nil),                     // 13: zvonilka.notification.v1.RevokePushTokenResponse
-	(*NotificationPreference)(nil),                      // 14: zvonilka.notification.v1.NotificationPreference
-	(*ConversationNotificationOverride)(nil),            // 15: zvonilka.notification.v1.ConversationNotificationOverride
-	(*PushToken)(nil),                                   // 16: zvonilka.notification.v1.PushToken
+	(*GetNotificationPreferenceRequest)(nil),               // 0: zvonilka.notification.v1.GetNotificationPreferenceRequest
+	(*GetNotificationPreferenceResponse)(nil),              // 1: zvonilka.notification.v1.GetNotificationPreferenceResponse
+	(*SetNotificationPreferenceRequest)(nil),               // 2: zvonilka.notification.v1.SetNotificationPreferenceRequest
+	(*SetNotificationPreferenceResponse)(nil),              // 3: zvonilka.notification.v1.SetNotificationPreferenceResponse
+	(*GetConversationNotificationOverrideRequest)(nil),     // 4: zvonilka.notification.v1.GetConversationNotificationOverrideRequest
+	(*GetConversationNotificationOverrideResponse)(nil),    // 5: zvonilka.notification.v1.GetConversationNotificationOverrideResponse
+	(*SetConversationNotificationOverrideRequest)(nil),     // 6: zvonilka.notification.v1.SetConversationNotificationOverrideRequest
+	(*SetConversationNotificationOverrideResponse)(nil),    // 7: zvonilka.notification.v1.SetConversationNotificationOverrideResponse
+	(*DeleteConversationNotificationOverrideRequest)(nil),  // 8: zvonilka.notification.v1.DeleteConversationNotificationOverrideRequest
+	(*DeleteConversationNotificationOverrideResponse)(nil), // 9: zvonilka.notification.v1.DeleteConversationNotificationOverrideResponse
+	(*ListPushTokensRequest)(nil),                          // 10: zvonilka.notification.v1.ListPushTokensRequest
+	(*ListPushTokensResponse)(nil),                         // 11: zvonilka.notification.v1.ListPushTokensResponse
+	(*RegisterPushTokenRequest)(nil),                       // 12: zvonilka.notification.v1.RegisterPushTokenRequest
+	(*RegisterPushTokenResponse)(nil),                      // 13: zvonilka.notification.v1.RegisterPushTokenResponse
+	(*RevokePushTokenRequest)(nil),                         // 14: zvonilka.notification.v1.RevokePushTokenRequest
+	(*RevokePushTokenResponse)(nil),                        // 15: zvonilka.notification.v1.RevokePushTokenResponse
+	(*NotificationPreference)(nil),                         // 16: zvonilka.notification.v1.NotificationPreference
+	(*ConversationNotificationOverride)(nil),               // 17: zvonilka.notification.v1.ConversationNotificationOverride
+	(*PushToken)(nil),                                      // 18: zvonilka.notification.v1.PushToken
 }
 var file_contracts_notification_v1_requests_proto_depIdxs = []int32{
-	14, // 0: zvonilka.notification.v1.GetNotificationPreferenceResponse.preference:type_name -> zvonilka.notification.v1.NotificationPreference
-	14, // 1: zvonilka.notification.v1.SetNotificationPreferenceRequest.preference:type_name -> zvonilka.notification.v1.NotificationPreference
-	14, // 2: zvonilka.notification.v1.SetNotificationPreferenceResponse.preference:type_name -> zvonilka.notification.v1.NotificationPreference
-	15, // 3: zvonilka.notification.v1.GetConversationNotificationOverrideResponse.override:type_name -> zvonilka.notification.v1.ConversationNotificationOverride
-	15, // 4: zvonilka.notification.v1.SetConversationNotificationOverrideRequest.override:type_name -> zvonilka.notification.v1.ConversationNotificationOverride
-	15, // 5: zvonilka.notification.v1.SetConversationNotificationOverrideResponse.override:type_name -> zvonilka.notification.v1.ConversationNotificationOverride
-	16, // 6: zvonilka.notification.v1.ListPushTokensResponse.push_tokens:type_name -> zvonilka.notification.v1.PushToken
-	16, // 7: zvonilka.notification.v1.RegisterPushTokenResponse.push_token:type_name -> zvonilka.notification.v1.PushToken
-	16, // 8: zvonilka.notification.v1.RevokePushTokenResponse.push_token:type_name -> zvonilka.notification.v1.PushToken
+	16, // 0: zvonilka.notification.v1.GetNotificationPreferenceResponse.preference:type_name -> zvonilka.notification.v1.NotificationPreference
+	16, // 1: zvonilka.notification.v1.SetNotificationPreferenceRequest.preference:type_name -> zvonilka.notification.v1.NotificationPreference
+	16, // 2: zvonilka.notification.v1.SetNotificationPreferenceResponse.preference:type_name -> zvonilka.notification.v1.NotificationPreference
+	17, // 3: zvonilka.notification.v1.GetConversationNotificationOverrideResponse.override:type_name -> zvonilka.notification.v1.ConversationNotificationOverride
+	17, // 4: zvonilka.notification.v1.SetConversationNotificationOverrideRequest.override:type_name -> zvonilka.notification.v1.ConversationNotificationOverride
+	17, // 5: zvonilka.notification.v1.SetConversationNotificationOverrideResponse.override:type_name -> zvonilka.notification.v1.ConversationNotificationOverride
+	18, // 6: zvonilka.notification.v1.ListPushTokensResponse.push_tokens:type_name -> zvonilka.notification.v1.PushToken
+	18, // 7: zvonilka.notification.v1.RegisterPushTokenResponse.push_token:type_name -> zvonilka.notification.v1.PushToken
+	18, // 8: zvonilka.notification.v1.RevokePushTokenResponse.push_token:type_name -> zvonilka.notification.v1.PushToken
 	9,  // [9:9] is the sub-list for method output_type
 	9,  // [9:9] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
@@ -922,7 +1018,7 @@ func file_contracts_notification_v1_requests_proto_init() {
 			}
 		}
 		file_contracts_notification_v1_requests_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ListPushTokensRequest); i {
+			switch v := v.(*DeleteConversationNotificationOverrideRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -934,7 +1030,7 @@ func file_contracts_notification_v1_requests_proto_init() {
 			}
 		}
 		file_contracts_notification_v1_requests_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ListPushTokensResponse); i {
+			switch v := v.(*DeleteConversationNotificationOverrideResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -946,7 +1042,7 @@ func file_contracts_notification_v1_requests_proto_init() {
 			}
 		}
 		file_contracts_notification_v1_requests_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RegisterPushTokenRequest); i {
+			switch v := v.(*ListPushTokensRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -958,7 +1054,7 @@ func file_contracts_notification_v1_requests_proto_init() {
 			}
 		}
 		file_contracts_notification_v1_requests_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RegisterPushTokenResponse); i {
+			switch v := v.(*ListPushTokensResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -970,7 +1066,7 @@ func file_contracts_notification_v1_requests_proto_init() {
 			}
 		}
 		file_contracts_notification_v1_requests_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RevokePushTokenRequest); i {
+			switch v := v.(*RegisterPushTokenRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -982,6 +1078,30 @@ func file_contracts_notification_v1_requests_proto_init() {
 			}
 		}
 		file_contracts_notification_v1_requests_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RegisterPushTokenResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_notification_v1_requests_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RevokePushTokenRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_contracts_notification_v1_requests_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*RevokePushTokenResponse); i {
 			case 0:
 				return &v.state
@@ -1000,7 +1120,7 @@ func file_contracts_notification_v1_requests_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_contracts_notification_v1_requests_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
