@@ -7,6 +7,20 @@ import "contracts/common/v1/types.proto";
 
 option go_package = "github.com/dm-vev/zvonilka/gen/proto/contracts/notification/v1;notificationv1";
 
+enum NotificationSettingsScope {
+  NOTIFICATION_SETTINGS_SCOPE_UNSPECIFIED = 0;
+  NOTIFICATION_SETTINGS_SCOPE_PRIVATE_CHATS = 1;
+  NOTIFICATION_SETTINGS_SCOPE_GROUP_CHATS = 2;
+  NOTIFICATION_SETTINGS_SCOPE_CHANNEL_CHATS = 3;
+}
+
+enum ReactionNotificationSource {
+  REACTION_NOTIFICATION_SOURCE_UNSPECIFIED = 0;
+  REACTION_NOTIFICATION_SOURCE_NONE = 1;
+  REACTION_NOTIFICATION_SOURCE_CONTACTS = 2;
+  REACTION_NOTIFICATION_SOURCE_ALL = 3;
+}
+
 message QuietHours {
   bool enabled = 1;
   uint32 start_minute = 2;
@@ -32,6 +46,51 @@ message ConversationNotificationOverride {
   bool mentions_only = 3;
   google.protobuf.Timestamp muted_until = 4;
   google.protobuf.Timestamp updated_at = 5;
+  bool show_preview = 6;
+  int64 sound_id = 7;
+  bool mute_stories = 8;
+  int64 story_sound_id = 9;
+  bool show_story_sender = 10;
+  bool disable_pinned_message_notifications = 11;
+  bool disable_mention_notifications = 12;
+  bool use_default_mute_for = 13;
+  bool use_default_sound = 14;
+  bool use_default_show_preview = 15;
+  bool use_default_mute_stories = 16;
+  bool use_default_story_sound = 17;
+  bool use_default_show_story_sender = 18;
+  bool use_default_disable_pinned_message_notifications = 19;
+  bool use_default_disable_mention_notifications = 20;
+}
+
+message ScopeNotificationSettings {
+  NotificationSettingsScope scope = 1;
+  google.protobuf.Timestamp muted_until = 2;
+  bool show_preview = 3;
+  int64 sound_id = 4;
+  bool mute_stories = 5;
+  int64 story_sound_id = 6;
+  bool show_story_sender = 7;
+  bool disable_pinned_message_notifications = 8;
+  bool disable_mention_notifications = 9;
+  google.protobuf.Timestamp updated_at = 10;
+  bool use_default_mute_stories = 11;
+}
+
+message ReactionNotificationSettings {
+  ReactionNotificationSource message_reaction_source = 1;
+  ReactionNotificationSource story_reaction_source = 2;
+  int64 sound_id = 3;
+  bool show_preview = 4;
+  google.protobuf.Timestamp updated_at = 5;
+  ReactionNotificationSource poll_vote_source = 6;
+}
+
+message SavedNotificationSound {
+  int64 sound_id = 1;
+  string media_id = 2;
+  string title = 3;
+  google.protobuf.Timestamp created_at = 4;
 }
 
 message PushToken {

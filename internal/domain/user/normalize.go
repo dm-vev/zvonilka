@@ -26,6 +26,38 @@ func normalizeVisibility(value Visibility) Visibility {
 	}
 }
 
+func normalizePrivacyRule(rule PrivacyRule) (PrivacyRule, bool) {
+	rule.Base = normalizeVisibility(rule.Base)
+	if rule.Base != VisibilityEveryone && rule.Base != VisibilityContacts && rule.Base != VisibilityNobody {
+		return PrivacyRule{}, false
+	}
+	rule.AllowUserIDs = normalizedIDs(rule.AllowUserIDs)
+	rule.RestrictUserIDs = normalizedIDs(rule.RestrictUserIDs)
+	rule.AllowChatIDs = normalizedIDs(rule.AllowChatIDs)
+	rule.RestrictChatIDs = normalizedIDs(rule.RestrictChatIDs)
+	if rule.AllowBots && rule.RestrictBots {
+		return PrivacyRule{}, false
+	}
+	return rule, true
+}
+
+func normalizedIDs(values []string) []string {
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
+}
+
 func normalizePhone(value string) string {
 	var builder strings.Builder
 	for _, r := range strings.TrimSpace(value) {

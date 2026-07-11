@@ -12,6 +12,13 @@ service NotificationService {
   rpc GetConversationNotificationOverride(GetConversationNotificationOverrideRequest) returns (GetConversationNotificationOverrideResponse);
   rpc SetConversationNotificationOverride(SetConversationNotificationOverrideRequest) returns (SetConversationNotificationOverrideResponse);
   rpc DeleteConversationNotificationOverride(DeleteConversationNotificationOverrideRequest) returns (DeleteConversationNotificationOverrideResponse);
+  rpc GetScopeNotificationSettings(GetScopeNotificationSettingsRequest) returns (GetScopeNotificationSettingsResponse);
+  rpc SetScopeNotificationSettings(SetScopeNotificationSettingsRequest) returns (SetScopeNotificationSettingsResponse);
+  rpc GetReactionNotificationSettings(GetReactionNotificationSettingsRequest) returns (GetReactionNotificationSettingsResponse);
+  rpc SetReactionNotificationSettings(SetReactionNotificationSettingsRequest) returns (SetReactionNotificationSettingsResponse);
+  rpc ListSavedNotificationSounds(ListSavedNotificationSoundsRequest) returns (ListSavedNotificationSoundsResponse);
+  rpc AddSavedNotificationSound(AddSavedNotificationSoundRequest) returns (AddSavedNotificationSoundResponse);
+  rpc RemoveSavedNotificationSound(RemoveSavedNotificationSoundRequest) returns (RemoveSavedNotificationSoundResponse);
   rpc ListPushTokens(ListPushTokensRequest) returns (ListPushTokensResponse);
   rpc RegisterPushToken(RegisterPushTokenRequest) returns (RegisterPushTokenResponse);
   rpc RevokePushToken(RevokePushTokenRequest) returns (RevokePushTokenResponse);

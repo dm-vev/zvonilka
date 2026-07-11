@@ -64,6 +64,46 @@ func (s *Service) UpdatePrivacy(ctx context.Context, params UpdatePrivacyParams)
 	privacy.AllowContactSync = params.Privacy.AllowContactSync
 	privacy.AllowUnknownSenders = params.Privacy.AllowUnknownSenders
 	privacy.AllowUsernameSearch = params.Privacy.AllowUsernameSearch
+	if params.Privacy.ShowStatus.Base == VisibilityUnspecified {
+		privacy.ShowStatus.Base = privacy.LastSeenVisibility
+	}
+	if params.Privacy.ShowBirthdate.Base == VisibilityUnspecified {
+		privacy.ShowBirthdate.Base = privacy.BirthdayVisibility
+	}
+	if params.Privacy.ShowPhoneNumber.Base == VisibilityUnspecified {
+		privacy.ShowPhoneNumber.Base = privacy.PhoneVisibility
+	}
+	updates := []struct {
+		dst *PrivacyRule
+		src PrivacyRule
+	}{
+		{&privacy.ShowStatus, params.Privacy.ShowStatus},
+		{&privacy.ShowProfilePhoto, params.Privacy.ShowProfilePhoto},
+		{&privacy.ShowProfileAudio, params.Privacy.ShowProfileAudio},
+		{&privacy.ShowBirthdate, params.Privacy.ShowBirthdate},
+		{&privacy.ShowBio, params.Privacy.ShowBio},
+		{&privacy.ShowPhoneNumber, params.Privacy.ShowPhoneNumber},
+		{&privacy.AllowFindingByPhoneNumber, params.Privacy.AllowFindingByPhoneNumber},
+		{&privacy.ShowLinkInForwardedMessages, params.Privacy.ShowLinkInForwardedMessages},
+		{&privacy.AllowChatInvites, params.Privacy.AllowChatInvites},
+		{&privacy.AllowPrivateVoiceAndVideoNoteMessages, params.Privacy.AllowPrivateVoiceAndVideoNoteMessages},
+		{&privacy.AllowCalls, params.Privacy.AllowCalls},
+		{&privacy.AllowPeerToPeerCalls, params.Privacy.AllowPeerToPeerCalls},
+		{&privacy.AutosaveGifts, params.Privacy.AutosaveGifts},
+	}
+	for _, update := range updates {
+		if update.src.Base == VisibilityUnspecified {
+			continue
+		}
+		rule, ok := normalizePrivacyRule(update.src)
+		if !ok {
+			return Privacy{}, ErrInvalidInput
+		}
+		*update.dst = rule
+	}
+	if params.ShowReadDate != nil {
+		privacy.ShowReadDate = *params.ShowReadDate
+	}
 	if privacy.CreatedAt.IsZero() {
 		privacy.CreatedAt = now
 	}

@@ -101,15 +101,29 @@ func (a *api) UpdatePrivacySettings(
 	privacy, err := a.user.UpdatePrivacy(ctx, domainuser.UpdatePrivacyParams{
 		AccountID: authContext.Account.ID,
 		Privacy: domainuser.Privacy{
-			PhoneVisibility:     visibilityFromProto(req.GetPrivacy().GetPhoneVisibility()),
-			LastSeenVisibility:  visibilityFromProto(req.GetPrivacy().GetLastSeenVisibility()),
-			MessagePrivacy:      visibilityFromProto(req.GetPrivacy().GetMessagePrivacy()),
-			BirthdayVisibility:  visibilityFromProto(req.GetPrivacy().GetBirthdayVisibility()),
-			AllowContactSync:    req.GetPrivacy().GetAllowContactSync(),
-			AllowUnknownSenders: req.GetPrivacy().GetAllowUnknownSenders(),
-			AllowUsernameSearch: req.GetPrivacy().GetAllowUsernameSearch(),
+			PhoneVisibility:                       visibilityFromProto(req.GetPrivacy().GetPhoneVisibility()),
+			LastSeenVisibility:                    visibilityFromProto(req.GetPrivacy().GetLastSeenVisibility()),
+			MessagePrivacy:                        visibilityFromProto(req.GetPrivacy().GetMessagePrivacy()),
+			BirthdayVisibility:                    visibilityFromProto(req.GetPrivacy().GetBirthdayVisibility()),
+			AllowContactSync:                      req.GetPrivacy().GetAllowContactSync(),
+			AllowUnknownSenders:                   req.GetPrivacy().GetAllowUnknownSenders(),
+			AllowUsernameSearch:                   req.GetPrivacy().GetAllowUsernameSearch(),
+			ShowStatus:                            privacyRuleFromProto(req.GetPrivacy().GetShowStatus()),
+			ShowProfilePhoto:                      privacyRuleFromProto(req.GetPrivacy().GetShowProfilePhoto()),
+			ShowProfileAudio:                      privacyRuleFromProto(req.GetPrivacy().GetShowProfileAudio()),
+			ShowBirthdate:                         privacyRuleFromProto(req.GetPrivacy().GetShowBirthdate()),
+			ShowBio:                               privacyRuleFromProto(req.GetPrivacy().GetShowBio()),
+			ShowPhoneNumber:                       privacyRuleFromProto(req.GetPrivacy().GetShowPhoneNumber()),
+			AllowFindingByPhoneNumber:             privacyRuleFromProto(req.GetPrivacy().GetAllowFindingByPhoneNumber()),
+			ShowLinkInForwardedMessages:           privacyRuleFromProto(req.GetPrivacy().GetShowLinkInForwardedMessages()),
+			AllowChatInvites:                      privacyRuleFromProto(req.GetPrivacy().GetAllowChatInvites()),
+			AllowPrivateVoiceAndVideoNoteMessages: privacyRuleFromProto(req.GetPrivacy().GetAllowPrivateVoiceAndVideoNoteMessages()),
+			AllowCalls:                            privacyRuleFromProto(req.GetPrivacy().GetAllowCalls()),
+			AllowPeerToPeerCalls:                  privacyRuleFromProto(req.GetPrivacy().GetAllowPeerToPeerCalls()),
+			AutosaveGifts:                         privacyRuleFromProto(req.GetPrivacy().GetAutosaveGifts()),
 		},
 		IdempotencyKey: req.GetIdempotencyKey(),
+		ShowReadDate:   req.GetPrivacy().ShowReadDate,
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -593,6 +607,10 @@ func (a *api) profilesByID(
 	}
 
 	result := make(map[string]*usersv1.UserProfile, len(accountIDs))
+	viewerIsBot := false
+	if viewer, loadErr := a.identity.AccountByID(ctx, viewerID); loadErr == nil {
+		viewerIsBot = viewer.Kind == domainidentity.AccountKindBot
+	}
 	for _, accountID := range accountIDs {
 		accountID = strings.TrimSpace(accountID)
 		if accountID == "" {
@@ -610,11 +628,15 @@ func (a *api) profilesByID(
 
 		relation := relations[accountID]
 		snapshot := presenceSnapshots[accountID]
-		userResult := userProfile(account, snapshot, privacy, relation, viewerID == accountID)
-		if err := a.addAccountAvatar(ctx, userResult, account); err != nil {
-			return nil, err
+		self := viewerID == accountID
+		viewer := domainuser.PrivacyViewer{UserID: viewerID, IsContact: relation.IsContact, IsBot: viewerIsBot}
+		userResult := userProfile(account, snapshot, privacy, relation, viewer, self)
+		if self || privacy.ShowProfilePhoto.Allows(viewer) {
+			if err := a.addAccountAvatar(ctx, userResult, account); err != nil {
+				return nil, err
+			}
 		}
-		if account.Kind == domainidentity.AccountKindBot {
+		if account.Kind == domainidentity.AccountKindBot && (self || privacy.ShowProfilePhoto.Allows(viewer)) {
 			if len(userResult.Avatars) == 0 {
 				if err := a.addBotAvatar(ctx, userResult, account.ID); err != nil {
 					return nil, err

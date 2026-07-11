@@ -12,30 +12,37 @@ import (
 // NewMemoryStore builds a concurrency-safe in-memory notification store for tests.
 func NewMemoryStore() notification.Store {
 	return &memoryStore{
-		preferencesByAccountID: make(map[string]notification.Preference),
-		overridesByKey:         make(map[string]notification.ConversationOverride),
-		pushTokensByID:         make(map[string]notification.PushToken),
-		pushTokenIDsByAccount:  make(map[string]map[string]struct{}),
-		pushTokenIDsByDevice:   make(map[string]string),
-		pushTokenIDsByToken:    make(map[string]string),
-		deliveriesByID:         make(map[string]notification.Delivery),
-		deliveryIDsByDedup:     make(map[string]string),
-		workerCursorsByName:    make(map[string]notification.WorkerCursor),
+		preferencesByAccountID:      make(map[string]notification.Preference),
+		overridesByKey:              make(map[string]notification.ConversationOverride),
+		scopeSettingsByKey:          make(map[string]notification.ScopeSettings),
+		reactionSettingsByAccountID: make(map[string]notification.ReactionSettings),
+		savedSoundsByAccountID:      make(map[string]map[int64]notification.SavedSound),
+		pushTokensByID:              make(map[string]notification.PushToken),
+		pushTokenIDsByAccount:       make(map[string]map[string]struct{}),
+		pushTokenIDsByDevice:        make(map[string]string),
+		pushTokenIDsByToken:         make(map[string]string),
+		deliveriesByID:              make(map[string]notification.Delivery),
+		deliveryIDsByDedup:          make(map[string]string),
+		workerCursorsByName:         make(map[string]notification.WorkerCursor),
 	}
 }
 
 type memoryStore struct {
 	mu sync.RWMutex
 
-	preferencesByAccountID map[string]notification.Preference
-	overridesByKey         map[string]notification.ConversationOverride
-	pushTokensByID         map[string]notification.PushToken
-	pushTokenIDsByAccount  map[string]map[string]struct{}
-	pushTokenIDsByDevice   map[string]string
-	pushTokenIDsByToken    map[string]string
-	deliveriesByID         map[string]notification.Delivery
-	deliveryIDsByDedup     map[string]string
-	workerCursorsByName    map[string]notification.WorkerCursor
+	preferencesByAccountID      map[string]notification.Preference
+	overridesByKey              map[string]notification.ConversationOverride
+	scopeSettingsByKey          map[string]notification.ScopeSettings
+	reactionSettingsByAccountID map[string]notification.ReactionSettings
+	savedSoundsByAccountID      map[string]map[int64]notification.SavedSound
+	nextSoundID                 int64
+	pushTokensByID              map[string]notification.PushToken
+	pushTokenIDsByAccount       map[string]map[string]struct{}
+	pushTokenIDsByDevice        map[string]string
+	pushTokenIDsByToken         map[string]string
+	deliveriesByID              map[string]notification.Delivery
+	deliveryIDsByDedup          map[string]string
+	workerCursorsByName         map[string]notification.WorkerCursor
 }
 
 type txStore struct {
@@ -124,6 +131,94 @@ func (s *memoryStore) DeleteOverride(_ context.Context, conversationID string, a
 		return notification.ErrNotFound
 	}
 	delete(s.overridesByKey, key)
+	return nil
+}
+
+func (s *memoryStore) SaveScopeSettings(_ context.Context, settings notification.ScopeSettings) (notification.ScopeSettings, error) {
+	settings, err := notification.NormalizeScopeSettings(settings, time.Now().UTC())
+	if err != nil {
+		return notification.ScopeSettings{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.scopeSettingsByKey[scopeKey(settings.AccountID, settings.Scope)] = settings
+	return settings, nil
+}
+
+func (s *memoryStore) ScopeSettingsByAccountAndScope(_ context.Context, accountID string, scope notification.SettingsScope) (notification.ScopeSettings, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	settings, ok := s.scopeSettingsByKey[scopeKey(accountID, scope)]
+	if !ok {
+		return notification.ScopeSettings{}, notification.ErrNotFound
+	}
+	return settings, nil
+}
+
+func (s *memoryStore) SaveReactionSettings(_ context.Context, settings notification.ReactionSettings) (notification.ReactionSettings, error) {
+	settings, err := notification.NormalizeReactionSettings(settings, time.Now().UTC())
+	if err != nil {
+		return notification.ReactionSettings{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reactionSettingsByAccountID[settings.AccountID] = settings
+	return settings, nil
+}
+
+func (s *memoryStore) ReactionSettingsByAccountID(_ context.Context, accountID string) (notification.ReactionSettings, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	settings, ok := s.reactionSettingsByAccountID[accountID]
+	if !ok {
+		return notification.ReactionSettings{}, notification.ErrNotFound
+	}
+	return settings, nil
+}
+
+func (s *memoryStore) SaveSavedSound(_ context.Context, sound notification.SavedSound) (notification.SavedSound, error) {
+	sound, err := notification.NormalizeSavedSound(sound, time.Now().UTC())
+	if err != nil {
+		return notification.SavedSound{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, existing := range s.savedSoundsByAccountID[sound.AccountID] {
+		if existing.MediaID == sound.MediaID {
+			existing.Title = sound.Title
+			s.savedSoundsByAccountID[sound.AccountID][existing.SoundID] = existing
+			return existing, nil
+		}
+	}
+	if sound.SoundID == 0 {
+		s.nextSoundID++
+		sound.SoundID = s.nextSoundID
+	}
+	if s.savedSoundsByAccountID[sound.AccountID] == nil {
+		s.savedSoundsByAccountID[sound.AccountID] = make(map[int64]notification.SavedSound)
+	}
+	s.savedSoundsByAccountID[sound.AccountID][sound.SoundID] = sound
+	return sound, nil
+}
+
+func (s *memoryStore) SavedSoundsByAccountID(_ context.Context, accountID string) ([]notification.SavedSound, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sounds := make([]notification.SavedSound, 0, len(s.savedSoundsByAccountID[accountID]))
+	for _, sound := range s.savedSoundsByAccountID[accountID] {
+		sounds = append(sounds, sound)
+	}
+	sort.Slice(sounds, func(i, j int) bool { return sounds[i].SoundID < sounds[j].SoundID })
+	return sounds, nil
+}
+
+func (s *memoryStore) DeleteSavedSound(_ context.Context, accountID string, soundID int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.savedSoundsByAccountID[accountID][soundID]; !ok {
+		return notification.ErrNotFound
+	}
+	delete(s.savedSoundsByAccountID[accountID], soundID)
 	return nil
 }
 
@@ -491,6 +586,19 @@ func (s *memoryStore) cloneLocked() *memoryStore {
 	for key, value := range s.overridesByKey {
 		clone.overridesByKey[key] = cloneOverride(value)
 	}
+	for key, value := range s.scopeSettingsByKey {
+		clone.scopeSettingsByKey[key] = value
+	}
+	for key, value := range s.reactionSettingsByAccountID {
+		clone.reactionSettingsByAccountID[key] = value
+	}
+	for accountID, sounds := range s.savedSoundsByAccountID {
+		clone.savedSoundsByAccountID[accountID] = make(map[int64]notification.SavedSound, len(sounds))
+		for soundID, sound := range sounds {
+			clone.savedSoundsByAccountID[accountID][soundID] = sound
+		}
+	}
+	clone.nextSoundID = s.nextSoundID
 	for key, value := range s.pushTokensByID {
 		clone.pushTokensByID[key] = clonePushToken(value)
 	}
@@ -522,6 +630,10 @@ func (s *memoryStore) cloneLocked() *memoryStore {
 func (s *memoryStore) replaceLocked(other *memoryStore) {
 	s.preferencesByAccountID = other.preferencesByAccountID
 	s.overridesByKey = other.overridesByKey
+	s.scopeSettingsByKey = other.scopeSettingsByKey
+	s.reactionSettingsByAccountID = other.reactionSettingsByAccountID
+	s.savedSoundsByAccountID = other.savedSoundsByAccountID
+	s.nextSoundID = other.nextSoundID
 	s.pushTokensByID = other.pushTokensByID
 	s.pushTokenIDsByAccount = other.pushTokenIDsByAccount
 	s.pushTokenIDsByDevice = other.pushTokenIDsByDevice
@@ -587,6 +699,10 @@ func (s *memoryStore) lockedDeliveryForLeaseAt(
 
 func overrideKey(conversationID string, accountID string) string {
 	return conversationID + ":" + accountID
+}
+
+func scopeKey(accountID string, scope notification.SettingsScope) string {
+	return accountID + ":" + string(scope)
 }
 
 func clonePreference(value notification.Preference) notification.Preference { return value }

@@ -127,12 +127,27 @@ func (s *Service) SetConversationOverride(ctx context.Context, params SetOverrid
 	}
 
 	override := ConversationOverride{
-		ConversationID: params.ConversationID,
-		AccountID:      params.AccountID,
-		Muted:          params.Muted,
-		MentionsOnly:   params.MentionsOnly,
-		MutedUntil:     params.MutedUntil,
-		UpdatedAt:      params.UpdatedAt,
+		ConversationID:                    params.ConversationID,
+		AccountID:                         params.AccountID,
+		Muted:                             params.Muted,
+		MentionsOnly:                      params.MentionsOnly,
+		MutedUntil:                        params.MutedUntil,
+		UpdatedAt:                         params.UpdatedAt,
+		ShowPreview:                       params.ShowPreview,
+		SoundID:                           params.SoundID,
+		MuteStories:                       params.MuteStories,
+		StorySoundID:                      params.StorySoundID,
+		ShowStorySender:                   params.ShowStorySender,
+		DisablePinnedMessageNotifications: params.DisablePinnedMessageNotifications,
+		DisableMentionNotifications:       params.DisableMentionNotifications,
+		UseDefaultMuteFor:                 params.UseDefaultMuteFor,
+		UseDefaultSound:                   params.UseDefaultSound,
+		UseDefaultShowPreview:             params.UseDefaultShowPreview,
+		UseDefaultMuteStories:             params.UseDefaultMuteStories,
+		UseDefaultStorySound:              params.UseDefaultStorySound,
+		UseDefaultShowStorySender:         params.UseDefaultShowStorySender,
+		UseDefaultDisablePinnedMessageNotifications: params.UseDefaultDisablePinnedMessageNotifications,
+		UseDefaultDisableMentionNotifications:       params.UseDefaultDisableMentionNotifications,
 	}
 	if override.UpdatedAt.IsZero() {
 		override.UpdatedAt = s.currentTime()
@@ -154,6 +169,152 @@ func (s *Service) SetConversationOverride(ctx context.Context, params SetOverrid
 	}
 
 	return saved, nil
+}
+
+// SetScopeSettings persists account settings for one TDLib notification scope.
+func (s *Service) SetScopeSettings(ctx context.Context, params SetScopeSettingsParams) (ScopeSettings, error) {
+	if err := s.validateContext(ctx, "set scope notification settings"); err != nil {
+		return ScopeSettings{}, err
+	}
+	params.AccountID = strings.TrimSpace(params.AccountID)
+	if params.AccountID == "" || !validSettingsScope(params.Scope) {
+		return ScopeSettings{}, ErrInvalidInput
+	}
+	if _, err := s.activeAccount(ctx, params.AccountID); err != nil {
+		return ScopeSettings{}, err
+	}
+	settings, err := (ScopeSettings{
+		AccountID: params.AccountID, Scope: params.Scope, MutedUntil: params.MutedUntil,
+		ShowPreview: params.ShowPreview, SoundID: params.SoundID, MuteStories: params.MuteStories,
+		StorySoundID: params.StorySoundID, ShowStorySender: params.ShowStorySender,
+		DisablePinnedMessageNotifications: params.DisablePinnedMessageNotifications,
+		DisableMentionNotifications:       params.DisableMentionNotifications, UpdatedAt: params.UpdatedAt,
+		UseDefaultMuteStories: params.UseDefaultMuteStories,
+	}).normalize(s.currentTime())
+	if err != nil {
+		return ScopeSettings{}, err
+	}
+	saved, err := s.store.SaveScopeSettings(ctx, settings)
+	if err != nil {
+		return ScopeSettings{}, fmt.Errorf("save %s notification settings for account %s: %w", settings.Scope, settings.AccountID, err)
+	}
+	return saved, nil
+}
+
+// ScopeSettingsByAccountAndScope returns explicit settings or server defaults.
+func (s *Service) ScopeSettingsByAccountAndScope(ctx context.Context, accountID string, scope SettingsScope) (ScopeSettings, error) {
+	if err := s.validateContext(ctx, "load scope notification settings"); err != nil {
+		return ScopeSettings{}, err
+	}
+	accountID = strings.TrimSpace(accountID)
+	if _, err := s.activeAccount(ctx, accountID); err != nil {
+		return ScopeSettings{}, err
+	}
+	if !validSettingsScope(scope) {
+		return ScopeSettings{}, ErrInvalidInput
+	}
+	settings, err := s.store.ScopeSettingsByAccountAndScope(ctx, accountID, scope)
+	if errors.Is(err, ErrNotFound) {
+		return defaultScopeSettings(accountID, scope, s.currentTime()), nil
+	}
+	if err != nil {
+		return ScopeSettings{}, fmt.Errorf("load %s notification settings for account %s: %w", scope, accountID, err)
+	}
+	return settings, nil
+}
+
+// SetReactionSettings persists reaction notification settings.
+func (s *Service) SetReactionSettings(ctx context.Context, params SetReactionSettingsParams) (ReactionSettings, error) {
+	if err := s.validateContext(ctx, "set reaction notification settings"); err != nil {
+		return ReactionSettings{}, err
+	}
+	params.AccountID = strings.TrimSpace(params.AccountID)
+	if params.AccountID == "" {
+		return ReactionSettings{}, ErrInvalidInput
+	}
+	if _, err := s.activeAccount(ctx, params.AccountID); err != nil {
+		return ReactionSettings{}, err
+	}
+	settings, err := (ReactionSettings{AccountID: params.AccountID, MessageReactionSource: params.MessageReactionSource, StoryReactionSource: params.StoryReactionSource, PollVoteSource: params.PollVoteSource, SoundID: params.SoundID, ShowPreview: params.ShowPreview, UpdatedAt: params.UpdatedAt}).normalize(s.currentTime())
+	if err != nil {
+		return ReactionSettings{}, err
+	}
+	saved, err := s.store.SaveReactionSettings(ctx, settings)
+	if err != nil {
+		return ReactionSettings{}, fmt.Errorf("save reaction notification settings for account %s: %w", settings.AccountID, err)
+	}
+	return saved, nil
+}
+
+// ReactionSettingsByAccountID returns explicit settings or server defaults.
+func (s *Service) ReactionSettingsByAccountID(ctx context.Context, accountID string) (ReactionSettings, error) {
+	if err := s.validateContext(ctx, "load reaction notification settings"); err != nil {
+		return ReactionSettings{}, err
+	}
+	accountID = strings.TrimSpace(accountID)
+	if _, err := s.activeAccount(ctx, accountID); err != nil {
+		return ReactionSettings{}, err
+	}
+	settings, err := s.store.ReactionSettingsByAccountID(ctx, accountID)
+	if errors.Is(err, ErrNotFound) {
+		return defaultReactionSettings(accountID, s.currentTime()), nil
+	}
+	if err != nil {
+		return ReactionSettings{}, fmt.Errorf("load reaction notification settings for account %s: %w", accountID, err)
+	}
+	return settings, nil
+}
+
+// AddSavedSound links an existing media asset as a notification sound.
+func (s *Service) AddSavedSound(ctx context.Context, params AddSavedSoundParams) (SavedSound, error) {
+	if err := s.validateContext(ctx, "add saved notification sound"); err != nil {
+		return SavedSound{}, err
+	}
+	params.AccountID = strings.TrimSpace(params.AccountID)
+	if params.AccountID == "" || strings.TrimSpace(params.MediaID) == "" {
+		return SavedSound{}, ErrInvalidInput
+	}
+	if _, err := s.activeAccount(ctx, params.AccountID); err != nil {
+		return SavedSound{}, err
+	}
+	sound, err := (SavedSound{AccountID: params.AccountID, MediaID: params.MediaID, Title: params.Title, CreatedAt: params.CreatedAt}).normalize(s.currentTime())
+	if err != nil {
+		return SavedSound{}, err
+	}
+	saved, err := s.store.SaveSavedSound(ctx, sound)
+	if err != nil {
+		return SavedSound{}, fmt.Errorf("save notification sound for account %s: %w", sound.AccountID, err)
+	}
+	return saved, nil
+}
+
+func (s *Service) SavedSoundsByAccountID(ctx context.Context, accountID string) ([]SavedSound, error) {
+	if err := s.validateContext(ctx, "list saved notification sounds"); err != nil {
+		return nil, err
+	}
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return nil, ErrInvalidInput
+	}
+	sounds, err := s.store.SavedSoundsByAccountID(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("list notification sounds for account %s: %w", accountID, err)
+	}
+	return sounds, nil
+}
+
+func (s *Service) RemoveSavedSound(ctx context.Context, accountID string, soundID int64) error {
+	if err := s.validateContext(ctx, "remove saved notification sound"); err != nil {
+		return err
+	}
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" || soundID <= 0 {
+		return ErrInvalidInput
+	}
+	if err := s.store.DeleteSavedSound(ctx, accountID, soundID); err != nil {
+		return fmt.Errorf("remove notification sound %d: %w", soundID, err)
+	}
+	return nil
 }
 
 // DeleteConversationOverride restores the account's default notification settings for a conversation.
@@ -195,8 +356,20 @@ func (s *Service) ConversationOverrideByConversationAndAccount(
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return ConversationOverride{
-				ConversationID: conversationID,
-				AccountID:      accountID,
+				ConversationID:            conversationID,
+				AccountID:                 accountID,
+				ShowPreview:               true,
+				SoundID:                   -1,
+				StorySoundID:              -1,
+				ShowStorySender:           true,
+				UseDefaultMuteFor:         true,
+				UseDefaultSound:           true,
+				UseDefaultShowPreview:     true,
+				UseDefaultMuteStories:     true,
+				UseDefaultStorySound:      true,
+				UseDefaultShowStorySender: true,
+				UseDefaultDisablePinnedMessageNotifications: true,
+				UseDefaultDisableMentionNotifications:       true,
 			}, nil
 		}
 

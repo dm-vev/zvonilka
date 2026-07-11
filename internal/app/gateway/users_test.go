@@ -7,13 +7,16 @@ import (
 	"image"
 	"image/png"
 	"testing"
+	"time"
 
 	authv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/auth/v1"
 	commonv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/common/v1"
 	mediav1 "github.com/dm-vev/zvonilka/gen/proto/contracts/media/v1"
 	usersv1 "github.com/dm-vev/zvonilka/gen/proto/contracts/users/v1"
 	"github.com/dm-vev/zvonilka/internal/domain/identity"
+	domainpresence "github.com/dm-vev/zvonilka/internal/domain/presence"
 	domainstorage "github.com/dm-vev/zvonilka/internal/domain/storage"
+	domainuser "github.com/dm-vev/zvonilka/internal/domain/user"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -49,6 +52,26 @@ func TestIdentityProfileUpdateValidatesFieldMaskAndAvatarPresence(t *testing.T) 
 	})
 	if !errors.Is(err, identity.ErrInvalidInput) {
 		t.Fatalf("empty avatar media error = %v", err)
+	}
+}
+
+func TestUserProfileEnforcesGenericPrivacyRules(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	profile := userProfile(identity.Account{
+		ID: "owner", Bio: "secret bio", Phone: "+15551230000",
+	}, domainpresence.Snapshot{
+		State: domainpresence.PresenceStateOnline, CustomStatus: "secret status", LastSeenAt: now,
+	}, domainuser.Privacy{
+		ShowPhoneNumber: domainuser.PrivacyRule{Base: domainuser.VisibilityNobody, AllowUserIDs: []string{"viewer"}},
+		ShowStatus:      domainuser.PrivacyRule{Base: domainuser.VisibilityNobody},
+		ShowBio:         domainuser.PrivacyRule{Base: domainuser.VisibilityContacts},
+	}, domainuser.Relation{}, domainuser.PrivacyViewer{UserID: "viewer"}, false)
+
+	if profile.Phone == "" || profile.Bio != "" || profile.LastSeenAt != nil ||
+		profile.Presence != commonv1.PresenceState_PRESENCE_STATE_OFFLINE || profile.CustomStatus != "" {
+		t.Fatalf("unexpected filtered profile: %+v", profile)
 	}
 }
 
@@ -116,12 +139,24 @@ func TestUpdateMyProfileAndPrivacyRPC(t *testing.T) {
 			AllowContactSync:    true,
 			AllowUnknownSenders: true,
 			AllowUsernameSearch: false,
+			ShowBio: &usersv1.PrivacyRule{
+				Base:         commonv1.Visibility_VISIBILITY_NOBODY,
+				AllowUserIds: []string{"friend-1"},
+			},
+			AllowCalls: &usersv1.PrivacyRule{
+				Base:              commonv1.Visibility_VISIBILITY_CONTACTS,
+				AllowPremiumUsers: true,
+				RestrictBots:      true,
+			},
+			ShowReadDate: boolPointer(false),
 		},
 	})
 	if err != nil {
 		t.Fatalf("update privacy: %v", err)
 	}
-	if !privacy.Privacy.AllowContactSync || privacy.Privacy.AllowUsernameSearch {
+	if !privacy.Privacy.AllowContactSync || privacy.Privacy.AllowUsernameSearch ||
+		privacy.Privacy.GetShowBio().GetBase() != commonv1.Visibility_VISIBILITY_NOBODY ||
+		privacy.Privacy.GetShowReadDate() {
 		t.Fatalf("unexpected privacy settings: %+v", privacy.Privacy)
 	}
 
@@ -133,6 +168,8 @@ func TestUpdateMyProfileAndPrivacyRPC(t *testing.T) {
 		t.Fatalf("expected own profile to expose privacy and phone: %+v", me.Profile)
 	}
 }
+
+func boolPointer(value bool) *bool { return &value }
 
 func TestProfileAvatarUpdateReturnsAvatarAndAllowsPublicDownload(t *testing.T) {
 	fixture := newGatewayFeatureFixture(t)
@@ -209,6 +246,20 @@ func TestProfileAvatarUpdateReturnsAvatarAndAllowsPublicDownload(t *testing.T) {
 		t.Fatalf("create viewer: %v", err)
 	}
 	viewerCtx, _ := mustLoginOnDevice(t, fixture.api, fixture.sender, ctx, viewer.Username, "viewer-phone", "viewer-key")
+	if _, err := fixture.api.UpdatePrivacySettings(ownerCtx, &usersv1.UpdatePrivacySettingsRequest{Privacy: &usersv1.PrivacySettings{
+		PhoneVisibility: commonv1.Visibility_VISIBILITY_CONTACTS, LastSeenVisibility: commonv1.Visibility_VISIBILITY_CONTACTS,
+		MessagePrivacy: commonv1.Visibility_VISIBILITY_EVERYONE, BirthdayVisibility: commonv1.Visibility_VISIBILITY_NOBODY,
+		ShowProfilePhoto: &usersv1.PrivacyRule{Base: commonv1.Visibility_VISIBILITY_NOBODY},
+	}}); err != nil {
+		t.Fatalf("hide profile photo: %v", err)
+	}
+	viewed, err := fixture.api.GetUser(viewerCtx, &usersv1.GetUserRequest{Lookup: &usersv1.GetUserRequest_UserId{UserId: owner.ID}})
+	if err != nil {
+		t.Fatalf("get privacy-filtered owner: %v", err)
+	}
+	if len(viewed.Profile.Avatars) != 0 {
+		t.Fatalf("expected hidden profile avatar, got %+v", viewed.Profile.Avatars)
+	}
 	download, err := fixture.api.GetDownloadUrl(viewerCtx, &mediav1.GetDownloadUrlRequest{MediaId: mediaID})
 	if err != nil {
 		t.Fatalf("download public avatar: %v", err)

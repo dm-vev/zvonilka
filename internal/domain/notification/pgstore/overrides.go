@@ -50,16 +50,50 @@ INSERT INTO %s (
 	muted,
 	mentions_only,
 	muted_until,
+	show_preview,
+	sound_id,
+	mute_stories,
+	story_sound_id,
+	show_story_sender,
+	disable_pinned_message_notifications,
+	disable_mention_notifications,
+	use_default_mute_for,
+	use_default_sound,
+	use_default_show_preview,
+	use_default_mute_stories,
+	use_default_story_sound,
+	use_default_show_story_sender,
+	use_default_disable_pinned_message_notifications,
+	use_default_disable_mention_notifications,
 	updated_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
 )
 ON CONFLICT (conversation_id, account_id) DO UPDATE SET
 	muted = EXCLUDED.muted,
 	mentions_only = EXCLUDED.mentions_only,
 	muted_until = EXCLUDED.muted_until,
+	show_preview = EXCLUDED.show_preview,
+	sound_id = EXCLUDED.sound_id,
+	mute_stories = EXCLUDED.mute_stories,
+	story_sound_id = EXCLUDED.story_sound_id,
+	show_story_sender = EXCLUDED.show_story_sender,
+	disable_pinned_message_notifications = EXCLUDED.disable_pinned_message_notifications,
+	disable_mention_notifications = EXCLUDED.disable_mention_notifications,
+	use_default_mute_for = EXCLUDED.use_default_mute_for,
+	use_default_sound = EXCLUDED.use_default_sound,
+	use_default_show_preview = EXCLUDED.use_default_show_preview,
+	use_default_mute_stories = EXCLUDED.use_default_mute_stories,
+	use_default_story_sound = EXCLUDED.use_default_story_sound,
+	use_default_show_story_sender = EXCLUDED.use_default_show_story_sender,
+	use_default_disable_pinned_message_notifications = EXCLUDED.use_default_disable_pinned_message_notifications,
+	use_default_disable_mention_notifications = EXCLUDED.use_default_disable_mention_notifications,
 	updated_at = EXCLUDED.updated_at
-RETURNING conversation_id, account_id, muted, mentions_only, muted_until, updated_at
+RETURNING conversation_id, account_id, muted, mentions_only, muted_until, show_preview, sound_id, mute_stories,
+	story_sound_id, show_story_sender, disable_pinned_message_notifications, disable_mention_notifications,
+	use_default_mute_for, use_default_sound, use_default_show_preview, use_default_mute_stories,
+	use_default_story_sound, use_default_show_story_sender, use_default_disable_pinned_message_notifications,
+	use_default_disable_mention_notifications, updated_at
 `, s.table("notification_conversation_overrides"))
 
 	row := s.conn().QueryRowContext(
@@ -70,6 +104,21 @@ RETURNING conversation_id, account_id, muted, mentions_only, muted_until, update
 		override.Muted,
 		override.MentionsOnly,
 		encodeTime(override.MutedUntil),
+		override.ShowPreview,
+		override.SoundID,
+		override.MuteStories,
+		override.StorySoundID,
+		override.ShowStorySender,
+		override.DisablePinnedMessageNotifications,
+		override.DisableMentionNotifications,
+		override.UseDefaultMuteFor,
+		override.UseDefaultSound,
+		override.UseDefaultShowPreview,
+		override.UseDefaultMuteStories,
+		override.UseDefaultStorySound,
+		override.UseDefaultShowStorySender,
+		override.UseDefaultDisablePinnedMessageNotifications,
+		override.UseDefaultDisableMentionNotifications,
 		override.UpdatedAt.UTC(),
 	)
 
@@ -108,7 +157,11 @@ func (s *Store) OverrideByConversationAndAccount(ctx context.Context, conversati
 	}
 
 	query := fmt.Sprintf(`
-SELECT conversation_id, account_id, muted, mentions_only, muted_until, updated_at
+SELECT conversation_id, account_id, muted, mentions_only, muted_until, show_preview, sound_id, mute_stories,
+	story_sound_id, show_story_sender, disable_pinned_message_notifications, disable_mention_notifications,
+	use_default_mute_for, use_default_sound, use_default_show_preview, use_default_mute_stories,
+	use_default_story_sound, use_default_show_story_sender, use_default_disable_pinned_message_notifications,
+	use_default_disable_mention_notifications, updated_at
 FROM %s
 WHERE conversation_id = $1 AND account_id = $2
 `, s.table("notification_conversation_overrides"))

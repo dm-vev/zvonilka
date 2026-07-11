@@ -45,6 +45,31 @@ message PrivacySettings {
   bool allow_contact_sync = 5;
   bool allow_unknown_senders = 6;
   bool allow_username_search = 7;
+  PrivacyRule show_status = 8;
+  PrivacyRule show_profile_photo = 9;
+  PrivacyRule show_profile_audio = 10;
+  PrivacyRule show_birthdate = 11;
+  PrivacyRule show_bio = 12;
+  PrivacyRule show_phone_number = 13;
+  PrivacyRule allow_finding_by_phone_number = 14;
+  PrivacyRule show_link_in_forwarded_messages = 15;
+  PrivacyRule allow_chat_invites = 16;
+  PrivacyRule allow_private_voice_and_video_note_messages = 17;
+  PrivacyRule allow_calls = 18;
+  PrivacyRule allow_peer_to_peer_calls = 19;
+  PrivacyRule autosave_gifts = 20;
+  optional bool show_read_date = 21;
+}
+
+message PrivacyRule {
+  zvonilka.common.v1.Visibility base = 1;
+  repeated string allow_user_ids = 2;
+  repeated string restrict_user_ids = 3;
+  repeated string allow_chat_ids = 4;
+  repeated string restrict_chat_ids = 5;
+  bool allow_premium_users = 6;
+  bool allow_bots = 7;
+  bool restrict_bots = 8;
 }
 
 enum ReactionNotificationSource {

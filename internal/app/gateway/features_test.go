@@ -916,6 +916,30 @@ func TestNotificationRPC(t *testing.T) {
 		t.Fatalf("expected quiet hours timezone to round-trip, got %+v", savedPreference.GetPreference().GetQuietHours())
 	}
 
+	scopeSettings, err := fixture.api.SetScopeNotificationSettings(ownerCtx, &notificationv1.SetScopeNotificationSettingsRequest{
+		Settings: &notificationv1.ScopeNotificationSettings{
+			Scope:      notificationv1.NotificationSettingsScope_NOTIFICATION_SETTINGS_SCOPE_GROUP_CHATS,
+			MutedUntil: protoTime(fixture.now().Add(time.Hour)), ShowPreview: true, SoundId: 17,
+			MuteStories: true, StorySoundId: 18, ShowStorySender: true,
+			DisablePinnedMessageNotifications: true, DisableMentionNotifications: true,
+		},
+	})
+	if err != nil || scopeSettings.GetSettings().GetSoundId() != 17 || !scopeSettings.GetSettings().GetMuteStories() {
+		t.Fatalf("set scope notification settings: response=%+v err=%v", scopeSettings, err)
+	}
+
+	reactionSettings, err := fixture.api.SetReactionNotificationSettings(ownerCtx, &notificationv1.SetReactionNotificationSettingsRequest{
+		Settings: &notificationv1.ReactionNotificationSettings{
+			MessageReactionSource: notificationv1.ReactionNotificationSource_REACTION_NOTIFICATION_SOURCE_ALL,
+			StoryReactionSource:   notificationv1.ReactionNotificationSource_REACTION_NOTIFICATION_SOURCE_CONTACTS,
+			PollVoteSource:        notificationv1.ReactionNotificationSource_REACTION_NOTIFICATION_SOURCE_CONTACTS,
+			SoundId:               19, ShowPreview: true,
+		},
+	})
+	if err != nil || reactionSettings.GetSettings().GetSoundId() != 19 || !reactionSettings.GetSettings().GetShowPreview() {
+		t.Fatalf("set reaction notification settings: response=%+v err=%v", reactionSettings, err)
+	}
+
 	created, err := fixture.api.CreateConversation(ownerCtx, &conversationv1.CreateConversationRequest{
 		Kind:          commonv1.ConversationKind_CONVERSATION_KIND_GROUP,
 		Title:         "Notification Overrides",
@@ -927,16 +951,23 @@ func TestNotificationRPC(t *testing.T) {
 
 	override, err := fixture.api.SetConversationNotificationOverride(ownerCtx, &notificationv1.SetConversationNotificationOverrideRequest{
 		Override: &notificationv1.ConversationNotificationOverride{
-			ConversationId: created.GetConversation().GetConversationId(),
-			Muted:          true,
-			MentionsOnly:   true,
-			MutedUntil:     protoTime(fixture.now().Add(2 * time.Hour)),
+			ConversationId:                    created.GetConversation().GetConversationId(),
+			Muted:                             true,
+			MentionsOnly:                      true,
+			MutedUntil:                        protoTime(fixture.now().Add(2 * time.Hour)),
+			ShowPreview:                       true,
+			SoundId:                           20,
+			MuteStories:                       true,
+			StorySoundId:                      21,
+			ShowStorySender:                   true,
+			DisablePinnedMessageNotifications: true,
+			DisableMentionNotifications:       true,
 		},
 	})
 	if err != nil {
 		t.Fatalf("set conversation notification override: %v", err)
 	}
-	if !override.GetOverride().GetMuted() || !override.GetOverride().GetMentionsOnly() {
+	if !override.GetOverride().GetMuted() || !override.GetOverride().GetMentionsOnly() || override.GetOverride().GetSoundId() != 20 || !override.GetOverride().GetDisableMentionNotifications() {
 		t.Fatalf("unexpected override: %+v", override.GetOverride())
 	}
 

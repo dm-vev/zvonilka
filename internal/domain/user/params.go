@@ -5,6 +5,7 @@ type UpdatePrivacyParams struct {
 	AccountID      string
 	Privacy        Privacy
 	IdempotencyKey string
+	ShowReadDate   *bool
 }
 
 // UpdateAccountSettingsParams contains a partial account-settings update.

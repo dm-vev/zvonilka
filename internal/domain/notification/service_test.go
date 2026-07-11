@@ -71,6 +71,65 @@ func TestPreferenceAndOverrideRegistry(t *testing.T) {
 	require.False(t, loadedOverride.MentionsOnly)
 }
 
+func TestScopeReactionAndSavedSoundSettings(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	now := time.Date(2026, time.July, 11, 12, 0, 0, 0, time.UTC)
+	identityStore := identitytest.NewMemoryStore()
+	seedActiveAccount(t, identityStore, "acc-1")
+	svc := mustNotificationService(t, notificationtest.NewMemoryStore(), identityStore, notification.WithNow(func() time.Time { return now }))
+
+	defaults, err := svc.ScopeSettingsByAccountAndScope(ctx, "acc-1", notification.SettingsScopeGroupChats)
+	require.NoError(t, err)
+	require.True(t, defaults.ShowPreview)
+	require.True(t, defaults.ShowStorySender)
+	require.Equal(t, int64(-1), defaults.SoundID)
+	require.Equal(t, int64(-1), defaults.StorySoundID)
+	require.True(t, defaults.UseDefaultMuteStories)
+
+	scope, err := svc.SetScopeSettings(ctx, notification.SetScopeSettingsParams{
+		AccountID: "acc-1", Scope: notification.SettingsScopeGroupChats, MutedUntil: now.Add(time.Hour),
+		SoundID: -1, MuteStories: true, StorySoundID: 0,
+		DisablePinnedMessageNotifications: true, DisableMentionNotifications: true,
+		UseDefaultMuteStories: false,
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(-1), scope.SoundID)
+	require.Equal(t, int64(0), scope.StorySoundID)
+	require.True(t, scope.MuteStories)
+	require.True(t, scope.DisableMentionNotifications)
+	require.False(t, scope.UseDefaultMuteStories)
+
+	reactions, err := svc.SetReactionSettings(ctx, notification.SetReactionSettingsParams{
+		AccountID: "acc-1", MessageReactionSource: notification.ReactionSourceAll,
+		StoryReactionSource: notification.ReactionSourceNone, PollVoteSource: notification.ReactionSourceContacts,
+		SoundID: -1, ShowPreview: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, notification.ReactionSourceAll, reactions.MessageReactionSource)
+	require.Equal(t, notification.ReactionSourceContacts, reactions.PollVoteSource)
+	require.Equal(t, int64(-1), reactions.SoundID)
+
+	_, err = svc.SetScopeSettings(ctx, notification.SetScopeSettingsParams{AccountID: "acc-1", Scope: notification.SettingsScopeGroupChats, SoundID: -2, StorySoundID: -1})
+	require.ErrorIs(t, err, notification.ErrInvalidInput)
+
+	sound, err := svc.AddSavedSound(ctx, notification.AddSavedSoundParams{AccountID: "acc-1", MediaID: "media-1", Title: "Ping"})
+	require.NoError(t, err)
+	require.Positive(t, sound.SoundID)
+	duplicate, err := svc.AddSavedSound(ctx, notification.AddSavedSoundParams{AccountID: "acc-1", MediaID: "media-1", Title: "Ping"})
+	require.NoError(t, err)
+	require.Equal(t, sound.SoundID, duplicate.SoundID)
+
+	sounds, err := svc.SavedSoundsByAccountID(ctx, "acc-1")
+	require.NoError(t, err)
+	require.Len(t, sounds, 1)
+	require.NoError(t, svc.RemoveSavedSound(ctx, "acc-1", sound.SoundID))
+	sounds, err = svc.SavedSoundsByAccountID(ctx, "acc-1")
+	require.NoError(t, err)
+	require.Empty(t, sounds)
+}
+
 func TestPushTokenRegistryAndRevocation(t *testing.T) {
 	t.Parallel()
 

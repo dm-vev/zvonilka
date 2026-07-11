@@ -115,6 +115,29 @@ func TestSavePreferenceRoundTrip(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestSaveScopeSettingsRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	store, mock, db := newMockStore(t)
+	defer db.Close()
+	now := time.Date(2026, time.July, 11, 12, 0, 0, 0, time.UTC)
+	mock.ExpectQuery(`(?s)INSERT INTO "notif"\."notification_scope_settings".*RETURNING account_id, scope, muted_until, show_preview, sound_id, mute_stories, story_sound_id, show_story_sender, disable_pinned_message_notifications, disable_mention_notifications, use_default_mute_stories, updated_at`).
+		WithArgs("acc-1", notification.SettingsScopeGroupChats, sqlmock.AnyArg(), true, int64(-1), true, int64(0), true, true, true, false, now).
+		WillReturnRows(sqlmock.NewRows([]string{"account_id", "scope", "muted_until", "show_preview", "sound_id", "mute_stories", "story_sound_id", "show_story_sender", "disable_pinned_message_notifications", "disable_mention_notifications", "use_default_mute_stories", "updated_at"}).
+			AddRow("acc-1", notification.SettingsScopeGroupChats, nil, true, int64(-1), true, int64(0), true, true, true, false, now))
+
+	saved, err := store.SaveScopeSettings(context.Background(), notification.ScopeSettings{
+		AccountID: "acc-1", Scope: notification.SettingsScopeGroupChats, ShowPreview: true,
+		SoundID: -1, MuteStories: true, StorySoundID: 0, ShowStorySender: true,
+		DisablePinnedMessageNotifications: true, DisableMentionNotifications: true, UpdatedAt: now,
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(-1), saved.SoundID)
+	require.False(t, saved.UseDefaultMuteStories)
+	require.True(t, saved.DisableMentionNotifications)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestSaveDeliveryRoundTrip(t *testing.T) {
 	t.Parallel()
 

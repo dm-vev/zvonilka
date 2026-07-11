@@ -12,6 +12,7 @@ import (
 func buildDeliveries(
 	now time.Time,
 	eventID string,
+	eventType conversation.EventType,
 	conv conversation.Conversation,
 	message conversation.Message,
 	members []conversation.ConversationMember,
@@ -36,8 +37,20 @@ func buildDeliveries(
 		presenceSnapshot := presenceByAccountID[accountID]
 		tokens := pushTokensByAccountID[accountID]
 
-		kind, reason, priority, ok := routeDecision(conv, message, accountID)
+		kind, reason, priority, ok := routeDecision(eventType, conv, message, accountID)
 		if !ok {
+			continue
+		}
+		if reason == "mention" && !override.UseDefaultDisableMentionNotifications && override.DisableMentionNotifications {
+			messageWithoutMentions := message
+			messageWithoutMentions.MentionAccountIDs = nil
+			kind, reason, priority, ok = routeDecision(eventType, conv, messageWithoutMentions, accountID)
+			if !ok {
+				continue
+			}
+		}
+		if reason == "pinned" && !override.UseDefaultDisablePinnedMessageNotifications && override.DisablePinnedMessageNotifications {
+			deliveries = append(deliveries, suppressedDelivery(now, eventID, conv, message, accountID, kind, reason, priority))
 			continue
 		}
 		if !shouldDeliver(preference, override, membershipByAccountID(members, accountID), kind, reason, now) {
@@ -121,12 +134,20 @@ func recipientIDs(conv conversation.Conversation, message conversation.Message, 
 }
 
 func routeDecision(
+	eventType conversation.EventType,
 	conv conversation.Conversation,
 	message conversation.Message,
 	accountID string,
 ) (NotificationKind, string, int, bool) {
 	if accountID == "" || accountID == message.SenderAccountID {
 		return NotificationKindUnspecified, "", 0, false
+	}
+	if eventType == conversation.EventTypeMessagePinned {
+		if !message.Pinned {
+			return NotificationKindUnspecified, "", 0, false
+		}
+		kind, ok := notificationKindForConversation(conv.Kind)
+		return kind, "pinned", 95, ok
 	}
 
 	if isMentioned(accountID, message.MentionAccountIDs) {
@@ -136,15 +157,32 @@ func routeDecision(
 		return NotificationKindReply, "reply", 90, true
 	}
 
-	switch conv.Kind {
-	case conversation.ConversationKindDirect:
+	kind, ok := notificationKindForConversation(conv.Kind)
+	if !ok {
+		return NotificationKindUnspecified, "", 0, false
+	}
+	switch kind {
+	case NotificationKindDirect:
 		return NotificationKindDirect, "direct", 80, true
-	case conversation.ConversationKindGroup:
+	case NotificationKindGroup:
 		return NotificationKindGroup, "group", 60, true
-	case conversation.ConversationKindChannel:
+	case NotificationKindChannel:
 		return NotificationKindChannel, "channel", 50, true
 	default:
 		return NotificationKindUnspecified, "", 0, false
+	}
+}
+
+func notificationKindForConversation(kind conversation.ConversationKind) (NotificationKind, bool) {
+	switch kind {
+	case conversation.ConversationKindDirect:
+		return NotificationKindDirect, true
+	case conversation.ConversationKindGroup:
+		return NotificationKindGroup, true
+	case conversation.ConversationKindChannel:
+		return NotificationKindChannel, true
+	default:
+		return NotificationKindUnspecified, false
 	}
 }
 
@@ -186,12 +224,14 @@ func shouldDeliver(
 		}
 	}
 
-	if reason != "mention" && reason != "reply" {
-		if !override.MutedUntil.IsZero() && now.Before(override.MutedUntil) {
-			return false
-		}
-		if override.Muted {
-			return false
+	if reason != "mention" && reason != "reply" && reason != "pinned" {
+		if !override.UseDefaultMuteFor {
+			if !override.MutedUntil.IsZero() && now.Before(override.MutedUntil) {
+				return false
+			}
+			if override.Muted {
+				return false
+			}
 		}
 		if override.MentionsOnly {
 			return false

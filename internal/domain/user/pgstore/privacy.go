@@ -2,6 +2,7 @@ package pgstore
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -18,12 +19,17 @@ func (s *Store) SavePrivacy(ctx context.Context, privacy domainuser.Privacy) (do
 	if strings.TrimSpace(privacy.AccountID) == "" {
 		return domainuser.Privacy{}, domainuser.ErrInvalidInput
 	}
+	rules, err := json.Marshal(privacyRulesFromPrivacy(privacy))
+	if err != nil {
+		return domainuser.Privacy{}, fmt.Errorf("encode privacy rules: %w", err)
+	}
 
 	query := fmt.Sprintf(`
 INSERT INTO %s (
 	account_id, phone_visibility, last_seen_visibility, message_privacy, birthday_visibility,
-	allow_contact_sync, allow_unknown_senders, allow_username_search, created_at, updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	allow_contact_sync, allow_unknown_senders, allow_username_search, privacy_rules, show_read_date,
+	created_at, updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 ON CONFLICT (account_id) DO UPDATE SET
 	phone_visibility = EXCLUDED.phone_visibility,
 	last_seen_visibility = EXCLUDED.last_seen_visibility,
@@ -32,6 +38,8 @@ ON CONFLICT (account_id) DO UPDATE SET
 	allow_contact_sync = EXCLUDED.allow_contact_sync,
 	allow_unknown_senders = EXCLUDED.allow_unknown_senders,
 	allow_username_search = EXCLUDED.allow_username_search,
+	privacy_rules = EXCLUDED.privacy_rules,
+	show_read_date = EXCLUDED.show_read_date,
 	updated_at = EXCLUDED.updated_at
 RETURNING %s
 `, s.table("user_privacy"), privacyColumnList)
@@ -45,6 +53,8 @@ RETURNING %s
 		privacy.AllowContactSync,
 		privacy.AllowUnknownSenders,
 		privacy.AllowUsernameSearch,
+		rules,
+		privacy.ShowReadDate,
 		privacy.CreatedAt.UTC(),
 		privacy.UpdatedAt.UTC(),
 	))

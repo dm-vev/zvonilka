@@ -53,7 +53,7 @@ func (s *Service) validateContext(ctx context.Context, operation string) error {
 }
 
 func defaultPrivacy(accountID string, now time.Time) Privacy {
-	return Privacy{
+	privacy := Privacy{
 		AccountID:           accountID,
 		PhoneVisibility:     VisibilityContacts,
 		LastSeenVisibility:  VisibilityContacts,
@@ -62,9 +62,24 @@ func defaultPrivacy(accountID string, now time.Time) Privacy {
 		AllowContactSync:    true,
 		AllowUnknownSenders: true,
 		AllowUsernameSearch: true,
+		ShowReadDate:        true,
 		CreatedAt:           now,
 		UpdatedAt:           now,
 	}
+	privacy.ShowStatus = PrivacyRule{Base: privacy.LastSeenVisibility}
+	privacy.ShowProfilePhoto = PrivacyRule{Base: VisibilityEveryone}
+	privacy.ShowProfileAudio = PrivacyRule{Base: VisibilityEveryone}
+	privacy.ShowBirthdate = PrivacyRule{Base: privacy.BirthdayVisibility}
+	privacy.ShowBio = PrivacyRule{Base: VisibilityEveryone}
+	privacy.ShowPhoneNumber = PrivacyRule{Base: privacy.PhoneVisibility}
+	privacy.AllowFindingByPhoneNumber = PrivacyRule{Base: VisibilityEveryone}
+	privacy.ShowLinkInForwardedMessages = PrivacyRule{Base: VisibilityEveryone}
+	privacy.AllowChatInvites = PrivacyRule{Base: VisibilityEveryone}
+	privacy.AllowPrivateVoiceAndVideoNoteMessages = PrivacyRule{Base: VisibilityEveryone}
+	privacy.AllowCalls = PrivacyRule{Base: VisibilityEveryone}
+	privacy.AllowPeerToPeerCalls = PrivacyRule{Base: VisibilityContacts}
+	privacy.AutosaveGifts = PrivacyRule{Base: VisibilityEveryone}
+	return privacy
 }
 
 func defaultAccountSettings(accountID string, now time.Time) AccountSettings {

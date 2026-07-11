@@ -82,6 +82,21 @@ func scanOverride(row rowScanner) (notification.ConversationOverride, error) {
 		&override.Muted,
 		&override.MentionsOnly,
 		&mutedUntil,
+		&override.ShowPreview,
+		&override.SoundID,
+		&override.MuteStories,
+		&override.StorySoundID,
+		&override.ShowStorySender,
+		&override.DisablePinnedMessageNotifications,
+		&override.DisableMentionNotifications,
+		&override.UseDefaultMuteFor,
+		&override.UseDefaultSound,
+		&override.UseDefaultShowPreview,
+		&override.UseDefaultMuteStories,
+		&override.UseDefaultStorySound,
+		&override.UseDefaultShowStorySender,
+		&override.UseDefaultDisablePinnedMessageNotifications,
+		&override.UseDefaultDisableMentionNotifications,
 		&override.UpdatedAt,
 	); err != nil {
 		return notification.ConversationOverride{}, err
@@ -91,6 +106,31 @@ func scanOverride(row rowScanner) (notification.ConversationOverride, error) {
 	override.UpdatedAt = override.UpdatedAt.UTC()
 
 	return override, nil
+}
+
+func scanScopeSettings(row rowScanner) (notification.ScopeSettings, error) {
+	var settings notification.ScopeSettings
+	var mutedUntil sql.NullTime
+	err := row.Scan(&settings.AccountID, &settings.Scope, &mutedUntil, &settings.ShowPreview, &settings.SoundID,
+		&settings.MuteStories, &settings.StorySoundID, &settings.ShowStorySender,
+		&settings.DisablePinnedMessageNotifications, &settings.DisableMentionNotifications, &settings.UseDefaultMuteStories, &settings.UpdatedAt)
+	settings.MutedUntil = decodeTime(mutedUntil)
+	settings.UpdatedAt = settings.UpdatedAt.UTC()
+	return settings, err
+}
+
+func scanReactionSettings(row rowScanner) (notification.ReactionSettings, error) {
+	var settings notification.ReactionSettings
+	err := row.Scan(&settings.AccountID, &settings.MessageReactionSource, &settings.StoryReactionSource, &settings.PollVoteSource, &settings.SoundID, &settings.ShowPreview, &settings.UpdatedAt)
+	settings.UpdatedAt = settings.UpdatedAt.UTC()
+	return settings, err
+}
+
+func scanSavedSound(row rowScanner) (notification.SavedSound, error) {
+	var sound notification.SavedSound
+	err := row.Scan(&sound.SoundID, &sound.AccountID, &sound.MediaID, &sound.Title, &sound.CreatedAt)
+	sound.CreatedAt = sound.CreatedAt.UTC()
+	return sound, err
 }
 
 func scanPushToken(row rowScanner) (notification.PushToken, error) {

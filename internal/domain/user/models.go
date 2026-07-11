@@ -20,16 +20,80 @@ const (
 
 // Privacy stores per-account visibility preferences.
 type Privacy struct {
-	AccountID           string
-	PhoneVisibility     Visibility
-	LastSeenVisibility  Visibility
-	MessagePrivacy      Visibility
-	BirthdayVisibility  Visibility
-	AllowContactSync    bool
-	AllowUnknownSenders bool
-	AllowUsernameSearch bool
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+	AccountID                             string
+	PhoneVisibility                       Visibility
+	LastSeenVisibility                    Visibility
+	MessagePrivacy                        Visibility
+	BirthdayVisibility                    Visibility
+	AllowContactSync                      bool
+	AllowUnknownSenders                   bool
+	AllowUsernameSearch                   bool
+	ShowStatus                            PrivacyRule
+	ShowProfilePhoto                      PrivacyRule
+	ShowProfileAudio                      PrivacyRule
+	ShowBirthdate                         PrivacyRule
+	ShowBio                               PrivacyRule
+	ShowPhoneNumber                       PrivacyRule
+	AllowFindingByPhoneNumber             PrivacyRule
+	ShowLinkInForwardedMessages           PrivacyRule
+	AllowChatInvites                      PrivacyRule
+	AllowPrivateVoiceAndVideoNoteMessages PrivacyRule
+	AllowCalls                            PrivacyRule
+	AllowPeerToPeerCalls                  PrivacyRule
+	AutosaveGifts                         PrivacyRule
+	ShowReadDate                          bool
+	CreatedAt                             time.Time
+	UpdatedAt                             time.Time
+}
+
+// PrivacyRule applies explicit exceptions before its everyone/contacts/nobody base.
+type PrivacyRule struct {
+	Base              Visibility `json:"base"`
+	AllowUserIDs      []string   `json:"allow_user_ids,omitempty"`
+	RestrictUserIDs   []string   `json:"restrict_user_ids,omitempty"`
+	AllowChatIDs      []string   `json:"allow_chat_ids,omitempty"`
+	RestrictChatIDs   []string   `json:"restrict_chat_ids,omitempty"`
+	AllowPremiumUsers bool       `json:"allow_premium_users,omitempty"`
+	AllowBots         bool       `json:"allow_bots,omitempty"`
+	RestrictBots      bool       `json:"restrict_bots,omitempty"`
+}
+
+// PrivacyViewer contains the facts needed to evaluate a rule.
+type PrivacyViewer struct {
+	UserID    string
+	ChatIDs   []string
+	IsContact bool
+	IsPremium bool
+	IsBot     bool
+}
+
+// Allows reports whether the viewer matches this rule.
+func (r PrivacyRule) Allows(viewer PrivacyViewer) bool {
+	if contains(r.RestrictUserIDs, viewer.UserID) || intersects(r.RestrictChatIDs, viewer.ChatIDs) || (r.RestrictBots && viewer.IsBot) {
+		return false
+	}
+	if contains(r.AllowUserIDs, viewer.UserID) || intersects(r.AllowChatIDs, viewer.ChatIDs) || (r.AllowPremiumUsers && viewer.IsPremium) || (r.AllowBots && viewer.IsBot) {
+		return true
+	}
+	return r.Base == VisibilityEveryone || r.Base == VisibilityContacts && viewer.IsContact
+}
+
+func contains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target && target != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func intersects(left, right []string) bool {
+	for _, value := range left {
+		if contains(right, value) {
+			return true
+		}
+	}
+	return false
 }
 
 // MediaDownloadSettings stores one network's automatic download policy.

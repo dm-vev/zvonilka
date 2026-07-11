@@ -12,6 +12,18 @@ func NormalizeConversationOverride(override ConversationOverride, now time.Time)
 	return override.normalize(now)
 }
 
+func NormalizeScopeSettings(settings ScopeSettings, now time.Time) (ScopeSettings, error) {
+	return settings.normalize(now)
+}
+
+func NormalizeReactionSettings(settings ReactionSettings, now time.Time) (ReactionSettings, error) {
+	return settings.normalize(now)
+}
+
+func NormalizeSavedSound(sound SavedSound, now time.Time) (SavedSound, error) {
+	return sound.normalize(now)
+}
+
 // NormalizePushToken validates and normalizes a push token.
 func NormalizePushToken(token PushToken, now time.Time) (PushToken, error) {
 	return token.normalize(now)

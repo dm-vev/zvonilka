@@ -22,12 +22,59 @@ type SetPreferenceParams struct {
 
 // SetOverrideParams updates conversation-level notification overrides.
 type SetOverrideParams struct {
-	ConversationID string
-	AccountID      string
-	Muted          bool
-	MentionsOnly   bool
-	MutedUntil     time.Time
-	UpdatedAt      time.Time
+	ConversationID                              string
+	AccountID                                   string
+	Muted                                       bool
+	MentionsOnly                                bool
+	MutedUntil                                  time.Time
+	UpdatedAt                                   time.Time
+	ShowPreview                                 bool
+	SoundID                                     int64
+	MuteStories                                 bool
+	StorySoundID                                int64
+	ShowStorySender                             bool
+	DisablePinnedMessageNotifications           bool
+	DisableMentionNotifications                 bool
+	UseDefaultMuteFor                           bool
+	UseDefaultSound                             bool
+	UseDefaultShowPreview                       bool
+	UseDefaultMuteStories                       bool
+	UseDefaultStorySound                        bool
+	UseDefaultShowStorySender                   bool
+	UseDefaultDisablePinnedMessageNotifications bool
+	UseDefaultDisableMentionNotifications       bool
+}
+
+type SetScopeSettingsParams struct {
+	AccountID                         string
+	Scope                             SettingsScope
+	MutedUntil                        time.Time
+	ShowPreview                       bool
+	SoundID                           int64
+	MuteStories                       bool
+	StorySoundID                      int64
+	ShowStorySender                   bool
+	DisablePinnedMessageNotifications bool
+	DisableMentionNotifications       bool
+	UseDefaultMuteStories             bool
+	UpdatedAt                         time.Time
+}
+
+type SetReactionSettingsParams struct {
+	AccountID             string
+	MessageReactionSource ReactionSource
+	StoryReactionSource   ReactionSource
+	PollVoteSource        ReactionSource
+	SoundID               int64
+	ShowPreview           bool
+	UpdatedAt             time.Time
+}
+
+type AddSavedSoundParams struct {
+	AccountID string
+	MediaID   string
+	Title     string
+	CreatedAt time.Time
 }
 
 // RegisterPushTokenParams registers or refreshes a push token.

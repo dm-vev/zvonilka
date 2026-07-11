@@ -320,6 +320,7 @@ func (w *Worker) buildDeliveriesForEvent(ctx context.Context, event conversation
 	deliveries := buildDeliveries(
 		w.currentTime(),
 		event.EventID,
+		event.EventType,
 		conversationRecord,
 		message,
 		members,

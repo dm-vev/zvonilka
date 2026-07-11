@@ -42,6 +42,57 @@ message DeleteConversationNotificationOverrideRequest {
 
 message DeleteConversationNotificationOverrideResponse {}
 
+message GetScopeNotificationSettingsRequest {
+  NotificationSettingsScope scope = 1;
+}
+
+message GetScopeNotificationSettingsResponse {
+  ScopeNotificationSettings settings = 1;
+}
+
+message SetScopeNotificationSettingsRequest {
+  ScopeNotificationSettings settings = 1;
+}
+
+message SetScopeNotificationSettingsResponse {
+  ScopeNotificationSettings settings = 1;
+}
+
+message GetReactionNotificationSettingsRequest {}
+
+message GetReactionNotificationSettingsResponse {
+  ReactionNotificationSettings settings = 1;
+}
+
+message SetReactionNotificationSettingsRequest {
+  ReactionNotificationSettings settings = 1;
+}
+
+message SetReactionNotificationSettingsResponse {
+  ReactionNotificationSettings settings = 1;
+}
+
+message ListSavedNotificationSoundsRequest {}
+
+message ListSavedNotificationSoundsResponse {
+  repeated SavedNotificationSound sounds = 1;
+}
+
+message AddSavedNotificationSoundRequest {
+  string media_id = 1;
+  string title = 2;
+}
+
+message AddSavedNotificationSoundResponse {
+  SavedNotificationSound sound = 1;
+}
+
+message RemoveSavedNotificationSoundRequest {
+  int64 sound_id = 1;
+}
+
+message RemoveSavedNotificationSoundResponse {}
+
 message ListPushTokensRequest {}
 
 message ListPushTokensResponse {

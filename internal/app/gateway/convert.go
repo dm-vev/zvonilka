@@ -1143,13 +1143,56 @@ func privacyToProto(privacy domainuser.Privacy) *usersv1.PrivacySettings {
 	}
 
 	return &usersv1.PrivacySettings{
-		PhoneVisibility:     visibilityToProto(privacy.PhoneVisibility),
-		LastSeenVisibility:  visibilityToProto(privacy.LastSeenVisibility),
-		MessagePrivacy:      visibilityToProto(privacy.MessagePrivacy),
-		BirthdayVisibility:  visibilityToProto(privacy.BirthdayVisibility),
-		AllowContactSync:    privacy.AllowContactSync,
-		AllowUnknownSenders: privacy.AllowUnknownSenders,
-		AllowUsernameSearch: privacy.AllowUsernameSearch,
+		PhoneVisibility:                       visibilityToProto(privacy.PhoneVisibility),
+		LastSeenVisibility:                    visibilityToProto(privacy.LastSeenVisibility),
+		MessagePrivacy:                        visibilityToProto(privacy.MessagePrivacy),
+		BirthdayVisibility:                    visibilityToProto(privacy.BirthdayVisibility),
+		AllowContactSync:                      privacy.AllowContactSync,
+		AllowUnknownSenders:                   privacy.AllowUnknownSenders,
+		AllowUsernameSearch:                   privacy.AllowUsernameSearch,
+		ShowStatus:                            privacyRuleToProto(privacy.ShowStatus),
+		ShowProfilePhoto:                      privacyRuleToProto(privacy.ShowProfilePhoto),
+		ShowProfileAudio:                      privacyRuleToProto(privacy.ShowProfileAudio),
+		ShowBirthdate:                         privacyRuleToProto(privacy.ShowBirthdate),
+		ShowBio:                               privacyRuleToProto(privacy.ShowBio),
+		ShowPhoneNumber:                       privacyRuleToProto(privacy.ShowPhoneNumber),
+		AllowFindingByPhoneNumber:             privacyRuleToProto(privacy.AllowFindingByPhoneNumber),
+		ShowLinkInForwardedMessages:           privacyRuleToProto(privacy.ShowLinkInForwardedMessages),
+		AllowChatInvites:                      privacyRuleToProto(privacy.AllowChatInvites),
+		AllowPrivateVoiceAndVideoNoteMessages: privacyRuleToProto(privacy.AllowPrivateVoiceAndVideoNoteMessages),
+		AllowCalls:                            privacyRuleToProto(privacy.AllowCalls),
+		AllowPeerToPeerCalls:                  privacyRuleToProto(privacy.AllowPeerToPeerCalls),
+		AutosaveGifts:                         privacyRuleToProto(privacy.AutosaveGifts),
+		ShowReadDate:                          &privacy.ShowReadDate,
+	}
+}
+
+func privacyRuleFromProto(rule *usersv1.PrivacyRule) domainuser.PrivacyRule {
+	if rule == nil {
+		return domainuser.PrivacyRule{}
+	}
+	return domainuser.PrivacyRule{
+		Base:              visibilityFromProto(rule.GetBase()),
+		AllowUserIDs:      append([]string(nil), rule.GetAllowUserIds()...),
+		RestrictUserIDs:   append([]string(nil), rule.GetRestrictUserIds()...),
+		AllowChatIDs:      append([]string(nil), rule.GetAllowChatIds()...),
+		RestrictChatIDs:   append([]string(nil), rule.GetRestrictChatIds()...),
+		AllowPremiumUsers: rule.GetAllowPremiumUsers(),
+		AllowBots:         rule.GetAllowBots(),
+		RestrictBots:      rule.GetRestrictBots(),
+	}
+}
+
+func privacyRuleToProto(rule domainuser.PrivacyRule) *usersv1.PrivacyRule {
+	return &usersv1.PrivacyRule{
+		Base:              visibilityToProto(rule.Base),
+		AllowUserIds:      append([]string(nil), rule.AllowUserIDs...),
+		RestrictUserIds:   append([]string(nil), rule.RestrictUserIDs...),
+		AllowChatIds:      append([]string(nil), rule.AllowChatIDs...),
+		RestrictChatIds:   append([]string(nil), rule.RestrictChatIDs...),
+		AllowPremiumUsers: rule.AllowPremiumUsers,
+		AllowBots:         rule.AllowBots,
+		RestrictBots:      rule.RestrictBots,
 	}
 }
 
@@ -1552,6 +1595,7 @@ func userProfile(
 	snapshot domainpresence.Snapshot,
 	privacy domainuser.Privacy,
 	relation domainuser.Relation,
+	viewer domainuser.PrivacyViewer,
 	self bool,
 ) *usersv1.UserProfile {
 	result := profile(account, snapshot)
@@ -1563,25 +1607,19 @@ func userProfile(
 	}
 
 	result.Email = ""
-	if !canViewVisibility(privacy.PhoneVisibility, relation) {
+	if !privacy.ShowPhoneNumber.Allows(viewer) {
 		result.Phone = ""
 	}
-	if !canViewVisibility(privacy.LastSeenVisibility, relation) {
+	if !privacy.ShowStatus.Allows(viewer) {
 		result.LastSeenAt = nil
+		result.Presence = commonv1.PresenceState_PRESENCE_STATE_OFFLINE
+		result.CustomStatus = ""
+	}
+	if !privacy.ShowBio.Allows(viewer) {
+		result.Bio = ""
 	}
 	result.Privacy = nil
 	return result
-}
-
-func canViewVisibility(visibility domainuser.Visibility, relation domainuser.Relation) bool {
-	switch visibility {
-	case domainuser.VisibilityEveryone:
-		return true
-	case domainuser.VisibilityContacts:
-		return relation.IsContact
-	default:
-		return false
-	}
 }
 
 func inviteProto(invite domainconversation.ConversationInvite) *conversationv1.Invite {

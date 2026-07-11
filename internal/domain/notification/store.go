@@ -16,6 +16,14 @@ type Store interface {
 	OverrideByConversationAndAccount(ctx context.Context, conversationID string, accountID string) (ConversationOverride, error)
 	DeleteOverride(ctx context.Context, conversationID string, accountID string) error
 
+	SaveScopeSettings(ctx context.Context, settings ScopeSettings) (ScopeSettings, error)
+	ScopeSettingsByAccountAndScope(ctx context.Context, accountID string, scope SettingsScope) (ScopeSettings, error)
+	SaveReactionSettings(ctx context.Context, settings ReactionSettings) (ReactionSettings, error)
+	ReactionSettingsByAccountID(ctx context.Context, accountID string) (ReactionSettings, error)
+	SaveSavedSound(ctx context.Context, sound SavedSound) (SavedSound, error)
+	SavedSoundsByAccountID(ctx context.Context, accountID string) ([]SavedSound, error)
+	DeleteSavedSound(ctx context.Context, accountID string, soundID int64) error
+
 	SavePushToken(ctx context.Context, token PushToken) (PushToken, error)
 	PushTokenByID(ctx context.Context, tokenID string) (PushToken, error)
 	PushTokensByAccountID(ctx context.Context, accountID string) ([]PushToken, error)

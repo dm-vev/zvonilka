@@ -43,6 +43,26 @@ const (
 // DeliveryState identifies the lifecycle of a notification delivery hint.
 type DeliveryState string
 
+// SettingsScope identifies a TDLib notification settings scope.
+type SettingsScope string
+
+const (
+	SettingsScopeUnspecified  SettingsScope = ""
+	SettingsScopePrivateChats SettingsScope = "private_chats"
+	SettingsScopeGroupChats   SettingsScope = "group_chats"
+	SettingsScopeChannelChats SettingsScope = "channel_chats"
+)
+
+// ReactionSource selects whose reactions produce notifications.
+type ReactionSource string
+
+const (
+	ReactionSourceUnspecified ReactionSource = ""
+	ReactionSourceNone        ReactionSource = "none"
+	ReactionSourceContacts    ReactionSource = "contacts"
+	ReactionSourceAll         ReactionSource = "all"
+)
+
 // Delivery states used by the notification domain.
 const (
 	DeliveryStateUnspecified DeliveryState = ""
@@ -76,12 +96,63 @@ type Preference struct {
 
 // ConversationOverride stores per-chat notification overrides.
 type ConversationOverride struct {
-	ConversationID string
-	AccountID      string
-	Muted          bool
-	MentionsOnly   bool
-	MutedUntil     time.Time
-	UpdatedAt      time.Time
+	ConversationID                              string
+	AccountID                                   string
+	Muted                                       bool
+	MentionsOnly                                bool
+	MutedUntil                                  time.Time
+	UpdatedAt                                   time.Time
+	ShowPreview                                 bool
+	SoundID                                     int64
+	MuteStories                                 bool
+	StorySoundID                                int64
+	ShowStorySender                             bool
+	DisablePinnedMessageNotifications           bool
+	DisableMentionNotifications                 bool
+	UseDefaultMuteFor                           bool
+	UseDefaultSound                             bool
+	UseDefaultShowPreview                       bool
+	UseDefaultMuteStories                       bool
+	UseDefaultStorySound                        bool
+	UseDefaultShowStorySender                   bool
+	UseDefaultDisablePinnedMessageNotifications bool
+	UseDefaultDisableMentionNotifications       bool
+}
+
+// ScopeSettings stores notification behavior for a TDLib chat scope.
+type ScopeSettings struct {
+	AccountID                         string
+	Scope                             SettingsScope
+	MutedUntil                        time.Time
+	ShowPreview                       bool
+	SoundID                           int64
+	MuteStories                       bool
+	StorySoundID                      int64
+	ShowStorySender                   bool
+	DisablePinnedMessageNotifications bool
+	DisableMentionNotifications       bool
+	UseDefaultMuteStories             bool
+	UpdatedAt                         time.Time
+}
+
+// ReactionSettings stores reaction notification behavior for an account.
+type ReactionSettings struct {
+	AccountID             string
+	MessageReactionSource ReactionSource
+	StoryReactionSource   ReactionSource
+	PollVoteSource        ReactionSource
+	SoundID               int64
+	ShowPreview           bool
+	UpdatedAt             time.Time
+}
+
+// SavedSound links an account notification sound to an existing media asset.
+type SavedSound struct {
+	SoundID   int64
+	AccountID string
+	MediaID   string
+	Title     string
+	CreatedAt time.Time
 }
 
 // PushToken stores a device push token registration.
@@ -143,6 +214,14 @@ func defaultPreference(accountID string, now time.Time) Preference {
 	}
 }
 
+func defaultScopeSettings(accountID string, scope SettingsScope, now time.Time) ScopeSettings {
+	return ScopeSettings{AccountID: strings.TrimSpace(accountID), Scope: scope, ShowPreview: true, SoundID: -1, StorySoundID: -1, ShowStorySender: true, UseDefaultMuteStories: true, UpdatedAt: now.UTC()}
+}
+
+func defaultReactionSettings(accountID string, now time.Time) ReactionSettings {
+	return ReactionSettings{AccountID: strings.TrimSpace(accountID), MessageReactionSource: ReactionSourceContacts, StoryReactionSource: ReactionSourceContacts, PollVoteSource: ReactionSourceContacts, SoundID: -1, ShowPreview: true, UpdatedAt: now.UTC()}
+}
+
 func (p Preference) normalize(now time.Time) (Preference, error) {
 	p.AccountID = strings.TrimSpace(p.AccountID)
 	if p.AccountID == "" {
@@ -178,6 +257,9 @@ func (o ConversationOverride) normalize(now time.Time) (ConversationOverride, er
 	if o.ConversationID == "" || o.AccountID == "" {
 		return ConversationOverride{}, ErrInvalidInput
 	}
+	if o.SoundID < -1 || o.StorySoundID < -1 {
+		return ConversationOverride{}, ErrInvalidInput
+	}
 	if o.MutedUntil.Before(time.Time{}) {
 		o.MutedUntil = time.Time{}
 	}
@@ -186,6 +268,49 @@ func (o ConversationOverride) normalize(now time.Time) (ConversationOverride, er
 	}
 
 	return o, nil
+}
+
+func (s ScopeSettings) normalize(now time.Time) (ScopeSettings, error) {
+	s.AccountID = strings.TrimSpace(s.AccountID)
+	if s.AccountID == "" || !validSettingsScope(s.Scope) || s.SoundID < -1 || s.StorySoundID < -1 {
+		return ScopeSettings{}, ErrInvalidInput
+	}
+	if s.UpdatedAt.IsZero() {
+		s.UpdatedAt = now.UTC()
+	}
+	return s, nil
+}
+
+func (r ReactionSettings) normalize(now time.Time) (ReactionSettings, error) {
+	r.AccountID = strings.TrimSpace(r.AccountID)
+	if r.AccountID == "" || !validReactionSource(r.MessageReactionSource) || !validReactionSource(r.StoryReactionSource) || !validReactionSource(r.PollVoteSource) || r.SoundID < -1 {
+		return ReactionSettings{}, ErrInvalidInput
+	}
+	if r.UpdatedAt.IsZero() {
+		r.UpdatedAt = now.UTC()
+	}
+	return r, nil
+}
+
+func (s SavedSound) normalize(now time.Time) (SavedSound, error) {
+	s.AccountID = strings.TrimSpace(s.AccountID)
+	s.MediaID = strings.TrimSpace(s.MediaID)
+	s.Title = strings.TrimSpace(s.Title)
+	if s.SoundID < 0 || s.AccountID == "" || s.MediaID == "" {
+		return SavedSound{}, ErrInvalidInput
+	}
+	if s.CreatedAt.IsZero() {
+		s.CreatedAt = now.UTC()
+	}
+	return s, nil
+}
+
+func validSettingsScope(scope SettingsScope) bool {
+	return scope == SettingsScopePrivateChats || scope == SettingsScopeGroupChats || scope == SettingsScopeChannelChats
+}
+
+func validReactionSource(source ReactionSource) bool {
+	return source == ReactionSourceNone || source == ReactionSourceContacts || source == ReactionSourceAll
 }
 
 func (t PushToken) normalize(now time.Time) (PushToken, error) {

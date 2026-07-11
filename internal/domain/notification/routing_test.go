@@ -21,19 +21,19 @@ func TestRouteDecisionPrioritizesMentionAndReply(t *testing.T) {
 		ReplyTo:           conversation.MessageReference{SenderAccountID: "acc-reply"},
 	}
 
-	kind, reason, priority, ok := routeDecision(conv, message, "acc-mention")
+	kind, reason, priority, ok := routeDecision(conversation.EventTypeMessageCreated, conv, message, "acc-mention")
 	require.True(t, ok)
 	require.Equal(t, NotificationKindMention, kind)
 	require.Equal(t, "mention", reason)
 	require.Equal(t, 100, priority)
 
-	kind, reason, priority, ok = routeDecision(conv, message, "acc-reply")
+	kind, reason, priority, ok = routeDecision(conversation.EventTypeMessageCreated, conv, message, "acc-reply")
 	require.True(t, ok)
 	require.Equal(t, NotificationKindReply, kind)
 	require.Equal(t, "reply", reason)
 	require.Equal(t, 90, priority)
 
-	kind, reason, priority, ok = routeDecision(conv, message, "acc-other")
+	kind, reason, priority, ok = routeDecision(conversation.EventTypeMessageCreated, conv, message, "acc-other")
 	require.True(t, ok)
 	require.Equal(t, NotificationKindDirect, kind)
 	require.Equal(t, "direct", reason)
@@ -95,7 +95,7 @@ func TestBuildDeliveriesAppliesRoutingAndOverrides(t *testing.T) {
 		},
 	}
 
-	deliveries := buildDeliveries(now, "evt-1", conv, message, members, preferences, overrides, presences, tokens)
+	deliveries := buildDeliveries(now, "evt-1", conversation.EventTypeMessageCreated, conv, message, members, preferences, overrides, presences, tokens)
 	require.Len(t, deliveries, 3)
 
 	mentionDelivery := deliveryByAccountID(t, deliveries, "acc-mention")
@@ -114,6 +114,32 @@ func TestBuildDeliveriesAppliesRoutingAndOverrides(t *testing.T) {
 	require.Equal(t, NotificationKindGroup, mutedDelivery.Kind)
 	require.Equal(t, "group", mutedDelivery.Reason)
 	require.Equal(t, DeliveryStateSuppressed, mutedDelivery.State)
+}
+
+func TestBuildDeliveriesAppliesPinnedAndMentionOverrides(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.July, 11, 12, 0, 0, 0, time.UTC)
+	conv := conversation.Conversation{ID: "conv-1", Kind: conversation.ConversationKindGroup}
+	members := []conversation.ConversationMember{
+		{ConversationID: "conv-1", AccountID: "sender", Role: conversation.MemberRoleMember},
+		{ConversationID: "conv-1", AccountID: "recipient", Role: conversation.MemberRoleMember},
+	}
+	preferences := map[string]Preference{"recipient": defaultPreference("recipient", now)}
+	overrides := map[string]ConversationOverride{"recipient": {AccountID: "recipient", ConversationID: "conv-1", Muted: true, DisableMentionNotifications: true, DisablePinnedMessageNotifications: true}}
+
+	mention := conversation.Message{ID: "msg-1", ConversationID: "conv-1", SenderAccountID: "sender", MentionAccountIDs: []string{"recipient"}}
+	deliveries := buildDeliveries(now, "evt-mention", conversation.EventTypeMessageCreated, conv, mention, members, preferences, overrides, nil, nil)
+	require.Len(t, deliveries, 1)
+	require.Equal(t, "group", deliveries[0].Reason)
+	require.Equal(t, DeliveryStateSuppressed, deliveries[0].State)
+
+	pinned := conversation.Message{ID: "msg-1", ConversationID: "conv-1", SenderAccountID: "sender", Pinned: true}
+	deliveries = buildDeliveries(now, "evt-pinned", conversation.EventTypeMessagePinned, conv, pinned, members, preferences, overrides, nil, nil)
+	require.Len(t, deliveries, 1)
+	require.Equal(t, "pinned", deliveries[0].Reason)
+	require.Equal(t, 95, deliveries[0].Priority)
+	require.Equal(t, DeliveryStateSuppressed, deliveries[0].State)
 }
 
 func TestQuietHoursActiveWrapsMidnight(t *testing.T) {

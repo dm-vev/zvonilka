@@ -68,6 +68,18 @@ func cloneSettings(src map[string]domainuser.AccountSettings) map[string]domainu
 func clonePrivacies(src map[string]domainuser.Privacy) map[string]domainuser.Privacy {
 	dst := make(map[string]domainuser.Privacy, len(src))
 	for key, value := range src {
+		for _, rule := range []*domainuser.PrivacyRule{
+			&value.ShowStatus, &value.ShowProfilePhoto, &value.ShowProfileAudio, &value.ShowBirthdate,
+			&value.ShowBio, &value.ShowPhoneNumber, &value.AllowFindingByPhoneNumber,
+			&value.ShowLinkInForwardedMessages, &value.AllowChatInvites,
+			&value.AllowPrivateVoiceAndVideoNoteMessages, &value.AllowCalls,
+			&value.AllowPeerToPeerCalls, &value.AutosaveGifts,
+		} {
+			rule.AllowUserIDs = append([]string(nil), rule.AllowUserIDs...)
+			rule.RestrictUserIDs = append([]string(nil), rule.RestrictUserIDs...)
+			rule.AllowChatIDs = append([]string(nil), rule.AllowChatIDs...)
+			rule.RestrictChatIDs = append([]string(nil), rule.RestrictChatIDs...)
+		}
 		dst[key] = value
 	}
 	return dst
